@@ -1,0 +1,116 @@
+.toolbar-customizer-app {
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100dvh;
+  z-index: 4;
+}
+
+// 自定义按钮样式增强
+[data-custom-button] {
+  transition: all 0.2s ease;
+  border-radius: 4px;
+  padding: 4px;
+  min-width: 32px;
+  min-height: 32px;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  margin: 0 4px;
+  
+  &:hover {
+    background-color: var(--b3-theme-hover);
+    transform: translateY(-1px);
+  }
+  
+  &:active {
+    transform: translateY(0);
+  }
+  
+  svg {
+    display: block;
+    margin: 0 auto;
+  }
+}
+
+// 移动端工具栏过渡动画
+.protyle-breadcrumb,
+.protyle-breadcrumb__bar {
+  transition: bottom 0.3s ease !important;
+}
+
+// 设置对话框优化
+.b3-dialog--open {
+  .b3-dialog__container {
+    max-width: 1000px !important;
+    
+    .b3-dialog__header {
+      background: linear-gradient(135deg, var(--b3-theme-primary) 0%, var(--b3-theme-secondary) 100%);
+      color: white;
+      border-radius: 12px 12px 0 0;
+      
+      .b3-dialog__title {
+        font-weight: 600;
+      }
+    }
+    
+    .b3-dialog__body {
+      max-height: 600px !important;
+      overflow-y: auto;
+      padding: 24px !important;
+    }
+    
+    .b3-dialog__action {
+      border-top: 1px solid var(--b3-border-color);
+      padding: 16px 24px;
+      border-radius: 0 0 12px 12px;
+    }
+  }
+}
+
+// 表单元素优化
+.b3-text-field,
+.b3-select {
+  border-radius: 8px !important;
+  border: 1px solid var(--b3-border-color) !important;
+  transition: all 0.2s ease !important;
+  
+  &:focus {
+    border-color: var(--b3-theme-primary) !important;
+    box-shadow: 0 0 0 3px rgba(var(--b3-theme-primary-rgb), 0.1) !important;
+    outline: none !important;
+  }
+}
+
+// 按钮优化
+.b3-button {
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+  
+  &--outline {
+    background: linear-gradient(135deg, var(--b3-theme-primary) 0%, var(--b3-theme-secondary) 100%) !important;
+    color: white !important;
+    border: none !important;
+    
+    &:hover {
+      transform: translateY(-2px) !important;
+      box-shadow: 0 4px 12px rgba(var(--b3-theme-primary-rgb), 0.3) !important;
+    }
+  }
+}
+
+// 移动端优化
+@media (max-width: 768px) {
+  .b3-dialog--open .b3-dialog__container {
+    max-width: 95vw !important;
+    margin: 0 auto;
+  }
+  
+  [data-custom-button] {
+    min-width: 40px !important;
+    min-height: 40px !important;
+    padding: 8px !important;
+  }
+}

@@ -7,32 +7,54 @@ import { getFrontend, showMessage } from "siyuan";
 
 // ===== 配置接口 =====
 export interface MobileToolbarConfig {
+  enableBottomToolbar: boolean; // 是否将工具栏置底
   openInputOffset: string;    // 打开输入框时距离底部高度
   closeInputOffset: string;   // 关闭输入框时距离底部高度
   heightThreshold: number;    // 高度变化阈值百分比
+  toolbarBackgroundColor: string; // 工具栏背景颜色
+  toolbarOpacity: number;     // 工具栏透明度 (0-1)
 }
 
 export interface ButtonConfig {
   id: string;                 // 唯一标识
   name: string;              // 按钮名称
-  type: 'builtin' | 'template'; // 功能类型
+  type: 'builtin' | 'template' | 'click-sequence'; // 功能类型
   builtinId?: string;        // 思源功能ID（如：menuSearch）
   template?: string;         // 模板内容
+  clickSequence?: string[];  // 模拟点击选择器序列
   icon: string;              // 图标（思源图标或Emoji）
   iconSize: number;          // 图标大小（px）
+  minWidth: number;          // 按钮最小宽度（px）
   marginRight: number;       // 右侧边距（px）
   sort: number;              // 排序（数字越小越靠左）
   platform: 'desktop' | 'mobile' | 'both'; // 显示平台
+  showNotification: boolean; // 是否显示右上角提示
 }
 
 // ===== 默认配置 =====
 export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
+  enableBottomToolbar: false,
   openInputOffset: '50px',
   closeInputOffset: '0px',
-  heightThreshold: 70
+  heightThreshold: 70,
+  toolbarBackgroundColor: '#f8f9fa',
+  toolbarOpacity: 0.95
 }
 
 export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = [
+  {
+    id: 'siyuan-settings',
+    name: '思源设置',
+    type: 'builtin',
+    builtinId: 'barSettings',
+    icon: 'iconSettings',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 1,
+    platform: 'both',
+    showNotification: true
+  },
   {
     id: 'search',
     name: '搜索',
@@ -40,9 +62,11 @@ export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = [
     builtinId: 'menuSearch',
     icon: 'iconSearch',
     iconSize: 18,
+    minWidth: 32,
     marginRight: 8,
-    sort: 1,
-    platform: 'both'
+    sort: 2,
+    platform: 'both',
+    showNotification: true
   },
   {
     id: 'recent',
@@ -51,9 +75,11 @@ export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = [
     builtinId: 'menuRecent',
     icon: 'iconHistory',
     iconSize: 18,
+    minWidth: 32,
     marginRight: 8,
-    sort: 2,
-    platform: 'both'
+    sort: 3,
+    platform: 'both',
+    showNotification: true
   },
   {
     id: 'template1',
@@ -62,9 +88,11 @@ export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = [
     template: '- [ ] ',
     icon: 'iconCheck',
     iconSize: 18,
+    minWidth: 32,
     marginRight: 8,
-    sort: 3,
-    platform: 'both'
+    sort: 4,
+    platform: 'both',
+    showNotification: true
   }
 ]
 
@@ -101,6 +129,23 @@ function shouldShowButton(button: ButtonConfig): boolean {
 export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
   // 仅在移动端初始化
   if (!isMobileDevice()) return
+  
+  // 如果未启用工具栏置底，则移除相关样式并返回
+  if (!config.enableBottomToolbar) {
+    // 移除之前可能添加的样式
+    const existingStyle = document.getElementById('mobile-toolbar-custom-style')
+    if (existingStyle) {
+      existingStyle.remove()
+    }
+    // 移除工具栏的自定义属性
+    const toolbars = document.querySelectorAll('[data-toolbar-customized="true"]')
+    toolbars.forEach(toolbar => {
+      (toolbar as HTMLElement).removeAttribute('data-toolbar-customized')
+      (toolbar as HTMLElement).removeAttribute('data-input-method')
+    })
+    console.log('工具栏置底已禁用，恢复默认状态')
+    return
+  }
   
   const setupToolbar = () => {
     // 找到面包屑元素
@@ -324,30 +369,29 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
   button.className = 'block__icon fn__flex-center ariaLabel'
   button.setAttribute('aria-label', config.name)
   button.title = config.name
-  button.style.cssText = `
-    font-size: ${config.iconSize}px;
-    margin-right: ${config.marginRight}px;
+  
+  // 基础样式（包含用户可配置的最小宽度）
+  const baseStyle = `
     line-height: 1;
     cursor: pointer;
     user-select: none;
     transition: all 0.2s ease;
-    min-width: 32px;
+    min-width: ${config.minWidth}px;
     min-height: 32px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     border-radius: 4px;
     padding: 4px;
-    
-    &:hover {
-      background-color: var(--b3-theme-hover);
-      transform: translateY(-1px);
-    }
   `
   
   // 设置图标
   if (config.icon.startsWith('icon')) {
     // 思源图标
+    button.style.cssText = baseStyle + `
+      margin-right: ${config.marginRight}px;
+    `
+    
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     svg.setAttribute('width', `${config.iconSize}`)
     svg.setAttribute('height', `${config.iconSize}`)
@@ -358,15 +402,36 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     svg.appendChild(use)
     
     button.appendChild(svg)
-  } else {
-    // Emoji或文本图标
-    button.textContent = config.icon
-    button.style.cssText += `
-      font-size: ${config.iconSize}px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+  } else if (config.icon.startsWith('lucide:')) {
+    // Lucide 图标
+    button.style.cssText = baseStyle + `
+      margin-right: ${config.marginRight}px;
     `
+    
+    const iconName = config.icon.substring(7)
+    try {
+      const lucideIcons = require('lucide')
+      const IconComponent = lucideIcons[iconName]
+      
+      if (IconComponent) {
+        const svgString = IconComponent.toSvg({ 
+          width: config.iconSize, 
+          height: config.iconSize
+        })
+        button.innerHTML = svgString
+      } else {
+        button.textContent = config.icon
+      }
+    } catch (e) {
+      button.textContent = config.icon
+    }
+  } else {
+    // Emoji 或文本图标
+    button.style.cssText = baseStyle + `
+      font-size: ${config.iconSize}px;
+      margin-right: ${config.marginRight}px;
+    `
+    button.textContent = config.icon
   }
   
   // 绑定点击事件
@@ -382,12 +447,20 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
 function handleButtonClick(config: ButtonConfig) {
   console.log(`点击按钮: ${config.name}`)
   
+  // 如果开启了右上角提示，显示消息
+  if (config.showNotification) {
+    showMessage(`执行: ${config.name}`, 1500, 'info')
+  }
+  
   if (config.type === 'builtin') {
     // 执行思源内置功能
     executeBuiltinFunction(config)
   } else if (config.type === 'template') {
     // 插入模板
     insertTemplate(config)
+  } else if (config.type === 'click-sequence') {
+    // 执行点击序列
+    executeClickSequence(config)
   }
 }
 
@@ -397,22 +470,67 @@ function executeBuiltinFunction(config: ButtonConfig) {
     return
   }
   
-  // 查找对应的思源菜单项
-  const menuItem = document.getElementById(config.builtinId)
+  // 尝试多种方式查找按钮
+  let menuItem: HTMLElement | null = null
+  
+  // 1. 通过 id 查找
+  menuItem = document.getElementById(config.builtinId)
   if (menuItem) {
-    menuItem.click()
-    console.log(`执行思源功能: ${config.builtinId}`)
-  } else {
-    showMessage(`未找到功能: ${config.builtinId}`, 3000, 'error')
-    console.warn(`未找到菜单项: ${config.builtinId}`)
-    
-    // 尝试查找其他可能的位置
-    const altMenuItem = document.querySelector(`[data-menu-id="${config.builtinId}"]`) as HTMLElement
-    if (altMenuItem) {
-      altMenuItem.click()
-      console.log(`通过data-menu-id找到并执行: ${config.builtinId}`)
+    clickElement(menuItem)
+    console.log(`通过id执行思源功能: ${config.builtinId}`)
+    return
+  }
+  
+  // 2. 通过 data-id 查找
+  menuItem = document.querySelector(`[data-id="${config.builtinId}"]`) as HTMLElement
+  if (menuItem) {
+    clickElement(menuItem)
+    console.log(`通过data-id执行思源功能: ${config.builtinId}`)
+    return
+  }
+  
+  // 3. 通过 data-menu-id 查找
+  menuItem = document.querySelector(`[data-menu-id="${config.builtinId}"]`) as HTMLElement
+  if (menuItem) {
+    clickElement(menuItem)
+    console.log(`通过data-menu-id执行思源功能: ${config.builtinId}`)
+    return
+  }
+  
+  // 4. 通过 data-type 查找
+  menuItem = document.querySelector(`[data-type="${config.builtinId}"]`) as HTMLElement
+  if (menuItem) {
+    clickElement(menuItem)
+    console.log(`通过data-type执行思源功能: ${config.builtinId}`)
+    return
+  }
+  
+  // 5. 通过 class 查找（支持多个class，用空格分隔）
+  const classNames = config.builtinId.split(' ')
+  if (classNames.length > 0) {
+    const classSelector = classNames.map(c => `.${c}`).join('')
+    menuItem = document.querySelector(classSelector) as HTMLElement
+    if (menuItem) {
+      clickElement(menuItem)
+      console.log(`通过class执行思源功能: ${config.builtinId}`)
+      return
     }
   }
+  
+  // 6. 通过文本内容查找按钮
+  const allButtons = document.querySelectorAll('button')
+  for (const btn of allButtons) {
+    const label = btn.querySelector('.b3-menu__label')?.textContent?.trim()
+    if (label === config.builtinId) {
+      clickElement(btn as HTMLElement)
+      console.log(`通过文本内容执行思源功能: ${config.builtinId}`)
+      return
+    }
+  }
+  
+  // 所有方法都失败
+  showMessage(`未找到功能: ${config.builtinId}`, 3000, 'error')
+  console.warn(`未找到菜单项: ${config.builtinId}，已尝试: id, data-id, data-menu-id, data-type, class, 文本内容`)
 }
 
 function insertTemplate(config: ButtonConfig) {
@@ -441,11 +559,276 @@ function insertTemplate(config: ButtonConfig) {
       // 触发输入事件
       contentEditable.dispatchEvent(inputEvent)
       
-      showMessage(`已插入模板: ${config.name}`, 2000, 'info')
+      // 移除这里的提示消息，因为handleButtonClick已经会显示了
       console.log(`插入模板: ${config.template.substring(0, 20)}...`)
     } catch (error) {
       console.error('插入模板失败:', error)
       showMessage('插入模板失败，请确保编辑器处于可编辑状态', 3000, 'error')
+    }
+  }
+}
+
+// ===== 点击序列执行 =====
+/**
+ * 执行点击序列
+ */
+async function executeClickSequence(config: ButtonConfig) {
+  if (!config.clickSequence || config.clickSequence.length === 0) {
+    showMessage(`按钮"${config.name}"未配置点击序列`, 3000, 'error')
+    return
+  }
+
+  console.log(`开始执行点击序列: ${config.name}`, config.clickSequence)
+
+  for (let i = 0; i < config.clickSequence.length; i++) {
+    const selector = config.clickSequence[i].trim()
+    if (!selector) continue // 跳过空选择器
+
+    console.log(`步骤 ${i + 1}/${config.clickSequence.length}: ${selector}`)
+
+    // 尝试执行当前步骤，最多重试2次
+    let success = false
+    for (let retry = 0; retry <= 2; retry++) {
+      if (retry > 0) {
+        console.log(`步骤 ${i + 1} 重试 ${retry}/2`)
+      }
+
+      try {
+        // 等待元素出现（最多5秒）
+        const element = await waitForElement(selector, 5000)
+        
+        if (!element) {
+          throw new Error(`未找到元素: ${selector}`)
+        }
+
+        // 检查元素是否可见
+        if (!isVisible(element)) {
+          throw new Error(`元素不可见: ${selector}`)
+        }
+
+        // 点击元素
+        clickElement(element)
+        console.log(`步骤 ${i + 1} 执行成功`)
+        success = true
+        break // 成功后跳出重试循环
+      } catch (error) {
+        console.error(`步骤 ${i + 1} 执行失败 (尝试 ${retry + 1}/3):`, error)
+        
+        if (retry === 2) {
+          // 最后一次重试也失败
+          showMessage(`点击序列失败: 步骤 ${i + 1} - ${selector}`, 3000, 'error')
+          return
+        }
+        
+        // 等待一小段时间后重试
+        await delay(300)
+      }
+    }
+
+    if (!success) {
+      return // 如果步骤失败，停止整个序列
+    }
+
+    // 步骤之间稍微延迟，让界面有时间响应
+    await delay(200)
+  }
+
+  console.log(`点击序列执行完成: ${config.name}`)
+  showMessage(`${config.name} 执行完成`, 1500, 'info')
+}
+
+/**
+ * 等待元素出现
+ * @param selector CSS选择器或简单标识符（支持智能匹配）
+ * @param timeout 超时时间（毫秒）
+ * @returns Promise<HTMLElement | null>
+ */
+function waitForElement(selector: string, timeout: number = 5000): Promise<HTMLElement | null> {
+  return new Promise((resolve) => {
+    // 智能查找元素（支持7种方式）
+    const findElement = (): HTMLElement | null => {
+      // 检查是否是文本查询模式 (text:xxx)
+      if (selector.startsWith('text:')) {
+        const searchText = selector.substring(5).trim()
+        return findElementByText(searchText)
+      }
+      
+      // 如果包含 CSS 选择器特殊字符，直接使用标准查询
+      if (selector.includes('#') || selector.includes('.') || selector.includes('[') || selector.includes('>') || selector.includes(' ')) {
+        return document.querySelector(selector) as HTMLElement
+      }
+      
+      // 否则使用 6 种智能匹配方式
+      let element: HTMLElement | null = null
+      
+      // 1. 通过 id 查找
+      element = document.getElementById(selector)
+      if (element) return element
+      
+      // 2. 通过 data-id 属性查找
+      element = document.querySelector(`[data-id="${selector}"]`) as HTMLElement
+      if (element) return element
+      
+      // 3. 通过 data-menu-id 属性查找
+      element = document.querySelector(`[data-menu-id="${selector}"]`) as HTMLElement
+      if (element) return element
+      
+      // 4. 通过 data-type 属性查找
+      element = document.querySelector(`[data-type="${selector}"]`) as HTMLElement
+      if (element) return element
+      
+      // 5. 通过 class 查找（支持多个class，用空格分隔）
+      const classNames = selector.split(' ')
+      if (classNames.length > 0) {
+        const classSelector = classNames.map(c => `.${c}`).join('')
+        element = document.querySelector(classSelector) as HTMLElement
+        if (element) return element
+      }
+      
+      // 6. 通过文本内容查找按钮（兼容旧的方式）
+      const allButtons = document.querySelectorAll('button')
+      for (const btn of allButtons) {
+        const label = btn.querySelector('.b3-menu__label')?.textContent?.trim()
+        if (label === selector) {
+          return btn as HTMLElement
+        }
+      }
+      
+      return null
+    }
+    
+    // 先检查元素是否已存在
+    const element = findElement()
+    if (element) {
+      resolve(element)
+      return
+    }
+
+    // 使用MutationObserver监听DOM变化
+    const observer = new MutationObserver(() => {
+      const element = findElement()
+      if (element) {
+        observer.disconnect()
+        clearTimeout(timeoutId)
+        resolve(element)
+      }
+    })
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true
+    })
+
+    // 超时处理
+    const timeoutId = setTimeout(() => {
+      observer.disconnect()
+      resolve(null)
+    }, timeout)
+  })
+}
+
+/**
+ * 通过文本内容查找元素（支持多种元素类型）
+ * @param searchText 要搜索的文本内容
+ * @returns 找到的元素或null
+ */
+function findElementByText(searchText: string): HTMLElement | null {
+  // 1. 查找按钮（最常见）
+  const allButtons = document.querySelectorAll('button')
+  for (const btn of allButtons) {
+    // 检查按钮的直接文本内容
+    if (btn.textContent?.trim() === searchText) {
+      return btn as HTMLElement
+    }
+    // 检查按钮内的 label
+    const label = btn.querySelector('.b3-menu__label')?.textContent?.trim()
+    if (label === searchText) {
+      return btn as HTMLElement
+    }
+  }
+  
+  // 2. 查找菜单项
+  const menuItems = document.querySelectorAll('.b3-menu__item')
+  for (const item of menuItems) {
+    if (item.textContent?.trim() === searchText) {
+      return item as HTMLElement
+    }
+  }
+  
+  // 3. 查找链接
+  const links = document.querySelectorAll('a')
+  for (const link of links) {
+    if (link.textContent?.trim() === searchText) {
+      return link as HTMLElement
+    }
+  }
+  
+  // 4. 查找 span 和 div（文本容器）
+  const textElements = document.querySelectorAll('span, div')
+  for (const el of textElements) {
+    // 直接比较 textContent（去除首尾空格）
+    if (el.textContent?.trim() === searchText) {
+      return el as HTMLElement
+    }
+  }
+  
+  // 5. 通用查找（最后的备选方案）- 查找所有可点击元素
+  const allElements = document.querySelectorAll('*')
+  for (const el of allElements) {
+    if (el.textContent?.trim() === searchText) {
+      return el as HTMLElement
+    }
+  }
+  
+  return null
+}
+
+/**
+ * 检查元素是否可见
+ */
+function isVisible(element: HTMLElement): boolean {
+  if (!element) return false
+  
+  const style = window.getComputedStyle(element)
+  if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+    return false
+  }
+  
+  const rect = element.getBoundingClientRect()
+  if (rect.width === 0 || rect.height === 0) {
+    return false
+  }
+  
+  return true
+}
+
+/**
+ * 延迟执行
+ */
+function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+/**
+ * 点击元素
+ */
+function clickElement(element: HTMLElement): void {
+  // 尝试多种点击方式以确保兼容性
+  try {
+    // 方式1: 标准click()
+    element.click()
+  } catch (e) {
+    try {
+      // 方式2: 模拟鼠标事件
+      const event = new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      })
+      element.dispatchEvent(event)
+    } catch (e2) {
+      console.error('点击元素失败:', e2)
     }
   }
 }

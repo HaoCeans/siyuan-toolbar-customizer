@@ -1,12 +1,23 @@
 {
-  "name": "plugin-sample-vite-vue",
-  "version": "0.0.1",
+  "name": "siyuan-toolbar-customizer",
+  "version": "1.0.0",
   "type": "module",
-  "description": "This is a sample plugin based on vite and vue for Siyuan (https://b3log.org/siyuan)",
-  "author": "",
+  "description": "A powerful toolbar customization plugin for SiYuan Notes",
+  "author": "whale🐋www",
   "license": "MIT",
-  "homepage": "",
-  "repository": "",
+  "homepage": "https://github.com/HaoCeans/siyuan-toolbar-customizer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/HaoCeans/siyuan-toolbar-customizer.git"
+  },
+  "keywords": [
+    "siyuan",
+    "plugin",
+    "toolbar",
+    "customization",
+    "mobile",
+    "automation"
+  ],
   "scripts": {
     "dev": "vite build --watch",
     "release": "node ./release.js",
@@ -17,6 +28,7 @@
     "build": "vite build"
   },
   "dependencies": {
+    "lucide": "^0.562.0",
     "vue": "^3.3.8"
   },
   "devDependencies": {

@@ -1,10 +1,9 @@
 {
-  "name": "plugin-sample-vite-vue",
-  "author": "wetoria",
-  "url": "https://github.com/Wetoria/plugin-sample-vite-vue",
-  "version": "0.0.1",
-  "minAppVersion": "2.10.14",
-  "disabledInPublish": true,
+  "name": "siyuan-toolbar-customizer",
+  "author": "whale🐋",
+  "url": "https://github.com/HaoCeans/siyuan-toolbar-customizer",
+  "version": "1.0.0",
+  "minAppVersion": "3.0.0",
   "backends": [
     "all"
   ],
@@ -12,14 +11,14 @@
     "all"
   ],
   "displayName": {
-    "default": "plugin-sample-vite-vue",
-    "en_US": "plugin-sample-vite-vue",
-    "zh_CN": "plugin-sample-vite-vue"
+    "default": "Toolbar Customizer",
+    "en_US": "Toolbar Customizer",
+    "zh_CN": "工具栏定制器"
   },
   "description": {
-    "default": "plugin-sample-vite-vue",
-    "en_US": "plugin-sample-vite-vue",
-    "zh_CN": "plugin-sample-vite-vue"
+    "default": "A powerful toolbar customization plugin for SiYuan Notes. Supports custom buttons, mobile toolbar positioning, click-sequence automation, and more.",
+    "en_US": "A powerful toolbar customization plugin for SiYuan Notes. Supports custom buttons, mobile toolbar positioning, click-sequence automation, and more.",
+    "zh_CN": "强大的思源笔记工具栏定制插件，支持自定义按钮、手机端工具栏位置调整、点击序列自动化等功能。"
   },
   "readme": {
     "default": "README.md",
@@ -29,5 +28,18 @@
   "funding": {
     "custom": []
   },
-  "keywords": []
+  "keywords": [
+    "toolbar",
+    "customization",
+    "mobile",
+    "automation",
+    "buttons",
+    "工具栏",
+    "自定义",
+    "手机端",
+    "自动化",
+    "按钮",
+    "移动端",
+    "鲸鱼"
+  ]
 }

@@ -97,6 +97,11 @@ export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = [
 ]
 
 // ===== 工具函数 =====
+// 保存监听器引用以便清理
+let resizeHandler: (() => void) | null = null
+let mutationObserver: MutationObserver | null = null
+let clickHandler: ((e: Event) => void) | null = null
+
 /**
  * 判断是否为移动端
  */
@@ -143,7 +148,6 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
       (toolbar as HTMLElement).removeAttribute('data-toolbar-customized')
       (toolbar as HTMLElement).removeAttribute('data-input-method')
     })
-    console.log('工具栏置底已禁用，恢复默认状态')
     return
   }
   
@@ -154,7 +158,6 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
       // 尝试其他可能的选择器
       const altBreadcrumb = document.querySelector('.protyle-breadcrumb')
       if (!altBreadcrumb) {
-        console.warn('未找到工具栏元素')
         return false
       }
       setupToolbarForElement(altBreadcrumb)
@@ -201,8 +204,6 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
           document.documentElement.style.setProperty('--mobile-toolbar-offset', config.closeInputOffset)
           toolbar.setAttribute('data-input-method', 'close')
         }
-        
-        console.log(`移动端工具栏位置更新: ${inputMethodOpen ? '输入法打开' : '输入法关闭'}, 偏移量: ${inputMethodOpen ? config.openInputOffset : config.closeInputOffset}`)
       }
       
       // 更新记录的高度
@@ -216,7 +217,8 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
     toolbar.setAttribute('data-input-method', 'close')
     
     // 监听窗口大小变化
-    window.addEventListener('resize', updateToolbarPosition)
+    resizeHandler = updateToolbarPosition
+    window.addEventListener('resize', resizeHandler)
     
     // 监听焦点事件，作为辅助判断
     const textInputs = document.querySelectorAll('textarea, input[type="text"], .protyle-wysiwyg, .protyle-content, .protyle-input')
@@ -284,26 +286,22 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
         }
       }
     `
-
-    console.log('移动端工具栏调整已启用')
   }
 
   // 尝试设置工具栏
   if (!setupToolbar()) {
     // 如果没找到，延迟尝试
     setTimeout(() => {
-      if (!setupToolbar()) {
-        console.warn('无法找到工具栏元素，移动端调整功能未启用')
-      }
+      setupToolbar()
     }, 2000)
   }
   
   // 监听DOM变化，确保工具栏加载后能应用样式
-  const observer = new MutationObserver(() => {
+  mutationObserver = new MutationObserver(() => {
     setupToolbar()
   })
   
-  observer.observe(document.body, {
+  mutationObserver.observe(document.body, {
     childList: true,
     subtree: true
   })
@@ -317,15 +315,21 @@ export function initCustomButtons(configs: ButtonConfig[]) {
   // 初始设置
   setTimeout(() => setupEditorButtons(configs), 1000)
   
+  // 移除旧的监听器
+  if (clickHandler) {
+    document.removeEventListener('click', clickHandler, true)
+  }
+  
   // 监听编辑器加载事件
-  document.addEventListener('click', (e) => {
+  clickHandler = (e: Event) => {
     // 检查是否点击了编辑器区域
     const target = e.target as HTMLElement
     if (target.closest('.protyle')) {
       // 延迟执行，确保编辑器完全加载
       setTimeout(() => setupEditorButtons(configs), 100)
     }
-  }, true)
+  }
+  document.addEventListener('click', clickHandler, true)
 }
 
 function cleanupCustomButtons() {
@@ -358,8 +362,6 @@ function setupEditorButtons(configs: ButtonConfig[]) {
       const button = createButtonElement(buttonConfig)
       exitFocusBtn.insertAdjacentElement('afterend', button)
     })
-    
-    console.log(`编辑器按钮设置完成，添加了${buttonsToAdd.length}个按钮`)
   })
 }
 
@@ -445,8 +447,6 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
 }
 
 function handleButtonClick(config: ButtonConfig) {
-  console.log(`点击按钮: ${config.name}`)
-  
   // 如果开启了右上角提示，显示消息
   if (config.showNotification) {
     showMessage(`执行: ${config.name}`, 1500, 'info')
@@ -477,7 +477,6 @@ function executeBuiltinFunction(config: ButtonConfig) {
   menuItem = document.getElementById(config.builtinId)
   if (menuItem) {
     clickElement(menuItem)
-    console.log(`通过id执行思源功能: ${config.builtinId}`)
     return
   }
   
@@ -485,7 +484,6 @@ function executeBuiltinFunction(config: ButtonConfig) {
   menuItem = document.querySelector(`[data-id="${config.builtinId}"]`) as HTMLElement
   if (menuItem) {
     clickElement(menuItem)
-    console.log(`通过data-id执行思源功能: ${config.builtinId}`)
     return
   }
   
@@ -493,7 +491,6 @@ function executeBuiltinFunction(config: ButtonConfig) {
   menuItem = document.querySelector(`[data-menu-id="${config.builtinId}"]`) as HTMLElement
   if (menuItem) {
     clickElement(menuItem)
-    console.log(`通过data-menu-id执行思源功能: ${config.builtinId}`)
     return
   }
   
@@ -501,7 +498,6 @@ function executeBuiltinFunction(config: ButtonConfig) {
   menuItem = document.querySelector(`[data-type="${config.builtinId}"]`) as HTMLElement
   if (menuItem) {
     clickElement(menuItem)
-    console.log(`通过data-type执行思源功能: ${config.builtinId}`)
     return
   }
   
@@ -512,7 +508,6 @@ function executeBuiltinFunction(config: ButtonConfig) {
     menuItem = document.querySelector(classSelector) as HTMLElement
     if (menuItem) {
       clickElement(menuItem)
-      console.log(`通过class执行思源功能: ${config.builtinId}`)
       return
     }
   }
@@ -523,14 +518,12 @@ function executeBuiltinFunction(config: ButtonConfig) {
     const label = btn.querySelector('.b3-menu__label')?.textContent?.trim()
     if (label === config.builtinId) {
       clickElement(btn as HTMLElement)
-      console.log(`通过文本内容执行思源功能: ${config.builtinId}`)
       return
     }
   }
   
   // 所有方法都失败
   showMessage(`未找到功能: ${config.builtinId}`, 3000, 'error')
-  console.warn(`未找到菜单项: ${config.builtinId}，已尝试: id, data-id, data-menu-id, data-type, class, 文本内容`)
 }
 
 function insertTemplate(config: ButtonConfig) {
@@ -558,11 +551,7 @@ function insertTemplate(config: ButtonConfig) {
       
       // 触发输入事件
       contentEditable.dispatchEvent(inputEvent)
-      
-      // 移除这里的提示消息，因为handleButtonClick已经会显示了
-      console.log(`插入模板: ${config.template.substring(0, 20)}...`)
     } catch (error) {
-      console.error('插入模板失败:', error)
       showMessage('插入模板失败，请确保编辑器处于可编辑状态', 3000, 'error')
     }
   }
@@ -578,21 +567,13 @@ async function executeClickSequence(config: ButtonConfig) {
     return
   }
 
-  console.log(`开始执行点击序列: ${config.name}`, config.clickSequence)
-
   for (let i = 0; i < config.clickSequence.length; i++) {
     const selector = config.clickSequence[i].trim()
     if (!selector) continue // 跳过空选择器
 
-    console.log(`步骤 ${i + 1}/${config.clickSequence.length}: ${selector}`)
-
     // 尝试执行当前步骤，最多重试2次
     let success = false
     for (let retry = 0; retry <= 2; retry++) {
-      if (retry > 0) {
-        console.log(`步骤 ${i + 1} 重试 ${retry}/2`)
-      }
-
       try {
         // 等待元素出现（最多5秒）
         const element = await waitForElement(selector, 5000)
@@ -608,12 +589,9 @@ async function executeClickSequence(config: ButtonConfig) {
 
         // 点击元素
         clickElement(element)
-        console.log(`步骤 ${i + 1} 执行成功`)
         success = true
         break // 成功后跳出重试循环
       } catch (error) {
-        console.error(`步骤 ${i + 1} 执行失败 (尝试 ${retry + 1}/3):`, error)
-        
         if (retry === 2) {
           // 最后一次重试也失败
           showMessage(`点击序列失败: 步骤 ${i + 1} - ${selector}`, 3000, 'error')
@@ -633,7 +611,6 @@ async function executeClickSequence(config: ButtonConfig) {
     await delay(200)
   }
 
-  console.log(`点击序列执行完成: ${config.name}`)
   showMessage(`${config.name} 执行完成`, 1500, 'info')
 }
 
@@ -828,7 +805,7 @@ function clickElement(element: HTMLElement): void {
       })
       element.dispatchEvent(event)
     } catch (e2) {
-      console.error('点击元素失败:', e2)
+      // 点击元素失败
     }
   }
 }
@@ -842,6 +819,22 @@ export function reloadEditorButtons(configs: ButtonConfig[]) {
 export function cleanup() {
   // 清理自定义按钮
   cleanupCustomButtons()
+  
+  // 移除事件监听器
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler)
+    resizeHandler = null
+  }
+  
+  if (mutationObserver) {
+    mutationObserver.disconnect()
+    mutationObserver = null
+  }
+  
+  if (clickHandler) {
+    document.removeEventListener('click', clickHandler, true)
+    clickHandler = null
+  }
   
   // 清理移动端样式
   const style = document.getElementById('mobile-toolbar-style')

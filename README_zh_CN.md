@@ -192,7 +192,7 @@ npm run build
 
 ## 更新日志
 
-查看 [CHANGELOG.md](./CHANGELOG.md) 了解版本历史。
+查看 [CHANGELOG.md](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/CHANGELOG.md) 了解版本历史。
 
 ## 许可证
 

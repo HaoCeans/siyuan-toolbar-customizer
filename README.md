@@ -192,7 +192,7 @@ npm run build
 
 ## Changelog
 
-See [CHANGELOG.md](./CHANGELOG.md) for version history.
+See [CHANGELOG.md](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/CHANGELOG.md) for version history.
 
 ## License
 

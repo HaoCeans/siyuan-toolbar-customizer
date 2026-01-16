@@ -12,17 +12,14 @@
   ],
   "displayName": {
     "default": "Toolbar Customizer",
-    "en_US": "Toolbar Customizer",
     "zh_CN": "工具栏定制器"
   },
   "description": {
     "default": "A powerful toolbar customization plugin for SiYuan Notes. Supports custom buttons, mobile toolbar positioning, click-sequence automation, and more.",
-    "en_US": "A powerful toolbar customization plugin for SiYuan Notes. Supports custom buttons, mobile toolbar positioning, click-sequence automation, and more.",
     "zh_CN": "强大的思源笔记工具栏定制插件，支持自定义按钮、手机端工具栏位置调整、点击序列自动化等功能。"
   },
   "readme": {
     "default": "README.md",
-    "en_US": "README.md",
     "zh_CN": "README_zh_CN.md"
   },
   "funding": {

@@ -37,7 +37,7 @@ let PluginInfo = {
 try {
   PluginInfo = PluginInfoString
 } catch (err) {
-  console.log('Plugin info parse error: ', err)
+  // Plugin info parse error
 }
 const { version } = PluginInfo
 
@@ -100,8 +100,6 @@ export default class ToolbarCustomizer extends Plugin {
       this.isElectron = false
     }
 
-    console.log('插件加载，平台:', this.platform)
-
     // ===== 加载配置 =====
     try {
       const savedMobileConfig = await this.loadData('mobileToolbarConfig')
@@ -126,7 +124,6 @@ export default class ToolbarCustomizer extends Plugin {
         }))
       } else if (oldButtonConfigs && oldButtonConfigs.length > 0) {
         // 迁移旧配置到桌面端配置
-        console.log('检测到旧配置，迁移到桌面端配置')
         this.desktopButtonConfigs = oldButtonConfigs.map((btn: any) => ({
           ...btn,
           minWidth: btn.minWidth !== undefined ? btn.minWidth : 32,
@@ -151,7 +148,6 @@ export default class ToolbarCustomizer extends Plugin {
         }))
       } else if (oldButtonConfigs && oldButtonConfigs.length > 0) {
         // 迁移旧配置到移动端配置
-        console.log('检测到旧配置，迁移到移动端配置')
         this.mobileButtonConfigs = oldButtonConfigs.map((btn: any) => ({
           ...btn,
           minWidth: btn.minWidth !== undefined ? btn.minWidth : 32,
@@ -185,7 +181,6 @@ export default class ToolbarCustomizer extends Plugin {
 
   // 布局就绪后初始化（确保 DOM 完全加载）
   onLayoutReady() {
-    console.log('布局就绪，初始化插件功能')
     this.initPluginFunctions()
     
     // ===== 应用手机端工具栏样式 =====
@@ -218,6 +213,15 @@ export default class ToolbarCustomizer extends Plugin {
     
     // 移除动态样式
     this.removeFeatureStyles()
+  }
+
+  async uninstall() {
+    // 卸载时删除插件配置数据
+    await this.removeData('mobileToolbarConfig')
+    await this.removeData('desktopButtonConfigs')
+    await this.removeData('mobileButtonConfigs')
+    await this.removeData('buttonConfigs')  // 旧配置
+    await this.removeData('featureConfig')
   }
 
   openSetting() {

@@ -24,6 +24,8 @@ import {
   initCustomButtons,
   cleanup,
   DEFAULT_BUTTONS_CONFIG,
+  DEFAULT_DESKTOP_BUTTONS,
+  DEFAULT_MOBILE_BUTTONS,
   DEFAULT_MOBILE_CONFIG,
   MobileToolbarConfig,
   ButtonConfig,
@@ -110,9 +112,6 @@ export default class ToolbarCustomizer extends Plugin {
         }
       }
 
-      // 检测并迁移旧的单一配置到分离的桌面/移动端配置
-      const oldButtonConfigs = await this.loadData('buttonConfigs')
-      
       // 加载电脑端按钮配置
       const savedDesktopButtons = await this.loadData('desktopButtonConfigs')
       if (savedDesktopButtons && savedDesktopButtons.length > 0) {
@@ -122,19 +121,9 @@ export default class ToolbarCustomizer extends Plugin {
           showNotification: btn.showNotification !== undefined ? btn.showNotification : true,
           clickSequence: btn.clickSequence || []
         }))
-      } else if (oldButtonConfigs && oldButtonConfigs.length > 0) {
-        // 迁移旧配置到桌面端配置
-        this.desktopButtonConfigs = oldButtonConfigs.map((btn: any) => ({
-          ...btn,
-          minWidth: btn.minWidth !== undefined ? btn.minWidth : 32,
-          showNotification: btn.showNotification !== undefined ? btn.showNotification : true,
-          clickSequence: btn.clickSequence || []
-        }))
-        // 保存迁移后的配置
-        await this.saveData('desktopButtonConfigs', this.desktopButtonConfigs)
       } else {
-        // 如果没有保存的配置，使用默认配置
-        this.desktopButtonConfigs = DEFAULT_BUTTONS_CONFIG.map(btn => ({...btn}))
+        // 使用桌面端默认配置
+        this.desktopButtonConfigs = DEFAULT_DESKTOP_BUTTONS.map(btn => ({...btn}))
       }
 
       // 加载手机端按钮配置
@@ -146,19 +135,9 @@ export default class ToolbarCustomizer extends Plugin {
           showNotification: btn.showNotification !== undefined ? btn.showNotification : true,
           clickSequence: btn.clickSequence || []
         }))
-      } else if (oldButtonConfigs && oldButtonConfigs.length > 0) {
-        // 迁移旧配置到移动端配置
-        this.mobileButtonConfigs = oldButtonConfigs.map((btn: any) => ({
-          ...btn,
-          minWidth: btn.minWidth !== undefined ? btn.minWidth : 32,
-          showNotification: btn.showNotification !== undefined ? btn.showNotification : true,
-          clickSequence: btn.clickSequence || []
-        }))
-        // 保存迁移后的配置
-        await this.saveData('mobileButtonConfigs', this.mobileButtonConfigs)
       } else {
-        // 如果没有保存的配置，使用默认配置
-        this.mobileButtonConfigs = DEFAULT_BUTTONS_CONFIG.map(btn => ({...btn}))
+        // 使用移动端默认配置
+        this.mobileButtonConfigs = DEFAULT_MOBILE_BUTTONS.map(btn => ({...btn}))
       }
       
       const savedFeatureConfig = await this.loadData('featureConfig')
@@ -220,7 +199,6 @@ export default class ToolbarCustomizer extends Plugin {
     await this.removeData('mobileToolbarConfig')
     await this.removeData('desktopButtonConfigs')
     await this.removeData('mobileButtonConfigs')
-    await this.removeData('buttonConfigs')  // 旧配置
     await this.removeData('featureConfig')
   }
 
@@ -250,14 +228,6 @@ export default class ToolbarCustomizer extends Plugin {
     }
 
     setting.open('工具栏定制器')
-    
-    // 在对话框打开后添加美化样式
-    setTimeout(() => {
-      const dialog = document.querySelector('.b3-dialog--open')
-      if (dialog) {
-        dialog.classList.add('toolbar-customizer-settings')
-      }
-    }, 0)
   }
 
   // 电脑端设置布局
@@ -439,45 +409,71 @@ export default class ToolbarCustomizer extends Plugin {
       direction: 'row',
       createActionElement: () => {
         const container = document.createElement('div')
-        container.style.cssText = 'font-size: 13px; line-height: 1.8; max-height: 400px; overflow-y: auto; padding-right: 8px;'
+        container.style.cssText = `
+          font-size: 14px;
+          line-height: 1.8;
+          max-height: 500px;
+          overflow-y: auto;
+          padding: 20px;
+          background: var(--b3-theme-background);
+          border-radius: 8px;
+          border: 1px solid var(--b3-border-color);
+        `
         
         container.innerHTML = `
-          <div style="margin-bottom: 20px;">
-            <div style="font-weight: bold; color: var(--b3-theme-primary); margin-bottom: 12px; font-size: 14px;">功能：手写模板插入</div>
-            <ol style="margin: 0; padding-left: 20px;">
-              <li>可设置模板内容</li>
-              <li>点击一键插入</li>
-              <li>支持md格式</li>
-            </ol>
+          <div style="margin-bottom: 24px; padding: 16px; background: var(--b3-theme-surface); border-radius: 6px; border-left: 4px solid var(--b3-theme-primary);">
+            <div style="font-weight: 600; color: var(--b3-theme-primary); margin-bottom: 12px; font-size: 15px; display: flex; align-items: center; gap: 8px;">
+              <span>📝</span>
+              <span>功能一：手写模板插入</span>
+            </div>
+            <ul style="margin: 0; padding-left: 24px; color: var(--b3-theme-on-surface);">
+              <li style="margin: 6px 0;">可设置模板内容</li>
+              <li style="margin: 6px 0;">点击一键插入到编辑器</li>
+              <li style="margin: 6px 0;">支持 Markdown 格式</li>
+            </ul>
           </div>
           
-          <div style="margin-bottom: 20px;">
-            <div style="font-weight: bold; color: var(--b3-theme-primary); margin-bottom: 12px; font-size: 14px;">功能：模拟点击序列</div>
+          <div style="margin-bottom: 24px; padding: 16px; background: var(--b3-theme-surface); border-radius: 6px; border-left: 4px solid var(--b3-theme-primary);">
+            <div style="font-weight: 600; color: var(--b3-theme-primary); margin-bottom: 16px; font-size: 15px; display: flex; align-items: center; gap: 8px;">
+              <span>🎯</span>
+              <span>功能二：模拟点击序列</span>
+            </div>
             
-            <div style="margin-bottom: 12px;">
-              <div style="font-weight: 500; margin-bottom: 8px;">1️⃣ 打开CSS选择器</div>
-              <ol style="margin: 0; padding-left: 20px; color: var(--b3-theme-on-surface-light);">
-                <li>点击左上角主菜单</li>
-                <li>点击开发者工具</li>
-                <li>Ctrl+Shift+C 开启选择器</li>
-                <li>选中目标按钮</li>
-                <li>查看并复制 ID 等属性</li>
+            <div style="margin-bottom: 16px; padding: 12px; background: var(--b3-theme-background); border-radius: 4px;">
+              <div style="font-weight: 500; margin-bottom: 10px; color: var(--b3-theme-on-background); display: flex; align-items: center; gap: 6px;">
+                <span style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background: var(--b3-theme-primary); color: white; border-radius: 50%; font-size: 12px; font-weight: 600;">1</span>
+                <span>打开 CSS 选择器</span>
+              </div>
+              <ol style="margin: 0; padding-left: 32px; color: var(--b3-theme-on-surface-light); font-size: 13px;">
+                <li style="margin: 4px 0;">点击左上角主菜单</li>
+                <li style="margin: 4px 0;">点击"开发者工具"</li>
+                <li style="margin: 4px 0;">按 <kbd style="background: var(--b3-theme-surface); padding: 2px 6px; border-radius: 3px; border: 1px solid var(--b3-border-color); font-size: 11px;">Ctrl+Shift+C</kbd> 开启选择器</li>
+                <li style="margin: 4px 0;">选中目标按钮</li>
+                <li style="margin: 4px 0;">查看并复制 ID 等属性</li>
               </ol>
             </div>
             
-            <div style="margin-bottom: 12px;">
-              <div style="font-weight: 500; margin-bottom: 8px;">2️⃣ 配置点击序列</div>
-              <div style="padding-left: 20px; color: var(--b3-theme-on-surface-light);">根据想执行的顺序，依次添加元素 ID 即可！</div>
+            <div style="margin-bottom: 16px; padding: 12px; background: var(--b3-theme-background); border-radius: 4px;">
+              <div style="font-weight: 500; margin-bottom: 10px; color: var(--b3-theme-on-background); display: flex; align-items: center; gap: 6px;">
+                <span style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background: var(--b3-theme-primary); color: white; border-radius: 50%; font-size: 12px; font-weight: 600;">2</span>
+                <span>配置点击序列</span>
+              </div>
+              <div style="padding-left: 32px; color: var(--b3-theme-on-surface-light); font-size: 13px;">
+                根据想执行的顺序，依次添加元素 ID 即可！
+              </div>
             </div>
             
-            <div style="margin-bottom: 8px;">
-              <div style="font-weight: 500; margin-bottom: 8px;">3️⃣ 支持识别方式</div>
-              <div style="padding-left: 20px;">
-                <code style="background: var(--b3-theme-surface); padding: 2px 6px; border-radius: 3px; font-size: 11px;">id</code>
-                <code style="background: var(--b3-theme-surface); padding: 2px 6px; border-radius: 3px; font-size: 11px;">data-id</code>
-                <code style="background: var(--b3-theme-surface); padding: 2px 6px; border-radius: 3px; font-size: 11px;">data-type</code>
-                <code style="background: var(--b3-theme-surface); padding: 2px 6px; border-radius: 3px; font-size: 11px;">class</code>
-                <code style="background: var(--b3-theme-surface); padding: 2px 6px; border-radius: 3px; font-size: 11px;">按钮文本</code>
+            <div style="padding: 12px; background: var(--b3-theme-background); border-radius: 4px;">
+              <div style="font-weight: 500; margin-bottom: 10px; color: var(--b3-theme-on-background); display: flex; align-items: center; gap: 6px;">
+                <span style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background: var(--b3-theme-primary); color: white; border-radius: 50%; font-size: 12px; font-weight: 600;">3</span>
+                <span>支持的识别方式</span>
+              </div>
+              <div style="padding-left: 32px; display: flex; flex-wrap: wrap; gap: 8px;">
+                <code style="background: var(--b3-theme-primary-lightest); color: var(--b3-theme-primary); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; border: 1px solid var(--b3-theme-primary-light);">id</code>
+                <code style="background: var(--b3-theme-primary-lightest); color: var(--b3-theme-primary); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; border: 1px solid var(--b3-theme-primary-light);">data-id</code>
+                <code style="background: var(--b3-theme-primary-lightest); color: var(--b3-theme-primary); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; border: 1px solid var(--b3-theme-primary-light);">data-type</code>
+                <code style="background: var(--b3-theme-primary-lightest); color: var(--b3-theme-primary); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; border: 1px solid var(--b3-theme-primary-light);">class</code>
+                <code style="background: var(--b3-theme-primary-lightest); color: var(--b3-theme-primary); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; border: 1px solid var(--b3-theme-primary-light);">按钮文本</code>
               </div>
             </div>
           </div>

@@ -33,7 +33,7 @@ export interface ButtonConfig {
 
 // ===== 默认配置 =====
 export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
-  enableBottomToolbar: false,
+  enableBottomToolbar: true,
   openInputOffset: '50px',
   closeInputOffset: '0px',
   heightThreshold: 70,
@@ -41,46 +41,10 @@ export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
   toolbarOpacity: 0.95
 }
 
-export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = [
-  {
-    id: 'siyuan-settings',
-    name: '思源设置',
-    type: 'builtin',
-    builtinId: 'barSettings',
-    icon: 'iconSettings',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
-    sort: 1,
-    platform: 'both',
-    showNotification: true
-  },
-  {
-    id: 'search',
-    name: '搜索',
-    type: 'builtin',
-    builtinId: 'menuSearch',
-    icon: 'iconSearch',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
-    sort: 2,
-    platform: 'both',
-    showNotification: true
-  },
-  {
-    id: 'recent',
-    name: '最近文档',
-    type: 'builtin',
-    builtinId: 'menuRecent',
-    icon: 'iconHistory',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
-    sort: 3,
-    platform: 'both',
-    showNotification: true
-  },
+export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = []
+
+// 桌面端默认按钮
+export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
   {
     id: 'template1',
     name: '插入待办',
@@ -90,8 +54,77 @@ export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = [
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
+    sort: 1,
+    platform: 'desktop',
+    showNotification: true
+  },
+  {
+    id: 'plugin-settings-desktop',
+    name: '插件设置',
+    type: 'click-sequence',
+    clickSequence: ['barPlugins', 'text:工具栏定制'],
+    icon: 'iconSettings',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 2,
+    platform: 'desktop',
+    showNotification: true
+  }
+]
+
+// 移动端默认按钮
+export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
+  {
+    id: 'template1-mobile',
+    name: '插入待办',
+    type: 'template',
+    template: '- [ ] ',
+    icon: 'iconCheck',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 1,
+    platform: 'mobile',
+    showNotification: true
+  },
+  {
+    id: 'recent-mobile',
+    name: '最近文档',
+    type: 'builtin',
+    builtinId: 'menuRecent',
+    icon: 'iconHistory',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 2,
+    platform: 'mobile',
+    showNotification: true
+  },
+  {
+    id: 'search-mobile',
+    name: '搜索',
+    type: 'builtin',
+    builtinId: 'menuSearch',
+    icon: 'iconSearch',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 3,
+    platform: 'mobile',
+    showNotification: true
+  },
+  {
+    id: 'plugin-settings-mobile',
+    name: '插件设置',
+    type: 'click-sequence',
+    clickSequence: ['toolbarMore', 'menuPlugin', 'text:工具栏定制器'],
+    icon: 'iconSettings',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
     sort: 4,
-    platform: 'both',
+    platform: 'mobile',
     showNotification: true
   }
 ]
@@ -152,17 +185,18 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
   }
   
   const setupToolbar = () => {
-    // 找到面包屑元素
-    const breadcrumb = document.querySelector('.protyle-breadcrumb__bar')
+    // 优先查找 .protyle-breadcrumb（移动端使用）
+    let breadcrumb = document.querySelector('.protyle-breadcrumb:not(.protyle-breadcrumb__bar)')
+    
+    // 如果没找到，尝试查找 .protyle-breadcrumb__bar（桌面端使用）
     if (!breadcrumb) {
-      // 尝试其他可能的选择器
-      const altBreadcrumb = document.querySelector('.protyle-breadcrumb')
-      if (!altBreadcrumb) {
-        return false
-      }
-      setupToolbarForElement(altBreadcrumb)
-      return true
+      breadcrumb = document.querySelector('.protyle-breadcrumb__bar')
     }
+    
+    if (!breadcrumb) {
+      return false
+    }
+    
     setupToolbarForElement(breadcrumb)
     return true
   }

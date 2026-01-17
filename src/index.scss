@@ -41,252 +41,31 @@
   transition: bottom 0.3s ease !important;
 }
 
-// ===== 插件设置对话框美化样式 =====
-.toolbar-customizer-settings {
-  // 对话框容器美化
-  .b3-dialog__container {
-    border-radius: 16px !important;
-    overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
-    background: var(--b3-theme-background);
-    max-width: 900px !important;
-  }
-  
-  // 标题栏美化 - 现代渐变设计
-  .b3-dialog__header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 20px 24px !important;
-    border-bottom: none;
-    
-    .b3-dialog__title {
-      font-weight: 600;
-      font-size: 18px;
-      letter-spacing: 0.5px;
-    }
-    
-    .b3-dialog__close {
-      color: white;
-      opacity: 0.9;
-      transition: all 0.2s ease;
-      
-      &:hover {
-        opacity: 1;
-        transform: rotate(90deg);
-      }
-    }
-  }
-  
-  // 内容区域美化
-  .b3-dialog__content {
-    padding: 0;
-    background: var(--b3-theme-background);
-  }
-  
-  .b3-dialog__body {
-    padding: 24px !important;
-    max-height: 70vh !important;
-    overflow-y: auto;
-    
-    // 自定义滚动条
-    &::-webkit-scrollbar {
-      width: 8px;
-    }
-    
-    &::-webkit-scrollbar-track {
-      background: var(--b3-theme-surface);
-      border-radius: 4px;
-    }
-    
-    &::-webkit-scrollbar-thumb {
-      background: var(--b3-border-color);
-      border-radius: 4px;
-      
-      &:hover {
-        background: var(--b3-theme-on-surface);
-      }
-    }
-  }
-  
-  // 底部操作栏美化
+// 移动端底部按钮区域避免被工具栏遮挡
+@media (max-width: 768px) {
   .b3-dialog__action {
-    padding: 16px 24px;
-    background: var(--b3-theme-surface);
-    border-top: 1px solid var(--b3-border-color);
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-  }
-  
-  // 按钮美化
-  .b3-button {
-    border-radius: 8px !important;
-    padding: 8px 20px !important;
-    font-weight: 500;
-    transition: all 0.2s ease !important;
+    position: fixed !important;
+    top: 8px !important;
+    right: 60px !important;
+    left: auto !important;
+    bottom: auto !important;
+    padding: 0 !important;
     border: none !important;
-    cursor: pointer;
-    
-    &--cancel {
-      background: var(--b3-theme-surface) !important;
-      color: var(--b3-theme-on-surface) !important;
-      border: 1px solid var(--b3-border-color) !important;
-      
-      &:hover {
-        background: var(--b3-theme-background-light) !important;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-      }
-    }
-    
-    &--outline {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-      color: white !important;
-      
-      &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4) !important;
-      }
-      
-      &:active {
-        transform: translateY(0);
-      }
-    }
+    background: transparent !important;
+    flex-direction: row-reverse !important;
+    gap: 8px !important;
+    z-index: 10 !important;
   }
   
-  // 设置项标题美化
-  .b3-label {
-    margin: 20px 0 12px 0;
-    padding: 0;
-    
-    &__text {
-      font-weight: 600;
-      font-size: 15px;
-      color: var(--b3-theme-on-background);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-  }
-  
-  // 输入框美化
-  .b3-text-field,
-  .b3-select,
-  input[type="text"],
-  input[type="number"],
-  textarea {
-    border-radius: 8px !important;
-    border: 2px solid var(--b3-border-color) !important;
-    padding: 10px 14px !important;
-    transition: all 0.2s ease !important;
-    background: var(--b3-theme-surface) !important;
-    
-    &:hover {
-      border-color: var(--b3-theme-primary-lighter) !important;
-    }
-    
-    &:focus {
-      border-color: #667eea !important;
-      box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1) !important;
-      outline: none !important;
-      background: var(--b3-theme-background) !important;
-    }
-  }
-  
-  // 选择器美化
-  .b3-select {
-    cursor: pointer;
-    height: 40px !important;
-    
-    &:hover {
-      border-color: #667eea !important;
-    }
-  }
-  
-  // 分组标题美化
-  .config-tab__title {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--b3-theme-on-background);
-    margin: 24px 0 16px 0;
-    padding-bottom: 8px;
-    border-bottom: 2px solid var(--b3-border-color);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  
-  // 卡片式容器美化
-  .fn__flex,
-  .b3-form__space {
-    background: var(--b3-theme-surface);
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 16px;
-    border: 1px solid var(--b3-border-color);
-    transition: all 0.2s ease;
-    
-    &:hover {
-      border-color: var(--b3-theme-primary-lighter);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    }
-  }
-  
-  // 开关按钮美化
-  input[type="checkbox"] {
-    cursor: pointer;
-    width: 42px;
-    height: 24px;
-    
-    &:checked {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-  }
-  
-  // 滑块美化
-  input[type="range"] {
-    cursor: pointer;
-    height: 6px;
-    border-radius: 3px;
-    background: var(--b3-border-color);
-    
-    &::-webkit-slider-thumb {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      
-      &:hover {
-        transform: scale(1.2);
-        box-shadow: 0 3px 10px rgba(102, 126, 234, 0.5);
-      }
-    }
-  }
-  
-  // 颜色选择器美化
-  input[type="color"] {
-    cursor: pointer;
-    border: 2px solid var(--b3-border-color) !important;
-    transition: all 0.2s ease;
-    
-    &:hover {
-      transform: scale(1.05);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    }
+  // 按钮样式调整
+  .b3-dialog__action .b3-button {
+    margin: 0 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
   }
 }
 
 // 移动端优化
 @media (max-width: 768px) {
-  .toolbar-customizer-settings .b3-dialog__container {
-    max-width: 95vw !important;
-    margin: 0 auto;
-    border-radius: 12px !important;
-  }
-  
   [data-custom-button] {
     min-width: 40px !important;
     min-height: 40px !important;

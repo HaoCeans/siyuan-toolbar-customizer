@@ -10,6 +10,7 @@
   "frontends": [
     "all"
   ],
+  "disabledInPublish": true,
   "displayName": {
     "default": "Toolbar Customizer",
     "zh_CN": "工具栏定制器"

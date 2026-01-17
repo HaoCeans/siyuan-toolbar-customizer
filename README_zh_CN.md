@@ -39,7 +39,8 @@
 - **集成帮助系统**：
   - 平台特定的帮助文档
   - 设置中可点击跳转的帮助链接
-  - 内置功能 ID 参考
+  - 内置功能 ID 参考:[思源笔记常用功能 ID 速查表](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/v1.0.1/README_BUILTIN_IDS.md) 
+
 
 ## 安装
 
@@ -88,7 +89,7 @@
    ```
 3. 插件将按顺序点击每个元素
 
-详细选择器语法请参见 `README_CLICK_SEQUENCE.md`
+详细选择器语法请参见:[模拟点击序列使用说明](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md) 
 
 ### 移动端工具栏配置
 
@@ -212,3 +213,14 @@ MIT 许可证 - 详见 LICENSE 文件
 - 基于 [思源笔记插件系统](https://github.com/siyuan-note/siyuan) 构建
 - 图标来自 [Lucide](https://lucide.dev/)
 - 模板基于 [Vite + Vue 插件模板](https://github.com/siyuan-note/siyuan-toolbar-customizer)
+
+## 🧧 打赏支持
+
+感谢您的支持，这将鼓励作者持续开发
+
+<div align="center">
+  <img src="./payment1.png" alt="打赏二维码" width="300">
+</div>
+<div align="center">
+  <img src="./payment2.png" alt="打赏二维码" width="300">
+</div>

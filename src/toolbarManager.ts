@@ -46,11 +46,11 @@ export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = []
 // 桌面端默认按钮
 export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
   {
-    id: 'template1',
-    name: '插入待办',
-    type: 'template',
-    template: '- [ ] ',
-    icon: 'iconCheck',
+    id: 'plugin-settings-desktop',
+    name: '插件设置',
+    type: 'click-sequence',
+    clickSequence: ['barPlugins', 'text:工具栏定制器'],
+    icon: 'iconSettings',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
@@ -59,11 +59,11 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
     showNotification: true
   },
   {
-    id: 'plugin-settings-desktop',
-    name: '插件设置',
-    type: 'click-sequence',
-    clickSequence: ['barPlugins', 'text:工具栏定制'],
-    icon: 'iconSettings',
+    id: 'template1',
+    name: '插入待办',
+    type: 'template',
+    template: '- [ ] ',
+    icon: 'iconCheck',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
@@ -76,11 +76,11 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
 // 移动端默认按钮
 export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
   {
-    id: 'template1-mobile',
-    name: '插入待办',
-    type: 'template',
-    template: '- [ ] ',
-    icon: 'iconCheck',
+    id: 'plugin-settings-mobile',
+    name: '插件设置',
+    type: 'click-sequence',
+    clickSequence: ['toolbarMore', 'menuPlugin', 'text:工具栏定制器'],
+    icon: 'iconSettings',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
@@ -115,11 +115,11 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     showNotification: true
   },
   {
-    id: 'plugin-settings-mobile',
-    name: '插件设置',
-    type: 'click-sequence',
-    clickSequence: ['toolbarMore', 'menuPlugin', 'text:工具栏定制器'],
-    icon: 'iconSettings',
+    id: 'template1-mobile',
+    name: '插入待办',
+    type: 'template',
+    template: '- [ ] ',
+    icon: 'iconCheck',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,

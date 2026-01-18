@@ -39,7 +39,7 @@
 - **集成帮助系统**：
   - 平台特定的帮助文档
   - 设置中可点击跳转的帮助链接
-  - 内置功能 ID 参考:[思源笔记常用功能 ID 速查表](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/v1.0.1/README_BUILTIN_IDS.md) 
+  - 内置功能 ID 参考:[思源笔记常用功能 ID 速查表](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/v1.0.4/README_BUILTIN_IDS.md) 
 
 
 ## 安装
@@ -219,8 +219,9 @@ MIT 许可证 - 详见 LICENSE 文件
 感谢您的支持，这将鼓励作者持续开发
 
 <div align="center">
-  <img src="./payment1.png" alt="打赏二维码" width="300">
+  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment1.png" alt="打赏二维码" width="300">
 </div>
+
 <div align="center">
-  <img src="./payment2.png" alt="打赏二维码" width="300">
+  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment2.png" alt="打赏二维码" width="300">
 </div>

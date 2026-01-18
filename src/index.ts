@@ -219,6 +219,17 @@ export default class ToolbarCustomizer extends Plugin {
       }
     })
 
+    // 手机端：给对话框添加标识，用于CSS定位
+    if (this.isMobile) {
+      // 等待对话框渲染后添加标识
+      setTimeout(() => {
+        const dialog = document.querySelector('.b3-dialog:not([data-plugin-dialog])')
+        if (dialog) {
+          dialog.setAttribute('data-plugin-dialog', 'toolbar-customizer')
+        }
+      }, 50)
+    }
+
     if (this.isMobile) {
       // 手机端：使用思源原生 b3-label 布局
       this.createMobileSettingLayout(setting)
@@ -592,11 +603,11 @@ export default class ToolbarCustomizer extends Plugin {
 
 
     // === 移动端工具栏设置 ===
-    createGroupTitle('📱', '工具栏配置')
+    createGroupTitle('📱', '底部工具栏配置')
 
     setting.addItem({
       title: '是否将工具栏置底',
-      description: '开启后才能调整输入法位置相关设置',
+      description: '💡开启后才能调整输入法位置相关设置',
       createActionElement: () => {
         const toggle = document.createElement('input')
         toggle.type = 'checkbox'
@@ -611,64 +622,72 @@ export default class ToolbarCustomizer extends Plugin {
       }
     })
 
+     // 工具栏按钮宽度
     setting.addItem({
-      title: '输入法打开偏移',
-      description: '输入法弹出时工具栏距底部距离，如：50px',
-      createActionElement: () => {
-        const input = document.createElement('input')
-        input.className = 'b3-text-field fn__flex-center fn__size200'
-        input.value = this.mobileConfig.openInputOffset
-        input.style.cssText = 'font-size: 14px; padding: 8px;'
-        input.disabled = !this.mobileConfig.enableBottomToolbar
-        if (!this.mobileConfig.enableBottomToolbar) {
-          input.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed;'
-        }
-        input.onchange = () => { this.mobileConfig.openInputOffset = input.value }
-        return input
-      }
-    })
-
-    setting.addItem({
-      title: '输入法关闭偏移',
-      description: '输入法关闭时工具栏距底部距离，如：0px',
-      createActionElement: () => {
-        const input = document.createElement('input')
-        input.className = 'b3-text-field fn__flex-center fn__size200'
-        input.value = this.mobileConfig.closeInputOffset
-        input.style.cssText = 'font-size: 14px; padding: 8px;'
-        input.disabled = !this.mobileConfig.enableBottomToolbar
-        if (!this.mobileConfig.enableBottomToolbar) {
-          input.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed;'
-        }
-        input.onchange = () => { this.mobileConfig.closeInputOffset = input.value }
-        return input
-      }
-    })
-
-    setting.addItem({
-      title: '高度变化阈值',
-      description: '窗口高度变化超过此百分比时触发（30-90）',
+      title: '栏内按钮间距',
+      description: '💡可整体调整按钮间的宽度',
       createActionElement: () => {
         const input = document.createElement('input')
         input.className = 'b3-text-field fn__flex-center fn__size200'
         input.type = 'number'
-        input.value = this.mobileConfig.heightThreshold.toString()
+        input.value = this.featureConfig.toolbarButtonWidth.toString()
         input.style.cssText = 'font-size: 14px; padding: 8px;'
-        input.min = '30'
-        input.max = '90'
-        input.disabled = !this.mobileConfig.enableBottomToolbar
-        if (!this.mobileConfig.enableBottomToolbar) {
-          input.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed;'
+        input.onchange = async () => {
+          this.featureConfig.toolbarButtonWidth = parseInt(input.value) || 32
+          await this.saveData('featureConfig', this.featureConfig)
+          this.applyFeatures()
         }
-        input.onchange = () => { this.mobileConfig.heightThreshold = parseInt(input.value) || 70 }
         return input
       }
     })
 
-    // 工具栏背景颜色
+
     setting.addItem({
-      title: '工具栏背景颜色',
-      description: '点击选择工具栏背景颜色',
+      title: '①距离底部高度',
+      description: '💡设置工具栏高度（仅在工具栏置底时有效）',
+      createActionElement: () => {
+        const input = document.createElement('input')
+        input.className = 'b3-text-field fn__flex-center fn__size200'
+        input.type = 'text'
+        input.value = this.mobileConfig.toolbarHeight
+        input.style.cssText = 'font-size: 14px; padding: 8px;'
+        input.disabled = !this.mobileConfig.enableBottomToolbar
+        if (!this.mobileConfig.enableBottomToolbar) {
+          input.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed;'
+        }
+        input.onchange = () => { 
+          this.mobileConfig.toolbarHeight = input.value 
+          this.applyMobileToolbarStyle() // 应用新样式
+        }
+        return input
+      }
+    })
+
+    setting.addItem({
+      title: '②工具栏自身高度',
+      description: '💡设置工具栏高度（仅在工具栏置底时有效）',
+      createActionElement: () => {
+        const input = document.createElement('input')
+        input.className = 'b3-text-field fn__flex-center fn__size200'
+        input.type = 'text'
+        input.value = this.mobileConfig.toolbarHeight
+        input.style.cssText = 'font-size: 14px; padding: 8px;'
+        input.disabled = !this.mobileConfig.enableBottomToolbar
+        if (!this.mobileConfig.enableBottomToolbar) {
+          input.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed;'
+        }
+        input.onchange = () => { 
+          this.mobileConfig.toolbarHeight = input.value 
+          this.applyMobileToolbarStyle() // 应用新样式
+        }
+        return input
+      }
+    })
+
+ // 工具栏背景颜色
+    setting.addItem({
+      title: '③工具栏背景颜色',
+      description: '💡点击选择工具栏背景颜色',
       createActionElement: () => {
         const colorPicker = document.createElement('input')
         colorPicker.type = 'color'
@@ -687,8 +706,8 @@ export default class ToolbarCustomizer extends Plugin {
 
     // 工具栏透明度
     setting.addItem({
-      title: '透明度',
-      description: '(0=完全透明，100=完全不透明)',
+      title: '④工具栏透明度',
+      description: '💡(0=完全透明，100=完全不透明)',
       createActionElement: () => {
         const container = document.createElement('div')
         container.style.cssText = 'display: flex; align-items: center; gap: 10px;'
@@ -720,32 +739,95 @@ export default class ToolbarCustomizer extends Plugin {
       }
     })
 
-    
-    // === 小功能选择 ===
-    createGroupTitle('⚙️', '小功能选择')
-
-    // 工具栏按钮宽度
     setting.addItem({
-      title: '工具栏按钮宽度',
-      description: '💡 可整体调整按钮间的宽度',
+      title: '⑤工具栏层级',
+      description: '💡值越大，越不容易被遮挡。默认值为5,显示在设置上层为10,完全不隐藏为100。',
       createActionElement: () => {
         const input = document.createElement('input')
         input.className = 'b3-text-field fn__flex-center fn__size200'
         input.type = 'number'
-        input.value = this.featureConfig.toolbarButtonWidth.toString()
+        input.value = this.mobileConfig.toolbarZIndex.toString()
         input.style.cssText = 'font-size: 14px; padding: 8px;'
-        input.onchange = async () => {
-          this.featureConfig.toolbarButtonWidth = parseInt(input.value) || 32
-          await this.saveData('featureConfig', this.featureConfig)
-          this.applyFeatures()
+        input.min = '0'
+        input.max = '100'
+        input.disabled = !this.mobileConfig.enableBottomToolbar
+        if (!this.mobileConfig.enableBottomToolbar) {
+          input.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed;'
+        }
+        input.onchange = () => { 
+          this.mobileConfig.toolbarZIndex = parseInt(input.value) || 2 
+          this.applyMobileToolbarStyle() // 应用新样式
         }
         return input
       }
     })
 
     setting.addItem({
+      title: '⌨️输入法打开偏移',
+      description: '💡输入法弹出时工具栏距底部距离。',
+      createActionElement: () => {
+        const input = document.createElement('input')
+        input.className = 'b3-text-field fn__flex-center fn__size200'
+        input.value = this.mobileConfig.openInputOffset
+        input.style.cssText = 'font-size: 14px; padding: 8px;'
+        input.disabled = !this.mobileConfig.enableBottomToolbar
+        if (!this.mobileConfig.enableBottomToolbar) {
+          input.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed;'
+        }
+        input.onchange = () => { this.mobileConfig.openInputOffset = input.value }
+        return input
+      }
+    })
+
+    setting.addItem({
+      title: '⌨️输入法关闭偏移',
+      description: '💡输入法关闭时工具栏距底部距离。',
+      createActionElement: () => {
+        const input = document.createElement('input')
+        input.className = 'b3-text-field fn__flex-center fn__size200'
+        input.value = this.mobileConfig.closeInputOffset
+        input.style.cssText = 'font-size: 14px; padding: 8px;'
+        input.disabled = !this.mobileConfig.enableBottomToolbar
+        if (!this.mobileConfig.enableBottomToolbar) {
+          input.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed;'
+        }
+        input.onchange = () => { this.mobileConfig.closeInputOffset = input.value }
+        return input
+      }
+    })
+
+
+    setting.addItem({
+      title: '⌨️高度变化阈值',
+      description: '💡窗口高度变化超过此百分比触发：30-90',
+      createActionElement: () => {
+        const input = document.createElement('input')
+        input.className = 'b3-text-field fn__flex-center fn__size200'
+        input.type = 'number'
+        input.value = this.mobileConfig.heightThreshold.toString()
+        input.style.cssText = 'font-size: 14px; padding: 8px;'
+        input.min = '30'
+        input.max = '90'
+        input.disabled = !this.mobileConfig.enableBottomToolbar
+        if (!this.mobileConfig.enableBottomToolbar) {
+          input.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed;'
+        }
+        input.onchange = () => { this.mobileConfig.heightThreshold = parseInt(input.value) || 70 }
+        return input
+      }
+    })
+
+    
+
+   
+    
+    // === 小功能选择 ===
+    createGroupTitle('⚙️', '小功能选择')
+
+   
+    setting.addItem({
       title: '面包屑图标隐藏',
-      description: '开启后隐藏面包屑左侧的图标',
+      description: '💡开启后隐藏面包屑左侧的图标',
       createActionElement: () => {
         const toggle = document.createElement('input')
         toggle.type = 'checkbox'
@@ -763,7 +845,7 @@ export default class ToolbarCustomizer extends Plugin {
 
     setting.addItem({
       title: '锁定编辑按钮隐藏',
-      description: '隐藏工具栏的锁定编辑按钮',
+      description: '💡隐藏工具栏的锁定编辑按钮',
       createActionElement: () => {
         const toggle = document.createElement('input')
         toggle.type = 'checkbox'
@@ -781,7 +863,7 @@ export default class ToolbarCustomizer extends Plugin {
 
     setting.addItem({
       title: '文档菜单按钮隐藏',
-      description: '隐藏工具栏的文档菜单按钮',
+      description: '💡隐藏工具栏的文档菜单按钮',
       createActionElement: () => {
         const toggle = document.createElement('input')
         toggle.type = 'checkbox'
@@ -799,7 +881,7 @@ export default class ToolbarCustomizer extends Plugin {
 
     setting.addItem({
       title: '更多按钮隐藏',
-      description: '隐藏工具栏的更多按钮',
+      description: '💡隐藏工具栏的更多按钮',
       createActionElement: () => {
         const toggle = document.createElement('input')
         toggle.type = 'checkbox'
@@ -818,7 +900,7 @@ export default class ToolbarCustomizer extends Plugin {
     // 手机端禁止左右滑动弹出
     setting.addItem({
       title: '禁止左右滑动弹出',
-      description: '开启后禁止左右滑动弹出文档树和设置菜单',
+      description: '💡开启后禁止左右滑动弹出文档树和设置菜单',
       createActionElement: () => {
         const toggle = document.createElement('input')
         toggle.type = 'checkbox'
@@ -1149,10 +1231,28 @@ export default class ToolbarCustomizer extends Plugin {
       const textarea = document.createElement('textarea')
       textarea.className = 'b3-text-field'
       textarea.value = button.template || ''
-      textarea.style.cssText = 'resize: vertical; min-height: 60px;'
+      textarea.style.cssText = 'resize: vertical; min-height: 80px;'
       textarea.onchange = () => { button.template = textarea.value }
+      
+      // 添加变量说明
+      const hint = document.createElement('div')
+      hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding: 8px; background: var(--b3-theme-surface); border-radius: 4px; margin-top: 4px;'
+      hint.innerHTML = `
+        <div style="font-weight: 500; margin-bottom: 4px;">💡 支持的模板变量：</div>
+        <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-family: monospace;">
+          <code>{{date}}</code><span>当前日期 (2026-01-18)</span>
+          <code>{{time}}</code><span>当前时间 (14:30:45)</span>
+          <code>{{datetime}}</code><span>日期时间 (2026-01-18 14:30:45)</span>
+          <code>{{year}}</code><span>年份 (2026)</span>
+          <code>{{month}}</code><span>月份 (01)</span>
+          <code>{{day}}</code><span>日期 (18)</span>
+          <code>{{week}}</code><span>星期几 (星期六)</span>
+        </div>
+      `
+      
       templateField.appendChild(label)
       templateField.appendChild(textarea)
+      templateField.appendChild(hint)
       editForm.appendChild(templateField)
     } else if (button.type === 'click-sequence') {
       // 点击序列配置
@@ -1294,10 +1394,28 @@ export default class ToolbarCustomizer extends Plugin {
       const textarea = document.createElement('textarea')
       textarea.className = 'b3-text-field'
       textarea.value = button.template || ''
-      textarea.style.cssText = 'resize: vertical; min-height: 60px;'
+      textarea.style.cssText = 'resize: vertical; min-height: 80px;'
       textarea.onchange = () => { button.template = textarea.value }
+      
+      // 添加变量说明
+      const hint = document.createElement('div')
+      hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding: 8px; background: var(--b3-theme-surface); border-radius: 4px; margin-top: 4px;'
+      hint.innerHTML = `
+        <div style="font-weight: 500; margin-bottom: 4px;">💡 支持的模板变量：</div>
+        <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-family: monospace;">
+          <code>{{date}}</code><span>当前日期 (2026-01-18)</span>
+          <code>{{time}}</code><span>当前时间 (14:30:45)</span>
+          <code>{{datetime}}</code><span>日期时间 (2026-01-18 14:30:45)</span>
+          <code>{{year}}</code><span>年份 (2026)</span>
+          <code>{{month}}</code><span>月份 (01)</span>
+          <code>{{day}}</code><span>日期 (18)</span>
+          <code>{{week}}</code><span>星期几 (星期六)</span>
+        </div>
+      `
+      
       templateField.appendChild(label)
       templateField.appendChild(textarea)
+      templateField.appendChild(hint)
       form.appendChild(templateField)
     } else if (button.type === 'click-sequence') {
       // 点击序列配置
@@ -1805,7 +1923,29 @@ export default class ToolbarCustomizer extends Plugin {
         
         typeFieldsContainer.appendChild(hint)
       } else if (button.type === 'template') {
-        typeFieldsContainer.appendChild(this.createTextareaField('模板内容', button.template || '', '插入的文本', (v) => { button.template = v }))
+        const templateContainer = document.createElement('div')
+        templateContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
+        
+        const textarea = this.createTextareaField('模板内容', button.template || '', '插入的文本', (v) => { button.template = v })
+        templateContainer.appendChild(textarea)
+        
+        // 添加变量说明
+        const hint = document.createElement('div')
+        hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding: 8px; background: var(--b3-theme-surface); border-radius: 4px;'
+        hint.innerHTML = `
+          <div style="font-weight: 500; margin-bottom: 6px;">💡 支持的模板变量：</div>
+          <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; font-family: monospace; font-size: 10px;">
+            <code>{{date}}</code><span>日期 (2026-01-18)</span>
+            <code>{{time}}</code><span>时间 (14:30:45)</span>
+            <code>{{datetime}}</code><span>日期时间</span>
+            <code>{{year}}</code><span>年份 (2026)</span>
+            <code>{{month}}</code><span>月份 (01)</span>
+            <code>{{day}}</code><span>日 (18)</span>
+            <code>{{week}}</code><span>星期几</span>
+          </div>
+        `
+        templateContainer.appendChild(hint)
+        typeFieldsContainer.appendChild(templateContainer)
       } else if (button.type === 'click-sequence') {
         // 点击序列配置
         const clickSequenceContainer = document.createElement('div')
@@ -2532,6 +2672,11 @@ export default class ToolbarCustomizer extends Plugin {
           .protyle-breadcrumb[data-input-method] {
             background-color: ${this.mobileConfig.toolbarBackgroundColor} !important;
             opacity: ${this.mobileConfig.toolbarOpacity} !important;
+            height: ${this.mobileConfig.toolbarHeight} !important;
+            min-height: ${this.mobileConfig.toolbarHeight} !important;
+          }
+          .protyle {
+            padding-bottom: calc(${this.mobileConfig.toolbarHeight} + 10px) !important;
           }
         }
       `)

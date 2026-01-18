@@ -13,6 +13,8 @@ export interface MobileToolbarConfig {
   heightThreshold: number;    // 高度变化阈值百分比
   toolbarBackgroundColor: string; // 工具栏背景颜色
   toolbarOpacity: number;     // 工具栏透明度 (0-1)
+  toolbarHeight: string;      // 工具栏高度
+  toolbarZIndex: number;      // 工具栏层级
 }
 
 export interface ButtonConfig {
@@ -38,7 +40,9 @@ export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
   closeInputOffset: '0px',
   heightThreshold: 70,
   toolbarBackgroundColor: '#f8f9fa',
-  toolbarOpacity: 0.95
+  toolbarOpacity: 0.95,
+  toolbarHeight: '30px', // 默认工具栏高度
+  toolbarZIndex: 5,      // 默认工具栏层级
 }
 
 export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = []
@@ -133,7 +137,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
 // 保存监听器引用以便清理
 let resizeHandler: (() => void) | null = null
 let mutationObserver: MutationObserver | null = null
-let clickHandler: ((e: Event) => void) | null = null
+let pageObserver: MutationObserver | null = null  // 用于检测页面变化的观察器
+let mobileToolbarClickHandler: ((e: Event) => void) | null = null  // 专门用于移动端工具栏的点击处理
+let customButtonClickHandler: ((e: Event) => void) | null = null  // 专门用于自定义按钮的点击处理
 
 /**
  * 判断是否为移动端
@@ -176,10 +182,13 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
       existingStyle.remove()
     }
     // 移除工具栏的自定义属性
-    const toolbars = document.querySelectorAll('[data-toolbar-customized="true"]')
-    toolbars.forEach(toolbar => {
-      (toolbar as HTMLElement).removeAttribute('data-toolbar-customized')
-      (toolbar as HTMLElement).removeAttribute('data-input-method')
+    const toolbars = document.querySelectorAll('[data-toolbar-customized="true"]') as NodeListOf<HTMLElement>
+    const toolbarsArray = Array.from(toolbars)
+    toolbarsArray.forEach(toolbar => {
+      toolbar.removeAttribute('data-toolbar-customized')
+      toolbar.removeAttribute('data-input-method')
+      // 不移除fn__none类，保留原生的隐藏状态
+      // toolbar.classList.remove('fn__none')  // 同时移除可能添加的隐藏类
     })
     return
   }
@@ -266,7 +275,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
       })
     })
 
-    // 添加CSS样式
+  // 添加CSS样式
     const styleId = 'mobile-toolbar-style'
     let style = document.getElementById(styleId) as HTMLStyleElement
     if (!style) {
@@ -285,7 +294,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
           top: auto !important;
           left: 0 !important;
           right: 0 !important;
-          z-index: 2147483647 !important;
+          z-index: ${config.toolbarZIndex} !important;
           background: var(--b3-theme-surface) !important;
           border-top: 1px solid var(--b3-border-color) !important;
           padding: 8px 12px !important;
@@ -296,6 +305,8 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
           transition: bottom 0.3s ease !important;
           backdrop-filter: blur(10px);
           background-color: rgba(var(--b3-theme-surface-rgb), 0.95) !important;
+          height: ${config.toolbarHeight} !important; /* 应用高度配置 */
+          min-height: ${config.toolbarHeight} !important;
         }
         
         .protyle-breadcrumb__bar[data-input-method="open"],
@@ -310,13 +321,19 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
         
         /* 防止编辑器内容被遮挡 */
         .protyle {
-          padding-bottom: 60px !important;
+          padding-bottom: calc(${config.toolbarHeight} + 10px) !important;
         }
         
         /* 安全区域适配 */
         .protyle-breadcrumb__bar[data-input-method],
         .protyle-breadcrumb[data-input-method] {
           padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+        }
+        
+        /* 使用思源原生的隐藏类 */
+        .protyle-breadcrumb__bar[data-input-method].fn__none,
+        .protyle-breadcrumb[data-input-method].fn__none {
+          display: none !important;
         }
       }
     `
@@ -333,9 +350,50 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
   // 监听DOM变化，确保工具栏加载后能应用样式
   mutationObserver = new MutationObserver(() => {
     setupToolbar()
+    // 检查当前是否在文档编辑页面，以确定是否显示工具栏
+    // 仅在工具栏被标记为移动到底部时才应用我们的隐藏逻辑
+    if (config.enableBottomToolbar) {
+      updateToolbarVisibility()
+    }
   })
   
   mutationObserver.observe(document.body, {
+    childList: true,
+    subtree: true
+  })
+  
+  // 页面加载完成后检查一次
+  if (config.enableBottomToolbar) {
+    updateToolbarVisibility()
+  }
+  
+  // 添加页面变化检测函数
+  function updateToolbarVisibility() {
+    // 获取所有工具栏元素
+    const toolbars = document.querySelectorAll('[data-toolbar-customized="true"][data-input-method]') as NodeListOf<HTMLElement>
+    const toolbarsArray = Array.from(toolbars)
+    
+    // 检查当前是否应该显示工具栏（基于原生逻辑）
+    // 我们只添加自定义属性，不应改变原生的显示/隐藏逻辑
+    toolbarsArray.forEach(toolbar => {
+      // 检查原生的隐藏类是否存在
+      // 如果原生逻辑需要隐藏工具栏，我们应该保留这个状态
+      // 不主动修改原生的隐藏类
+    })
+  }
+  
+  // 监听路由变化或页面状态变化
+  if (pageObserver) {
+    pageObserver.disconnect()
+  }
+  pageObserver = new MutationObserver(() => {
+    // 仅在工具栏被标记为移动到底部时才应用我们的隐藏逻辑
+    if (config.enableBottomToolbar) {
+      updateToolbarVisibility()
+    }
+  })
+  
+  pageObserver.observe(document.body, {
     childList: true,
     subtree: true
   })
@@ -350,12 +408,12 @@ export function initCustomButtons(configs: ButtonConfig[]) {
   setTimeout(() => setupEditorButtons(configs), 1000)
   
   // 移除旧的监听器
-  if (clickHandler) {
-    document.removeEventListener('click', clickHandler, true)
+  if (customButtonClickHandler) {
+    document.removeEventListener('click', customButtonClickHandler, true)
   }
   
   // 监听编辑器加载事件
-  clickHandler = (e: Event) => {
+  customButtonClickHandler = (e: Event) => {
     // 检查是否点击了编辑器区域
     const target = e.target as HTMLElement
     if (target.closest('.protyle')) {
@@ -363,7 +421,7 @@ export function initCustomButtons(configs: ButtonConfig[]) {
       setTimeout(() => setupEditorButtons(configs), 100)
     }
   }
-  document.addEventListener('click', clickHandler, true)
+  document.addEventListener('click', customButtonClickHandler, true)
 }
 
 function cleanupCustomButtons() {
@@ -569,9 +627,12 @@ function insertTemplate(config: ButtonConfig) {
   // 获取当前焦点所在的编辑器
   const activeEditor = document.activeElement?.closest('.protyle')
   if (!activeEditor) {
-    showMessage('请先聚焦到编辑器', 3000, 'warning')
+    showMessage('请先聚焦到编辑器', 3000, 'info')
     return
   }
+  
+  // 处理模板变量
+  const processedTemplate = processTemplateVariables(config.template)
   
   // 插入模板内容
   const contentEditable = activeEditor.querySelector('[contenteditable="true"]')
@@ -581,7 +642,7 @@ function insertTemplate(config: ButtonConfig) {
     
     try {
       // 尝试使用execCommand插入文本
-      document.execCommand('insertText', false, config.template)
+      document.execCommand('insertText', false, processedTemplate)
       
       // 触发输入事件
       contentEditable.dispatchEvent(inputEvent)
@@ -589,6 +650,52 @@ function insertTemplate(config: ButtonConfig) {
       showMessage('插入模板失败，请确保编辑器处于可编辑状态', 3000, 'error')
     }
   }
+}
+
+/**
+ * 处理模板变量
+ * 支持的变量：
+ * - {{date}} - 当前日期 YYYY-MM-DD
+ * - {{time}} - 当前时间 HH:mm:ss
+ * - {{datetime}} - 当前日期时间 YYYY-MM-DD HH:mm:ss
+ * - {{year}} - 年份 YYYY
+ * - {{month}} - 月份 MM
+ * - {{day}} - 日期 DD
+ * - {{hour}} - 小时 HH
+ * - {{minute}} - 分钟 mm
+ * - {{second}} - 秒 ss
+ * - {{week}} - 星期几（中文）
+ * - {{timestamp}} - Unix时间戳（毫秒）
+ */
+function processTemplateVariables(template: string): string {
+  const now = new Date()
+  
+  // 格式化函数
+  const pad = (num: number): string => String(num).padStart(2, '0')
+  
+  const year = now.getFullYear()
+  const month = pad(now.getMonth() + 1)
+  const day = pad(now.getDate())
+  const hour = pad(now.getHours())
+  const minute = pad(now.getMinutes())
+  const second = pad(now.getSeconds())
+  
+  const weekDays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
+  const week = weekDays[now.getDay()]
+  
+  // 替换变量
+  return template
+    .replace(/\{\{datetime\}\}/g, `${year}-${month}-${day} ${hour}:${minute}:${second}`)
+    .replace(/\{\{date\}\}/g, `${year}-${month}-${day}`)
+    .replace(/\{\{time\}\}/g, `${hour}:${minute}:${second}`)
+    .replace(/\{\{year\}\}/g, String(year))
+    .replace(/\{\{month\}\}/g, month)
+    .replace(/\{\{day\}\}/g, day)
+    .replace(/\{\{hour\}\}/g, hour)
+    .replace(/\{\{minute\}\}/g, minute)
+    .replace(/\{\{second\}\}/g, second)
+    .replace(/\{\{week\}\}/g, week)
+    .replace(/\{\{timestamp\}\}/g, String(now.getTime()))
 }
 
 // ===== 点击序列执行 =====
@@ -865,9 +972,19 @@ export function cleanup() {
     mutationObserver = null
   }
   
-  if (clickHandler) {
-    document.removeEventListener('click', clickHandler, true)
-    clickHandler = null
+  if (pageObserver) {
+    pageObserver.disconnect()
+    pageObserver = null
+  }
+  
+  if (mobileToolbarClickHandler) {
+    document.removeEventListener('click', mobileToolbarClickHandler, true)
+    mobileToolbarClickHandler = null
+  }
+  
+  if (customButtonClickHandler) {
+    document.removeEventListener('click', customButtonClickHandler, true)
+    customButtonClickHandler = null
   }
   
   // 清理移动端样式
@@ -879,8 +996,13 @@ export function cleanup() {
   // 清理属性
   const toolbars = document.querySelectorAll('.protyle-breadcrumb__bar, .protyle-breadcrumb')
   toolbars.forEach(toolbar => {
-    toolbar.removeAttribute('data-input-method')
-    toolbar.removeAttribute('data-toolbar-customized')
+    // 只清理我们添加的属性，不干扰原生面包屑的隐藏逻辑
+    if (toolbar.getAttribute('data-toolbar-customized') === 'true') {
+      toolbar.removeAttribute('data-input-method')
+      toolbar.removeAttribute('data-toolbar-customized')
+      // 不移除fn__none类，保留原生的隐藏状态
+      // toolbar.classList.remove('fn__none')
+    }
   })
   
   // 移除CSS变量

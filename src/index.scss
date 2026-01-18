@@ -41,26 +41,26 @@
   transition: bottom 0.3s ease !important;
 }
 
-// 移动端底部按钮区域避免被工具栏遮挡
+// 移动端设置对话框按钮区域放在右下角
 @media (max-width: 768px) {
-  .b3-dialog__action {
+  // 只针对插件设置对话框
+  .b3-dialog[data-plugin-dialog="toolbar-customizer"] .b3-dialog__action {
     position: fixed !important;
-    top: 8px !important;
-    right: 60px !important;
+    bottom: 20px !important;
+    right: 20px !important;
+    top: auto !important;
     left: auto !important;
-    bottom: auto !important;
     padding: 0 !important;
     border: none !important;
     background: transparent !important;
     flex-direction: row-reverse !important;
     gap: 8px !important;
     z-index: 10 !important;
-  }
-  
-  // 按钮样式调整
-  .b3-dialog__action .b3-button {
-    margin: 0 !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+    
+    .b3-button {
+      margin: 0 !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+    }
   }
 }
 

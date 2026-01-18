@@ -1,6 +1,36 @@
-# 工具栏定制器
 
-一个强大的思源笔记工具栏定制插件，为桌面端和移动端提供全面的工具栏控制功能。
+### 核心功能亮点
+
+- 🎨 **自由定制工具栏布局**，满足个性化使用需求  
+- 📱 **兼容桌面与手机端**，无缝衔接多终端操作体验  
+- ⚙️ **简洁易用的配置界面**，无需复杂操作即可生效  
+- 🚀 **高性能低资源占用**，流畅运行不拖慢笔记速度  
+
+<hr style="border: none; height: 3px; background-color: red;">
+
+# 📌 v1.0.5更新说明（Changelog）
+
+---
+
+## 🛠 修复（Fixes）
+
+1. 修复了**插件设置中“保存 / 取消”按钮位置**异常，导致影响思源原有设置布局的问题  
+2. 修复了**工具栏按钮无法正常删除**的问题  
+3. 修复了**底部工具栏遮挡设置界面**的问题  
+
+---
+
+## ✨ 新增（Features）
+
+1. 新增**插入模板内容**功能，支持自动填充**时间、日期**  
+2. 手机端新增**工具栏高度设置**  
+3. 手机端新增**工具栏层级（z-index）设置**
+
+---
+
+
+<hr style="border: none; height: 3px; background-color: red;">
+
 
 ## 功能特性
 
@@ -42,24 +72,10 @@
   - 内置功能 ID 参考:[思源笔记常用功能 ID 速查表](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/v1.0.4/README_BUILTIN_IDS.md) 
 
 
-## 安装
+<hr style="border: none; height: 3px; background-color: red;">
 
-### 从插件集市安装
 
-1. 打开思源笔记
-2. 进入 设置 → 集市 → 插件
-3. 搜索"工具栏定制器"
-4. 点击安装
-
-### 手动安装
-
-1. 从 [GitHub Releases](https://github.com/siyuan-note/siyuan-toolbar-customizer/releases) 下载最新版本
-2. 解压 zip 文件
-3. 将文件夹复制到 `{工作空间}/data/plugins/`
-4. 重启思源笔记
-5. 在 设置 → 集市 → 已下载 中启用插件
-
-## 使用指南
+## 《使用指南》
 
 ### 添加自定义按钮
 
@@ -159,6 +175,44 @@
 - 检查偏移值是否为有效的 CSS 单位（px、vh 等）
 - 如果工具栏跳动，尝试禁用滑动手势
 
+
+<hr style="border: none; height: 3px; background-color: red;">
+
+## 🧧 打赏支持
+
+感谢您的支持，这将鼓励作者持续开发
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment1.png" alt="打赏二维码" width="300">
+</div>
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment2.png" alt="打赏二维码" width="300">
+</div>
+
+
+<hr style="border: none; height: 3px; background-color: red;">
+
+
+## 安装
+
+### 从插件集市安装
+
+1. 打开思源笔记
+2. 进入 设置 → 集市 → 插件
+3. 搜索"工具栏定制器"
+4. 点击安装
+
+### 手动安装
+
+1. 从 [GitHub Releases](https://github.com/siyuan-note/siyuan-toolbar-customizer/releases) 下载最新版本
+2. 解压 zip 文件
+3. 将文件夹复制到 `{工作空间}/data/plugins/`
+4. 重启思源笔记
+5. 在 设置 → 集市 → 已下载 中启用插件
+
+<hr style="border: none; height: 3px; background-color: red;">
+
 ## 开发
 
 ### 从源码构建
@@ -214,14 +268,3 @@ MIT 许可证 - 详见 LICENSE 文件
 - 图标来自 [Lucide](https://lucide.dev/)
 - 模板基于 [Vite + Vue 插件模板](https://github.com/siyuan-note/siyuan-toolbar-customizer)
 
-## 🧧 打赏支持
-
-感谢您的支持，这将鼓励作者持续开发
-
-<div align="center">
-  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment1.png" alt="打赏二维码" width="300">
-</div>
-
-<div align="center">
-  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment2.png" alt="打赏二维码" width="300">
-</div>

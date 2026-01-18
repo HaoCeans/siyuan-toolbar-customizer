@@ -114,7 +114,8 @@ export default class ToolbarCustomizer extends Plugin {
 
       // 加载电脑端按钮配置
       const savedDesktopButtons = await this.loadData('desktopButtonConfigs')
-      if (savedDesktopButtons && savedDesktopButtons.length > 0) {
+      if (savedDesktopButtons !== null && savedDesktopButtons !== undefined) {
+        // 如果配置存在（即使是空数组），则使用保存的配置
         this.desktopButtonConfigs = savedDesktopButtons.map((btn: any) => ({
           ...btn,
           minWidth: btn.minWidth !== undefined ? btn.minWidth : 32,
@@ -122,13 +123,14 @@ export default class ToolbarCustomizer extends Plugin {
           clickSequence: btn.clickSequence || []
         }))
       } else {
-        // 使用桌面端默认配置
+        // 只有在配置完全不存在时才使用默认配置
         this.desktopButtonConfigs = DEFAULT_DESKTOP_BUTTONS.map(btn => ({...btn}))
       }
 
       // 加载手机端按钮配置
       const savedMobileButtons = await this.loadData('mobileButtonConfigs')
-      if (savedMobileButtons && savedMobileButtons.length > 0) {
+      if (savedMobileButtons !== null && savedMobileButtons !== undefined) {
+        // 如果配置存在（即使是空数组），则使用保存的配置
         this.mobileButtonConfigs = savedMobileButtons.map((btn: any) => ({
           ...btn,
           minWidth: btn.minWidth !== undefined ? btn.minWidth : 32,
@@ -136,7 +138,7 @@ export default class ToolbarCustomizer extends Plugin {
           clickSequence: btn.clickSequence || []
         }))
       } else {
-        // 使用移动端默认配置
+        // 只有在配置完全不存在时才使用默认配置
         this.mobileButtonConfigs = DEFAULT_MOBILE_BUTTONS.map(btn => ({...btn}))
       }
       
@@ -262,10 +264,10 @@ export default class ToolbarCustomizer extends Plugin {
         
         const renderList = () => {
           listContainer.innerHTML = ''
-          const sortedButtons = [...this.desktopButtonConfigs].sort((a, b) => a.sort - b.sort)
+          const sortedButtons = [...this.buttonConfigs].sort((a, b) => a.sort - b.sort)
           
           sortedButtons.forEach((button, index) => {
-            const item = this.createDesktopButtonItem(button, index, renderList, this.desktopButtonConfigs)
+            const item = this.createDesktopButtonItem(button, index, renderList, this.buttonConfigs)
             listContainer.appendChild(item)
             
             // 只有在是刚添加的按钮时才自动展开
@@ -527,7 +529,7 @@ export default class ToolbarCustomizer extends Plugin {
 
     setting.addItem({
       title: '按钮列表（可长按拖动排序）',
-      description: `已配置 ${this.buttonConfigs.length} 个按钮，点击展开编辑`,
+      description: `已配置 ${this.isMobile ? this.mobileButtonConfigs.length : this.desktopButtonConfigs.length} 个按钮，点击展开编辑`,
       createActionElement: () => {
         const container = document.createElement('div')
         container.style.cssText = 'width: 100%; padding: 8px 0;'
@@ -554,7 +556,7 @@ export default class ToolbarCustomizer extends Plugin {
           const sortedButtons = [...this.buttonConfigs].sort((a, b) => a.sort - b.sort)
           
           sortedButtons.forEach((button, index) => {
-            const item = this.createMobileButtonItem(button, index, renderList, this.mobileButtonConfigs)
+            const item = this.createMobileButtonItem(button, index, renderList, this.buttonConfigs)
             listContainer.appendChild(item)
             
             // 只有在是刚添加的按钮时才自动展开
@@ -1143,17 +1145,32 @@ export default class ToolbarCustomizer extends Plugin {
     deleteBtn.onclick = (e) => {
       e.stopPropagation()
       if (confirm(`确定删除"${button.name}"？`)) {
-        // 通过button.id查找在原数组中的真实索引
+        // 先尝试通过configsArray删除
+        let deleted = false
         const realIndex = configsArray.findIndex(btn => btn.id === button.id)
         if (realIndex !== -1) {
           configsArray.splice(realIndex, 1)
-          // 删除后重新分配排序值
-          const sortedButtons = [...configsArray].sort((a, b) => a.sort - b.sort)
-          sortedButtons.forEach((btn, idx) => {
-            btn.sort = idx + 1
-          })
-          renderList()
+          deleted = true
         }
+        
+        // 确保排序值连续
+        configsArray.sort((a, b) => a.sort - b.sort).forEach((btn, idx) => {
+          btn.sort = idx + 1
+        })
+        
+        // 如果未成功删除，尝试从主配置数组中删除
+        if (!deleted) {
+          const mainIndex = this.buttonConfigs.findIndex(btn => btn.id === button.id)
+          if (mainIndex !== -1) {
+            this.buttonConfigs.splice(mainIndex, 1)
+            // 重新分配排序值
+            this.buttonConfigs.sort((a, b) => a.sort - b.sort).forEach((btn, idx) => {
+              btn.sort = idx + 1
+            })
+          }
+        }
+        
+        renderList()
       }
     }
     
@@ -1827,17 +1844,32 @@ export default class ToolbarCustomizer extends Plugin {
     deleteBtn.onclick = (e) => {
       e.stopPropagation()
       if (confirm(`确定删除"${button.name}"？`)) {
-        // 通过button.id查找在原数组中的真实索引
+        // 先尝试通过configsArray删除
+        let deleted = false
         const realIndex = configsArray.findIndex(btn => btn.id === button.id)
         if (realIndex !== -1) {
           configsArray.splice(realIndex, 1)
-          // 删除后重新分配排序值
-          const sortedButtons = [...configsArray].sort((a, b) => a.sort - b.sort)
-          sortedButtons.forEach((btn, idx) => {
-            btn.sort = idx + 1
-          })
-          renderList()
+          deleted = true
         }
+        
+        // 确保排序值连续
+        configsArray.sort((a, b) => a.sort - b.sort).forEach((btn, idx) => {
+          btn.sort = idx + 1
+        })
+        
+        // 如果未成功删除，尝试从主配置数组中删除
+        if (!deleted) {
+          const mainIndex = this.buttonConfigs.findIndex(btn => btn.id === button.id)
+          if (mainIndex !== -1) {
+            this.buttonConfigs.splice(mainIndex, 1)
+            // 重新分配排序值
+            this.buttonConfigs.sort((a, b) => a.sort - b.sort).forEach((btn, idx) => {
+              btn.sort = idx + 1
+            })
+          }
+        }
+        
+        renderList()
       }
     }
     

@@ -6,7 +6,25 @@
 - ⚙️ **简洁易用的配置界面**，无需复杂操作即可生效  
 - 🚀 **高性能低资源占用**，流畅运行不拖慢笔记速度  
 
+### 问题反馈请QQ群
+
+<div align="center">
+  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/preview2.png" alt="问题反馈群" width="300">
+</div>
+
 <hr style="border: none; height: 3px; background-color: red;">
+
+# 📌 v1.1.2更新说明
+
+## 🛠 修复
+
+修复了部分Bug
+
+## ✨ 新增
+1. 增加执行快捷键按钮（几乎支持电脑端所有快捷键，不排除部分失效，等待反馈）
+2. 栏内按钮均匀分布设置
+
+---
 
 # 📌 v1.0.6更新说明
 

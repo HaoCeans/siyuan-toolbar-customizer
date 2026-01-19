@@ -20,10 +20,11 @@ export interface MobileToolbarConfig {
 export interface ButtonConfig {
   id: string;                 // 唯一标识
   name: string;              // 按钮名称
-  type: 'builtin' | 'template' | 'click-sequence'; // 功能类型
+  type: 'builtin' | 'template' | 'click-sequence' | 'shortcut'; // 功能类型
   builtinId?: string;        // 思源功能ID（如：menuSearch）
   template?: string;         // 模板内容
   clickSequence?: string[];  // 模拟点击选择器序列
+  shortcutKey?: string;      // 快捷键组合
   icon: string;              // 图标（思源图标或Emoji）
   iconSize: number;          // 图标大小（px）
   minWidth: number;          // 按钮最小宽度（px）
@@ -283,7 +284,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
       style.id = styleId
       document.head.appendChild(style)
     }
-    
+
     style.textContent = `
       /* 移动端工具栏样式 - 修复版 */
       @media (max-width: 768px) {
@@ -308,7 +309,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
           height: ${config.toolbarHeight} !important; /* 应用高度配置 */
           min-height: ${config.toolbarHeight} !important;
         }
-        
+
         .protyle-breadcrumb__bar[data-input-method="open"],
         .protyle-breadcrumb[data-input-method="open"] {
           bottom: var(--mobile-toolbar-offset, 50px) !important;
@@ -433,22 +434,22 @@ function cleanupCustomButtons() {
 function setupEditorButtons(configs: ButtonConfig[]) {
   // 找到所有编辑器
   const editors = document.querySelectorAll('.protyle')
-  
+
   editors.forEach(editor => {
     // 找到退出聚焦按钮
-    const exitFocusBtn = editor.querySelector('.protyle-breadcrumb__bar [data-type="exit-focus"]') || 
+    const exitFocusBtn = editor.querySelector('.protyle-breadcrumb__bar [data-type="exit-focus"]') ||
                         editor.querySelector('.protyle-breadcrumb [data-type="exit-focus"]')
     if (!exitFocusBtn) return
-    
+
     // 过滤并排序按钮
     const buttonsToAdd = configs
       .filter(button => shouldShowButton(button))
       .sort((a, b) => a.sort - b.sort)
-    
+
     // 清理旧的插件按钮
     const oldButtons = editor.querySelectorAll('[data-custom-button]')
     oldButtons.forEach(btn => btn.remove())
-    
+
     // 添加新按钮
     buttonsToAdd.forEach(buttonConfig => {
       const button = createButtonElement(buttonConfig)
@@ -463,53 +464,58 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
   button.className = 'block__icon fn__flex-center ariaLabel'
   button.setAttribute('aria-label', config.name)
   button.title = config.name
-  
-  // 基础样式（包含用户可配置的最小宽度）
-  const baseStyle = `
-    line-height: 1;
-    cursor: pointer;
-    user-select: none;
-    transition: all 0.2s ease;
-    min-width: ${config.minWidth}px;
-    min-height: 32px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    padding: 4px;
-  `
-  
+
   // 设置图标
   if (config.icon.startsWith('icon')) {
     // 思源图标
-    button.style.cssText = baseStyle + `
+    button.style.cssText = `
+      line-height: 1;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s ease;
+      min-height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      padding: 4px;
       margin-right: ${config.marginRight}px;
     `
-    
+
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     svg.setAttribute('width', `${config.iconSize}`)
     svg.setAttribute('height', `${config.iconSize}`)
     svg.style.cssText = 'display: block;'
-    
+
     const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
     use.setAttribute('href', `#${config.icon}`)
     svg.appendChild(use)
-    
+
     button.appendChild(svg)
   } else if (config.icon.startsWith('lucide:')) {
     // Lucide 图标
-    button.style.cssText = baseStyle + `
+    button.style.cssText = `
+      line-height: 1;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s ease;
+      min-height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      padding: 4px;
       margin-right: ${config.marginRight}px;
     `
-    
+
     const iconName = config.icon.substring(7)
     try {
       const lucideIcons = require('lucide')
       const IconComponent = lucideIcons[iconName]
-      
+
       if (IconComponent) {
-        const svgString = IconComponent.toSvg({ 
-          width: config.iconSize, 
+        const svgString = IconComponent.toSvg({
+          width: config.iconSize,
           height: config.iconSize
         })
         button.innerHTML = svgString
@@ -521,29 +527,58 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     }
   } else {
     // Emoji 或文本图标
-    button.style.cssText = baseStyle + `
+    button.style.cssText = `
+      line-height: 1;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s ease;
+      min-height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      padding: 4px;
       font-size: ${config.iconSize}px;
       margin-right: ${config.marginRight}px;
     `
     button.textContent = config.icon
   }
-  
+
+  // 保存选区的变量（用于快捷键按钮）
+  let savedSelection: Range | null = null
+  let lastActiveElement: HTMLElement | null = null
+
+  // 在 mousedown 时保存选区和焦点元素（此时编辑器还未失去焦点）
+  button.addEventListener('mousedown', (e) => {
+    const selection = window.getSelection()
+    if (selection && selection.rangeCount > 0) {
+      savedSelection = selection.getRangeAt(0).cloneRange()
+    }
+    lastActiveElement = document.activeElement as HTMLElement
+  })
+
   // 绑定点击事件
   button.addEventListener('click', (e) => {
     e.stopPropagation()
     e.preventDefault()
-    handleButtonClick(config)
+
+    // 将保存的选区传递给处理函数
+    handleButtonClick(config, savedSelection, lastActiveElement)
+
+    // 清理
+    savedSelection = null
+    lastActiveElement = null
   })
-  
+
   return button
 }
 
-function handleButtonClick(config: ButtonConfig) {
+function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
   // 如果开启了右上角提示，显示消息
   if (config.showNotification) {
     showMessage(`执行: ${config.name}`, 1500, 'info')
   }
-  
+
   if (config.type === 'builtin') {
     // 执行思源内置功能
     executeBuiltinFunction(config)
@@ -553,6 +588,9 @@ function handleButtonClick(config: ButtonConfig) {
   } else if (config.type === 'click-sequence') {
     // 执行点击序列
     executeClickSequence(config)
+  } else if (config.type === 'shortcut') {
+    // 执行快捷键，传递保存的选区
+    executeShortcut(config, savedSelection, lastActiveElement)
   }
 }
 
@@ -951,11 +989,6 @@ function clickElement(element: HTMLElement): void {
   }
 }
 
-// ===== 辅助函数：重新加载编辑器按钮 =====
-export function reloadEditorButtons(configs: ButtonConfig[]) {
-  setupEditorButtons(configs)
-}
-
 // ===== 清理函数 =====
 export function cleanup() {
   // 清理自定义按钮
@@ -1007,4 +1040,774 @@ export function cleanup() {
   
   // 移除CSS变量
   document.documentElement.style.removeProperty('--mobile-toolbar-offset')
+}
+
+// ===== 快捷键执行功能 =====
+
+/**
+ * 将思源格式的快捷键（如 ⌥5）解析为键盘事件参数
+ */
+function parseHotkeyToKeyEvent(hotkey: string): KeyboardEventInit | null {
+  if (!hotkey) return null
+
+  const event: KeyboardEventInit = {
+    key: '',
+    code: '',
+    keyCode: undefined,
+    which: undefined,
+    ctrlKey: false,
+    shiftKey: false,
+    altKey: false,
+    metaKey: false,
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+    view: window
+  }
+
+  // 解析修饰键
+  // 思源使用 ⌘ 表示主修饰键：Windows上是Ctrl，Mac上是Command
+  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
+  if (hotkey.includes('⌘')) {
+    if (isMac) {
+      event.metaKey = true    // Mac: Command键
+    } else {
+      event.ctrlKey = true    // Windows/Linux: Ctrl键
+    }
+  }
+  if (hotkey.includes('⌃')) event.ctrlKey = true  // Ctrl键（Mac上的物理Ctrl）
+  if (hotkey.includes('⇧')) event.shiftKey = true // Shift
+  if (hotkey.includes('⌥')) event.altKey = true   // Alt/Option
+
+  // 移除修饰键，获取主键
+  let mainKey = hotkey
+    .replace(/[⌘⌃⇧⌥]/g, '')
+    .trim()
+
+  if (!mainKey) return null
+
+  // keyCode 映射表
+  const keyCodeMap: Record<string, number> = {
+    // 数字 0-9
+    '0': 48, '1': 49, '2': 50, '3': 51, '4': 52,
+    '5': 53, '6': 54, '7': 55, '8': 56, '9': 57,
+    // 字母 A-Z
+    'a': 65, 'b': 66, 'c': 67, 'd': 68, 'e': 69,
+    'f': 70, 'g': 71, 'h': 72, 'i': 73, 'j': 74,
+    'k': 75, 'l': 76, 'm': 77, 'n': 78, 'o': 79,
+    'p': 80, 'q': 81, 'r': 82, 's': 83, 't': 84,
+    'u': 85, 'v': 86, 'w': 87, 'x': 88, 'y': 89, 'z': 90,
+    // 特殊键
+    'Enter': 13,
+    'Escape': 27,
+    'Backspace': 8,
+    'Tab': 9,
+    'Delete': 46,
+    'Space': 32,
+    'ArrowUp': 38,
+    'ArrowDown': 40,
+    'ArrowLeft': 37,
+    'ArrowRight': 39,
+    'F1': 112, 'F2': 113, 'F3': 114, 'F4': 115, 'F5': 116,
+    'F6': 117, 'F7': 118, 'F8': 119, 'F9': 120, 'F10': 121,
+    'F11': 122, 'F12': 123
+  }
+
+  // 处理功能键 F1-F12
+  if (/^F\d{1,2}$/.test(mainKey)) {
+    event.key = mainKey
+    event.code = mainKey
+    event.keyCode = keyCodeMap[mainKey]
+    event.which = keyCodeMap[mainKey]
+    return event
+  }
+
+  // 处理特殊键
+  if (keyCodeMap[mainKey]) {
+    const specialKeyNames: Record<string, string> = {
+      'Space': ' ',
+      'Enter': 'Enter',
+      'Escape': 'Escape',
+      'Backspace': 'Backspace',
+      'Tab': 'Tab',
+      'Delete': 'Delete',
+      'ArrowUp': 'ArrowUp',
+      'ArrowDown': 'ArrowDown',
+      'ArrowLeft': 'ArrowLeft',
+      'ArrowRight': 'ArrowRight',
+    }
+
+    event.key = specialKeyNames[mainKey] || mainKey
+    event.code = mainKey
+    event.keyCode = keyCodeMap[mainKey]
+    event.which = keyCodeMap[mainKey]
+    return event
+  }
+
+  // 处理单个字符（字母或数字）
+  if (mainKey.length === 1) {
+    event.key = mainKey.toUpperCase()
+    event.keyCode = keyCodeMap[mainKey.toLowerCase()]
+    event.which = keyCodeMap[mainKey.toLowerCase()]
+
+    // 设置 code
+    if (/^[A-Z]$/.test(mainKey.toUpperCase())) {
+      event.code = `Key${mainKey.toUpperCase()}`
+    } else if (/^[0-9]$/.test(mainKey)) {
+      event.code = `Digit${mainKey}`
+    } else {
+      event.code = mainKey
+    }
+
+    return event
+  }
+
+  return null
+}
+
+/**
+ * 将用户输入的快捷键转换为思源格式的快捷键字符串
+ * 思源使用 ⌘ 表示主修饰键（Windows:Ctrl, Mac:Command）
+ * 例如：Alt+5 -> ⌥5, Ctrl+B -> ⌘B, Alt+P -> ⌥P
+ */
+function convertToSiyuanHotkey(shortcut: string): string {
+  let result = shortcut.trim()
+
+  // 替换修饰键为思源格式的符号（保留大小写）
+  // 思源使用 ⌘ 表示主修饰键（Windows上是Ctrl，Mac上是Command）
+  // Ctrl/Control -> ⌘, Alt -> ⌥, Shift -> ⇧
+  result = result
+    .replace(/ctrl\+/gi, '⌘')     // Ctrl -> ⌘
+    .replace(/control\+/gi, '⌘')  // Control -> ⌘
+    .replace(/shift\+/gi, '⇧')    // Shift -> ⇧
+    .replace(/alt\+/gi, '⌥')      // Alt -> ⌥
+    .replace(/option\+/gi, '⌥')   // Option -> ⌥ (Mac)
+    .replace(/cmd\+/gi, '⌘')      // Cmd -> ⌘
+    .replace(/command\+/gi, '⌘')  // Command -> ⌘
+    .replace(/\+/g, '')            // 移除所有 + 号
+
+  // 主键保持大写（思源的快捷键配置中使用大写字母）
+  // 例如：Alt+P -> ⌥P，而不是 ⌥p
+  const parts = result.split(/([⌘⌃⇧⌥])/)
+  for (let i = 0; i < parts.length; i++) {
+    // 如果不是修饰键符号，就转大写
+    if (!['⌘', '⌃', '⇧', '⌥'].includes(parts[i])) {
+      parts[i] = parts[i].toUpperCase()
+    }
+  }
+  result = parts.join('')
+
+  // 排序修饰键以匹配思源格式
+  // 思源修饰键顺序: ⇧ (Shift) 在前，⌘ (Command) 在后
+  // 例如: Ctrl+Shift+K -> ⇧⌘K，而不是 ⌘⇧K
+  const modifiers: string[] = []
+  let mainKey = ''
+
+  for (const char of result) {
+    if (char === '⇧') modifiers.push('⇧')
+    else if (char === '⌘') modifiers.push('⌘')
+    else if (char === '⌃') modifiers.push('⌃')
+    else if (char === '⌥') modifiers.push('⌥')
+    else mainKey += char
+  }
+
+  // 思源修饰键顺序: ⇧ ⌃ ⌥ ⌘ (Shift, Ctrl, Alt, Command)
+  const sortOrder = { '⇧': 0, '⌃': 1, '⌥': 2, '⌘': 3 }
+  modifiers.sort((a, b) => sortOrder[a] - sortOrder[b])
+
+  result = modifiers.join('') + mainKey
+
+  return result
+}
+
+/**
+ * 在配置对象中根据快捷键查找命令名称
+ */
+function findCommandByKey(configObj: any, hotkey: string): string | null {
+  if (!configObj) return null
+
+  for (const key in configObj) {
+    const item = configObj[key]
+    // 检查 custom（用户自定义）或 default（默认）是否匹配
+    if (item && (item.custom === hotkey || item.default === hotkey)) {
+      return key
+    }
+  }
+
+  return null
+}
+
+/**
+ * 获取当前活动的 Protyle DOM 元素
+ */
+function getActiveProtyleElement(): HTMLElement | null {
+  const activeElement = document.activeElement as HTMLElement
+  if (activeElement) {
+    const protyleElement = activeElement.closest('.protyle') as HTMLElement
+    if (protyleElement) {
+      return protyleElement
+    }
+  }
+
+  const protyles = document.querySelectorAll('.protyle')
+  for (const protyleElement of Array.from(protyles)) {
+    if (protyleElement) {
+      return protyleElement as HTMLElement
+    }
+  }
+
+  return null
+}
+
+/**
+ * 获取当前活动的 Protyle 实例
+ * 思源的 protyle 实例可能存储在 window.siyuan.layout 或其他位置
+ */
+function getActiveProtyle(): any | null {
+  const windowObj = window as any
+
+  // 移动端：直接从 window.siyuan.mobile.editor.protyle 获取
+  if (windowObj.siyuan?.mobile?.editor?.protyle) {
+    return windowObj.siyuan.mobile.editor.protyle
+  }
+
+  // 桌面端：尝试从 layout 的 children 中查找
+  if (windowObj.siyuan?.layout?.centerLayout?.children) {
+    const children = windowObj.siyuan.layout.centerLayout.children
+    for (const child of children) {
+      if (child.children && child.children.length > 0) {
+        // 找到当前活动的 tab
+        for (const tab of child.children) {
+          // 尝试从 panelElement 获取
+          if (tab.panelElement) {
+            const protyleDiv = tab.panelElement.querySelector('.protyle')
+            if (protyleDiv && (protyleDiv as any).protyle) {
+              return (protyleDiv as any).protyle
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 尝试从所有 .protyle 元素中查找
+  const protyleElements = document.querySelectorAll('.protyle')
+  for (const element of Array.from(protyleElements)) {
+    if ((element as any).protyle) {
+      return (element as any).protyle
+    }
+  }
+
+  return null
+}
+
+/**
+ * 保存和恢复选区
+ */
+function saveSelection(): Range | null {
+  const selection = window.getSelection()
+  if (selection && selection.rangeCount > 0) {
+    return selection.getRangeAt(0).cloneRange()
+  }
+  return null
+}
+
+function restoreSelection(range: Range | null) {
+  if (!range) return
+  const selection = window.getSelection()
+  selection?.removeAllRanges()
+  selection?.addRange(range)
+}
+
+/**
+ * 获取当前光标所在块的 ID
+ */
+function getCurrentBlockId(protyleElement: HTMLElement | null): string | null {
+  if (!protyleElement) return null
+
+  // 查找当前焦点的块元素
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0) return null
+
+  let node = selection.anchorNode
+  while (node && node !== protyleElement) {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node as HTMLElement
+      // 查找带有 data-node-id 的元素
+      if (element.dataset.nodeId) {
+        return element.dataset.nodeId
+      }
+      // 查找 .b3-list__item（块列表项）
+      const listItem = element.closest('[data-node-id]')
+      if (listItem && (listItem as HTMLElement).dataset.nodeId) {
+        return (listItem as HTMLElement).dataset.nodeId
+      }
+    }
+    node = node.parentElement
+  }
+
+  return null
+}
+
+/**
+ * 复制文本到剪切板（兼容移动端）
+ */
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    // 尝试使用现代 Clipboard API
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+
+    // 备用方案：使用 execCommand
+    const textArea = document.createElement('textarea')
+    textArea.value = text
+    textArea.style.position = 'fixed'
+    textArea.style.left = '-9999px'
+    textArea.style.top = '0'
+    document.body.appendChild(textArea)
+    textArea.select()
+    const successful = document.execCommand('copy')
+    document.body.removeChild(textArea)
+    return successful
+  } catch (err) {
+    console.error('复制失败:', err)
+    return false
+  }
+}
+
+/**
+ * 执行思源命令（通过查找思源的命令执行函数）
+ */
+function executeSiyuanCommand(command: string, protyle?: any) {
+  const windowObj = window as any
+
+  console.log('执行命令:', command, 'protyle:', protyle ? '有' : '无')
+
+  // ========== 新方法：直接触发思源的快捷键处理系统 ==========
+  // 思源监听键盘事件来处理快捷键，我们模拟真实的键盘事件
+
+  // 解析快捷键（从命令反推快捷键，或者直接使用原始快捷键）
+  // 首先尝试从 keymap 中查找这个命令对应的快捷键
+  let hotkeyToTrigger = ''
+  if (windowObj.siyuan?.config?.keymap) {
+    const keymap = windowObj.siyuan.config.keymap
+
+    // 在 general 中查找
+    if (keymap.general && keymap.general[command]) {
+      const item = keymap.general[command]
+      hotkeyToTrigger = item.custom || item.default
+    }
+
+    // 在 editor 中查找
+    if (!hotkeyToTrigger && keymap.editor) {
+      if (keymap.editor.general && keymap.editor.general[command]) {
+        const item = keymap.editor.general[command]
+        hotkeyToTrigger = item.custom || item.default
+      }
+      if (keymap.editor.insert && keymap.editor.insert[command]) {
+        const item = keymap.editor.insert[command]
+        hotkeyToTrigger = item.custom || item.default
+      }
+    }
+  }
+
+  if (hotkeyToTrigger) {
+    console.log('尝试触发快捷键事件:', hotkeyToTrigger)
+
+    // 解析快捷键并创建键盘事件
+    const keyEvent = parseHotkeyToKeyEvent(hotkeyToTrigger)
+
+    if (keyEvent) {
+      // 在 window 和 document.body 上同时触发快捷键事件
+      const eventDown = new KeyboardEvent('keydown', keyEvent)
+      const eventUp = new KeyboardEvent('keyup', keyEvent)
+
+      // 先在 window 上触发
+      window.dispatchEvent(eventDown)
+      window.dispatchEvent(eventUp)
+
+      // 再在 body 上触发
+      document.body.dispatchEvent(eventDown)
+      document.body.dispatchEvent(eventUp)
+
+      console.log('已触发键盘事件:', keyEvent)
+
+      // 快捷键触发成功，直接返回
+      showMessage(`执行: ${config.shortcutKey}`, 1500, 'info')
+      return
+    }
+  }
+
+  // ========== 备用方法：点击按钮 ==========
+  console.log('尝试备用方法：点击按钮')
+
+  const generalCommandHandlers: Record<string, () => void> = {
+    'dailyNote': () => {
+      console.log('尝试通过多种方式打开日记')
+
+      const siyuan = (window as any).siyuan
+
+      // 方法1: 尝试使用 window.siyuan 中的函数
+      if (siyuan) {
+        console.log('siyuan 对象的键:', Object.keys(siyuan))
+
+        // 尝试查找可能的日记相关函数
+        for (const key in siyuan) {
+          if (typeof siyuan[key] === 'function' && key.toLowerCase().includes('daily')) {
+            console.log('找到日记相关函数:', key)
+            try {
+              siyuan[key]()
+              console.log('调用成功')
+              return
+            } catch (e) {
+              console.log('调用失败:', e)
+            }
+          }
+        }
+      }
+
+      // 方法2: 尝试通过 fetchSyncPost 调用思源 API
+      try {
+        console.log('尝试通过思源 API 打开日记')
+
+        if (typeof (window as any).fetchSyncPost === 'function') {
+          console.log('fetchSyncPost 存在，尝试调用')
+
+          ;(window as any).fetchSyncPost('/api/notebook/lsNotebooks', {}).then((result: any) => {
+            console.log('笔记本列表:', result)
+            if (result.code === 0 && result.data) {
+              const dailyNotebook = result.data.notebooks?.find((nb: any) =>
+                nb.name?.includes('日记') || nb.name?.includes('Daily')
+              )
+              if (dailyNotebook) {
+                console.log('找到日记笔记本:', dailyNotebook)
+              }
+            }
+          })
+        }
+      } catch (e) {
+        console.log('API 调用失败:', e)
+      }
+
+      // 方法3: 查找并触发菜单容器
+      const menuContainers = document.querySelectorAll('.b3-menu, [role="menu"]')
+      console.log('找到', menuContainers.length, '个菜单容器')
+
+      menuContainers.forEach(menu => {
+        const items = menu.querySelectorAll('.b3-menu__item, [role="menuitem"]')
+        items.forEach(item => {
+          const text = item.textContent?.trim()
+          if (text?.includes('日记')) {
+            console.log('找到日记菜单项:', text)
+            ;(item as HTMLElement).click()
+          }
+        })
+      })
+
+      console.log('所有方法尝试完毕，仍未找到打开日记的方法')
+    },
+    'search': () => {
+      const searchBtn = document.querySelector('[data-type="search"]') as HTMLElement
+      if (searchBtn) searchBtn.click()
+    },
+    'globalSearch': () => {
+      const globalSearchBtn = document.querySelector('[data-type="globalSearch"]') as HTMLElement
+      if (globalSearchBtn) globalSearchBtn.click()
+    },
+    'replace': () => {
+      const replaceBtn = document.querySelector('[data-type="replace"]') as HTMLElement
+      if (replaceBtn) replaceBtn.click()
+    },
+    'commandPanel': () => {
+      if (windowObj.siyuan?.commandPanel) {
+        windowObj.siyuan.commandPanel()
+      }
+    },
+    'config': () => {
+      const settingBtn = document.querySelector('[data-type="setting"]') as HTMLElement
+      if (settingBtn) settingBtn.click()
+    },
+    'newFile': () => {
+      const newFileBtn = document.querySelector('[data-type="newFile"]') as HTMLElement
+      if (newFileBtn) newFileBtn.click()
+    },
+    'closeTab': () => {
+      const closeTabBtn = document.querySelector('[data-type="closeTab"]') as HTMLElement
+      if (closeTabBtn) closeTabBtn.click()
+    },
+  }
+
+  if (generalCommandHandlers[command]) {
+    generalCommandHandlers[command]()
+    return
+  }
+
+  // 方法4: 对于编辑器命令，使用 protyle 实例
+  if (protyle) {
+    // 插入类命令（加粗、斜体、链接等）
+    const insertCommands = [
+      'bold', 'italic', 'underline', 'mark', 'strike', 'code', 'inline-code',
+      'inline-math', 'link', 'ref', 'tag', 'check', 'list', 'ordered-list',
+      'table', 'kbd', 'sup', 'sub', 'memo', 'clearInline'
+    ]
+
+    if (insertCommands.includes(command)) {
+      if (protyle.insert) {
+        protyle.insert(command)
+        return
+      }
+    }
+
+    // 编辑器通用命令
+    const editorCommandHandlers: Record<string, (p: any) => void> = {
+      'undo': (p) => p.document?.execUndo?.(),
+      'redo': (p) => p.document?.execRedo?.(),
+      'duplicate': (p) => p.duplicate?.(),
+      'expand': (p) => p.document?.execExpand?.(),
+      'collapse': (p) => p.document?.execCollapse?.(),
+    }
+
+    if (editorCommandHandlers[command]) {
+      editorCommandHandlers[command](protyle)
+      return
+    }
+  }
+
+  showMessage(`无法执行命令: ${command}`, 3000, 'error')
+}
+
+/**
+ * 执行快捷键（主入口函数）
+ */
+function executeShortcut(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
+  if (!config.shortcutKey) {
+    showMessage(`按钮"${config.name}"未配置快捷键`, 3000, 'error')
+    return
+  }
+
+  try {
+    // 转换为思源的快捷键格式
+    const siyuanHotkey = convertToSiyuanHotkey(config.shortcutKey)
+    console.log('执行快捷键:', config.shortcutKey, '-> 转换为:', siyuanHotkey)
+
+    // 获取思源的快捷键配置
+    const windowObj = window as any
+    let command: string | null = null
+
+    if (windowObj.siyuan?.config?.keymap) {
+      const keymap = windowObj.siyuan.config.keymap
+
+      // 在 general 中查找
+      command = findCommandByKey(keymap.general, siyuanHotkey)
+
+      // 在 editor.general 中查找
+      if (!command && keymap.editor?.general) {
+        command = findCommandByKey(keymap.editor.general, siyuanHotkey)
+      }
+
+      // 在 editor.insert 中查找
+      if (!command && keymap.editor?.insert) {
+        command = findCommandByKey(keymap.editor.insert, siyuanHotkey)
+      }
+
+      // 在 editor.heading 中查找
+      if (!command && keymap.editor?.heading) {
+        command = findCommandByKey(keymap.editor.heading, siyuanHotkey)
+      }
+
+      // 在 editor.list 中查找
+      if (!command && keymap.editor?.list) {
+        command = findCommandByKey(keymap.editor.list, siyuanHotkey)
+      }
+
+      // 在 editor.table 中查找
+      if (!command && keymap.editor?.table) {
+        command = findCommandByKey(keymap.editor.table, siyuanHotkey)
+      }
+
+      // 在 plugin 中查找
+      if (!command && keymap.plugin) {
+        command = findCommandByKey(keymap.plugin, siyuanHotkey)
+      }
+    }
+
+    if (command) {
+      console.log('找到命令:', command)
+
+      // 获取 keymap 和该命令对应的快捷键，以及判断是否为编辑器命令
+      let hotkeyToTrigger = ''
+      let isEditorCommand = false
+      if (windowObj.siyuan?.config?.keymap) {
+        const keymap = windowObj.siyuan.config.keymap
+
+        // 判断是否为编辑器命令
+        isEditorCommand = !!(keymap.editor?.insert?.[command] ||
+                             keymap.editor?.general?.[command] ||
+                             keymap.editor?.heading?.[command] ||
+                             keymap.editor?.list?.[command] ||
+                             keymap.editor?.table?.[command])
+
+        // 获取快捷键
+        if (keymap.general && keymap.general[command]) {
+          const item = keymap.general[command]
+          hotkeyToTrigger = item.custom || item.default
+        } else if (keymap.editor?.general && keymap.editor.general[command]) {
+          const item = keymap.editor.general[command]
+          hotkeyToTrigger = item.custom || item.default
+        } else if (keymap.editor?.insert && keymap.editor.insert[command]) {
+          const item = keymap.editor.insert[command]
+          hotkeyToTrigger = item.custom || item.default
+        } else if (keymap.editor?.heading && keymap.editor.heading[command]) {
+          const item = keymap.editor.heading[command]
+          hotkeyToTrigger = item.custom || item.default
+        } else if (keymap.editor?.list && keymap.editor.list[command]) {
+          const item = keymap.editor.list[command]
+          hotkeyToTrigger = item.custom || item.default
+        } else if (keymap.editor?.table && keymap.editor.table[command]) {
+          const item = keymap.editor.table[command]
+          hotkeyToTrigger = item.custom || item.default
+        }
+      }
+
+      // 触发键盘事件
+      if (hotkeyToTrigger) {
+        const keyEvent = parseHotkeyToKeyEvent(hotkeyToTrigger)
+        if (keyEvent) {
+          // 移动端特殊处理：复制类命令直接使用 protyle 方法
+          const isMobile = isMobileDevice()
+          const copyCommands = ['copyBlockRef', 'copyBlockEmbed', 'copyText', 'copyHPath', 'copyProtocol', 'copyID', 'copyPlainText']
+
+          if (isMobile && isEditorCommand && copyCommands.includes(command)) {
+            const windowObj = window as any
+            let protyle: any = null
+
+            // 移动端：从 window.siyuan.mobile.editor.protyle 获取
+            if (windowObj.siyuan?.mobile?.editor?.protyle) {
+              protyle = windowObj.siyuan.mobile.editor.protyle
+            }
+            // 桌面端：从 layout 获取
+            else if (windowObj.siyuan?.layout?.centerLayout?.children) {
+              const protyleElement = getActiveProtyleElement()
+              if (protyleElement) {
+                const children = windowObj.siyuan.layout.centerLayout.children
+                for (const child of children) {
+                  if (child.children && child.children.length > 0) {
+                    for (const tab of child.children) {
+                      if (tab.panelElement) {
+                        const p = tab.panelElement.querySelector('.protyle')
+                        if (p && p === protyleElement && (p as any).protyle) {
+                          protyle = (p as any).protyle
+                          break
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+            if (protyle && protyle[command]) {
+              try {
+                protyle[command]()
+                showMessage(`复制成功`, 1500, 'info')
+                return
+              } catch (e) {
+                console.error('protyle 方法执行失败:', e)
+              }
+            }
+
+            // 备用方案：直接获取当前块 ID 并生成引用
+            const protyleElement = getActiveProtyleElement()
+            const blockId = getCurrentBlockId(protyleElement)
+            if (blockId) {
+              // 思源块引用格式: ((id)) 为动态引用，!((id)) 为嵌入块
+              let ref = ''
+              if (command === 'copyBlockEmbed') {
+                ref = `!((${blockId}))`
+              } else if (command === 'copyBlockRef') {
+                ref = `((${blockId}))`
+              } else {
+                ref = `((${blockId}))`
+              }
+
+              copyToClipboard(ref).then(success => {
+                if (success) {
+                  showMessage(`已复制: ${ref}`, 1500, 'info')
+                } else {
+                  showMessage(`复制失败`, 3000, 'error')
+                }
+              })
+              return
+            }
+          }
+
+          if (isEditorCommand && savedSelection) {
+            // 编辑器命令：需要恢复选区和焦点
+
+            // 获取编辑器可编辑区域
+            let editArea: HTMLElement | null = null
+            if (lastActiveElement?.matches('[contenteditable="true"]')) {
+              editArea = lastActiveElement
+            } else {
+              const protyleElement = getActiveProtyleElement()
+              editArea = protyleElement?.querySelector('[contenteditable="true"]') as HTMLElement
+            }
+
+            if (editArea) {
+              // 先聚焦到编辑器
+              editArea.focus()
+
+              // 延迟触发，确保聚焦完成
+              setTimeout(() => {
+                // 恢复选区到之前的位置
+                restoreSelection(savedSelection)
+
+                // 触发键盘事件
+                const eventDown = new KeyboardEvent('keydown', keyEvent)
+                editArea.dispatchEvent(eventDown)
+
+                showMessage(`执行: ${config.shortcutKey}`, 1500, 'info')
+              }, 50)
+              return
+            }
+          }
+
+          // 通用命令：在 window 上触发
+          const eventDown = new KeyboardEvent('keydown', keyEvent)
+          window.dispatchEvent(eventDown)
+
+          console.log('已触发键盘事件:', hotkeyToTrigger, '目标: 全局')
+          showMessage(`执行: ${config.shortcutKey}`, 1500, 'info')
+          return
+        }
+      }
+
+      showMessage(`无法执行命令: ${command}`, 3000, 'error')
+    } else {
+      // 未在 keymap 中找到命令，直接触发用户输入的快捷键
+      console.log('未在 keymap 中找到，直接触发快捷键:', siyuanHotkey)
+
+      const keyEvent = parseHotkeyToKeyEvent(siyuanHotkey)
+      if (keyEvent) {
+        try {
+          const eventDown = new KeyboardEvent('keydown', keyEvent)
+          window.dispatchEvent(eventDown)
+          console.log('已触发键盘事件:', siyuanHotkey)
+          showMessage(`执行: ${config.shortcutKey}`, 1500, 'info')
+        } catch (e) {
+          // 思源内部处理此快捷键时出错（可能不是有效快捷键）
+          console.warn('思源处理此快捷键时出错:', e)
+          showMessage(`快捷键可能无效: ${config.shortcutKey}`, 2000, 'warning')
+        }
+      } else {
+        showMessage(`无法解析快捷键: ${config.shortcutKey}`, 3000, 'error')
+      }
+    }
+
+  } catch (error) {
+    console.error('执行快捷键失败:', error)
+    showMessage(`执行快捷键失败: ${config.shortcutKey} - ${error}`, 3000, 'error')
+  }
 }

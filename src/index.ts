@@ -19,7 +19,7 @@ import { destroy, init } from '@/main'
 import * as lucideIcons from 'lucide';
 
 // 导入新功能模块
-import { 
+import {
   initMobileToolbarAdjuster,
   initCustomButtons,
   cleanup,
@@ -114,8 +114,8 @@ export default class ToolbarCustomizer extends Plugin {
 
       // 加载电脑端按钮配置
       const savedDesktopButtons = await this.loadData('desktopButtonConfigs')
-      if (savedDesktopButtons !== null && savedDesktopButtons !== undefined) {
-        // 如果配置存在（即使是空数组），则使用保存的配置
+      if (Array.isArray(savedDesktopButtons)) {
+        // 配置存在且是数组，使用保存的配置
         this.desktopButtonConfigs = savedDesktopButtons.map((btn: any) => ({
           ...btn,
           minWidth: btn.minWidth !== undefined ? btn.minWidth : 32,
@@ -123,14 +123,16 @@ export default class ToolbarCustomizer extends Plugin {
           clickSequence: btn.clickSequence || []
         }))
       } else {
-        // 只有在配置完全不存在时才使用默认配置
+        // 配置不存在或格式错误，使用默认配置
         this.desktopButtonConfigs = DEFAULT_DESKTOP_BUTTONS.map(btn => ({...btn}))
+        // 首次加载后保存默认配置
+        await this.saveData('desktopButtonConfigs', this.desktopButtonConfigs)
       }
 
       // 加载手机端按钮配置
       const savedMobileButtons = await this.loadData('mobileButtonConfigs')
-      if (savedMobileButtons !== null && savedMobileButtons !== undefined) {
-        // 如果配置存在（即使是空数组），则使用保存的配置
+      if (Array.isArray(savedMobileButtons)) {
+        // 配置存在且是数组，使用保存的配置
         this.mobileButtonConfigs = savedMobileButtons.map((btn: any) => ({
           ...btn,
           minWidth: btn.minWidth !== undefined ? btn.minWidth : 32,
@@ -138,8 +140,10 @@ export default class ToolbarCustomizer extends Plugin {
           clickSequence: btn.clickSequence || []
         }))
       } else {
-        // 只有在配置完全不存在时才使用默认配置
+        // 配置不存在或格式错误，使用默认配置
         this.mobileButtonConfigs = DEFAULT_MOBILE_BUTTONS.map(btn => ({...btn}))
+        // 首次加载后保存默认配置
+        await this.saveData('mobileButtonConfigs', this.mobileButtonConfigs)
       }
       
       const savedFeatureConfig = await this.loadData('featureConfig')
@@ -624,10 +628,10 @@ export default class ToolbarCustomizer extends Plugin {
       }
     })
 
-     // 工具栏按钮宽度
+      // 工具栏按钮宽度
     setting.addItem({
-      title: '栏内按钮间距',
-      description: '💡可整体调整按钮间的宽度',
+      title: '📏栏内按钮均匀分布',
+      description: '💡可整体调整按钮间的宽度。<br>   调整建议：每次增加50，会明显变化，感觉合适后，再微调！',
       createActionElement: () => {
         const input = document.createElement('input')
         input.className = 'b3-text-field fn__flex-center fn__size200'
@@ -642,7 +646,6 @@ export default class ToolbarCustomizer extends Plugin {
         return input
       }
     })
-
 
     setting.addItem({
       title: '①距离底部高度',
@@ -819,10 +822,7 @@ export default class ToolbarCustomizer extends Plugin {
       }
     })
 
-    
-
    
-    
     // === 小功能选择 ===
     createGroupTitle('⚙️', '小功能选择')
 
@@ -1188,6 +1188,7 @@ export default class ToolbarCustomizer extends Plugin {
     editForm.appendChild(this.createDesktopSelectField('类型', button.type, [
       // { value: 'builtin', label: '思源内置功能' },  // 电脑端隐藏，代码保留
       { value: 'template', label: '手写模板插入' },
+      { value: 'shortcut', label: '执行快捷键' },
       { value: 'click-sequence', label: '模拟点击序列' }
     ], (v) => { 
       button.type = v as any
@@ -1296,6 +1297,51 @@ export default class ToolbarCustomizer extends Plugin {
       clickSequenceField.appendChild(hint)
       
       editForm.appendChild(clickSequenceField)
+    } else if (button.type === 'shortcut') {
+      // 快捷键配置
+      const shortcutField = document.createElement('div')
+      shortcutField.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
+      
+      const label = document.createElement('label')
+      label.textContent = '快捷键组合'
+      label.style.cssText = 'font-size: 13px;'
+      shortcutField.appendChild(label)
+      
+      const input = document.createElement('input')
+      input.className = 'b3-text-field fn__flex-1'
+      input.type = 'text'
+      input.placeholder = '快捷键格式：Alt+5 / Ctrl+B等'
+      input.value = button.shortcutKey || ''
+      input.style.cssText = 'font-family: monospace;'
+      input.onchange = () => { button.shortcutKey = input.value }
+      
+      shortcutField.appendChild(input)
+      
+      const hint = document.createElement('div')
+      hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding: 8px; background: var(--b3-theme-surface); border-radius: 4px; overflow-x: auto;'
+      hint.innerHTML = `
+        <table style="width: 100%; border-collapse: collapse; font-family: monospace;">
+          <tr><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">快捷键</th><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">功能</th></tr>
+          <tr><td><code>Alt+5</code></td><td>打开日记</td></tr>
+          <tr><td><code>Alt+P</code></td><td>打开设置</td></tr>
+          <tr><td><code>Alt+Shift+P</code></td><td>命令面板</td></tr>
+          <tr><td><code>Ctrl+P</code></td><td>全局搜索</td></tr>
+          <tr><td><code>Ctrl+F</code></td><td>当前文档搜索</td></tr>
+          <tr><td><code>Ctrl+H</code></td><td>替换</td></tr>
+          <tr><td><code>Ctrl+N</code></td><td>新建文档</td></tr>
+          <tr><td><code>Alt+1</code></td><td>文件树</td></tr>
+          <tr><td><code>Alt+2</code></td><td>大纲</td></tr>
+          <tr><td><code>Alt+3</code></td><td>书签</td></tr>
+          <tr><td><code>Alt+4</code></td><td>标签</td></tr>
+          <tr><td><code>Alt+7</code></td><td>反向链接</td></tr>
+          <tr><td><code>Ctrl+W</code></td><td>关闭标签页</td></tr>
+          <tr><td><code>Ctrl+\</code></td><td>左右分屏</td></tr>
+          <tr><td><code>Ctrl+/</code></td><td>上下分屏</td></tr>
+        </table>
+      `
+      
+      shortcutField.appendChild(hint)
+      editForm.appendChild(shortcutField)
     }
     
     editForm.appendChild(this.createDesktopIconField('图标', button.icon, (v) => { 
@@ -1352,7 +1398,9 @@ export default class ToolbarCustomizer extends Plugin {
     form.appendChild(this.createDesktopSelectField('类型', button.type, [
       // { value: 'builtin', label: '思源内置功能' },  // 电脑端隐藏，代码保留
       { value: 'template', label: '手写模板插入' },
+      { value: 'shortcut', label: '执行快捷键' },
       { value: 'click-sequence', label: '模拟点击序列' }
+     
     ], (v) => { 
       button.type = v as any
       const newForm = document.createElement('div')
@@ -1459,6 +1507,51 @@ export default class ToolbarCustomizer extends Plugin {
       clickSequenceField.appendChild(hint)
       
       form.appendChild(clickSequenceField)
+    } else if (button.type === 'shortcut') {
+      // 快捷键配置
+      const shortcutField = document.createElement('div')
+      shortcutField.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
+      
+      const label = document.createElement('label')
+      label.textContent = '快捷键组合'
+      label.style.cssText = 'font-size: 13px;'
+      shortcutField.appendChild(label)
+      
+      const input = document.createElement('input')
+      input.className = 'b3-text-field fn__flex-1'
+      input.type = 'text'
+      input.placeholder = '快捷键格式：Alt+5 / Ctrl+B等'
+      input.value = button.shortcutKey || ''
+      input.style.cssText = 'font-family: monospace;'
+      input.onchange = () => { button.shortcutKey = input.value }
+      
+      shortcutField.appendChild(input)
+      
+      const hint = document.createElement('div')
+      hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding: 8px; background: var(--b3-theme-surface); border-radius: 4px; overflow-x: auto;'
+      hint.innerHTML = `
+        <table style="width: 100%; border-collapse: collapse; font-family: monospace;">
+          <tr><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">快捷键</th><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">功能</th></tr>
+          <tr><td><code>Alt+5</code></td><td>打开日记</td></tr>
+          <tr><td><code>Alt+P</code></td><td>打开设置</td></tr>
+          <tr><td><code>Alt+Shift+P</code></td><td>命令面板</td></tr>
+          <tr><td><code>Ctrl+P</code></td><td>全局搜索</td></tr>
+          <tr><td><code>Ctrl+F</code></td><td>当前文档搜索</td></tr>
+          <tr><td><code>Ctrl+H</code></td><td>替换</td></tr>
+          <tr><td><code>Ctrl+N</code></td><td>新建文档</td></tr>
+          <tr><td><code>Alt+1</code></td><td>文件树</td></tr>
+          <tr><td><code>Alt+2</code></td><td>大纲</td></tr>
+          <tr><td><code>Alt+3</code></td><td>书签</td></tr>
+          <tr><td><code>Alt+4</code></td><td>标签</td></tr>
+          <tr><td><code>Alt+7</code></td><td>反向链接</td></tr>
+          <tr><td><code>Ctrl+W</code></td><td>关闭标签页</td></tr>
+          <tr><td><code>Ctrl+\</code></td><td>左右分屏</td></tr>
+          <tr><td><code>Ctrl+/</code></td><td>上下分屏</td></tr>
+        </table>
+      `
+      
+      shortcutField.appendChild(hint)
+      form.appendChild(shortcutField)
     }
     
     form.appendChild(this.createDesktopIconField('图标', button.icon, (v) => { 
@@ -1898,6 +1991,7 @@ export default class ToolbarCustomizer extends Plugin {
     const typeField = this.createSelectField('类型', button.type, [
       { value: 'builtin', label: '思源内置功能' },
       { value: 'template', label: '手写模板插入' },
+      { value: 'shortcut', label: '执行快捷键' },
       { value: 'click-sequence', label: '模拟点击序列' }
     ], (v) => { 
       button.type = v as any
@@ -2003,6 +2097,41 @@ export default class ToolbarCustomizer extends Plugin {
         clickSequenceContainer.appendChild(hint)
         
         typeFieldsContainer.appendChild(clickSequenceContainer)
+      } else if (button.type === 'shortcut') {
+        // 快捷键配置
+        const shortcutContainer = document.createElement('div')
+        shortcutContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
+        
+        const inputField = this.createInputField('快捷键组合', button.shortcutKey || '', '快捷键格式：Alt+5 / Ctrl+B等', (v) => { button.shortcutKey = v })
+        inputField.querySelector('input')!.style.fontFamily = 'monospace'
+        shortcutContainer.appendChild(inputField)
+        
+        // 添加快捷键提示
+        const hint = document.createElement('div')
+        hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding: 8px; background: var(--b3-theme-surface); border-radius: 4px; overflow-x: auto;'
+        hint.innerHTML = `
+          <table style="width: 100%; border-collapse: collapse; font-family: monospace;">
+            <tr><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">快捷键</th><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">功能</th></tr>
+            <tr><td><code>Alt+5</code></td><td>打开日记</td></tr>
+            <tr><td><code>Alt+P</code></td><td>打开设置</td></tr>
+            <tr><td><code>Alt+Shift+P</code></td><td>命令面板</td></tr>
+            <tr><td><code>Ctrl+P</code></td><td>全局搜索</td></tr>
+            <tr><td><code>Ctrl+F</code></td><td>当前文档搜索</td></tr>
+            <tr><td><code>Ctrl+H</code></td><td>替换</td></tr>
+            <tr><td><code>Ctrl+N</code></td><td>新建文档</td></tr>
+            <tr><td><code>Alt+1</code></td><td>文件树</td></tr>
+            <tr><td><code>Alt+2</code></td><td>大纲</td></tr>
+            <tr><td><code>Alt+3</code></td><td>书签</td></tr>
+            <tr><td><code>Alt+4</code></td><td>标签</td></tr>
+            <tr><td><code>Alt+7</code></td><td>反向链接</td></tr>
+            <tr><td><code>Ctrl+W</code></td><td>关闭标签页</td></tr>
+            <tr><td><code>Ctrl+\\</code></td><td>左右分屏</td></tr>
+            <tr><td><code>Ctrl+/</code></td><td>上下分屏</td></tr>
+          </table>
+        `
+        
+        shortcutContainer.appendChild(hint)
+        typeFieldsContainer.appendChild(shortcutContainer)
       }
     }
     
@@ -2697,7 +2826,7 @@ export default class ToolbarCustomizer extends Plugin {
     // 生成 CSS 规则，使用 !important 来覆盖默认样式
     const cssRules: string[] = []
     
-    if (this.mobileConfig.toolbarBackgroundColor) {
+    if (this.mobileConfig.toolbarBackgroundColor || this.mobileConfig.toolbarZIndex !== undefined) {
       cssRules.push(`
         @media (max-width: 768px) {
           .protyle-breadcrumb__bar[data-input-method],
@@ -2706,6 +2835,7 @@ export default class ToolbarCustomizer extends Plugin {
             opacity: ${this.mobileConfig.toolbarOpacity} !important;
             height: ${this.mobileConfig.toolbarHeight} !important;
             min-height: ${this.mobileConfig.toolbarHeight} !important;
+            z-index: ${this.mobileConfig.toolbarZIndex} !important;
           }
           .protyle {
             padding-bottom: calc(${this.mobileConfig.toolbarHeight} + 10px) !important;

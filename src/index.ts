@@ -16,7 +16,6 @@ import {
 import "@/index.scss";
 import PluginInfoString from '@/../plugin.json'
 import { destroy, init } from '@/main'
-import * as lucideIcons from 'lucide';
 
 // 导入新功能模块
 import {
@@ -31,6 +30,13 @@ import {
   ButtonConfig,
   isMobileDevice
 } from './toolbarManager'
+
+// 导入 UI 组件
+import { showConfirmDialog as showConfirmDialogModal } from './ui/dialog'
+import { showButtonSelector, type ButtonInfo } from './ui/buttonSelector'
+import { showIconPicker as showIconPickerModal } from './ui/iconPicker'
+import { showClickSequenceSelector } from './ui/clickSequenceSelector'
+import { updateIconDisplay as updateIconDisplayUtil } from './data/icons'
 
 // 读取插件配置
 let PluginInfo = {
@@ -123,10 +129,8 @@ export default class ToolbarCustomizer extends Plugin {
           clickSequence: btn.clickSequence || []
         }))
       } else {
-        // 配置不存在或格式错误，使用默认配置
+        // 配置不存在或格式错误，使用默认配置（首次加载时不保存，等用户修改时再保存）
         this.desktopButtonConfigs = DEFAULT_DESKTOP_BUTTONS.map(btn => ({...btn}))
-        // 首次加载后保存默认配置
-        await this.saveData('desktopButtonConfigs', this.desktopButtonConfigs)
       }
 
       // 加载手机端按钮配置
@@ -140,10 +144,8 @@ export default class ToolbarCustomizer extends Plugin {
           clickSequence: btn.clickSequence || []
         }))
       } else {
-        // 配置不存在或格式错误，使用默认配置
+        // 配置不存在或格式错误，使用默认配置（首次加载时不保存，等用户修改时再保存）
         this.mobileButtonConfigs = DEFAULT_MOBILE_BUTTONS.map(btn => ({...btn}))
-        // 首次加载后保存默认配置
-        await this.saveData('mobileButtonConfigs', this.mobileButtonConfigs)
       }
       
       const savedFeatureConfig = await this.loadData('featureConfig')
@@ -152,6 +154,22 @@ export default class ToolbarCustomizer extends Plugin {
           ...this.featureConfig,
           ...savedFeatureConfig
         }
+      }
+
+      // ===== 首次安装提示 =====
+      // 检查是否显示过首次安装提示
+      const hasShownWelcome = await this.loadData('hasShownWelcome')
+      if (!hasShownWelcome) {
+        // 延迟显示欢迎提示，确保界面完全加载
+        setTimeout(() => {
+          if (this.isMobile) {
+            showMessage('欢迎使用本插件🎉🎉\n\n已经默认添加按钮：\n①打开插件设置\n②打开日记\n③插入时间\n④全局搜索', 0, 'info')
+          } else {
+            showMessage('欢迎使用本插件🎉🎉\n\n已经默认添加按钮：\n①打开插件设置\n②打开日记\n③插入时间', 0, 'info')
+          }
+          // 标记已显示过欢迎提示
+          this.saveData('hasShownWelcome', true)
+        }, 2000)
       }
     } catch (error) {
       console.warn('加载配置失败，使用默认配置:', error)
@@ -240,61 +258,62 @@ export default class ToolbarCustomizer extends Plugin {
       // 手机端：使用思源原生 b3-label 布局
       this.createMobileSettingLayout(setting)
     } else {
-      // 电脑端：使用 fn__size200 左右分栏布局
+      // 电脑端：使用标签切换布局
       this.createDesktopSettingLayout(setting)
     }
 
     setting.open('工具栏定制器')
+
+    // 电脑端：对话框打开后注入标签栏
+    if (!this.isMobile) {
+      this.injectTabSwitcher()
+    }
   }
 
   // 电脑端设置布局
   private createDesktopSettingLayout(setting: Setting) {
+    // === 电脑端配置项 ===
 
-
-    // === 电脑端自定义按钮管理 ===
+    // 电脑端自定义按钮
     setting.addItem({
       title: '🖥️ 电脑端自定义按钮',
       description: '管理电脑端工具栏自定义按钮（可拖动排序）',
-      direction: 'row',
       createActionElement: () => {
-        const container = document.createElement('div')
-        container.style.cssText = 'display: flex; flex-direction: column; gap: 8px; width: 100%;'
-        
-        // 按钮列表
+        const wrapper = document.createElement('div')
+        wrapper.className = 'toolbar-customizer-content'
+        wrapper.dataset.tabGroup = 'desktop'
+        wrapper.style.cssText = 'display: flex; flex-direction: column; gap: 8px; width: 100%;'
+
         const listContainer = document.createElement('div')
-        listContainer.style.cssText = 'max-height: 400px; overflow-y: auto; border: 1px solid var(--b3-border-color); border-radius: 4px; padding: 8px;'
-        
+        listContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px;'
+
         let lastAddedButtonId: string | null = null
-        
+
         const renderList = () => {
           listContainer.innerHTML = ''
-          const sortedButtons = [...this.buttonConfigs].sort((a, b) => a.sort - b.sort)
-          
+          const sortedButtons = [...this.desktopButtonConfigs].sort((a, b) => a.sort - b.sort)
+
           sortedButtons.forEach((button, index) => {
-            const item = this.createDesktopButtonItem(button, index, renderList, this.buttonConfigs)
+            const item = this.createDesktopButtonItem(button, index, renderList, this.desktopButtonConfigs)
             listContainer.appendChild(item)
-            
-            // 只有在是刚添加的按钮时才自动展开
+
             if (lastAddedButtonId && button.id === lastAddedButtonId) {
-              // 使用 setTimeout 确保 DOM 已渲染
               setTimeout(() => {
                 const header = item.querySelector('[style*="cursor: pointer"]') as HTMLElement
                 if (header) {
                   header.click()
-                  // 滚动到该按钮
                   item.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
                 }
-                // 清除标记
                 lastAddedButtonId = null
               }, 100)
             }
           })
         }
-        
-        // 添加按钮
+
         const addBtn = document.createElement('button')
         addBtn.className = 'b3-button b3-button--outline'
-        addBtn.innerHTML = '+ 添加新按钮'
+        addBtn.style.cssText = 'width: 100%; margin-bottom: 12px; padding: 10px; border-radius: 6px; font-size: 14px;'
+        addBtn.textContent = '+ 添加新按钮'
         addBtn.onclick = () => {
           const newButton: ButtonConfig = {
             id: `button_${Date.now()}`,
@@ -305,41 +324,41 @@ export default class ToolbarCustomizer extends Plugin {
             iconSize: 18,
             minWidth: 32,
             marginRight: 8,
-            sort: this.buttonConfigs.length + 1,
+            sort: this.desktopButtonConfigs.length + 1,
             platform: 'both',
-            showNotification: true
+            showNotification: true,
+            enabled: true
           }
-          this.buttonConfigs.push(newButton)
+          this.desktopButtonConfigs.push(newButton)
           lastAddedButtonId = newButton.id
           renderList()
         }
-        
+
         renderList()
-        
-        container.appendChild(addBtn)
-        container.appendChild(listContainer)
-        return container
+        wrapper.appendChild(addBtn)
+        wrapper.appendChild(listContainer)
+        return wrapper
       }
     })
 
-    // === 小功能选择 ===
+    // 小功能选择
     setting.addItem({
       title: '⚙️ 小功能选择',
       description: '界面微调与体验优化',
-      direction: 'row',
       createActionElement: () => {
         const container = document.createElement('div')
+        container.className = 'toolbar-customizer-content'
+        container.dataset.tabGroup = 'desktop'
         container.style.cssText = 'display: flex; flex-direction: column; gap: 12px;'
-        
-        // 创建开关项的辅助函数
+
         const createSwitchItem = (labelText: string, checked: boolean, onChange: (value: boolean) => void) => {
           const item = document.createElement('div')
           item.style.cssText = 'display: flex; align-items: center; gap: 12px;'
-          
+
           const label = document.createElement('label')
           label.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
           label.textContent = labelText
-          
+
           const switchEl = document.createElement('input')
           switchEl.type = 'checkbox'
           switchEl.className = 'b3-switch'
@@ -349,23 +368,23 @@ export default class ToolbarCustomizer extends Plugin {
             await this.saveData('featureConfig', this.featureConfig)
             this.applyFeatures()
           }
-          
+
           item.appendChild(label)
           item.appendChild(switchEl)
           return item
         }
-        
-        // 工具栏按钮宽度（放第一个）
+
+        // 工具栏按钮宽度
         const widthItem = document.createElement('div')
         widthItem.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
-        
+
         const widthRow = document.createElement('div')
         widthRow.style.cssText = 'display: flex; align-items: center; gap: 12px;'
-        
+
         const widthLabel = document.createElement('label')
         widthLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
         widthLabel.textContent = '工具栏按钮宽度'
-        
+
         const widthInput = document.createElement('input')
         widthInput.type = 'number'
         widthInput.value = this.featureConfig.toolbarButtonWidth.toString()
@@ -376,129 +395,313 @@ export default class ToolbarCustomizer extends Plugin {
           await this.saveData('featureConfig', this.featureConfig)
           this.applyFeatures()
         }
-        
+
         widthRow.appendChild(widthLabel)
         widthRow.appendChild(widthInput)
-        
+
         const widthDesc = document.createElement('div')
         widthDesc.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
         widthDesc.textContent = '💡 可整体调整按钮间的宽度'
-        
+
         widthItem.appendChild(widthRow)
         widthItem.appendChild(widthDesc)
         container.appendChild(widthItem)
-        
-        // 面包屑图标隐藏
+
         container.appendChild(createSwitchItem('面包屑图标隐藏', this.featureConfig.hideBreadcrumbIcon, (v) => {
           this.featureConfig.hideBreadcrumbIcon = v
         }))
-        
-        // 锁定编辑按钮隐藏
+
         container.appendChild(createSwitchItem('锁定编辑按钮隐藏', this.featureConfig.hideReadonlyButton, (v) => {
           this.featureConfig.hideReadonlyButton = v
         }))
-        
-        // 文档菜单按钮隐藏
+
         container.appendChild(createSwitchItem('文档菜单按钮隐藏', this.featureConfig.hideDocMenuButton, (v) => {
           this.featureConfig.hideDocMenuButton = v
         }))
-        
-        // 更多按钮隐藏
+
         container.appendChild(createSwitchItem('更多按钮隐藏', this.featureConfig.hideMoreButton, (v) => {
           this.featureConfig.hideMoreButton = v
         }))
-        
-        // 手机端禁止左右滑动弹出
-        if (this.isMobile) {
-          container.appendChild(createSwitchItem('禁止左右滑动弹出', this.featureConfig.disableMobileSwipe, (v) => {
-            this.featureConfig.disableMobileSwipe = v
-          }))
-        }
-        
+
         return container
       }
     })
 
-    // === 使用帮助（电脑端）===
+    // === 手机端配置项 ===
+
+    // 手机端自定义按钮
     setting.addItem({
-      title: '📖 使用说明和介绍',
-      description: '功能介绍和使用指南',
-      direction: 'row',
+      title: '📱 手机端自定义按钮',
+      description: `已配置 ${this.mobileButtonConfigs.length} 个按钮，点击展开编辑`,
+      createActionElement: () => {
+        const wrapper = document.createElement('div')
+        wrapper.className = 'toolbar-customizer-content'
+        wrapper.dataset.tabGroup = 'mobile'
+        wrapper.style.cssText = 'display: flex; flex-direction: column; gap: 8px; width: 100%;'
+
+        const listContainer = document.createElement('div')
+        listContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px;'
+
+        let lastAddedButtonId: string | null = null
+
+        const renderList = () => {
+          listContainer.innerHTML = ''
+          const sortedButtons = [...this.mobileButtonConfigs].sort((a, b) => a.sort - b.sort)
+
+          sortedButtons.forEach((button, index) => {
+            const item = this.createMobileButtonItem(button, index, renderList, this.mobileButtonConfigs)
+            listContainer.appendChild(item)
+
+            if (lastAddedButtonId && button.id === lastAddedButtonId) {
+              setTimeout(() => {
+                const header = item.querySelector('[style*="cursor: pointer"]') as HTMLElement
+                if (header) {
+                  header.click()
+                  item.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                }
+                lastAddedButtonId = null
+              }, 100)
+            }
+          })
+        }
+
+        const addBtn = document.createElement('button')
+        addBtn.className = 'b3-button b3-button--outline'
+        addBtn.style.cssText = 'width: 100%; margin-bottom: 12px; padding: 10px; border-radius: 6px; font-size: 14px;'
+        addBtn.textContent = '+ 添加新按钮'
+        addBtn.onclick = () => {
+          const newButton: ButtonConfig = {
+            id: `button_${Date.now()}`,
+            name: '新按钮',
+            type: 'builtin',
+            builtinId: 'menuSearch',
+            icon: 'iconHeart',
+            iconSize: 18,
+            minWidth: 32,
+            marginRight: 8,
+            sort: this.mobileButtonConfigs.length + 1,
+            platform: 'both',
+            showNotification: true,
+            enabled: true
+          }
+          this.mobileButtonConfigs.push(newButton)
+          lastAddedButtonId = newButton.id
+          renderList()
+        }
+
+        renderList()
+        wrapper.appendChild(addBtn)
+        wrapper.appendChild(listContainer)
+        return wrapper
+      }
+    })
+
+    // 底部工具栏配置
+    setting.addItem({
+      title: '📱 底部工具栏配置',
+      description: '💡 开启后才能调整输入法位置相关设置',
       createActionElement: () => {
         const container = document.createElement('div')
-        container.style.cssText = `
-          font-size: 14px;
-          line-height: 1.8;
-          max-height: 500px;
-          overflow-y: auto;
-          padding: 20px;
-          background: var(--b3-theme-background);
+        container.className = 'toolbar-customizer-content'
+        container.dataset.tabGroup = 'mobile'
+        container.style.cssText = 'display: flex; flex-direction: column; gap: 12px;'
+
+        // 是否将工具栏置底
+        const toggleRow = document.createElement('div')
+        toggleRow.style.cssText = `
+         width:100%;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 10px 14px;
+          background: var(--b3-theme-surface);
           border-radius: 8px;
           border: 1px solid var(--b3-border-color);
         `
-        
-        container.innerHTML = `
-          <div style="margin-bottom: 24px; padding: 16px; background: var(--b3-theme-surface); border-radius: 6px; border-left: 4px solid var(--b3-theme-primary);">
-            <div style="font-weight: 600; color: var(--b3-theme-primary); margin-bottom: 12px; font-size: 15px; display: flex; align-items: center; gap: 8px;">
-              <span>📝</span>
-              <span>功能一：手写模板插入</span>
-            </div>
-            <ul style="margin: 0; padding-left: 24px; color: var(--b3-theme-on-surface);">
-              <li style="margin: 6px 0;">可设置模板内容</li>
-              <li style="margin: 6px 0;">点击一键插入到编辑器</li>
-              <li style="margin: 6px 0;">支持 Markdown 格式</li>
-            </ul>
-          </div>
-          
-          <div style="margin-bottom: 24px; padding: 16px; background: var(--b3-theme-surface); border-radius: 6px; border-left: 4px solid var(--b3-theme-primary);">
-            <div style="font-weight: 600; color: var(--b3-theme-primary); margin-bottom: 16px; font-size: 15px; display: flex; align-items: center; gap: 8px;">
-              <span>🎯</span>
-              <span>功能二：模拟点击序列</span>
-            </div>
-            
-            <div style="margin-bottom: 16px; padding: 12px; background: var(--b3-theme-background); border-radius: 4px;">
-              <div style="font-weight: 500; margin-bottom: 10px; color: var(--b3-theme-on-background); display: flex; align-items: center; gap: 6px;">
-                <span style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background: var(--b3-theme-primary); color: white; border-radius: 50%; font-size: 12px; font-weight: 600;">1</span>
-                <span>打开 CSS 选择器</span>
-              </div>
-              <ol style="margin: 0; padding-left: 32px; color: var(--b3-theme-on-surface-light); font-size: 13px;">
-                <li style="margin: 4px 0;">点击左上角主菜单</li>
-                <li style="margin: 4px 0;">点击"开发者工具"</li>
-                <li style="margin: 4px 0;">按 <kbd style="background: var(--b3-theme-surface); padding: 2px 6px; border-radius: 3px; border: 1px solid var(--b3-border-color); font-size: 11px;">Ctrl+Shift+C</kbd> 开启选择器</li>
-                <li style="margin: 4px 0;">选中目标按钮</li>
-                <li style="margin: 4px 0;">查看并复制 ID 等属性</li>
-              </ol>
-            </div>
-            
-            <div style="margin-bottom: 16px; padding: 12px; background: var(--b3-theme-background); border-radius: 4px;">
-              <div style="font-weight: 500; margin-bottom: 10px; color: var(--b3-theme-on-background); display: flex; align-items: center; gap: 6px;">
-                <span style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background: var(--b3-theme-primary); color: white; border-radius: 50%; font-size: 12px; font-weight: 600;">2</span>
-                <span>配置点击序列</span>
-              </div>
-              <div style="padding-left: 32px; color: var(--b3-theme-on-surface-light); font-size: 13px;">
-                根据想执行的顺序，依次添加元素 ID 即可！
-              </div>
-            </div>
-            
-            <div style="padding: 12px; background: var(--b3-theme-background); border-radius: 4px;">
-              <div style="font-weight: 500; margin-bottom: 10px; color: var(--b3-theme-on-background); display: flex; align-items: center; gap: 6px;">
-                <span style="display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; background: var(--b3-theme-primary); color: white; border-radius: 50%; font-size: 12px; font-weight: 600;">3</span>
-                <span>支持的识别方式</span>
-              </div>
-              <div style="padding-left: 32px; display: flex; flex-wrap: wrap; gap: 8px;">
-                <code style="background: var(--b3-theme-primary-lightest); color: var(--b3-theme-primary); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; border: 1px solid var(--b3-theme-primary-light);">id</code>
-                <code style="background: var(--b3-theme-primary-lightest); color: var(--b3-theme-primary); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; border: 1px solid var(--b3-theme-primary-light);">data-id</code>
-                <code style="background: var(--b3-theme-primary-lightest); color: var(--b3-theme-primary); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; border: 1px solid var(--b3-theme-primary-light);">data-type</code>
-                <code style="background: var(--b3-theme-primary-lightest); color: var(--b3-theme-primary); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; border: 1px solid var(--b3-theme-primary-light);">class</code>
-                <code style="background: var(--b3-theme-primary-lightest); color: var(--b3-theme-primary); padding: 4px 10px; border-radius: 4px; font-size: 12px; font-weight: 500; border: 1px solid var(--b3-theme-primary-light);">按钮文本</code>
-              </div>
-            </div>
-          </div>
-        `
-        
+
+        const toggleLabel = document.createElement('span')
+        toggleLabel.textContent = '是否将工具栏置底'
+        toggleLabel.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-surface); font-weight: 500;'
+
+        const toggle = document.createElement('input')
+        toggle.type = 'checkbox'
+        toggle.className = 'b3-switch'
+        toggle.checked = this.mobileConfig.enableBottomToolbar
+        toggle.onchange = async () => {
+          this.mobileConfig.enableBottomToolbar = toggle.checked
+          await this.saveData('mobileConfig', this.mobileConfig)
+        }
+
+        toggleRow.appendChild(toggleLabel)
+        toggleRow.appendChild(toggle)
+        container.appendChild(toggleRow)
+
         return container
       }
     })
+  }
+
+  // 注入标签切换器
+  private injectTabSwitcher() {
+    // 等待对话框渲染完成
+    setTimeout(() => {
+      const dialogContent = document.querySelector('.b3-dialog__content')
+      if (!dialogContent) return
+
+      // 隐藏配置项的标题部分（左边的 .fn__flex-1），因为我们用标签切换器了
+      const style = document.createElement('style')
+      style.textContent = `
+        .b3-dialog__content .config__item > .fn__flex-1 {
+          display: none !important;
+        }
+        .b3-dialog__content .config__item > .fn__space {
+          display: none !important;
+        }
+        .b3-dialog__content .config__item > .fn__flex-column {
+          width: 100% !important;
+          max-width: none !important;
+        }
+      `
+      document.head.appendChild(style)
+
+      // 创建标签栏容器 - 使用思源的分段控制器样式
+      const tabsContainer = document.createElement('div')
+      tabsContainer.className = 'fn__flex'
+      tabsContainer.style.cssText = `
+        padding: 8px 16px 16px 16px;
+        gap: 8px;
+      `
+
+      // 电脑端标签
+      const desktopTab = document.createElement('button')
+      desktopTab.className = 'b3-button'
+      desktopTab.dataset.tab = 'desktop'
+      desktopTab.textContent = '🖥️ 电脑配置'
+      desktopTab.style.cssText = `
+        flex: 1;
+        padding: 8px 16px;
+        font-size: 13px;
+        border-radius: 4px;
+      `
+
+      // 手机端标签
+      const mobileTab = document.createElement('button')
+      mobileTab.className = 'b3-button'
+      mobileTab.dataset.tab = 'mobile'
+      mobileTab.textContent = '📱 手机配置'
+      mobileTab.style.cssText = `
+        flex: 1;
+        padding: 8px 16px;
+        font-size: 13px;
+        border-radius: 4px;
+      `
+
+      const previewConfig = {
+      width: '100%',                 // 宽度：'100%' / '300px' / '20rem' 等
+      fontSize: '17px',
+      textColor: '#000000ff',         // 文字颜色
+      bgColor: '#a3bcf1ff',            // 默认背景色
+      hoverBgColor: '#2563eb',       // 悬停背景色
+      borderColor: '#2563eb'         // 边框颜色
+      }
+
+
+      // 预览链接（只在手机端选中时显示）
+    const previewLink = document.createElement('a')
+    previewLink.href = 'http://127.0.0.1:6806/stage/build/mobile/'
+    previewLink.target = '_blank'
+    previewLink.className = 'b3-button b3-button--outline'
+    previewLink.innerHTML = '🔍 伺服浏览器：预览手机端'
+
+    previewLink.style.cssText = `
+      width: ${previewConfig.width};
+      margin-bottom: 15px;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: ${previewConfig.fontSize};
+      text-align: center;
+      text-decoration: none;
+      display: none;
+      color: ${previewConfig.textColor};
+      background: ${previewConfig.bgColor};
+      border: 1px solid ${previewConfig.borderColor};
+      `
+
+      previewLink.onmouseenter = () => {
+          previewLink.style.background = previewConfig.hoverBgColor
+      }
+
+      previewLink.onmouseleave = () => {
+         previewLink.style.background = previewConfig.bgColor
+      }
+
+      // 预览链接的说明文字
+      const previewHint = document.createElement('div')
+      previewHint.style.cssText = `
+        font-size: 15px;
+        color: var(--b3-theme-on-surface-light);
+        text-align: center;
+        margin-top: 4px;
+        display: none;
+      `
+      previewHint.textContent = '💡点击打开浏览器，可预览手机端效果，本处仅支持插入按钮。更多配置，请同步至手机端设置！'
+
+      // 切换函数
+      const switchTab = (type: 'desktop' | 'mobile') => {
+        // 更新按钮样式
+        if (type === 'desktop') {
+          desktopTab.classList.add('b3-button--primary')
+          desktopTab.classList.remove('b3-button--outline')
+          mobileTab.classList.remove('b3-button--primary')
+          mobileTab.classList.add('b3-button--outline')
+          previewLink.style.display = 'none'
+          previewHint.style.display = 'none'
+        } else {
+          mobileTab.classList.add('b3-button--primary')
+          mobileTab.classList.remove('b3-button--outline')
+          desktopTab.classList.remove('b3-button--primary')
+          desktopTab.classList.add('b3-button--outline')
+          previewLink.style.display = 'block'
+          previewHint.style.display = 'block'
+        }
+
+        // 显示/隐藏对应的配置项
+        // 遍历所有配置项，根据 toolbar-customizer-content 的 data-tabGroup 属性切换显示
+        const allConfigItems = dialogContent.querySelectorAll('.config__item')
+        allConfigItems.forEach(configItem => {
+          const contentEl = configItem.querySelector('.toolbar-customizer-content')
+          if (contentEl) {
+            const tabGroup = (contentEl as HTMLElement).dataset.tabGroup
+            if (tabGroup === type) {
+              ;(configItem as HTMLElement).style.display = ''
+            } else if (tabGroup) {
+              ;(configItem as HTMLElement).style.display = 'none'
+            }
+          }
+        })
+      }
+
+      desktopTab.onclick = () => switchTab('desktop')
+      mobileTab.onclick = () => switchTab('mobile')
+
+      tabsContainer.appendChild(desktopTab)
+      tabsContainer.appendChild(mobileTab)
+
+      // 预览链接容器（插入到标签栏后面，会在第一个配置项前面显示）
+      const previewContainer = document.createElement('div')
+      previewContainer.className = 'toolbar-customizer-preview-container'
+      previewContainer.dataset.tabGroup = 'mobile'
+      previewContainer.style.cssText = 'margin-bottom: 12px;'
+      previewContainer.appendChild(previewLink)
+      previewContainer.appendChild(previewHint)
+
+      // 插入到内容区域顶部
+      dialogContent.insertBefore(tabsContainer, dialogContent.firstChild)
+      dialogContent.insertBefore(previewContainer, tabsContainer.nextSibling)
+
+      // 默认显示电脑端配置
+      switchTab('desktop')
+    }, 100)
   }
 
   // 手机端设置布局
@@ -692,19 +895,23 @@ export default class ToolbarCustomizer extends Plugin {
  // 工具栏背景颜色
     setting.addItem({
       title: '③工具栏背景颜色',
-      description: '💡点击选择工具栏背景颜色',
+      description: '💡点击选择工具栏背景颜色（仅在工具栏置底时有效）',
       createActionElement: () => {
         const colorPicker = document.createElement('input')
         colorPicker.type = 'color'
         colorPicker.value = this.mobileConfig.toolbarBackgroundColor
         colorPicker.style.cssText = 'width: 60px; height: 40px; border: 1px solid var(--b3-border-color); border-radius: 4px; cursor: pointer;'
-        
+        colorPicker.disabled = !this.mobileConfig.enableBottomToolbar
+        if (!this.mobileConfig.enableBottomToolbar) {
+          colorPicker.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed; opacity: 0.5;'
+        }
+
         colorPicker.onchange = async () => {
           this.mobileConfig.toolbarBackgroundColor = colorPicker.value
           await this.saveData('mobileConfig', this.mobileConfig)
           this.applyMobileToolbarStyle()
         }
-        
+
         return colorPicker
       }
     })
@@ -712,32 +919,39 @@ export default class ToolbarCustomizer extends Plugin {
     // 工具栏透明度
     setting.addItem({
       title: '④工具栏透明度',
-      description: '💡(0=完全透明，100=完全不透明)',
+      description: '💡(0=完全透明，100=完全不透明，仅在工具栏置底时有效)',
       createActionElement: () => {
         const container = document.createElement('div')
         container.style.cssText = 'display: flex; align-items: center; gap: 10px;'
-        
+
         const slider = document.createElement('input')
         slider.type = 'range'
         slider.min = '0'
         slider.max = '100'
         slider.value = String(Math.round(this.mobileConfig.toolbarOpacity * 100))
         slider.style.cssText = 'width: 150px; cursor: pointer;'
-        
+        slider.disabled = !this.mobileConfig.enableBottomToolbar
+        if (!this.mobileConfig.enableBottomToolbar) {
+          slider.style.cssText += 'opacity: 0.5; cursor: not-allowed;'
+        }
+
         const valueLabel = document.createElement('span')
         valueLabel.textContent = `${Math.round(this.mobileConfig.toolbarOpacity * 100)}%`
         valueLabel.style.cssText = 'min-width: 40px; font-size: 14px; color: var(--b3-theme-on-surface);'
-        
+        if (!this.mobileConfig.enableBottomToolbar) {
+          valueLabel.style.cssText += 'opacity: 0.5;'
+        }
+
         slider.oninput = () => {
           valueLabel.textContent = `${slider.value}%`
         }
-        
+
         slider.onchange = async () => {
           this.mobileConfig.toolbarOpacity = parseInt(slider.value) / 100
           await this.saveData('mobileConfig', this.mobileConfig)
           this.applyMobileToolbarStyle()
         }
-        
+
         container.appendChild(slider)
         container.appendChild(valueLabel)
         return container
@@ -1059,16 +1273,27 @@ export default class ToolbarCustomizer extends Plugin {
     return field
   }
 
+  // 按钮选择器（已迁移到 ui/buttonSelector.ts）
+  private showButtonIdPicker(currentValue: string, onSelect: (result: ButtonInfo) => void) {
+    showButtonSelector({ currentValue, onSelect })
+  }
+
+  // 自定义确认对话框（已迁移到 ui/dialog.ts，兼容鸿蒙系统）
+  private showConfirmDialog(message: string): Promise<boolean> {
+    return showConfirmDialogModal({ message, confirmText: '删除', cancelText: '取消' })
+  }
+
   // 电脑端按钮列表项
   private createDesktopButtonItem(button: ButtonConfig, index: number, renderList: () => void, configsArray: ButtonConfig[]): HTMLElement {
     const item = document.createElement('div')
     item.style.cssText = `
-      padding: 8px;
       border: 1px solid var(--b3-border-color);
-      border-radius: 4px;
-      margin-bottom: 4px;
-      background: var(--b3-theme-background);
-      cursor: move;
+      border-radius: 6px;
+      padding: 12px;
+      background: var(--b3-theme-surface);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      margin-bottom: 8px;
+      transition: all 0.2s ease;
     `
     item.draggable = true
     
@@ -1116,88 +1341,148 @@ export default class ToolbarCustomizer extends Plugin {
         renderList()
       }
     }
-    
+
     // 头部
     const header = document.createElement('div')
-    header.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer;'
-    
+    header.style.cssText = 'display: flex; align-items: center; gap: 10px; cursor: pointer;'
+
     const dragHandle = document.createElement('span')
     dragHandle.textContent = '⋮⋮'
-    dragHandle.style.cssText = 'font-size: 16px; color: var(--b3-theme-on-surface-light); cursor: move;'
+    dragHandle.style.cssText = `
+      font-size: 18px;
+      color: var(--b3-theme-on-surface-light);
+      cursor: move;
+      flex-shrink: 0;
+    `
     dragHandle.title = '拖动排序'
-    
+
     const iconSpan = document.createElement('span')
-    iconSpan.style.cssText = 'font-size: 16px;'
+    iconSpan.className = 'toolbar-customizer-button-icon'
+    iconSpan.style.cssText = `
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      background: var(--b3-theme-background);
+      font-size: 16px;
+      flex-shrink: 0;
+    `
     this.updateIconDisplay(iconSpan, button.icon)
-    
-    const nameSpan = document.createElement('span')
-    nameSpan.style.cssText = 'flex: 1; font-size: 13px;'
-    nameSpan.textContent = button.name
-    
+
+    // 使用 infoDiv 来显示名称和类型描述（手机端风格）
+    const infoDiv = document.createElement('div')
+    infoDiv.style.cssText = 'flex: 1; min-width: 0;'
+    infoDiv.innerHTML = `
+      <div style="font-weight: 500; font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 4px;">${button.name}</div>
+      <div style="font-size: 11px; color: var(--b3-theme-on-surface-light);">
+        ${button.type === 'builtin' ? '①思源内置功能【简单】' : button.type === 'template' ? '①手写模板插入【简单】' : button.type === 'shortcut' ? '②电脑端快捷键【简单】' : '③自动化模拟点击【难】'}
+      </div>
+    `
+
     const expandIcon = document.createElement('span')
     expandIcon.textContent = '▼'
-    expandIcon.style.cssText = 'font-size: 10px; transition: transform 0.2s;'
-    
+    expandIcon.style.cssText = `
+      font-size: 10px;
+      color: var(--b3-theme-on-surface-light);
+      transition: transform 0.2s ease;
+      flex-shrink: 0;
+    `
+
     const deleteBtn = document.createElement('button')
     deleteBtn.className = 'b3-button b3-button--text'
     deleteBtn.textContent = '删除'
-    deleteBtn.style.cssText = 'padding: 2px 8px; font-size: 12px;'
-    deleteBtn.onclick = (e) => {
+    deleteBtn.style.cssText = `
+      padding: 4px 10px;
+      font-size: 12px;
+      color: var(--b3-card-error-color);
+      flex-shrink: 0;
+      border-radius: 4px;
+    `
+    deleteBtn.onclick = async (e) => {
       e.stopPropagation()
-      if (confirm(`确定删除"${button.name}"？`)) {
-        // 先尝试通过configsArray删除
-        let deleted = false
+      if (await this.showConfirmDialog(`确定删除"${button.name}"？`)) {
+        // 从配置数组中删除
         const realIndex = configsArray.findIndex(btn => btn.id === button.id)
         if (realIndex !== -1) {
           configsArray.splice(realIndex, 1)
-          deleted = true
+          // 确保排序值连续
+          configsArray.sort((a, b) => a.sort - b.sort).forEach((btn, idx) => {
+            btn.sort = idx + 1
+          })
+          renderList()
         }
-        
-        // 确保排序值连续
-        configsArray.sort((a, b) => a.sort - b.sort).forEach((btn, idx) => {
-          btn.sort = idx + 1
-        })
-        
-        // 如果未成功删除，尝试从主配置数组中删除
-        if (!deleted) {
-          const mainIndex = this.buttonConfigs.findIndex(btn => btn.id === button.id)
-          if (mainIndex !== -1) {
-            this.buttonConfigs.splice(mainIndex, 1)
-            // 重新分配排序值
-            this.buttonConfigs.sort((a, b) => a.sort - b.sort).forEach((btn, idx) => {
-              btn.sort = idx + 1
-            })
-          }
-        }
-        
-        renderList()
       }
     }
-    
+
+    // 启用/禁用开关
+    const enabledToggle = document.createElement('input')
+    enabledToggle.type = 'checkbox'
+    enabledToggle.className = 'b3-switch'
+    enabledToggle.checked = button.enabled !== false
+    enabledToggle.style.cssText = 'transform: scale(0.8); flex-shrink: 0; cursor: pointer;'
+    enabledToggle.title = button.enabled !== false ? '点击禁用按钮' : '点击启用按钮'
+    enabledToggle.onclick = (e) => {
+      e.stopPropagation()
+      button.enabled = enabledToggle.checked
+      enabledToggle.title = enabledToggle.checked ? '点击禁用按钮' : '点击启用按钮'
+      // 更新按钮项的透明度
+      item.style.opacity = enabledToggle.checked ? '1' : '0.5'
+    }
+    // 根据启用状态设置透明度
+    if (button.enabled === false) {
+      item.style.opacity = '0.5'
+    }
+
     header.appendChild(dragHandle)
     header.appendChild(iconSpan)
-    header.appendChild(nameSpan)
+    header.appendChild(infoDiv)
     header.appendChild(expandIcon)
+    header.appendChild(enabledToggle)
     header.appendChild(deleteBtn)
-    
+
     // 编辑表单
     const editForm = document.createElement('div')
-    editForm.style.cssText = 'display: none; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--b3-border-color); gap: 8px; flex-direction: column;'
-    
-    editForm.appendChild(this.createDesktopField('名称', button.name, '按钮名称', (v) => { button.name = v; nameSpan.textContent = v }))
-    editForm.appendChild(this.createDesktopSelectField('类型', button.type, [
-      // { value: 'builtin', label: '思源内置功能' },  // 电脑端隐藏，代码保留
-      { value: 'template', label: '手写模板插入' },
-      { value: 'shortcut', label: '执行快捷键' },
-      { value: 'click-sequence', label: '模拟点击序列' }
-    ], (v) => { 
+    editForm.className = 'toolbar-customizer-edit-form'
+    editForm.style.cssText = `
+      display: none;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--b3-border-color);
+      gap: 10px;
+      flex-direction: column;
+    `
+
+    // 名称输入框
+    const nameField = this.createDesktopField('名称', button.name, '按钮显示名称', (v) => {
+      button.name = v
+      infoDiv.querySelector('div:first-child')!.textContent = v
+    })
+    editForm.appendChild(nameField)
+    editForm.appendChild(this.createDesktopSelectField('选择功能', button.type, [
+      { value: 'template', label: '①手写模板插入【简单】' },
+      { value: 'shortcut', label: '②电脑端快捷键【简单】' },
+      { value: 'click-sequence', label: '③自动化模拟点击【难】' }
+    ], (v) => {
       button.type = v as any
+
+      // 保存当前展开状态
+      const wasExpanded = item.dataset.expanded === 'true'
+
       // 重新渲染表单
       const newForm = document.createElement('div')
+      newForm.className = 'toolbar-customizer-edit-form'
       newForm.style.cssText = editForm.style.cssText
-      newForm.style.display = 'flex'
-      this.populateDesktopEditForm(newForm, button, nameSpan)
+      newForm.style.display = wasExpanded ? 'flex' : 'none'
+      this.populateDesktopEditForm(newForm, button, iconSpan, infoDiv, item, renderList)
       editForm.replaceWith(newForm)
+
+      // 更新类型描述显示
+      const typeDesc = infoDiv.querySelector('div:last-child')
+      if (typeDesc) {
+        typeDesc.textContent = button.type === 'builtin' ? '①思源内置功能【简单】' : button.type === 'template' ? '①手写模板插入【简单】' : button.type === 'shortcut' ? '②电脑端快捷键【简单】' : '③自动化模拟点击【难】'
+      }
     }))
     
     // 电脑端隐藏'思源内置功能'类型，代码保留以便后续使用
@@ -1264,6 +1549,9 @@ export default class ToolbarCustomizer extends Plugin {
           <code>{{year}}</code><span>年份 (2026)</span>
           <code>{{month}}</code><span>月份 (01)</span>
           <code>{{day}}</code><span>日期 (18)</span>
+          <code>{{hour}}</code><span>小时 (14)</span>
+          <code>{{minute}}</code><span>分钟 (30)</span>
+          <code>{{second}}</code><span>秒 (45)</span>
           <code>{{week}}</code><span>星期几 (星期六)</span>
         </div>
       `
@@ -1276,12 +1564,39 @@ export default class ToolbarCustomizer extends Plugin {
       // 点击序列配置
       const clickSequenceField = document.createElement('div')
       clickSequenceField.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
-      
+
+      // 标签行容器（包含标签和选择按钮）
+      const labelRow = document.createElement('div')
+      labelRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px;'
+
       const label = document.createElement('label')
       label.textContent = '点击序列（每行一个选择器）'
       label.style.cssText = 'font-size: 13px;'
-      clickSequenceField.appendChild(label)
-      
+      labelRow.appendChild(label)
+
+      // 预设按钮
+      const presetBtn = document.createElement('button')
+      presetBtn.className = 'b3-button b3-button--outline'
+      presetBtn.textContent = '选择'
+      presetBtn.style.cssText = 'padding: 4px 12px; font-size: 12px; white-space: nowrap;'
+      presetBtn.onclick = () => {
+        showClickSequenceSelector({
+          platform: 'desktop',
+          onSelect: (sequence) => {
+            const textarea = textareaContainer.querySelector('textarea') as HTMLTextAreaElement
+            if (textarea) {
+              textarea.value = sequence.join('\n')
+              button.clickSequence = sequence
+              // 更新行号显示
+              ;(textareaContainer as any).updateLineNumbers()
+            }
+          }
+        })
+      }
+      labelRow.appendChild(presetBtn)
+
+      clickSequenceField.appendChild(labelRow)
+
       // 创建带行号的 textarea
       const textareaContainer = this.createLineNumberedTextarea(
         button.clickSequence?.join('\n') || '',
@@ -1290,12 +1605,12 @@ export default class ToolbarCustomizer extends Plugin {
         }
       )
       clickSequenceField.appendChild(textareaContainer)
-      
+
       const hint = document.createElement('div')
       hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
       hint.innerHTML = '💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong>'
       clickSequenceField.appendChild(hint)
-      
+
       editForm.appendChild(clickSequenceField)
     } else if (button.type === 'shortcut') {
       // 快捷键配置
@@ -1321,6 +1636,7 @@ export default class ToolbarCustomizer extends Plugin {
       hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding: 8px; background: var(--b3-theme-surface); border-radius: 4px; overflow-x: auto;'
       hint.innerHTML = `
         <table style="width: 100%; border-collapse: collapse; font-family: monospace;">
+          <tr><td>💡更多快捷键，请查看：思源桌面端➡设置➡快捷键</td></tr>
           <tr><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">快捷键</th><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">功能</th></tr>
           <tr><td><code>Alt+5</code></td><td>打开日记</td></tr>
           <tr><td><code>Alt+P</code></td><td>打开设置</td></tr>
@@ -1335,8 +1651,6 @@ export default class ToolbarCustomizer extends Plugin {
           <tr><td><code>Alt+4</code></td><td>标签</td></tr>
           <tr><td><code>Alt+7</code></td><td>反向链接</td></tr>
           <tr><td><code>Ctrl+W</code></td><td>关闭标签页</td></tr>
-          <tr><td><code>Ctrl+\</code></td><td>左右分屏</td></tr>
-          <tr><td><code>Ctrl+/</code></td><td>上下分屏</td></tr>
         </table>
       `
       
@@ -1379,37 +1693,62 @@ export default class ToolbarCustomizer extends Plugin {
     notificationItem.appendChild(notificationLabel)
     notificationItem.appendChild(notificationSwitch)
     editForm.appendChild(notificationItem)
-    
+
+    // 使用数据属性存储展开状态，设置统一的展开/收起处理器
+    item.dataset.expanded = 'false'
     header.onclick = (e) => {
-      if ((e.target as HTMLElement).closest('button')) return
-      isExpanded = !isExpanded
-      editForm.style.display = isExpanded ? 'flex' : 'none'
-      expandIcon.style.transform = isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
+      // 过滤：不处理点击输入框、下拉框、按钮、开关
+      const target = e.target as HTMLElement
+      if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('.b3-switch')) return
+
+      // 切换状态
+      const currentState = item.dataset.expanded === 'true'
+      item.dataset.expanded = (!currentState).toString()
+
+      // 查找表单（通过 class 名称）
+      const currentForm = item.querySelector('.toolbar-customizer-edit-form') as HTMLElement
+      if (currentForm) {
+        currentForm.style.display = (!currentState) ? 'flex' : 'none'
+      }
+      expandIcon.style.transform = (!currentState) ? 'rotate(180deg)' : 'rotate(0deg)'
     }
-    
+
     item.appendChild(header)
     item.appendChild(editForm)
     return item
   }
 
   // 填充电脑端编辑表单
-  private populateDesktopEditForm(form: HTMLElement, button: ButtonConfig, nameSpan: HTMLElement, renderList?: () => void) {
-    form.appendChild(this.createDesktopField('名称', button.name, '按钮名称', (v) => { button.name = v; nameSpan.textContent = v }))
-    form.appendChild(this.createDesktopSelectField('类型', button.type, [
-      // { value: 'builtin', label: '思源内置功能' },  // 电脑端隐藏，代码保留
-      { value: 'template', label: '手写模板插入' },
-      { value: 'shortcut', label: '执行快捷键' },
-      { value: 'click-sequence', label: '模拟点击序列' }
-     
-    ], (v) => { 
-      button.type = v as any
-      const newForm = document.createElement('div')
-      newForm.style.cssText = form.style.cssText
-      newForm.style.display = 'flex'
-      this.populateDesktopEditForm(newForm, button, nameSpan, renderList)
-      form.replaceWith(newForm)
+  private populateDesktopEditForm(form: HTMLElement, button: ButtonConfig, iconSpan: HTMLElement, infoDiv: HTMLElement, item: HTMLElement, renderList?: () => void) {
+    form.appendChild(this.createDesktopField('名称', button.name, '按钮名称', (v) => {
+      button.name = v
+      const nameEl = infoDiv.querySelector('div:first-child')
+      if (nameEl) nameEl.textContent = v
     }))
-    
+    form.appendChild(this.createDesktopSelectField('选择功能', button.type, [
+      { value: 'template', label: '①手写模板插入【简单】' },
+      { value: 'shortcut', label: '②电脑端快捷键【简单】' },
+      { value: 'click-sequence', label: '③自动化模拟点击【难】' }
+    ], (v) => {
+      button.type = v as any
+
+      // 保存当前展开状态
+      const wasExpanded = item.dataset.expanded === 'true'
+
+      const newForm = document.createElement('div')
+      newForm.className = 'toolbar-customizer-edit-form'
+      newForm.style.cssText = form.style.cssText
+      newForm.style.display = wasExpanded ? 'flex' : 'none'
+      this.populateDesktopEditForm(newForm, button, iconSpan, infoDiv, item, renderList)
+      form.replaceWith(newForm)
+
+      // 更新类型描述显示
+      const typeDesc = infoDiv.querySelector('div:last-child')
+      if (typeDesc) {
+        typeDesc.textContent = button.type === 'builtin' ? '①思源内置功能【简单】' : button.type === 'template' ? '①手写模板插入【简单】' : button.type === 'shortcut' ? '②电脑端快捷键【简单】' : '③自动化模拟点击【难】'
+      }
+    }))
+
     // 电脑端隐藏'思源内置功能'类型，代码保留以便后续使用
     // if (button.type === 'builtin') {
     //   const builtinContainer = document.createElement('div')
@@ -1474,6 +1813,9 @@ export default class ToolbarCustomizer extends Plugin {
           <code>{{year}}</code><span>年份 (2026)</span>
           <code>{{month}}</code><span>月份 (01)</span>
           <code>{{day}}</code><span>日期 (18)</span>
+          <code>{{hour}}</code><span>小时 (14)</span>
+          <code>{{minute}}</code><span>分钟 (30)</span>
+          <code>{{second}}</code><span>秒 (45)</span>
           <code>{{week}}</code><span>星期几 (星期六)</span>
         </div>
       `
@@ -1486,12 +1828,38 @@ export default class ToolbarCustomizer extends Plugin {
       // 点击序列配置
       const clickSequenceField = document.createElement('div')
       clickSequenceField.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
-      
+
+      // 标签行容器（包含标签和选择按钮）
+      const labelRow = document.createElement('div')
+      labelRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px;'
+
       const label = document.createElement('label')
       label.textContent = '点击序列（每行一个选择器）'
       label.style.cssText = 'font-size: 13px;'
-      clickSequenceField.appendChild(label)
-      
+      labelRow.appendChild(label)
+
+      // 预设按钮
+      const presetBtn = document.createElement('button')
+      presetBtn.className = 'b3-button b3-button--outline'
+      presetBtn.textContent = '选择'
+      presetBtn.style.cssText = 'padding: 4px 12px; font-size: 12px; white-space: nowrap;'
+      presetBtn.onclick = () => {
+        const textarea = textareaContainer.querySelector('textarea') as HTMLTextAreaElement
+        if (textarea) {
+          // 根据平台插入不同的预设序列
+          const presetSequence = this.isMobile
+            ? 'toolbarMore\nmenuPlugin\ntext:工具栏定制器'
+            : 'barPlugins\ntext:工具栏定制器'
+          textarea.value = presetSequence
+          button.clickSequence = presetSequence.split('\n')
+          // 更新行号显示
+          ;(textareaContainer as any).updateLineNumbers()
+        }
+      }
+      labelRow.appendChild(presetBtn)
+
+      clickSequenceField.appendChild(labelRow)
+
       // 创建带行号的 textarea
       const textareaContainer = this.createLineNumberedTextarea(
         button.clickSequence?.join('\n') || '',
@@ -1500,12 +1868,12 @@ export default class ToolbarCustomizer extends Plugin {
         }
       )
       clickSequenceField.appendChild(textareaContainer)
-      
+
       const hint = document.createElement('div')
       hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
       hint.innerHTML = '💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong>'
       clickSequenceField.appendChild(hint)
-      
+
       form.appendChild(clickSequenceField)
     } else if (button.type === 'shortcut') {
       // 快捷键配置
@@ -1531,6 +1899,7 @@ export default class ToolbarCustomizer extends Plugin {
       hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding: 8px; background: var(--b3-theme-surface); border-radius: 4px; overflow-x: auto;'
       hint.innerHTML = `
         <table style="width: 100%; border-collapse: collapse; font-family: monospace;">
+          <tr><td>💡更多快捷键，请查看：思源桌面端➡设置➡快捷键</td></tr>
           <tr><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">快捷键</th><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">功能</th></tr>
           <tr><td><code>Alt+5</code></td><td>打开日记</td></tr>
           <tr><td><code>Alt+P</code></td><td>打开设置</td></tr>
@@ -1545,8 +1914,6 @@ export default class ToolbarCustomizer extends Plugin {
           <tr><td><code>Alt+4</code></td><td>标签</td></tr>
           <tr><td><code>Alt+7</code></td><td>反向链接</td></tr>
           <tr><td><code>Ctrl+W</code></td><td>关闭标签页</td></tr>
-          <tr><td><code>Ctrl+\</code></td><td>左右分屏</td></tr>
-          <tr><td><code>Ctrl+/</code></td><td>上下分屏</td></tr>
         </table>
       `
       
@@ -1594,13 +1961,23 @@ export default class ToolbarCustomizer extends Plugin {
   private createDesktopSelectField(label: string, value: string, options: Array<{value: string, label: string}>, onChange: (value: string) => void): HTMLElement {
     const field = document.createElement('div')
     field.style.cssText = 'display: flex; align-items: center; gap: 12px;'
-    
+
     const labelEl = document.createElement('label')
     labelEl.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
     labelEl.textContent = label
-    
+
     const select = document.createElement('select')
-    select.className = 'b3-select fn__flex-1'
+    select.className = 'b3-text-field fn__flex-1'
+    select.style.cssText = `
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--b3-border-color);
+      background: var(--b3-theme-background);
+      color: var(--b3-theme-on-background);
+      font-size: 14px;
+      cursor: pointer;
+    `
+
     options.forEach(opt => {
       const option = document.createElement('option')
       option.value = opt.value
@@ -1608,8 +1985,13 @@ export default class ToolbarCustomizer extends Plugin {
       select.appendChild(option)
     })
     select.value = value
-    select.onchange = () => onChange(select.value)
-    
+
+    // 使用 addEventListener 确保事件正确绑定
+    select.addEventListener('change', () => {
+      console.log('Desktop select changed to:', select.value)
+      onChange(select.value)
+    })
+
     field.appendChild(labelEl)
     field.appendChild(select)
     return field
@@ -1891,8 +2273,9 @@ export default class ToolbarCustomizer extends Plugin {
       touch-action: none;
     `
     dragHandle.title = '长按拖动排序'
-    
+
     const iconSpan = document.createElement('span')
+    iconSpan.className = 'toolbar-customizer-button-icon'
     iconSpan.style.cssText = `
       display: inline-flex;
       align-items: center;
@@ -1911,7 +2294,7 @@ export default class ToolbarCustomizer extends Plugin {
     infoDiv.innerHTML = `
       <div style="font-weight: 500; font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 4px;">${button.name}</div>
       <div style="font-size: 11px; color: var(--b3-theme-on-surface-light);">
-        ${button.type === 'builtin' ? '思源内置功能' : button.type === 'template' ? '手写模板插入' : '模拟点击序列'}
+        ${button.type === 'builtin' ? '①思源内置功能【简单】' : button.type === 'template' ? '②手写模板插入【简单】' : button.type === 'shortcut' ? '③电脑端快捷键【简单】' : '④自动化模拟点击【难】'}
       </div>
     `
     
@@ -1934,42 +2317,46 @@ export default class ToolbarCustomizer extends Plugin {
       flex-shrink: 0;
       border-radius: 4px;
     `
-    deleteBtn.onclick = (e) => {
+    deleteBtn.onclick = async (e) => {
       e.stopPropagation()
-      if (confirm(`确定删除"${button.name}"？`)) {
-        // 先尝试通过configsArray删除
-        let deleted = false
+      if (await this.showConfirmDialog(`确定删除"${button.name}"？`)) {
+        // 从配置数组中删除
         const realIndex = configsArray.findIndex(btn => btn.id === button.id)
         if (realIndex !== -1) {
           configsArray.splice(realIndex, 1)
-          deleted = true
+          // 确保排序值连续
+          configsArray.sort((a, b) => a.sort - b.sort).forEach((btn, idx) => {
+            btn.sort = idx + 1
+          })
+          renderList()
         }
-        
-        // 确保排序值连续
-        configsArray.sort((a, b) => a.sort - b.sort).forEach((btn, idx) => {
-          btn.sort = idx + 1
-        })
-        
-        // 如果未成功删除，尝试从主配置数组中删除
-        if (!deleted) {
-          const mainIndex = this.buttonConfigs.findIndex(btn => btn.id === button.id)
-          if (mainIndex !== -1) {
-            this.buttonConfigs.splice(mainIndex, 1)
-            // 重新分配排序值
-            this.buttonConfigs.sort((a, b) => a.sort - b.sort).forEach((btn, idx) => {
-              btn.sort = idx + 1
-            })
-          }
-        }
-        
-        renderList()
       }
     }
-    
+
+    // 启用/禁用开关
+    const enabledToggle = document.createElement('input')
+    enabledToggle.type = 'checkbox'
+    enabledToggle.className = 'b3-switch'
+    enabledToggle.checked = button.enabled !== false
+    enabledToggle.style.cssText = 'transform: scale(0.8); flex-shrink: 0; cursor: pointer;'
+    enabledToggle.title = button.enabled !== false ? '点击禁用按钮' : '点击启用按钮'
+    enabledToggle.onclick = (e) => {
+      e.stopPropagation()
+      button.enabled = enabledToggle.checked
+      enabledToggle.title = enabledToggle.checked ? '点击禁用按钮' : '点击启用按钮'
+      // 更新按钮项的透明度
+      item.style.opacity = enabledToggle.checked ? '1' : '0.5'
+    }
+    // 根据启用状态设置透明度
+    if (button.enabled === false) {
+      item.style.opacity = '0.5'
+    }
+
     header.appendChild(dragHandle)
     header.appendChild(iconSpan)
     header.appendChild(infoDiv)
     header.appendChild(expandIcon)
+    header.appendChild(enabledToggle)
     header.appendChild(deleteBtn)
     
     const editForm = document.createElement('div')
@@ -1981,18 +2368,21 @@ export default class ToolbarCustomizer extends Plugin {
       gap: 10px;
       flex-direction: column;
     `
-    
-    editForm.appendChild(this.createInputField('名称', button.name, '按钮显示名称', (v) => { 
+
+    // 名称输入框 - 需要保存引用以便在选择按钮时更新
+    const nameField = this.createInputField('名称', button.name, '按钮显示名称', (v) => {
       button.name = v
       infoDiv.querySelector('div:first-child')!.textContent = v
-    }))
+    })
+    editForm.appendChild(nameField)
+    const nameInput = nameField.querySelector('input') as HTMLInputElement
     
     // 类型选择 - 需要动态更新表单
-    const typeField = this.createSelectField('类型', button.type, [
-      { value: 'builtin', label: '思源内置功能' },
-      { value: 'template', label: '手写模板插入' },
-      { value: 'shortcut', label: '执行快捷键' },
-      { value: 'click-sequence', label: '模拟点击序列' }
+    const typeField = this.createSelectField('选择功能', button.type, [
+      { value: 'builtin', label: '①思源内置功能【简单】' },
+      { value: 'template', label: '②手写模板插入【简单】' },
+      { value: 'shortcut', label: '③电脑端快捷键【简单】' },
+      { value: 'click-sequence', label: '④自动化模拟点击【难】' }
     ], (v) => { 
       button.type = v as any
       // 重新渲染整个表单
@@ -2009,15 +2399,60 @@ export default class ToolbarCustomizer extends Plugin {
     const updateTypeFields = () => {
       typeFieldsContainer.innerHTML = ''
       if (button.type === 'builtin') {
-        // 按钮选择器字段
-        const selectorField = this.createInputField('按钮选择器', button.builtinId || '', 'menuSearch', (v) => { button.builtinId = v })
-        typeFieldsContainer.appendChild(selectorField)
-        
-        // 添加提示
+        // 按钮选择器字段（带选择按钮）
+        const builtinContainer = document.createElement('div')
+        builtinContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
+
+        const label = document.createElement('label')
+        label.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
+        label.textContent = '按钮选择器'
+
+        const inputWrapper = document.createElement('div')
+        inputWrapper.style.cssText = 'display: flex; gap: 8px; align-items: center;'
+
+        const input = document.createElement('input')
+        input.type = 'text'
+        input.value = button.builtinId || ''
+        input.placeholder = '选择或输入按钮ID'
+        input.className = 'b3-text-field fn__flex-1'
+        input.style.cssText = 'flex: 1;'
+
+        const selectBtn = document.createElement('button')
+        selectBtn.className = 'b3-button b3-button--outline'
+        selectBtn.textContent = '选择'
+        selectBtn.style.cssText = 'padding: 6px 12px; font-size: 13px; flex-shrink: 0; white-space: nowrap;'
+
+        input.oninput = () => {
+          button.builtinId = input.value
+        }
+
+        selectBtn.onclick = () => {
+          this.showButtonIdPicker(input.value, (result) => {
+            input.value = result.id
+            button.builtinId = result.id
+            // 自动填充名称和图标
+            button.name = result.name
+            button.icon = result.icon
+            // 更新显示
+            infoDiv.querySelector('div:first-child')!.textContent = result.name
+            this.updateIconDisplay(iconSpan, result.icon)
+            // 同步更新名称和图标输入框
+            if (nameInput) nameInput.value = result.name
+            if (iconInput) iconInput.value = result.icon
+            if (iconPreview) this.updateIconDisplay(iconPreview, result.icon)
+          })
+        }
+
+        inputWrapper.appendChild(input)
+        inputWrapper.appendChild(selectBtn)
+        builtinContainer.appendChild(label)
+        builtinContainer.appendChild(inputWrapper)
+
+        // 添加帮助链接
         const hint = document.createElement('div')
-        hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: -6px; padding-left: 4px;'
-        hint.innerHTML = '💡 支持: id、data-id、data-type、class、按钮文本 <a href="#" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">查看常用ID →</a>'
-        
+        hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: -4px; padding-left: 4px;'
+        hint.innerHTML = '💡 <a href="#" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">查看常用ID →</a>'
+
         const link = hint.querySelector('a')
         if (link) {
           link.onclick = (e) => {
@@ -2028,10 +2463,10 @@ export default class ToolbarCustomizer extends Plugin {
               const helpSection = settingItems.find(item => {
                 const descEl = item.querySelector('.b3-label__text')
                 const text = descEl?.textContent
-                // 手机端查找 description 包含"思源内置菜单ID参考（F12查看更多）"的项
+                // 查找包含"思源内置菜单ID参考"的项
                 return descEl && text?.includes('思源内置菜单ID参考')
               })
-              
+
               if (helpSection) {
                 // 先滚动到该区域
                 helpSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -2046,8 +2481,9 @@ export default class ToolbarCustomizer extends Plugin {
             }, 100)
           }
         }
-        
-        typeFieldsContainer.appendChild(hint)
+
+        builtinContainer.appendChild(hint)
+        typeFieldsContainer.appendChild(builtinContainer)
       } else if (button.type === 'template') {
         const templateContainer = document.createElement('div')
         templateContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
@@ -2067,6 +2503,9 @@ export default class ToolbarCustomizer extends Plugin {
             <code>{{year}}</code><span>年份 (2026)</span>
             <code>{{month}}</code><span>月份 (01)</span>
             <code>{{day}}</code><span>日 (18)</span>
+            <code>{{hour}}</code><span>小时 (14)</span>
+            <code>{{minute}}</code><span>分钟 (30)</span>
+            <code>{{second}}</code><span>秒 (45)</span>
             <code>{{week}}</code><span>星期几</span>
           </div>
         `
@@ -2076,12 +2515,41 @@ export default class ToolbarCustomizer extends Plugin {
         // 点击序列配置
         const clickSequenceContainer = document.createElement('div')
         clickSequenceContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
-        
+
+        // 标签行容器（包含标签和选择按钮）
+        const labelRow = document.createElement('div')
+        labelRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px;'
+
         const label = document.createElement('label')
         label.textContent = '点击序列（每行一个选择器）'
         label.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
-        clickSequenceContainer.appendChild(label)
-        
+        labelRow.appendChild(label)
+
+        // 预设按钮
+        const presetBtn = document.createElement('button')
+        presetBtn.className = 'b3-button b3-button--outline'
+        presetBtn.textContent = '选择'
+        presetBtn.style.cssText = 'padding: 4px 12px; font-size: 12px; white-space: nowrap;'
+        presetBtn.onclick = () => {
+          // 根据配置数组判断当前是手机配置还是电脑配置区域
+          const isMobileConfig = configsArray === this.mobileButtonConfigs
+          showClickSequenceSelector({
+            platform: isMobileConfig ? 'mobile' : 'desktop',
+            onSelect: (sequence) => {
+              const textarea = textareaContainer.querySelector('textarea') as HTMLTextAreaElement
+              if (textarea) {
+                textarea.value = sequence.join('\n')
+                button.clickSequence = sequence
+                // 更新行号显示
+                ;(textareaContainer as any).updateLineNumbers()
+              }
+            }
+          })
+        }
+        labelRow.appendChild(presetBtn)
+
+        clickSequenceContainer.appendChild(labelRow)
+
         // 创建带行号的 textarea
         const textareaContainer = this.createLineNumberedTextarea(
           button.clickSequence?.join('\n') || '',
@@ -2090,12 +2558,12 @@ export default class ToolbarCustomizer extends Plugin {
           }
         )
         clickSequenceContainer.appendChild(textareaContainer)
-        
+
         const hint = document.createElement('div')
         hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
         hint.innerHTML = '💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong>'
         clickSequenceContainer.appendChild(hint)
-        
+
         typeFieldsContainer.appendChild(clickSequenceContainer)
       } else if (button.type === 'shortcut') {
         // 快捷键配置
@@ -2111,6 +2579,7 @@ export default class ToolbarCustomizer extends Plugin {
         hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding: 8px; background: var(--b3-theme-surface); border-radius: 4px; overflow-x: auto;'
         hint.innerHTML = `
           <table style="width: 100%; border-collapse: collapse; font-family: monospace;">
+            <tr><td>💡更多快捷键，请查看：思源桌面端➡设置➡快捷键</td></tr>
             <tr><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">快捷键</th><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">功能</th></tr>
             <tr><td><code>Alt+5</code></td><td>打开日记</td></tr>
             <tr><td><code>Alt+P</code></td><td>打开设置</td></tr>
@@ -2125,8 +2594,6 @@ export default class ToolbarCustomizer extends Plugin {
             <tr><td><code>Alt+4</code></td><td>标签</td></tr>
             <tr><td><code>Alt+7</code></td><td>反向链接</td></tr>
             <tr><td><code>Ctrl+W</code></td><td>关闭标签页</td></tr>
-            <tr><td><code>Ctrl+\\</code></td><td>左右分屏</td></tr>
-            <tr><td><code>Ctrl+/</code></td><td>上下分屏</td></tr>
           </table>
         `
         
@@ -2134,16 +2601,20 @@ export default class ToolbarCustomizer extends Plugin {
         typeFieldsContainer.appendChild(shortcutContainer)
       }
     }
-    
+
     // 初始化类型字段
     updateTypeFields()
-    
-    editForm.appendChild(this.createIconField('图标', button.icon, (v) => { 
+
+    // 图标输入框 - 需要保存引用以便在选择按钮时更新
+    const iconField = this.createIconField('图标', button.icon, (v) => {
       button.icon = v
-      // 更新显示的图标
-      const iconSpan = item.querySelector('span') as HTMLElement
-      this.updateIconDisplay(iconSpan, v)
-    }))
+      // 更新显示的图标 - 使用特定的 class 来查找
+      const iconSpan = item.querySelector('.toolbar-customizer-button-icon') as HTMLElement
+      if (iconSpan) this.updateIconDisplay(iconSpan, v)
+    })
+    editForm.appendChild(iconField)
+    const iconInput = iconField.querySelector('input') as HTMLInputElement
+    const iconPreview = iconField.querySelector('span') as HTMLElement
     editForm.appendChild(this.createInputField('图标大小', button.iconSize.toString(), '18', (v) => { button.iconSize = parseInt(v) || 18 }, 'number'))
     editForm.appendChild(this.createInputField('按钮宽度', button.minWidth.toString(), '32', (v) => { button.minWidth = parseInt(v) || 32 }, 'number'))
     editForm.appendChild(this.createInputField('右边距', button.marginRight.toString(), '8', (v) => { button.marginRight = parseInt(v) || 8 }, 'number'))
@@ -2215,18 +2686,32 @@ export default class ToolbarCustomizer extends Plugin {
     labelEl.textContent = label
 
     const select = document.createElement('select')
-    select.className = 'b3-select'
-    // 移除内联样式，让 CSS 文件中的样式生效
-    
+    select.className = 'b3-text-field'
+    select.style.cssText = `
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border: 1px solid var(--b3-border-color);
+      background: var(--b3-theme-background);
+      color: var(--b3-theme-on-background);
+      font-size: 14px;
+      cursor: pointer;
+    `
+
     options.forEach(opt => {
       const option = document.createElement('option')
       option.value = opt.value
       option.textContent = opt.label
       select.appendChild(option)
     })
-    
+
     select.value = value
-    select.onchange = () => onChange(select.value)
+
+    // 使用 addEventListener 确保事件正确绑定
+    select.addEventListener('change', () => {
+      console.log('Select changed to:', select.value)
+      onChange(select.value)
+    })
 
     field.appendChild(labelEl)
     field.appendChild(select)
@@ -2375,256 +2860,14 @@ export default class ToolbarCustomizer extends Plugin {
     return field
   }
 
-  // 图标选择器弹窗
+  // 图标选择器（已迁移到 ui/iconPicker.ts）
   private showIconPicker(currentValue: string, onSelect: (icon: string) => void) {
-    const dialog = document.createElement('div')
-    dialog.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      padding: 20px;
-    `
-
-    const panel = document.createElement('div')
-    panel.style.cssText = `
-      background: var(--b3-theme-background);
-      border-radius: 8px;
-      max-width: 600px;
-      width: 100%;
-      max-height: 80vh;
-      display: flex;
-      flex-direction: column;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    `
-
-    // 标题栏
-    const header = document.createElement('div')
-    header.style.cssText = `
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--b3-border-color);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    `
-    header.innerHTML = `
-      <div style="font-size: 16px; font-weight: 500;">选择图标</div>
-    `
-    
-    const closeBtn = document.createElement('button')
-    closeBtn.className = 'b3-button b3-button--text'
-    closeBtn.textContent = '✕'
-    closeBtn.style.cssText = `padding: 4px 8px; font-size: 18px;`
-    closeBtn.onclick = () => document.body.removeChild(dialog)
-    header.appendChild(closeBtn)
-
-    // 搜索框
-    const searchWrapper = document.createElement('div')
-    searchWrapper.style.cssText = `padding: 12px 20px; border-bottom: 1px solid var(--b3-border-color);`
-    const searchInput = document.createElement('input')
-    searchInput.type = 'text'
-    searchInput.placeholder = '搜索图标...'
-    searchInput.className = 'b3-text-field'
-    searchInput.style.cssText = `width: 100%; padding: 8px 12px;`
-    searchWrapper.appendChild(searchInput)
-
-    // 内容区域
-    const content = document.createElement('div')
-    content.style.cssText = `
-      padding: 20px;
-      overflow-y: auto;
-      flex: 1;
-    `
-
-    // 分类标签
-    const tabs = document.createElement('div')
-    tabs.style.cssText = `
-      display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    `
-
-    const categories = [
-      { id: 'emoji', name: 'Emoji', icons: ['😀', '😊', '🎉', '❤️', '⭐', '🔥', '💡', '🎨', '📝', '🔍', '⚙️', '📁', '🏠', '💻', '📱', '🌙', '☀️', '🌟', '✨', '🎯', '📌', '✅', '❌', '➕', '➖'] },
-      { id: 'lucide', name: 'Lucide 图标', icons: [] }
-    ]
-
-    // 获取常用的 Lucide 图标
-    const commonLucideIcons = [
-      'Search', 'Settings', 'Menu', 'Home', 'User', 'Mail', 'Bell', 'Heart', 'Star', 
-      'Bookmark', 'Calendar', 'Clock', 'Download', 'Upload', 'Trash', 'Edit', 'Copy', 
-      'Share', 'Send', 'Save', 'Plus', 'Minus', 'Check', 'X', 'ChevronRight', 'ChevronLeft',
-      'ChevronUp', 'ChevronDown', 'ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown',
-      'File', 'Folder', 'Image', 'Video', 'Music', 'Code', 'Database', 'Cloud',
-      'Lock', 'Unlock', 'Eye', 'EyeOff', 'Filter', 'Refresh', 'Info', 'AlertCircle',
-      'CheckCircle', 'XCircle', 'HelpCircle', 'Zap', 'Sun', 'Moon', 'Volume', 'Volume2'
-    ]
-
-    let activeCategory = 'emoji'
-
-    const renderContent = (category: string, filter: string = '') => {
-      content.innerHTML = ''
-      
-      const grid = document.createElement('div')
-      grid.style.cssText = `
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
-        gap: 8px;
-      `
-
-      let icons: string[] = []
-      
-      if (category === 'emoji') {
-        icons = categories[0].icons.filter(icon => !filter || icon.includes(filter))
-      } else if (category === 'lucide') {
-        icons = commonLucideIcons
-          .filter(name => !filter || name.toLowerCase().includes(filter.toLowerCase()))
-          .map(name => `lucide:${name}`)
-      }
-
-      icons.forEach(icon => {
-        const btn = document.createElement('button')
-        btn.className = 'b3-button'
-        btn.style.cssText = `
-          width: 50px;
-          height: 50px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border: 1px solid var(--b3-border-color);
-          border-radius: 6px;
-          cursor: pointer;
-          font-size: 24px;
-          background: var(--b3-theme-background);
-        `
-        
-        this.updateIconDisplay(btn, icon)
-        
-        btn.onclick = () => {
-          onSelect(icon)
-          document.body.removeChild(dialog)
-        }
-        
-        btn.onmouseenter = () => {
-          btn.style.background = 'var(--b3-theme-surface)'
-          btn.style.borderColor = 'var(--b3-theme-primary)'
-        }
-        
-        btn.onmouseleave = () => {
-          btn.style.background = 'var(--b3-theme-background)'
-          btn.style.borderColor = 'var(--b3-border-color)'
-        }
-        
-        grid.appendChild(btn)
-      })
-
-      content.appendChild(grid)
-    }
-
-    // 创建分类标签
-    categories.forEach(cat => {
-      const tab = document.createElement('button')
-      tab.className = 'b3-button'
-      tab.textContent = cat.name
-      tab.style.cssText = `
-        padding: 6px 16px;
-        border-radius: 16px;
-      `
-      
-      const updateTabStyle = () => {
-        if (activeCategory === cat.id) {
-          tab.classList.add('b3-button--outline')
-          tab.style.background = 'var(--b3-theme-primary)'
-          tab.style.color = 'var(--b3-theme-on-primary)'
-        } else {
-          tab.classList.remove('b3-button--outline')
-          tab.style.background = ''
-          tab.style.color = ''
-        }
-      }
-      
-      updateTabStyle()
-      
-      tab.onclick = () => {
-        activeCategory = cat.id
-        tabs.querySelectorAll('button').forEach(b => {
-          b.style.background = ''
-          b.style.color = ''
-        })
-        updateTabStyle()
-        renderContent(cat.id, searchInput.value)
-      }
-      
-      tabs.appendChild(tab)
-    })
-
-    // 搜索功能
-    searchInput.oninput = () => {
-      renderContent(activeCategory, searchInput.value)
-    }
-
-    content.appendChild(tabs)
-    renderContent('emoji')
-
-    panel.appendChild(header)
-    panel.appendChild(searchWrapper)
-    panel.appendChild(content)
-    dialog.appendChild(panel)
-
-    // 点击背景关闭
-    dialog.onclick = (e) => {
-      if (e.target === dialog) {
-        document.body.removeChild(dialog)
-      }
-    }
-
-    document.body.appendChild(dialog)
+    showIconPickerModal({ currentValue, onSelect })
   }
 
-  // 更新图标显示
+  // 更新图标显示（已迁移到 data/icons.ts）
   private updateIconDisplay(element: HTMLElement, iconValue: string) {
-    element.innerHTML = ''
-    
-    if (!iconValue) {
-      element.textContent = '?'
-      return
-    }
-
-    // 检查是否是 lucide 图标（格式：lucide:IconName）
-    if (iconValue.startsWith('lucide:')) {
-      const iconName = iconValue.substring(7) // 去掉 "lucide:" 前缀
-      const IconComponent = (lucideIcons as any)[iconName]
-      
-      if (IconComponent) {
-        try {
-          const svgString = IconComponent.toSvg({ 
-            width: 16, 
-            height: 16,
-            color: 'var(--b3-theme-on-background)'
-          })
-          element.innerHTML = svgString
-        } catch (e) {
-          element.textContent = iconValue
-        }
-      } else {
-        element.textContent = '?'
-      }
-    }
-    // 检查是否是思源内置图标（格式：icon开头）
-    else if (iconValue.startsWith('icon')) {
-      element.innerHTML = `<svg style="width: 16px; height: 16px;"><use xlink:href="#${iconValue}"></use></svg>`
-    }
-    // 否则当作 emoji 或文本
-    else {
-      element.textContent = iconValue
-    }
+    updateIconDisplayUtil(element, iconValue)
   }
 
   // 应用小功能
@@ -2910,6 +3153,9 @@ export default class ToolbarCustomizer extends Plugin {
       const lines = textarea.value.split('\n').length
       lineNumbers.innerHTML = Array.from({ length: lines }, (_, i) => i + 1).join('<br>')
     }
+
+    // 将更新函数暴露为容器的方法
+    ;(container as any).updateLineNumbers = updateLineNumbers
 
     // 初始化行号
     updateLineNumbers()

@@ -32,6 +32,7 @@ export interface ButtonConfig {
   sort: number;              // 排序（数字越小越靠左）
   platform: 'desktop' | 'mobile' | 'both'; // 显示平台
   showNotification: boolean; // 是否显示右上角提示
+  enabled?: boolean;         // 是否启用（默认true）
 }
 
 // ===== 默认配置 =====
@@ -64,15 +65,28 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
     showNotification: true
   },
   {
-    id: 'template1',
-    name: '插入待办',
-    type: 'template',
-    template: '- [ ] ',
-    icon: 'iconCheck',
+    id: 'open-diary-desktop',
+    name: '打开日记',
+    type: 'shortcut',
+    shortcutKey: 'Alt+5',
+    icon: 'iconCalendar',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
     sort: 2,
+    platform: 'desktop',
+    showNotification: true
+  },
+  {
+    id: 'template-time-desktop',
+    name: '插入时分',
+    type: 'template',
+    template: '{{hour}}时{{minute}}分',
+    icon: 'iconClock',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 3,
     platform: 'desktop',
     showNotification: true
   }
@@ -94,15 +108,28 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     showNotification: true
   },
   {
-    id: 'recent-mobile',
-    name: '最近文档',
-    type: 'builtin',
-    builtinId: 'menuRecent',
-    icon: 'iconHistory',
+    id: 'open-diary-mobile',
+    name: '打开日记',
+    type: 'shortcut',
+    shortcutKey: 'Alt+5',
+    icon: 'iconCalendar',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
     sort: 2,
+    platform: 'mobile',
+    showNotification: true
+  },
+  {
+    id: 'template-time-mobile',
+    name: '插入时分',
+    type: 'template',
+    template: '{{hour}}时{{minute}}分',
+    icon: 'iconClock',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 3,
     platform: 'mobile',
     showNotification: true
   },
@@ -112,19 +139,6 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'builtin',
     builtinId: 'menuSearch',
     icon: 'iconSearch',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
-    sort: 3,
-    platform: 'mobile',
-    showNotification: true
-  },
-  {
-    id: 'template1-mobile',
-    name: '插入待办',
-    type: 'template',
-    template: '- [ ] ',
-    icon: 'iconCheck',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
@@ -141,6 +155,27 @@ let mutationObserver: MutationObserver | null = null
 let pageObserver: MutationObserver | null = null  // 用于检测页面变化的观察器
 let mobileToolbarClickHandler: ((e: Event) => void) | null = null  // 专门用于移动端工具栏的点击处理
 let customButtonClickHandler: ((e: Event) => void) | null = null  // 专门用于自定义按钮的点击处理
+let activeTimers: Set<number> = new Set()  // 跟踪所有活动的定时器
+
+/**
+ * 安全的 setTimeout，返回的定时器会被跟踪以便清理
+ */
+function safeSetTimeout(callback: () => void, delay: number): number {
+  const timerId = setTimeout(() => {
+    activeTimers.delete(timerId)
+    callback()
+  }, delay)
+  activeTimers.add(timerId)
+  return timerId
+}
+
+/**
+ * 清除所有活动的定时器
+ */
+function clearAllTimers(): void {
+  activeTimers.forEach(timerId => clearTimeout(timerId))
+  activeTimers.clear()
+}
 
 /**
  * 判断是否为移动端
@@ -162,11 +197,14 @@ function isDesktopDevice(): boolean {
  */
 function shouldShowButton(button: ButtonConfig): boolean {
   const isMobile = isMobileDevice()
-  
+
+  // 检查是否启用
+  if (button.enabled === false) return false
+
   if (button.platform === 'both') return true
   if (button.platform === 'mobile' && isMobile) return true
   if (button.platform === 'desktop' && !isMobile) return true
-  
+
   return false
 }
 
@@ -268,16 +306,16 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
     const textInputs = document.querySelectorAll('textarea, input[type="text"], .protyle-wysiwyg, .protyle-content, .protyle-input')
     textInputs.forEach(input => {
       input.addEventListener('focus', () => {
-        setTimeout(updateToolbarPosition, 300)
+        safeSetTimeout(updateToolbarPosition, 300)
       })
-      
+
       input.addEventListener('blur', () => {
-        setTimeout(updateToolbarPosition, 300)
+        safeSetTimeout(updateToolbarPosition, 300)
       })
     })
 
   // 添加CSS样式
-    const styleId = 'mobile-toolbar-style'
+    const styleId = 'mobile-toolbar-custom-style'
     let style = document.getElementById(styleId) as HTMLStyleElement
     if (!style) {
       style = document.createElement('style')
@@ -343,7 +381,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
   // 尝试设置工具栏
   if (!setupToolbar()) {
     // 如果没找到，延迟尝试
-    setTimeout(() => {
+    safeSetTimeout(() => {
       setupToolbar()
     }, 2000)
   }
@@ -404,22 +442,22 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
 export function initCustomButtons(configs: ButtonConfig[]) {
   // 清理旧的插件按钮
   cleanupCustomButtons()
-  
+
   // 初始设置
-  setTimeout(() => setupEditorButtons(configs), 1000)
-  
+  safeSetTimeout(() => setupEditorButtons(configs), 1000)
+
   // 移除旧的监听器
   if (customButtonClickHandler) {
     document.removeEventListener('click', customButtonClickHandler, true)
   }
-  
+
   // 监听编辑器加载事件
   customButtonClickHandler = (e: Event) => {
     // 检查是否点击了编辑器区域
     const target = e.target as HTMLElement
     if (target.closest('.protyle')) {
       // 延迟执行，确保编辑器完全加载
-      setTimeout(() => setupEditorButtons(configs), 100)
+      safeSetTimeout(() => setupEditorButtons(configs), 100)
     }
   }
   document.addEventListener('click', customButtonClickHandler, true)
@@ -991,41 +1029,44 @@ function clickElement(element: HTMLElement): void {
 
 // ===== 清理函数 =====
 export function cleanup() {
+  // 清理所有定时器
+  clearAllTimers()
+
   // 清理自定义按钮
   cleanupCustomButtons()
-  
+
   // 移除事件监听器
   if (resizeHandler) {
     window.removeEventListener('resize', resizeHandler)
     resizeHandler = null
   }
-  
+
   if (mutationObserver) {
     mutationObserver.disconnect()
     mutationObserver = null
   }
-  
+
   if (pageObserver) {
     pageObserver.disconnect()
     pageObserver = null
   }
-  
+
   if (mobileToolbarClickHandler) {
     document.removeEventListener('click', mobileToolbarClickHandler, true)
     mobileToolbarClickHandler = null
   }
-  
+
   if (customButtonClickHandler) {
     document.removeEventListener('click', customButtonClickHandler, true)
     customButtonClickHandler = null
   }
-  
+
   // 清理移动端样式
-  const style = document.getElementById('mobile-toolbar-style')
+  const style = document.getElementById('mobile-toolbar-custom-style')
   if (style) {
     style.remove()
   }
-  
+
   // 清理属性
   const toolbars = document.querySelectorAll('.protyle-breadcrumb__bar, .protyle-breadcrumb')
   toolbars.forEach(toolbar => {
@@ -1037,7 +1078,7 @@ export function cleanup() {
       // toolbar.classList.remove('fn__none')
     }
   })
-  
+
   // 移除CSS变量
   document.documentElement.style.removeProperty('--mobile-toolbar-offset')
 }

@@ -1,290 +1,236 @@
+# ✨ 核心功能亮点
 
-### 核心功能亮点
+- ➕ **自定义按钮**：在工具栏添加快捷按钮，支持4种功能类型
+- 📝 **模板插入**：一键插入时间、日期等预设文本
+- ⌨️ **快捷键模拟**：执行常用快捷键，如打开日记、全局搜索
+- 🖱️ **点击自动化**：模拟多步点击操作，实现复杂功能
+- 📱 **手机端置底**：工具栏固定在底部，方便单手操作
+- ⚖️ **双端独立配置**：电脑端和手机端分别设置
 
-- 🎨 **自由定制工具栏布局**，满足个性化使用需求  
-- 📱 **兼容桌面与手机端**，无缝衔接多终端操作体验  
-- ⚙️ **简洁易用的配置界面**，无需复杂操作即可生效  
-- 🚀 **高性能低资源占用**，流畅运行不拖慢笔记速度  
+---
 
-### 问题反馈请QQ群
+# 🔗 常用链接
+
+| 链接 | 说明 |
+|------|------|
+| [V2.0.0《工具栏定制器》简化重构：小白易用](https://ld246.com/article/1768938149464) | 重构思路 / 新手向说明 |
+| [《工具栏定制器插件》手机端自动化！简化操作](https://ld246.com/article/1768670747491) | 开发心得+教学视频+更新说明图 |
+| [README_BUILTIN_IDS.md](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md) | 思源常用功能ID 速查表 |
+| [README_CLICK_SEQUENCE.md](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md) | 模拟点击序列使用说明 |
+
+---
+
+<details>
+  <summary style="font-size: 24px; font-weight: 600; padding: 6px 0; cursor: pointer;">
+    🧩 功能特性
+  </summary>
+
+### 电脑端
+| 功能 | 说明 |
+|------|------|
+| **自定义按钮** | 在顶部工具栏添加快捷按钮 |
+| **4种功能类型** | 思源内置、模板插入、快捷键、点击序列 |
+| **图标自定义** | 支持思源图标、Lucide 图标、Emoji |
+| **按钮样式** | 可调图标大小、宽度、边距 |
+
+### 手机端
+| 功能 | 说明 |
+|------|------|
+| **工具栏置底** | 固定在屏幕底部，方便单手操作 |
+| **输入法适配** | 键盘弹出时自动上移 |
+| **外观定制** | 背景颜色、透明度可调 |
+| **独立配置** | 与电脑端分别设置 |
+
+### 通用
+| 功能 | 说明 |
+|------|------|
+| **隐藏内置按钮** | 隐藏不常用的思源原生按钮 |
+| **按钮拖拽排序** | 长按拖动调整顺序 |
+| **按钮开关** | 可临时禁用某个按钮 |
+| **双端独立配置** | 电脑端和手机端互不影响 |
+
+</details>
+
+---
+
+<details>
+  <summary style="font-size: 24px; font-weight: 600; padding: 6px 0; cursor: pointer;">
+    📖 使用指南
+  </summary>
+
+### 一、添加自定义按钮
+
+**路径**：设置 → 插件 → 工具栏定制器
+
+| 设置项 | 说明 |
+|--------|------|
+| **电脑端配置** | 电脑端工具栏按钮 |
+| **手机端配置** | 手机端工具栏按钮 |
+
+点击「添加新按钮」，可选择 4 种功能类型：
+
+#### ① 思源内置功能【简单】
+点击「选择」按钮，从列表中选择思源内置功能（如设置、搜索、文件树等）
+
+#### ② 手写模板插入【简单】
+插入预设文本，支持变量：
+
+| 变量 | 输出示例 |
+|------|----------|
+| `{{date}}` | 2026-01-21 |
+| `{{time}}` | 14:30:45 |
+| `{{datetime}}` | 2026-01-21 14:30:45 |
+| `{{year}}` / `{{month}}` / `{{day}}` | 2026 / 01 / 21 |
+| `{{hour}}` / `{{minute}}` / `{{second}}` | 14 / 30 / 45 |
+| `{{week}}` | 星期二 |
+
+**示例**：插入 `{{year}}年{{month}}月{{day}}日 {{hour}}:{{minute}}` → `2026年01月21日 14:30`
+
+#### ③ 电脑端快捷键【简单】
+模拟键盘快捷键，如 `Alt+5`（打开日记）、`Ctrl+P`（全局搜索）
+
+#### ④ 自动化模拟点击【难】
+按顺序自动点击多个元素，实现复杂操作
+
+**常用预设**（点击「选择」按钮快速填入）：
+- **电脑端**：
+  - 打开插件设置：`barPlugins → text:工具栏定制器`
+  - 打开伺服浏览器：`barWorkspace → config → → text:关于 → text:打开浏览器`
+- **手机端**：
+  - 打开插件设置：`toolbarMore → menuPlugin → text:工具栏定制器`
+  - 打开伺服浏览器：`toolbarMore → menuAbout`
+
+**选择器语法**：
+- 简单 ID：`barSettings`
+- CSS 选择器：`#barSettings`
+- 文本匹配：`text:复制块引用`
+
+### 二、移动端工具栏设置
+
+将工具栏固定到屏幕底部，方便单手操作。
+
+| 设置项 | 说明 |
+|--------|------|
+| **工具栏置底** | 开启后工具栏固定在底部 |
+| **工具栏背景颜色** | 设置背景色（仅置底时可用） |
+| **工具栏透明度** | 调整透明度 0–100%（仅置底时可用） |
+| **输入法偏移** | 键盘打开时工具栏上移距离（如 `300px`） |
+| **隐藏思源内置按钮** | 隐藏只读模式按钮、隐藏文档按钮|
+
+### 三、常见问题
+
+**Q: 按钮没有显示？**
+A: 刷新页面或重启思源笔记
+
+**Q: 点击序列不工作？**
+A: 检查选择器是否正确，尝试使用 `text:xxx` 文本匹配
+
+**Q: 手机端工具栏遮挡输入框？**
+A: 调整「输入法偏移」数值
+
+</details>
+
+---
+
+<details>
+  <summary style="font-size: 24px; font-weight: 600; padding: 6px 0; cursor: pointer;">
+    📌 更新说明
+  </summary>
+
+### v2.0.0（重构、简化操作）
+
+#### ✨ 新增
+
+**增强兼容性**
+| 平台                              | 是否支持    |
+| ----------------------------------- | ------------- |
+| 鸿蒙系统                          | ✅ 正常支持 |
+| Android                           | ✅ 支持     |
+| iOS                               | ✅ 支持     |
+| 桌面端（Windows / macOS / Linux） | ✅ 支持     |
+| WebView / 内嵌环境                | ✅ 稳定     |
+
+**简化操作**
+- 预设 **23 个**手机端思源内置按钮，供用户快速选择
+- 支持电脑端配置手机端按钮
+
+**新增功能**
+- 电脑端打开手机伺服浏览器预览
+- 100 种按钮图标选择
+- 按钮开关功能（可临时禁用按钮）
+- 手写模板变量增强：小时、分钟、秒
+- 首次安装欢迎提示
+- 自动化模拟点击预设：打开插件设置、打开伺服浏览器
+
+#### 🛠 修复
+- 鸿蒙系统适配问题
+
+<details>
+  <summary style="font-size: 18px; font-weight: 600; padding: 6px 0; cursor: pointer;">
+    查看历史版本
+  </summary>
+
+### v1.1.2
+- 增加执行快捷键按钮
+- 栏内按钮均匀分布设置
+
+### v1.0.6
+- 修复工具栏按钮全部删除后会重新出现的问题
+
+### v1.0.5
+- 修复插件设置中"保存 / 取消"按钮位置异常
+- 修复工具栏按钮无法正常删除
+- 修复底部工具栏遮挡设置界面
+- 新增插入模板内容功能，支持自动填充时间、日期
+- 手机端新增工具栏高度设置
+- 手机端新增工具栏层级（z-index）设置
+
+</details>
+
+</details>
+
+---
+
+# ❓问题反馈Q群
+
+感谢您的支持与反馈，这将鼓励作者持续开发
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/preview2.png" alt="问题反馈群" width="300">
+  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/preview2.png" alt="预览图" width="300">
 </div>
 
-<hr style="border: none; height: 3px; background-color: red;">
+# 🧧 打赏支持
 
-# 📌 v1.1.2更新说明
-
-## 🛠 修复
-
-修复了部分Bug
-
-## ✨ 新增
-1. 增加执行快捷键按钮（几乎支持电脑端所有快捷键，不排除部分失效，等待反馈）
-2. 栏内按钮均匀分布设置
-
----
-
-# 📌 v1.0.6更新说明
-
-## 🛠 修复
-
-修复了**工具栏按钮全部删除，会重新出现**的问题  
-
----
-# 📌 v1.0.5更新说明
-
-## 🛠 修复
-
-1. 修复了**插件设置中“保存 / 取消”按钮位置**异常，导致影响思源原有设置布局的问题  
-2. 修复了**工具栏按钮无法正常删除**的问题  
-3. 修复了**底部工具栏遮挡设置界面**的问题  
-
-## ✨ 新增
-1. 新增**插入模板内容**功能，支持自动填充**时间、日期**  
-2. 手机端新增**工具栏高度设置**  
-3. 手机端新增**工具栏层级（z-index）设置**
-
----
-
-
-<hr style="border: none; height: 3px; background-color: red;">
-
-
-## 功能特性
-
-### 桌面端功能
-
-- **自定义按钮**：为工具栏添加无限制的自定义按钮
-  - 内置功能快捷方式（如：设置、搜索、外观）
-  - 模板插入按钮
-  - 点击序列自动化执行复杂操作
-- **按钮配置**：完全控制按钮外观
-  - 自定义图标（思源图标或 Emoji）
-  - 可调节图标大小、宽度、边距
-  - 按钮排序和定位
-- **智能元素选择**：简化选择器与智能匹配
-  - 支持 CSS 选择器、文本内容、name 属性和 aria-label
-  - 多步点击序列实现自动化
-
-### 移动端功能
-
-- **工具栏位置控制**：将工具栏固定到屏幕底部
-  - 输入法打开/关闭时自动调整
-  - 可配置偏移量和高度阈值
-  - 流畅动画效果
-- **视觉定制**：
-  - 背景颜色选择器
-  - 可调节透明度（0-100%）
-- **手势控制**：
-  - 禁用左右滑动以防止误触菜单
-  - 可选禁用文档树和设置菜单
-
-### 其他功能
-
-- **双端独立支持**：桌面端和移动端分别配置
-- **全局按钮宽度控制**：为工具栏设置统一的按钮宽度
-- **隐藏内置按钮**：隐藏你不使用的思源工具栏按钮
-- **集成帮助系统**：
-  - 平台特定的帮助文档
-  - 设置中可点击跳转的帮助链接
-  - 内置功能 ID 参考:[思源笔记常用功能 ID 速查表](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/v1.0.4/README_BUILTIN_IDS.md) 
-
-
-<hr style="border: none; height: 3px; background-color: red;">
-
-
-## 《使用指南》
-
-### 添加自定义按钮
-
-1. 打开插件设置
-2. 进入"电脑端自定义按钮"或"手机端自定义按钮"
-3. 点击"添加新按钮"
-4. 配置按钮属性：
-   - **名称**：按钮的显示名称
-   - **类型**：选择功能类型
-     - 内置功能：执行思源内置功能
-     - 模板：插入预定义的文本/模板
-     - 点击序列：自动化多步操作
-   - **图标**：选择图标或输入 emoji
-   - **大小和间距**：调整视觉外观
-
-### 使用点击序列
-
-点击序列允许你通过模拟按顺序点击多个元素来自动化复杂操作。
-
-**示例**：创建一个按钮打开特定文档中的 AI 对话
-
-1. 添加类型为"点击序列"的新按钮
-2. 按顺序添加选择器：
-   ```
-   [aria-label="AI 对话"]
-   button:contains("在文档中打开")
-   ```
-3. 插件将按顺序点击每个元素
-
-详细选择器语法请参见:[模拟点击序列使用说明](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md) 
-
-### 移动端工具栏配置
-
-1. 在移动端设置中启用"工具栏置底"
-2. 配置偏移量：
-   - **输入法关闭偏移**：键盘关闭时距离底部的距离（如 `0px`）
-   - **输入法打开偏移**：键盘打开时距离底部的距离（如 `50px`）
-3. 调整透明度和背景颜色
-4. 可选：禁用滑动手势以防止误触菜单
-
-### 隐藏内置按钮
-
-1. 进入"小功能选择"部分
-2. 输入要隐藏的按钮选择器（每行一个）
-   ```
-   [data-type="readonly"]
-   [data-type="doc"]
-   ```
-
-## 配置示例
-
-### 示例 1：快速模板按钮
-
-```
-名称：每日笔记模板
-类型：模板
-模板内容：
-# {{date}}
-
-## 任务
-- [ ] 
-
-## 笔记
-
-图标：📝
-```
-
-### 示例 2：AI 对话自动化
-
-```
-名称：快速 AI
-类型：点击序列
-选择器：
-  [aria-label="AI"]
-  .dialog-open
-图标：🤖
-```
-
-## 故障排除
-
-### 按钮未显示
-
-- 检查插件是否在集市中启用
-- 验证平台选择（桌面端/移动端/两者）
-- 配置更改后刷新页面
-
-### 点击序列不工作
-
-- 打开浏览器控制台检查选择器错误
-- 验证页面上是否存在元素
-- 使用更简单的选择器或文本匹配
-- 检查时机 - 某些元素可能加载缓慢
-
-### 移动端工具栏问题
-
-- 确保已启用"工具栏置底"
-- 检查偏移值是否为有效的 CSS 单位（px、vh 等）
-- 如果工具栏跳动，尝试禁用滑动手势
-
-
-<hr style="border: none; height: 3px; background-color: red;">
-
-## 🧧 打赏支持
-
-感谢您的支持，这将鼓励作者持续开发
-
-<div align="center">
-  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment1.png" alt="打赏二维码" width="300">
-</div>
+感谢您的支持与反馈，这将鼓励作者持续开发
 
 <div align="center">
   <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment2.png" alt="打赏二维码" width="300">
 </div>
 
+<div align="center">
+  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment1.png" alt="打赏二维码" width="300">
+</div>
 
-<hr style="border: none; height: 3px; background-color: red;">
+---
 
+<details>
+  <summary style="font-size: 24px; font-weight: 600; padding: 6px 0; cursor: pointer;">
+    📦 插件说明总览
+  </summary>
 
-## 安装
+| 模块 | 子项 | 内容 |
+|------|------|------|
+| 安装 | 从插件集市安装 | 1. 打开思源笔记<br>2. 设置 → 集市 → 插件<br>3. 搜索 **工具栏定制器**<br>4. 点击安装 |
+| 安装 | 手动安装 | 1. 从 [GitHub Releases](https://github.com/siyuan-note/siyuan-toolbar-customizer/releases) 下载最新版本<br>2. 解压 zip 文件<br>3. 复制到 `{工作空间}/data/plugins/`<br>4. 重启思源笔记<br>5. 设置 → 集市 → 已下载 中启用插件 |
+| 开发 | 从源码构建 | `git clone https://github.com/siyuan-note/siyuan-toolbar-customizer.git`<br>`cd siyuan-toolbar-customizer`<br>`npm install`<br>`npm run dev`<br>`npm run build` |
+| 开发 | 项目结构 | `src/index.ts` 主逻辑<br>`src/toolbarManager.ts` 工具栏管理<br>`src/App.vue` 设置界面<br>`src/index.scss` 样式<br>`public/` 静态资源<br>`plugin.json` 插件元数据 |
+| 文档 | 更新日志 | 查看版本历史：<br>[CHANGELOG.md](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/CHANGELOG.md) |
+| 协议 | 许可证 | MIT License（详见 LICENSE 文件） |
+| 社区 | 贡献 | 欢迎提交 Issue 与 Pull Request |
+| 支持 | 问题反馈 | GitHub Issues：<br>👉 https://github.com/siyuan-note/siyuan-toolbar-customizer/issues |
+| 支持 | 社区讨论 | 思源社区：<br>👉 https://ld246.com |
+| 致谢 | 基础 | 基于 [思源笔记插件系统](https://github.com/siyuan-note/siyuan) |
+| 致谢 | 图标 | 来自 [Lucide](https://lucide.dev/) |
+| 致谢 | 模板 | 基于 [Vite + Vue 插件模板](https://github.com/siyuan-note/siyuan-toolbar-customizer) |
 
-### 从插件集市安装
-
-1. 打开思源笔记
-2. 进入 设置 → 集市 → 插件
-3. 搜索"工具栏定制器"
-4. 点击安装
-
-### 手动安装
-
-1. 从 [GitHub Releases](https://github.com/siyuan-note/siyuan-toolbar-customizer/releases) 下载最新版本
-2. 解压 zip 文件
-3. 将文件夹复制到 `{工作空间}/data/plugins/`
-4. 重启思源笔记
-5. 在 设置 → 集市 → 已下载 中启用插件
-
-<hr style="border: none; height: 3px; background-color: red;">
-
-## 开发
-
-### 从源码构建
-
-```bash
-# 克隆仓库
-git clone https://github.com/siyuan-note/siyuan-toolbar-customizer.git
-cd siyuan-toolbar-customizer
-
-# 安装依赖
-npm install
-
-# 开发模式（热重载）
-npm run dev
-
-# 生产构建
-npm run build
-```
-
-### 项目结构
-
-```
-├── src/
-│   ├── index.ts          # 主插件逻辑
-│   ├── toolbarManager.ts # 工具栏配置和初始化
-│   ├── App.vue           # 设置界面 Vue 组件
-│   └── index.scss        # 插件样式
-├── public/               # 静态资源
-├── plugin.json           # 插件元数据
-└── README.md            # 文档
-```
-
-## 更新日志
-
-查看 [CHANGELOG.md](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/CHANGELOG.md) 了解版本历史。
-
-## 许可证
-
-MIT 许可证 - 详见 LICENSE 文件
-
-## 贡献
-
-欢迎贡献！请随时提交问题和拉取请求。
-
-## 支持
-
-- GitHub Issues：[报告错误或请求功能](https://github.com/siyuan-note/siyuan-toolbar-customizer/issues)
-- 思源社区：[在论坛讨论](https://ld246.com)
-
-## 致谢
-
-- 基于 [思源笔记插件系统](https://github.com/siyuan-note/siyuan) 构建
-- 图标来自 [Lucide](https://lucide.dev/)
-- 模板基于 [Vite + Vue 插件模板](https://github.com/siyuan-note/siyuan-toolbar-customizer)
-
+</details>

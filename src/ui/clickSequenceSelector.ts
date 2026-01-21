@@ -28,7 +28,7 @@ const PRESET_SEQUENCES: ClickSequenceOption[] = [
     id: 'open-browser-desktop',
     name: '②打开伺服浏览器',
     description: '电脑端：工作区 → 配置 → 关于 → 打开浏览器',
-    sequence: ['barWorkspace', 'config', '→', 'text:关于', 'text:打开浏览器']
+    sequence: ['barWorkspace', 'config', 'text:关于', 'text:打开浏览器']
   },
   // 手机端预设
   {

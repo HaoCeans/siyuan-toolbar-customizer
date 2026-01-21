@@ -78,17 +78,31 @@ export default class ToolbarCustomizer extends Plugin {
       this.desktopButtonConfigs = configs
     }
   }
-  
-  // 小功能配置
-  private featureConfig = {
-    hideBreadcrumbIcon: false,
-    hideReadonlyButton: false,
-    hideDocMenuButton: false,
-    hideMoreButton: false,
-    toolbarButtonWidth: 32,  // 工具栏按钮全局宽度（px）
-    disableMobileSwipe: false,  // 手机端禁止左右滑动弹出
+
+  // 电脑端小功能配置
+  private desktopFeatureConfig = {
+    hideBreadcrumbIcon: true,   // 面包屑图标隐藏
+    hideReadonlyButton: true,   // 锁定编辑按钮隐藏
+    hideDocMenuButton: true,    // 文档菜单按钮隐藏
+    hideMoreButton: true,       // 更多按钮隐藏
+    toolbarButtonWidth: 20      // 工具栏按钮全局宽度（px）
+  }
+
+  // 手机端小功能配置
+  private mobileFeatureConfig = {
+    hideBreadcrumbIcon: true,   // 面包屑图标隐藏
+    hideReadonlyButton: true,   // 锁定编辑按钮隐藏
+    hideDocMenuButton: true,    // 文档菜单按钮隐藏
+    hideMoreButton: true,       // 更多按钮隐藏
+    toolbarButtonWidth: 32,     // 工具栏按钮全局宽度（px）
+    disableMobileSwipe: true,   // 手机端禁止左右滑动弹出
     disableFileTree: true,      // 禁止右滑弹出文档树
     disableSettingMenu: true    // 禁止左滑弹出设置菜单
+  }
+
+  // 获取当前平台的功能配置（向后兼容）
+  private get featureConfig() {
+    return this.isMobile ? this.mobileFeatureConfig : this.desktopFeatureConfig
   }
 
   async onload() {
@@ -147,13 +161,52 @@ export default class ToolbarCustomizer extends Plugin {
         // 配置不存在或格式错误，使用默认配置（首次加载时不保存，等用户修改时再保存）
         this.mobileButtonConfigs = DEFAULT_MOBILE_BUTTONS.map(btn => ({...btn}))
       }
-      
-      const savedFeatureConfig = await this.loadData('featureConfig')
-      if (savedFeatureConfig) {
-        this.featureConfig = {
-          ...this.featureConfig,
-          ...savedFeatureConfig
+
+      // 加载电脑端小功能配置
+      const savedDesktopFeatureConfig = await this.loadData('desktopFeatureConfig')
+      if (savedDesktopFeatureConfig) {
+        this.desktopFeatureConfig = {
+          ...this.desktopFeatureConfig,
+          ...savedDesktopFeatureConfig
         }
+      }
+
+      // 加载手机端小功能配置
+      const savedMobileFeatureConfig = await this.loadData('mobileFeatureConfig')
+      if (savedMobileFeatureConfig) {
+        this.mobileFeatureConfig = {
+          ...this.mobileFeatureConfig,
+          ...savedMobileFeatureConfig
+        }
+      }
+
+      // 向后兼容：尝试加载旧的 featureConfig 并迁移到对应平台
+      const savedLegacyFeatureConfig = await this.loadData('featureConfig')
+      if (savedLegacyFeatureConfig) {
+        // 只迁移新配置中存在的属性
+        const desktopProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'toolbarButtonWidth']
+        const mobileProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'toolbarButtonWidth', 'disableMobileSwipe', 'disableFileTree', 'disableSettingMenu']
+
+        // 迁移到电脑端配置（只迁移电脑端支持的属性）
+        desktopProps.forEach(prop => {
+          if (savedLegacyFeatureConfig[prop] !== undefined) {
+            (this.desktopFeatureConfig as any)[prop] = savedLegacyFeatureConfig[prop]
+          }
+        })
+
+        // 迁移到手机端配置（只迁移手机端支持的属性）
+        mobileProps.forEach(prop => {
+          if (savedLegacyFeatureConfig[prop] !== undefined) {
+            (this.mobileFeatureConfig as any)[prop] = savedLegacyFeatureConfig[prop]
+          }
+        })
+
+        // 保存迁移后的配置
+        await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
+        await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
+
+        // 删除旧配置
+        await this.removeData('featureConfig')
       }
 
       // ===== 首次安装提示 =====
@@ -163,9 +216,9 @@ export default class ToolbarCustomizer extends Plugin {
         // 延迟显示欢迎提示，确保界面完全加载
         setTimeout(() => {
           if (this.isMobile) {
-            showMessage('欢迎使用本插件🎉🎉\n\n已经默认添加按钮：\n①打开插件设置\n②打开日记\n③插入时间\n④全局搜索', 0, 'info')
+            showMessage('欢迎使用本插件！🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦搜索', 0, 'info')
           } else {
-            showMessage('欢迎使用本插件🎉🎉\n\n已经默认添加按钮：\n①打开插件设置\n②打开日记\n③插入时间', 0, 'info')
+            showMessage('欢迎使用本插件🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦伺服浏览器', 0, 'info')
           }
           // 标记已显示过欢迎提示
           this.saveData('hasShownWelcome', true)
@@ -234,7 +287,8 @@ export default class ToolbarCustomizer extends Plugin {
         await this.saveData('mobileToolbarConfig', this.mobileConfig)
         await this.saveData('desktopButtonConfigs', this.desktopButtonConfigs)
         await this.saveData('mobileButtonConfigs', this.mobileButtonConfigs)
-        await this.saveData('featureConfig', this.featureConfig)
+        await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
+        await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
         
         showMessage('设置已保存，正在重载...', 2000, 'info')
         
@@ -365,7 +419,7 @@ export default class ToolbarCustomizer extends Plugin {
           switchEl.checked = checked
           switchEl.onchange = async () => {
             onChange(switchEl.checked)
-            await this.saveData('featureConfig', this.featureConfig)
+            await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
             this.applyFeatures()
           }
 
@@ -387,12 +441,12 @@ export default class ToolbarCustomizer extends Plugin {
 
         const widthInput = document.createElement('input')
         widthInput.type = 'number'
-        widthInput.value = this.featureConfig.toolbarButtonWidth.toString()
+        widthInput.value = this.desktopFeatureConfig.toolbarButtonWidth.toString()
         widthInput.className = 'b3-text-field'
         widthInput.style.cssText = 'width: 80px;'
         widthInput.onchange = async () => {
-          this.featureConfig.toolbarButtonWidth = parseInt(widthInput.value) || 32
-          await this.saveData('featureConfig', this.featureConfig)
+          this.desktopFeatureConfig.toolbarButtonWidth = parseInt(widthInput.value) || 32
+          await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
           this.applyFeatures()
         }
 
@@ -407,20 +461,20 @@ export default class ToolbarCustomizer extends Plugin {
         widthItem.appendChild(widthDesc)
         container.appendChild(widthItem)
 
-        container.appendChild(createSwitchItem('面包屑图标隐藏', this.featureConfig.hideBreadcrumbIcon, (v) => {
-          this.featureConfig.hideBreadcrumbIcon = v
+        container.appendChild(createSwitchItem('面包屑图标隐藏', this.desktopFeatureConfig.hideBreadcrumbIcon, (v) => {
+          this.desktopFeatureConfig.hideBreadcrumbIcon = v
         }))
 
-        container.appendChild(createSwitchItem('锁定编辑按钮隐藏', this.featureConfig.hideReadonlyButton, (v) => {
-          this.featureConfig.hideReadonlyButton = v
+        container.appendChild(createSwitchItem('锁定编辑按钮隐藏', this.desktopFeatureConfig.hideReadonlyButton, (v) => {
+          this.desktopFeatureConfig.hideReadonlyButton = v
         }))
 
-        container.appendChild(createSwitchItem('文档菜单按钮隐藏', this.featureConfig.hideDocMenuButton, (v) => {
-          this.featureConfig.hideDocMenuButton = v
+        container.appendChild(createSwitchItem('文档菜单按钮隐藏', this.desktopFeatureConfig.hideDocMenuButton, (v) => {
+          this.desktopFeatureConfig.hideDocMenuButton = v
         }))
 
-        container.appendChild(createSwitchItem('更多按钮隐藏', this.featureConfig.hideMoreButton, (v) => {
-          this.featureConfig.hideMoreButton = v
+        container.appendChild(createSwitchItem('更多按钮隐藏', this.desktopFeatureConfig.hideMoreButton, (v) => {
+          this.desktopFeatureConfig.hideMoreButton = v
         }))
 
         return container
@@ -812,26 +866,11 @@ export default class ToolbarCustomizer extends Plugin {
 
 
     // === 移动端工具栏设置 ===
-    createGroupTitle('📱', '底部工具栏配置')
 
-    setting.addItem({
-      title: '是否将工具栏置底',
-      description: '💡开启后才能调整输入法位置相关设置',
-      createActionElement: () => {
-        const toggle = document.createElement('input')
-        toggle.type = 'checkbox'
-        toggle.className = 'b3-switch'
-        toggle.checked = this.mobileConfig.enableBottomToolbar
-        toggle.style.cssText = 'transform: scale(1.2);'
-        toggle.onchange = async () => {
-          this.mobileConfig.enableBottomToolbar = toggle.checked
-          await this.saveData('mobileConfig', this.mobileConfig)
-        }
-        return toggle
-      }
-    })
+    // === 全局工具栏配置 ===
+    createGroupTitle('📱', '全局工具栏配置')
 
-      // 工具栏按钮宽度
+    // 工具栏按钮宽度
     setting.addItem({
       title: '📏栏内按钮均匀分布',
       description: '💡可整体调整按钮间的宽度。<br>   调整建议：每次增加50，会明显变化，感觉合适后，再微调！',
@@ -839,87 +878,120 @@ export default class ToolbarCustomizer extends Plugin {
         const input = document.createElement('input')
         input.className = 'b3-text-field fn__flex-center fn__size200'
         input.type = 'number'
-        input.value = this.featureConfig.toolbarButtonWidth.toString()
+        input.value = this.mobileFeatureConfig.toolbarButtonWidth.toString()
         input.style.cssText = 'font-size: 14px; padding: 8px;'
         input.onchange = async () => {
-          this.featureConfig.toolbarButtonWidth = parseInt(input.value) || 32
-          await this.saveData('featureConfig', this.featureConfig)
+          this.mobileFeatureConfig.toolbarButtonWidth = parseInt(input.value) || 32
+          await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
           this.applyFeatures()
         }
         return input
       }
     })
 
+    // 工具栏自身高度
     setting.addItem({
-      title: '①距离底部高度',
-      description: '💡设置工具栏高度（仅在工具栏置底时有效）',
+      title: '①工具栏自身高度',
+      description: '💡设置工具栏自身的高度',
       createActionElement: () => {
         const input = document.createElement('input')
         input.className = 'b3-text-field fn__flex-center fn__size200'
         input.type = 'text'
         input.value = this.mobileConfig.toolbarHeight
         input.style.cssText = 'font-size: 14px; padding: 8px;'
-        input.disabled = !this.mobileConfig.enableBottomToolbar
-        if (!this.mobileConfig.enableBottomToolbar) {
-          input.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed;'
-        }
-        input.onchange = () => { 
-          this.mobileConfig.toolbarHeight = input.value 
-          this.applyMobileToolbarStyle() // 应用新样式
+        input.onchange = async () => {
+          this.mobileConfig.toolbarHeight = input.value
+          await this.saveData('mobileConfig', this.mobileConfig)
+          this.applyMobileToolbarStyle()
         }
         return input
       }
     })
 
+    // 工具栏背景颜色
     setting.addItem({
-      title: '②工具栏自身高度',
-      description: '💡设置工具栏高度（仅在工具栏置底时有效）',
+      title: '②工具栏背景颜色',
+      description: '💡点击色块选择颜色，或直接输入颜色值，或跟随主题',
       createActionElement: () => {
-        const input = document.createElement('input')
-        input.className = 'b3-text-field fn__flex-center fn__size200'
-        input.type = 'text'
-        input.value = this.mobileConfig.toolbarHeight
-        input.style.cssText = 'font-size: 14px; padding: 8px;'
-        input.disabled = !this.mobileConfig.enableBottomToolbar
-        if (!this.mobileConfig.enableBottomToolbar) {
-          input.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed;'
-        }
-        input.onchange = () => { 
-          this.mobileConfig.toolbarHeight = input.value 
-          this.applyMobileToolbarStyle() // 应用新样式
-        }
-        return input
-      }
-    })
+        const container = document.createElement('div')
+        container.style.cssText = 'display: flex; align-items: center; gap: 8px;'
 
- // 工具栏背景颜色
-    setting.addItem({
-      title: '③工具栏背景颜色',
-      description: '💡点击选择工具栏背景颜色（仅在工具栏置底时有效）',
-      createActionElement: () => {
+        // 颜色选择器
         const colorPicker = document.createElement('input')
         colorPicker.type = 'color'
         colorPicker.value = this.mobileConfig.toolbarBackgroundColor
-        colorPicker.style.cssText = 'width: 60px; height: 40px; border: 1px solid var(--b3-border-color); border-radius: 4px; cursor: pointer;'
-        colorPicker.disabled = !this.mobileConfig.enableBottomToolbar
-        if (!this.mobileConfig.enableBottomToolbar) {
-          colorPicker.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed; opacity: 0.5;'
+        colorPicker.style.cssText = 'width: 50px; height: 36px; border: 1px solid var(--b3-border-color); border-radius: 4px; cursor: pointer; flex-shrink: 0;'
+
+        // 文本输入框（鸿蒙系统备用）
+        const textInput = document.createElement('input')
+        textInput.className = 'b3-text-field'
+        textInput.type = 'text'
+        textInput.value = this.mobileConfig.toolbarBackgroundColor
+        textInput.placeholder = '#f8f9fa'
+        textInput.style.cssText = 'width: 80px; font-size: 14px; padding: 6px 8px;'
+
+        // 跟随主题颜色开关
+        const themeCheckbox = document.createElement('input')
+        themeCheckbox.type = 'checkbox'
+        themeCheckbox.className = 'b3-switch'
+        themeCheckbox.checked = this.mobileConfig.useThemeColor || false
+        themeCheckbox.style.cssText = 'transform: scale(0.8); margin-left: 4px;'
+
+        // 主题色标签
+        const themeLabel = document.createElement('span')
+        themeLabel.textContent = '跟随主题'
+        themeLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); margin-left: 2px;'
+
+        // 更新禁用状态
+        const updateDisabledState = () => {
+          const isTheme = themeCheckbox.checked
+          colorPicker.disabled = isTheme
+          textInput.disabled = isTheme
+          colorPicker.style.opacity = isTheme ? '0.4' : ''
+          textInput.style.opacity = isTheme ? '0.4' : ''
         }
 
+        // 初始化禁用状态
+        updateDisabledState()
+
+        // 同步颜色选择器和文本框
         colorPicker.onchange = async () => {
           this.mobileConfig.toolbarBackgroundColor = colorPicker.value
+          textInput.value = colorPicker.value
           await this.saveData('mobileConfig', this.mobileConfig)
           this.applyMobileToolbarStyle()
         }
 
-        return colorPicker
+        textInput.onchange = async () => {
+          const colorValue = textInput.value.trim()
+          if (colorValue) {
+            this.mobileConfig.toolbarBackgroundColor = colorValue
+            colorPicker.value = colorValue.startsWith('#') ? colorValue : '#f8f9fa'
+            await this.saveData('mobileConfig', this.mobileConfig)
+            this.applyMobileToolbarStyle()
+          }
+        }
+
+        // 主题色开关变化
+        themeCheckbox.onchange = async () => {
+          this.mobileConfig.useThemeColor = themeCheckbox.checked
+          updateDisabledState()
+          await this.saveData('mobileConfig', this.mobileConfig)
+          this.applyMobileToolbarStyle()
+        }
+
+        container.appendChild(colorPicker)
+        container.appendChild(textInput)
+        container.appendChild(themeCheckbox)
+        container.appendChild(themeLabel)
+        return container
       }
     })
 
     // 工具栏透明度
     setting.addItem({
-      title: '④工具栏透明度',
-      description: '💡(0=完全透明，100=完全不透明，仅在工具栏置底时有效)',
+      title: '③工具栏透明度',
+      description: '💡(0=完全透明，100=完全不透明)',
       createActionElement: () => {
         const container = document.createElement('div')
         container.style.cssText = 'display: flex; align-items: center; gap: 10px;'
@@ -930,17 +1002,10 @@ export default class ToolbarCustomizer extends Plugin {
         slider.max = '100'
         slider.value = String(Math.round(this.mobileConfig.toolbarOpacity * 100))
         slider.style.cssText = 'width: 150px; cursor: pointer;'
-        slider.disabled = !this.mobileConfig.enableBottomToolbar
-        if (!this.mobileConfig.enableBottomToolbar) {
-          slider.style.cssText += 'opacity: 0.5; cursor: not-allowed;'
-        }
 
         const valueLabel = document.createElement('span')
         valueLabel.textContent = `${Math.round(this.mobileConfig.toolbarOpacity * 100)}%`
         valueLabel.style.cssText = 'min-width: 40px; font-size: 14px; color: var(--b3-theme-on-surface);'
-        if (!this.mobileConfig.enableBottomToolbar) {
-          valueLabel.style.cssText += 'opacity: 0.5;'
-        }
 
         slider.oninput = () => {
           valueLabel.textContent = `${slider.value}%`
@@ -958,89 +1023,111 @@ export default class ToolbarCustomizer extends Plugin {
       }
     })
 
+    // === 底部工具栏配置 ===
+    createGroupTitle('📱', '底部工具栏配置')
+
     setting.addItem({
-      title: '⑤工具栏层级',
+      title: '是否将工具栏置底',
+      description: '💡开启后才能调整输入法位置相关设置',
+      createActionElement: () => {
+        const toggle = document.createElement('input')
+        toggle.type = 'checkbox'
+        toggle.className = 'b3-switch'
+        toggle.checked = this.mobileConfig.enableBottomToolbar
+        toggle.style.cssText = 'transform: scale(1.2);'
+        toggle.onchange = async () => {
+          this.mobileConfig.enableBottomToolbar = toggle.checked
+          await this.saveData('mobileConfig', this.mobileConfig)
+          // 动态更新底部专用设置的禁用状态
+          document.querySelectorAll('.bottom-toolbar-setting').forEach(el => {
+            (el as HTMLInputElement).disabled = !toggle.checked
+            ;(el as HTMLInputElement).style.opacity = toggle.checked ? '' : '0.5'
+          })
+        }
+        return toggle
+      }
+    })
+
+    setting.addItem({
+      title: '①输入法关闭时高度',
+      description: '💡输入法关闭时，工具栏距底部距离（仅在工具栏置底时有效）',
+      createActionElement: () => {
+        const input = document.createElement('input')
+        input.className = 'b3-text-field fn__flex-center fn__size200 bottom-toolbar-setting'
+        input.type = 'text'
+        input.value = this.mobileConfig.closeInputOffset
+        input.style.cssText = 'font-size: 14px; padding: 8px;'
+        input.disabled = !this.mobileConfig.enableBottomToolbar
+        if (!this.mobileConfig.enableBottomToolbar) input.style.opacity = '0.5'
+        input.onchange = () => {
+          this.mobileConfig.closeInputOffset = input.value
+        }
+        return input
+      }
+    })
+
+
+    setting.addItem({
+      title: '②输入法打开时高度',
+      description: '💡输入法弹出时，工具栏距底部距离（仅在工具栏置底时有效）',
+      createActionElement: () => {
+        const input = document.createElement('input')
+        input.className = 'b3-text-field fn__flex-center fn__size200 bottom-toolbar-setting'
+        input.value = this.mobileConfig.openInputOffset
+        input.style.cssText = 'font-size: 14px; padding: 8px;'
+        input.disabled = !this.mobileConfig.enableBottomToolbar
+        if (!this.mobileConfig.enableBottomToolbar) input.style.opacity = '0.5'
+        input.onchange = () => {
+          this.mobileConfig.openInputOffset = input.value
+        }
+        return input
+      }
+    })
+
+    setting.addItem({
+      title: '③工具栏层级',
       description: '💡值越大，越不容易被遮挡。默认值为5,显示在设置上层为10,完全不隐藏为100。',
       createActionElement: () => {
         const input = document.createElement('input')
-        input.className = 'b3-text-field fn__flex-center fn__size200'
+        input.className = 'b3-text-field fn__flex-center fn__size200 bottom-toolbar-setting'
         input.type = 'number'
         input.value = this.mobileConfig.toolbarZIndex.toString()
         input.style.cssText = 'font-size: 14px; padding: 8px;'
         input.min = '0'
         input.max = '100'
         input.disabled = !this.mobileConfig.enableBottomToolbar
-        if (!this.mobileConfig.enableBottomToolbar) {
-          input.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed;'
-        }
-        input.onchange = () => { 
-          this.mobileConfig.toolbarZIndex = parseInt(input.value) || 2 
-          this.applyMobileToolbarStyle() // 应用新样式
+        if (!this.mobileConfig.enableBottomToolbar) input.style.opacity = '0.5'
+        input.onchange = () => {
+          this.mobileConfig.toolbarZIndex = parseInt(input.value) || 2
+          this.applyMobileToolbarStyle()
         }
         return input
       }
     })
 
     setting.addItem({
-      title: '⌨️输入法打开偏移',
-      description: '💡输入法弹出时工具栏距底部距离。',
+      title: '④输入法灵敏度检查',
+      description: '💡不建议修改：窗口高度变化超过此百分比触发：30-90（仅在工具栏置底时有效）',
       createActionElement: () => {
         const input = document.createElement('input')
-        input.className = 'b3-text-field fn__flex-center fn__size200'
-        input.value = this.mobileConfig.openInputOffset
-        input.style.cssText = 'font-size: 14px; padding: 8px;'
-        input.disabled = !this.mobileConfig.enableBottomToolbar
-        if (!this.mobileConfig.enableBottomToolbar) {
-          input.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed;'
-        }
-        input.onchange = () => { this.mobileConfig.openInputOffset = input.value }
-        return input
-      }
-    })
-
-    setting.addItem({
-      title: '⌨️输入法关闭偏移',
-      description: '💡输入法关闭时工具栏距底部距离。',
-      createActionElement: () => {
-        const input = document.createElement('input')
-        input.className = 'b3-text-field fn__flex-center fn__size200'
-        input.value = this.mobileConfig.closeInputOffset
-        input.style.cssText = 'font-size: 14px; padding: 8px;'
-        input.disabled = !this.mobileConfig.enableBottomToolbar
-        if (!this.mobileConfig.enableBottomToolbar) {
-          input.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed;'
-        }
-        input.onchange = () => { this.mobileConfig.closeInputOffset = input.value }
-        return input
-      }
-    })
-
-
-    setting.addItem({
-      title: '⌨️高度变化阈值',
-      description: '💡窗口高度变化超过此百分比触发：30-90',
-      createActionElement: () => {
-        const input = document.createElement('input')
-        input.className = 'b3-text-field fn__flex-center fn__size200'
+        input.className = 'b3-text-field fn__flex-center fn__size200 bottom-toolbar-setting'
         input.type = 'number'
         input.value = this.mobileConfig.heightThreshold.toString()
         input.style.cssText = 'font-size: 14px; padding: 8px;'
         input.min = '30'
         input.max = '90'
         input.disabled = !this.mobileConfig.enableBottomToolbar
-        if (!this.mobileConfig.enableBottomToolbar) {
-          input.style.cssText += 'background-color: var(--b3-theme-surface); color: var(--b3-theme-on-surface-light); cursor: not-allowed;'
-        }
+        if (!this.mobileConfig.enableBottomToolbar) input.style.opacity = '0.5'
         input.onchange = () => { this.mobileConfig.heightThreshold = parseInt(input.value) || 70 }
         return input
       }
     })
 
-   
+
     // === 小功能选择 ===
     createGroupTitle('⚙️', '小功能选择')
 
-   
+
     setting.addItem({
       title: '面包屑图标隐藏',
       description: '💡开启后隐藏面包屑左侧的图标',
@@ -1048,11 +1135,11 @@ export default class ToolbarCustomizer extends Plugin {
         const toggle = document.createElement('input')
         toggle.type = 'checkbox'
         toggle.className = 'b3-switch'
-        toggle.checked = this.featureConfig.hideBreadcrumbIcon
+        toggle.checked = this.mobileFeatureConfig.hideBreadcrumbIcon
         toggle.style.cssText = 'transform: scale(1.2);'
         toggle.onchange = async () => {
-          this.featureConfig.hideBreadcrumbIcon = toggle.checked
-          await this.saveData('featureConfig', this.featureConfig)
+          this.mobileFeatureConfig.hideBreadcrumbIcon = toggle.checked
+          await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
           this.applyFeatures()
         }
         return toggle
@@ -1066,11 +1153,11 @@ export default class ToolbarCustomizer extends Plugin {
         const toggle = document.createElement('input')
         toggle.type = 'checkbox'
         toggle.className = 'b3-switch'
-        toggle.checked = this.featureConfig.hideReadonlyButton
+        toggle.checked = this.mobileFeatureConfig.hideReadonlyButton
         toggle.style.cssText = 'transform: scale(1.2);'
         toggle.onchange = async () => {
-          this.featureConfig.hideReadonlyButton = toggle.checked
-          await this.saveData('featureConfig', this.featureConfig)
+          this.mobileFeatureConfig.hideReadonlyButton = toggle.checked
+          await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
           this.applyFeatures()
         }
         return toggle
@@ -1084,11 +1171,11 @@ export default class ToolbarCustomizer extends Plugin {
         const toggle = document.createElement('input')
         toggle.type = 'checkbox'
         toggle.className = 'b3-switch'
-        toggle.checked = this.featureConfig.hideDocMenuButton
+        toggle.checked = this.mobileFeatureConfig.hideDocMenuButton
         toggle.style.cssText = 'transform: scale(1.2);'
         toggle.onchange = async () => {
-          this.featureConfig.hideDocMenuButton = toggle.checked
-          await this.saveData('featureConfig', this.featureConfig)
+          this.mobileFeatureConfig.hideDocMenuButton = toggle.checked
+          await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
           this.applyFeatures()
         }
         return toggle
@@ -1102,11 +1189,11 @@ export default class ToolbarCustomizer extends Plugin {
         const toggle = document.createElement('input')
         toggle.type = 'checkbox'
         toggle.className = 'b3-switch'
-        toggle.checked = this.featureConfig.hideMoreButton
+        toggle.checked = this.mobileFeatureConfig.hideMoreButton
         toggle.style.cssText = 'transform: scale(1.2);'
         toggle.onchange = async () => {
-          this.featureConfig.hideMoreButton = toggle.checked
-          await this.saveData('featureConfig', this.featureConfig)
+          this.mobileFeatureConfig.hideMoreButton = toggle.checked
+          await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
           this.applyFeatures()
         }
         return toggle
@@ -1121,11 +1208,11 @@ export default class ToolbarCustomizer extends Plugin {
         const toggle = document.createElement('input')
         toggle.type = 'checkbox'
         toggle.className = 'b3-switch'
-        toggle.checked = this.featureConfig.disableMobileSwipe
+        toggle.checked = this.mobileFeatureConfig.disableMobileSwipe
         toggle.style.cssText = 'transform: scale(1.2);'
         toggle.onchange = async () => {
-          this.featureConfig.disableMobileSwipe = toggle.checked
-          await this.saveData('featureConfig', this.featureConfig)
+          this.mobileFeatureConfig.disableMobileSwipe = toggle.checked
+          await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
           this.applyFeatures()
         }
         return toggle
@@ -1844,17 +1931,18 @@ export default class ToolbarCustomizer extends Plugin {
       presetBtn.textContent = '选择'
       presetBtn.style.cssText = 'padding: 4px 12px; font-size: 12px; white-space: nowrap;'
       presetBtn.onclick = () => {
-        const textarea = textareaContainer.querySelector('textarea') as HTMLTextAreaElement
-        if (textarea) {
-          // 根据平台插入不同的预设序列
-          const presetSequence = this.isMobile
-            ? 'toolbarMore\nmenuPlugin\ntext:工具栏定制器'
-            : 'barPlugins\ntext:工具栏定制器'
-          textarea.value = presetSequence
-          button.clickSequence = presetSequence.split('\n')
-          // 更新行号显示
-          ;(textareaContainer as any).updateLineNumbers()
-        }
+        showClickSequenceSelector({
+          platform: this.isMobile ? 'mobile' : 'desktop',
+          onSelect: (sequence) => {
+            const textarea = textareaContainer.querySelector('textarea') as HTMLTextAreaElement
+            if (textarea) {
+              textarea.value = sequence.join('\n')
+              button.clickSequence = sequence
+              // 更新行号显示
+              ;(textareaContainer as any).updateLineNumbers()
+            }
+          }
+        })
       }
       labelRow.appendChild(presetBtn)
 
@@ -2874,47 +2962,67 @@ export default class ToolbarCustomizer extends Plugin {
   private applyFeatures() {
     // 移除旧样式
     this.removeFeatureStyles()
-    
+
     const style = document.createElement('style')
     style.id = 'toolbar-customizer-feature-style'
-    
+
     let styleContent = ''
-    
-    // 面包屑图标隐藏
+
+    // 面包屑图标隐藏（使用 transform 缩放到 0，保持按钮位置不变）
     if (this.featureConfig.hideBreadcrumbIcon) {
       styleContent += `
         .protyle-breadcrumb__icon {
-          display: none !important;
+          transform: scale(0) !important;
+          width: 0 !important;
+          min-width: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          overflow: hidden !important;
         }
       `
     }
-    
-    // 锁定编辑按钮隐藏
+
+    // 锁定编辑按钮隐藏（使用 transform 缩放到 0，保持按钮位置不变）
     if (this.featureConfig.hideReadonlyButton) {
       styleContent += `
         .protyle-breadcrumb__bar button[data-type="readonly"],
         .protyle-breadcrumb button[data-type="readonly"] {
-          display: none !important;
+          transform: scale(0) !important;
+          width: 0 !important;
+          min-width: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          overflow: hidden !important;
         }
       `
     }
-    
-    // 文档菜单按钮隐藏
+
+    // 文档菜单按钮隐藏（使用 transform 缩放到 0，保持按钮位置不变）
     if (this.featureConfig.hideDocMenuButton) {
       styleContent += `
         .protyle-breadcrumb__bar button[data-type="doc"],
         .protyle-breadcrumb button[data-type="doc"] {
-          display: none !important;
+          transform: scale(0) !important;
+          width: 0 !important;
+          min-width: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          overflow: hidden !important;
         }
       `
     }
-    
-    // 更多按钮隐藏
+
+    // 更多按钮隐藏（使用 transform 缩放到 0，保持按钮位置不变）
     if (this.featureConfig.hideMoreButton) {
       styleContent += `
         .protyle-breadcrumb__bar button[data-type="more"],
         .protyle-breadcrumb button[data-type="more"] {
-          display: none !important;
+          transform: scale(0) !important;
+          width: 0 !important;
+          min-width: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          overflow: hidden !important;
         }
       `
     }
@@ -3055,39 +3163,55 @@ export default class ToolbarCustomizer extends Plugin {
   // 应用手机端工具栏样式
   private applyMobileToolbarStyle() {
     if (!this.isMobile) return
-    
+
     // 使用 style 标签来覆盖 toolbarManager 中的 !important 样式
     const styleId = 'mobile-toolbar-background-color-style'
     let style = document.getElementById(styleId) as HTMLStyleElement
-    
+
     if (!style) {
       style = document.createElement('style')
       style.id = styleId
       document.head.appendChild(style)
     }
-    
+
     // 生成 CSS 规则，使用 !important 来覆盖默认样式
     const cssRules: string[] = []
-    
-    if (this.mobileConfig.toolbarBackgroundColor || this.mobileConfig.toolbarZIndex !== undefined) {
+
+    // 判断是否使用主题颜色
+    const bgColor = this.mobileConfig.useThemeColor
+      ? 'var(--b3-theme-surface)'
+      : this.mobileConfig.toolbarBackgroundColor
+
+    // 通用设置：应用于顶部和底部工具栏（包括底部置底工具栏）
+    cssRules.push(`
+      @media (max-width: 768px) {
+        .protyle-breadcrumb,
+        .protyle-breadcrumb__bar,
+        .protyle-breadcrumb__bar[data-input-method],
+        .protyle-breadcrumb[data-input-method] {
+          background-color: ${bgColor} !important;
+          opacity: ${this.mobileConfig.toolbarOpacity} !important;
+          height: ${this.mobileConfig.toolbarHeight} !important;
+          min-height: ${this.mobileConfig.toolbarHeight} !important;
+        }
+      }
+    `)
+
+    // 底部专用设置：仅应用于置底工具栏
+    if (this.mobileConfig.enableBottomToolbar) {
       cssRules.push(`
         @media (max-width: 768px) {
           .protyle-breadcrumb__bar[data-input-method],
           .protyle-breadcrumb[data-input-method] {
-            background-color: ${this.mobileConfig.toolbarBackgroundColor} !important;
-            opacity: ${this.mobileConfig.toolbarOpacity} !important;
-            height: ${this.mobileConfig.toolbarHeight} !important;
-            min-height: ${this.mobileConfig.toolbarHeight} !important;
             z-index: ${this.mobileConfig.toolbarZIndex} !important;
-          }
-          .protyle {
-            padding-bottom: calc(${this.mobileConfig.toolbarHeight} + 10px) !important;
           }
         }
       `)
     }
-    
+
     style.textContent = cssRules.join('\n')
+    // 确保样式在最后（最高优先级）
+    document.head.appendChild(style)
   }
 
   // 移除功能样式

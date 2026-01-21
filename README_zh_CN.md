@@ -14,9 +14,9 @@
 | 链接 | 说明 |
 |------|------|
 | [V2.0.0《工具栏定制器》简化重构：小白易用](https://ld246.com/article/1768938149464) | 重构思路 / 新手向说明 |
-| [《工具栏定制器插件》手机端自动化！简化操作](https://ld246.com/article/1768670747491) | 开发心得+教学视频+更新说明图 |
+| [V1.0.0《工具栏定制器插件》手机端自动化！简化操作](https://ld246.com/article/1768670747491) | 开发心得+教学视频+更新说明图 |
 | [README_BUILTIN_IDS.md](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md) | 思源常用功能ID 速查表 |
-| [README_CLICK_SEQUENCE.md](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md) | 模拟点击序列使用说明 |
+| [README_CLICK_SEQUENCE.md](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md) | 模拟点击序列使用说明 |
 
 ---
 
@@ -131,10 +131,26 @@ A: 调整「输入法偏移」数值
 </details>
 
 ---
+# 📌 更新说明
+
+### v2.4.5
+
+#### 🛠 修复
+- 手机端设置工具栏高度设置问题
+- 鸿蒙手机端，无法修改工具栏颜色的问题
+- 鸿蒙手机端，在不打开底部工具栏时，底部仍然有白色占位的背景条问题
+- iOS 手机端，工具栏层级设置非常高，底部工具栏仍然被遮挡问题
+- 修复部分遗留 bug（内存泄漏、性能优化）
+
+#### ✨ 新增
+- 新增全局工具栏配置
+- 增加颜色选择按钮：选择颜色 or 跟随主题色变化
+- 第一次安装，手机端、电脑端默认加 7 个按钮
+- 思源默认按钮：更多、打开菜单、锁住文档；替换为更好点的按钮
 
 <details>
-  <summary style="font-size: 24px; font-weight: 600; padding: 6px 0; cursor: pointer;">
-    📌 更新说明
+  <summary style="font-size: 18px; font-weight: 600; padding: 6px 0; cursor: pointer;">
+    查看历史版本
   </summary>
 
 ### v2.0.0（重构、简化操作）
@@ -165,6 +181,9 @@ A: 调整「输入法偏移」数值
 #### 🛠 修复
 - 鸿蒙系统适配问题
 
+
+</details>
+
 <details>
   <summary style="font-size: 18px; font-weight: 600; padding: 6px 0; cursor: pointer;">
     查看历史版本
@@ -185,7 +204,6 @@ A: 调整「输入法偏移」数值
 - 手机端新增工具栏高度设置
 - 手机端新增工具栏层级（z-index）设置
 
-</details>
 
 </details>
 

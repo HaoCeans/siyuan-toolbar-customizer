@@ -15,6 +15,7 @@ export interface MobileToolbarConfig {
   toolbarOpacity: number;     // 工具栏透明度 (0-1)
   toolbarHeight: string;      // 工具栏高度
   toolbarZIndex: number;      // 工具栏层级
+  useThemeColor: boolean;     // 是否使用主题颜色
 }
 
 export interface ButtonConfig {
@@ -42,25 +43,65 @@ export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
   closeInputOffset: '0px',
   heightThreshold: 70,
   toolbarBackgroundColor: '#f8f9fa',
-  toolbarOpacity: 0.95,
-  toolbarHeight: '30px', // 默认工具栏高度
-  toolbarZIndex: 5,      // 默认工具栏层级
+  toolbarOpacity: 1.0,        // 100% 透明度
+  toolbarHeight: '40px',      // 工具栏高度
+  toolbarZIndex: 5,
+  useThemeColor: true,        // 颜色跟随主题
 }
 
 export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = []
 
-// 桌面端默认按钮
+// 桌面端默认按钮（7个）
 export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
+  {
+    id: 'more-desktop',
+    name: '更多',
+    type: 'click-sequence',
+    clickSequence: ['more'],
+    icon: '✨',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 1,
+    platform: 'desktop',
+    showNotification: false
+  },
+  {
+    id: 'doc-desktop',
+    name: '打开菜单',
+    type: 'click-sequence',
+    clickSequence: ['doc'],
+    icon: '🧩',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 2,
+    platform: 'desktop',
+    showNotification: false
+  },
+  {
+    id: 'readonly-desktop',
+    name: '锁住文档',
+    type: 'click-sequence',
+    clickSequence: ['readonly'],
+    icon: '🔒',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 3,
+    platform: 'desktop',
+    showNotification: false
+  },
   {
     id: 'plugin-settings-desktop',
     name: '插件设置',
     type: 'click-sequence',
     clickSequence: ['barPlugins', 'text:工具栏定制器'],
-    icon: 'iconSettings',
+    icon: '⚙️',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
-    sort: 1,
+    sort: 4,
     platform: 'desktop',
     showNotification: true
   },
@@ -69,37 +110,50 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
     name: '打开日记',
     type: 'shortcut',
     shortcutKey: 'Alt+5',
-    icon: 'iconCalendar',
+    icon: '🗓️',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
-    sort: 2,
+    sort: 5,
     platform: 'desktop',
     showNotification: true
   },
   {
     id: 'template-time-desktop',
-    name: '插入时分',
+    name: '插入时间',
     type: 'template',
     template: '{{hour}}时{{minute}}分',
-    icon: 'iconClock',
+    icon: '⏰',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
-    sort: 3,
+    sort: 6,
+    platform: 'desktop',
+    showNotification: true
+  },
+  {
+    id: 'open-browser-desktop',
+    name: '伺服浏览器',
+    type: 'click-sequence',
+    clickSequence: ['barWorkspace', 'config', 'text:关于', 'text:打开浏览器'],
+    icon: '🔗',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 7,
     platform: 'desktop',
     showNotification: true
   }
 ]
 
-// 移动端默认按钮
+// 移动端默认按钮（7个）
 export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
   {
-    id: 'plugin-settings-mobile',
-    name: '插件设置',
-    type: 'click-sequence',
-    clickSequence: ['toolbarMore', 'menuPlugin', 'text:工具栏定制器'],
-    icon: 'iconSettings',
+    id: 'more-mobile',
+    name: '更多',
+    type: 'builtin',
+    builtinId: 'more',
+    icon: '✨',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
@@ -108,11 +162,11 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     showNotification: true
   },
   {
-    id: 'open-diary-mobile',
-    name: '打开日记',
-    type: 'shortcut',
-    shortcutKey: 'Alt+5',
-    icon: 'iconCalendar',
+    id: 'doc-mobile',
+    name: '打开菜单',
+    type: 'builtin',
+    builtinId: 'doc',
+    icon: '🧩',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
@@ -121,11 +175,11 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     showNotification: true
   },
   {
-    id: 'template-time-mobile',
-    name: '插入时分',
-    type: 'template',
-    template: '{{hour}}时{{minute}}分',
-    icon: 'iconClock',
+    id: 'readonly-mobile',
+    name: '锁住文档',
+    type: 'builtin',
+    builtinId: 'readonly',
+    icon: '🔒',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
@@ -134,15 +188,54 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     showNotification: true
   },
   {
-    id: 'search-mobile',
-    name: '搜索',
-    type: 'builtin',
-    builtinId: 'menuSearch',
-    icon: 'iconSearch',
+    id: 'plugin-settings-mobile',
+    name: '插件设置',
+    type: 'click-sequence',
+    clickSequence: ['toolbarMore', 'menuPlugin', 'text:工具栏定制器'],
+    icon: '⚙️',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
     sort: 4,
+    platform: 'mobile',
+    showNotification: true
+  },
+  {
+    id: 'open-diary-mobile',
+    name: '打开日记',
+    type: 'shortcut',
+    shortcutKey: 'Alt+5',
+    icon: '🗓️',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 5,
+    platform: 'mobile',
+    showNotification: true
+  },
+  {
+    id: 'template-time-mobile',
+    name: '插入时间',
+    type: 'template',
+    template: '{{hour}}时{{minute}}分',
+    icon: '⏰',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 6,
+    platform: 'mobile',
+    showNotification: true
+  },
+  {
+    id: 'search-mobile',
+    name: '搜索',
+    type: 'builtin',
+    builtinId: 'menuSearch',
+    icon: '🔎',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 7,
     platform: 'mobile',
     showNotification: true
   }
@@ -156,6 +249,7 @@ let pageObserver: MutationObserver | null = null  // 用于检测页面变化的
 let mobileToolbarClickHandler: ((e: Event) => void) | null = null  // 专门用于移动端工具栏的点击处理
 let customButtonClickHandler: ((e: Event) => void) | null = null  // 专门用于自定义按钮的点击处理
 let activeTimers: Set<number> = new Set()  // 跟踪所有活动的定时器
+let focusEventHandlers: Array<{ element: HTMLElement; focusHandler: () => void; blurHandler: () => void }> = []  // 跟踪焦点事件监听器以便清理
 
 /**
  * 安全的 setTimeout，返回的定时器会被跟踪以便清理
@@ -212,23 +306,42 @@ function shouldShowButton(button: ButtonConfig): boolean {
 export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
   // 仅在移动端初始化
   if (!isMobileDevice()) return
-  
+
   // 如果未启用工具栏置底，则移除相关样式并返回
   if (!config.enableBottomToolbar) {
-    // 移除之前可能添加的样式
+    // 移除所有相关样式
     const existingStyle = document.getElementById('mobile-toolbar-custom-style')
     if (existingStyle) {
       existingStyle.remove()
     }
-    // 移除工具栏的自定义属性
-    const toolbars = document.querySelectorAll('[data-toolbar-customized="true"]') as NodeListOf<HTMLElement>
+    const backgroundColorStyle = document.getElementById('mobile-toolbar-background-color-style')
+    if (backgroundColorStyle) {
+      backgroundColorStyle.remove()
+    }
+
+    // 移除工具栏的自定义属性，重置内联样式
+    const toolbars = document.querySelectorAll('[data-toolbar-customized="true"], .protyle-breadcrumb__bar[data-input-method], .protyle-breadcrumb[data-input-method]') as NodeListOf<HTMLElement>
     const toolbarsArray = Array.from(toolbars)
     toolbarsArray.forEach(toolbar => {
       toolbar.removeAttribute('data-toolbar-customized')
       toolbar.removeAttribute('data-input-method')
-      // 不移除fn__none类，保留原生的隐藏状态
-      // toolbar.classList.remove('fn__none')  // 同时移除可能添加的隐藏类
+      // 重置可能导致底部占位的样式
+      toolbar.style.position = ''
+      toolbar.style.bottom = ''
+      toolbar.style.top = ''
+      toolbar.style.left = ''
+      toolbar.style.right = ''
+      toolbar.style.zIndex = ''
+      toolbar.style.backgroundColor = ''
+      toolbar.style.paddingBottom = ''
     })
+
+    // 重置 protyle 的底部内边距
+    const protyles = document.querySelectorAll('.protyle') as NodeListOf<HTMLElement>
+    protyles.forEach(protyle => {
+      protyle.style.paddingBottom = ''
+    })
+
     return
   }
   
@@ -305,13 +418,16 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
     // 监听焦点事件，作为辅助判断
     const textInputs = document.querySelectorAll('textarea, input[type="text"], .protyle-wysiwyg, .protyle-content, .protyle-input')
     textInputs.forEach(input => {
-      input.addEventListener('focus', () => {
+      const focusHandler = () => {
         safeSetTimeout(updateToolbarPosition, 300)
-      })
-
-      input.addEventListener('blur', () => {
+      }
+      const blurHandler = () => {
         safeSetTimeout(updateToolbarPosition, 300)
-      })
+      }
+      input.addEventListener('focus', focusHandler)
+      input.addEventListener('blur', blurHandler)
+      // 保存引用以便清理
+      focusEventHandlers.push({ element: input as HTMLElement, focusHandler, blurHandler })
     })
 
   // 添加CSS样式
@@ -324,7 +440,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
     }
 
     style.textContent = `
-      /* 移动端工具栏样式 - 修复版 */
+      /* 移动端工具栏样式 - iOS z-index 修复版 */
       @media (max-width: 768px) {
         .protyle-breadcrumb__bar[data-input-method],
         .protyle-breadcrumb[data-input-method] {
@@ -334,7 +450,6 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
           left: 0 !important;
           right: 0 !important;
           z-index: ${config.toolbarZIndex} !important;
-          background: var(--b3-theme-surface) !important;
           border-top: 1px solid var(--b3-border-color) !important;
           padding: 8px 12px !important;
           display: flex !important;
@@ -343,32 +458,37 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
           box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1) !important;
           transition: bottom 0.3s ease !important;
           backdrop-filter: blur(10px);
-          background-color: rgba(var(--b3-theme-surface-rgb), 0.95) !important;
-          height: ${config.toolbarHeight} !important; /* 应用高度配置 */
+          height: ${config.toolbarHeight} !important;
           min-height: ${config.toolbarHeight} !important;
+          /* iOS z-index 修复 - 启用硬件加速提升层级 */
+          -webkit-transform: translateZ(0);
+          transform: translateZ(0);
+          -webkit-backface-visibility: hidden;
+          backface-visibility: hidden;
+          will-change: transform;
         }
 
         .protyle-breadcrumb__bar[data-input-method="open"],
         .protyle-breadcrumb[data-input-method="open"] {
           bottom: var(--mobile-toolbar-offset, 50px) !important;
         }
-        
+
         .protyle-breadcrumb__bar[data-input-method="close"],
         .protyle-breadcrumb[data-input-method="close"] {
           bottom: var(--mobile-toolbar-offset, 0px) !important;
         }
-        
+
         /* 防止编辑器内容被遮挡 */
         .protyle {
           padding-bottom: calc(${config.toolbarHeight} + 10px) !important;
         }
-        
+
         /* 安全区域适配 */
         .protyle-breadcrumb__bar[data-input-method],
         .protyle-breadcrumb[data-input-method] {
           padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
         }
-        
+
         /* 使用思源原生的隐藏类 */
         .protyle-breadcrumb__bar[data-input-method].fn__none,
         .protyle-breadcrumb[data-input-method].fn__none {
@@ -385,33 +505,16 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
       setupToolbar()
     }, 2000)
   }
-  
-  // 监听DOM变化，确保工具栏加载后能应用样式
-  mutationObserver = new MutationObserver(() => {
-    setupToolbar()
-    // 检查当前是否在文档编辑页面，以确定是否显示工具栏
-    // 仅在工具栏被标记为移动到底部时才应用我们的隐藏逻辑
-    if (config.enableBottomToolbar) {
-      updateToolbarVisibility()
-    }
-  })
-  
-  mutationObserver.observe(document.body, {
-    childList: true,
-    subtree: true
-  })
-  
-  // 页面加载完成后检查一次
-  if (config.enableBottomToolbar) {
-    updateToolbarVisibility()
-  }
-  
+
+  // 防抖变量
+  let observerTimer: number | null = null
+
   // 添加页面变化检测函数
   function updateToolbarVisibility() {
     // 获取所有工具栏元素
     const toolbars = document.querySelectorAll('[data-toolbar-customized="true"][data-input-method]') as NodeListOf<HTMLElement>
     const toolbarsArray = Array.from(toolbars)
-    
+
     // 检查当前是否应该显示工具栏（基于原生逻辑）
     // 我们只添加自定义属性，不应改变原生的显示/隐藏逻辑
     toolbarsArray.forEach(toolbar => {
@@ -420,22 +523,34 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
       // 不主动修改原生的隐藏类
     })
   }
-  
-  // 监听路由变化或页面状态变化
-  if (pageObserver) {
-    pageObserver.disconnect()
-  }
-  pageObserver = new MutationObserver(() => {
-    // 仅在工具栏被标记为移动到底部时才应用我们的隐藏逻辑
-    if (config.enableBottomToolbar) {
-      updateToolbarVisibility()
+
+  // 合并的 MutationObserver 回调（添加防抖）
+  const handleMutation = () => {
+    if (observerTimer !== null) {
+      clearTimeout(observerTimer)
     }
-  })
-  
-  pageObserver.observe(document.body, {
+    observerTimer = safeSetTimeout(() => {
+      setupToolbar()
+      if (config.enableBottomToolbar) {
+        updateToolbarVisibility()
+      }
+      observerTimer = null
+    }, 100) // 100ms 防抖
+  }
+
+  // 监听DOM变化，确保工具栏加载后能应用样式
+  // 只监听 childList，不监听属性变化，减少触发频率
+  mutationObserver = new MutationObserver(handleMutation)
+
+  mutationObserver.observe(document.body, {
     childList: true,
     subtree: true
   })
+
+  // 页面加载完成后检查一次
+  if (config.enableBottomToolbar) {
+    updateToolbarVisibility()
+  }
 }
 
 // ===== 自定义按钮功能 =====
@@ -613,7 +728,9 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
 
 function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
   // 如果开启了右上角提示，显示消息
-  if (config.showNotification) {
+  // 注意：showNotification 默认为 true，只有明确设置为 false 时才不显示
+  const shouldShow = config.showNotification !== false
+  if (shouldShow) {
     showMessage(`执行: ${config.name}`, 1500, 'info')
   }
 
@@ -828,7 +945,10 @@ async function executeClickSequence(config: ButtonConfig) {
     await delay(200)
   }
 
-  showMessage(`${config.name} 执行完成`, 1500, 'info')
+  // 执行完成提示（受 showNotification 控制）
+  if (config.showNotification !== false) {
+    showMessage(`${config.name} 执行完成`, 1500, 'info')
+  }
 }
 
 /**
@@ -839,38 +959,45 @@ async function executeClickSequence(config: ButtonConfig) {
  */
 function waitForElement(selector: string, timeout: number = 5000): Promise<HTMLElement | null> {
   return new Promise((resolve) => {
-    // 智能查找元素（支持7种方式）
+    // 智能查找元素（支持8种方式）
     const findElement = (): HTMLElement | null => {
       // 检查是否是文本查询模式 (text:xxx)
       if (selector.startsWith('text:')) {
         const searchText = selector.substring(5).trim()
         return findElementByText(searchText)
       }
-      
+
       // 如果包含 CSS 选择器特殊字符，直接使用标准查询
       if (selector.includes('#') || selector.includes('.') || selector.includes('[') || selector.includes('>') || selector.includes(' ')) {
         return document.querySelector(selector) as HTMLElement
-      }
-      
-      // 否则使用 6 种智能匹配方式
+ }
+
+      // 否则使用 7 种智能匹配方式
       let element: HTMLElement | null = null
-      
+
       // 1. 通过 id 查找
       element = document.getElementById(selector)
       if (element) return element
-      
+
       // 2. 通过 data-id 属性查找
       element = document.querySelector(`[data-id="${selector}"]`) as HTMLElement
       if (element) return element
-      
+
       // 3. 通过 data-menu-id 属性查找
       element = document.querySelector(`[data-menu-id="${selector}"]`) as HTMLElement
       if (element) return element
-      
+
       // 4. 通过 data-type 属性查找
-      element = document.querySelector(`[data-type="${selector}"]`) as HTMLElement
+      // 优先在工具栏中查找（避免找到文档块上的同名按钮）
+      element = document.querySelector(`.protyle-breadcrumb__bar [data-type="${selector}"]`) as HTMLElement
+      if (!element) {
+        element = document.querySelector(`.protyle-breadcrumb [data-type="${selector}"]`) as HTMLElement
+      }
+      if (!element) {
+        element = document.querySelector(`[data-type="${selector}"]`) as HTMLElement
+      }
       if (element) return element
-      
+
       // 5. 通过 class 查找（支持多个class，用空格分隔）
       const classNames = selector.split(' ')
       if (classNames.length > 0) {
@@ -878,8 +1005,20 @@ function waitForElement(selector: string, timeout: number = 5000): Promise<HTMLE
         element = document.querySelector(classSelector) as HTMLElement
         if (element) return element
       }
-      
-      // 6. 通过文本内容查找按钮（兼容旧的方式）
+
+      // 6. 通过 SVG 图标引用查找（如 iconMore）
+      // 注意：需要同时检查 href 和 xlink:href（不同浏览器/环境可能使用不同属性）
+      let svgUse = document.querySelector(`use[href="#${selector}"]`) as HTMLElement
+      if (!svgUse) {
+        svgUse = document.querySelector(`use[xlink\\:href="#${selector}"]`) as HTMLElement
+      }
+      if (svgUse) {
+        // 找到包含该 SVG use 元素的按钮
+        const button = svgUse.closest('button')
+        if (button) return button as HTMLElement
+      }
+
+      // 7. 通过文本内容查找按钮（兼容旧的方式）
       const allButtons = document.querySelectorAll('button')
       for (const btn of allButtons) {
         const label = btn.querySelector('.b3-menu__label')?.textContent?.trim()
@@ -887,7 +1026,7 @@ function waitForElement(selector: string, timeout: number = 5000): Promise<HTMLE
           return btn as HTMLElement
         }
       }
-      
+
       return null
     }
     
@@ -928,72 +1067,74 @@ function waitForElement(selector: string, timeout: number = 5000): Promise<HTMLE
  * @returns 找到的元素或null
  */
 function findElementByText(searchText: string): HTMLElement | null {
-  // 1. 查找按钮（最常见）
-  const allButtons = document.querySelectorAll('button')
-  for (const btn of allButtons) {
-    // 检查按钮的直接文本内容
-    if (btn.textContent?.trim() === searchText) {
-      return btn as HTMLElement
+  // 使用 TreeWalker 遍历文本节点，性能优于 querySelectorAll('*')
+  const walker = document.createTreeWalker(
+    document.body,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: (node) => {
+        // 跳过纯空白节点
+        if (node.textContent?.trim() === '') {
+          return NodeFilter.FILTER_SKIP
+        }
+        // 检查文本是否匹配
+        if (node.textContent?.trim() === searchText) {
+          return NodeFilter.FILTER_ACCEPT
+        }
+        return NodeFilter.FILTER_SKIP
+      }
     }
-    // 检查按钮内的 label
-    const label = btn.querySelector('.b3-menu__label')?.textContent?.trim()
-    if (label === searchText) {
-      return btn as HTMLElement
-    }
-  }
-  
-  // 2. 查找菜单项
-  const menuItems = document.querySelectorAll('.b3-menu__item')
-  for (const item of menuItems) {
-    if (item.textContent?.trim() === searchText) {
-      return item as HTMLElement
-    }
-  }
-  
-  // 3. 查找链接
-  const links = document.querySelectorAll('a')
-  for (const link of links) {
-    if (link.textContent?.trim() === searchText) {
-      return link as HTMLElement
-    }
-  }
-  
-  // 4. 查找 span 和 div（文本容器）
-  const textElements = document.querySelectorAll('span, div')
-  for (const el of textElements) {
-    // 直接比较 textContent（去除首尾空格）
-    if (el.textContent?.trim() === searchText) {
-      return el as HTMLElement
+  )
+
+  let node: Node | null
+  while ((node = walker.nextNode())) {
+    // 找到匹配的文本节点，返回其父元素（通常是按钮、链接等可点击元素）
+    let parent = node.parentElement
+    // 向上查找，直到找到一个可交互的元素
+    while (parent && parent !== document.body) {
+      const tagName = parent.tagName.toLowerCase()
+      if (['button', 'a', 'span', 'div', 'b3-menu__item', 'b3-menu__label'].includes(tagName) ||
+          parent.classList.contains('b3-menu__item') ||
+          parent.classList.contains('b3-menu__label') ||
+          parent.getAttribute('role') === 'menuitem') {
+        return parent as HTMLElement
+      }
+      parent = parent.parentElement
     }
   }
-  
-  // 5. 通用查找（最后的备选方案）- 查找所有可点击元素
-  const allElements = document.querySelectorAll('*')
-  for (const el of allElements) {
-    if (el.textContent?.trim() === searchText) {
-      return el as HTMLElement
-    }
-  }
-  
+
   return null
 }
 
 /**
  * 检查元素是否可见
+ * 注意：工具栏按钮即使被隐藏（transform: scale(0)）也应该被认为是"可见"的，
+ * 因为它们仍然可以被 JavaScript 点击
  */
 function isVisible(element: HTMLElement): boolean {
   if (!element) return false
-  
+
+  // 检查是否是工具栏按钮（这些按钮即使被隐藏也可以被点击）
+  const isToolbarButton = element.matches('.protyle-breadcrumb__bar button, .protyle-breadcrumb button, .protyle-breadcrumb__icon')
+
   const style = window.getComputedStyle(element)
-  if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+  if (style.display === 'none') {
     return false
   }
-  
-  const rect = element.getBoundingClientRect()
-  if (rect.width === 0 || rect.height === 0) {
-    return false
+
+  // 对于工具栏按钮，跳过 visibility、opacity 和尺寸检查
+  // （因为它们可能被 transform: scale(0) 隐藏但仍可点击）
+  if (!isToolbarButton) {
+    if (style.visibility === 'hidden' || style.opacity === '0') {
+      return false
+    }
+
+    const rect = element.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) {
+      return false
+    }
   }
-  
+
   return true
 }
 
@@ -1040,6 +1181,13 @@ export function cleanup() {
     window.removeEventListener('resize', resizeHandler)
     resizeHandler = null
   }
+
+  // 清理焦点事件监听器
+  focusEventHandlers.forEach(({ element, focusHandler, blurHandler }) => {
+    element.removeEventListener('focus', focusHandler)
+    element.removeEventListener('blur', blurHandler)
+  })
+  focusEventHandlers = []
 
   if (mutationObserver) {
     mutationObserver.disconnect()
@@ -1752,7 +1900,9 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
             if (protyle && protyle[command]) {
               try {
                 protyle[command]()
-                showMessage(`复制成功`, 1500, 'info')
+                if (config.showNotification !== false) {
+                  showMessage(`复制成功`, 1500, 'info')
+                }
                 return
               } catch (e) {
                 console.error('protyle 方法执行失败:', e)
@@ -1775,7 +1925,9 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
 
               copyToClipboard(ref).then(success => {
                 if (success) {
-                  showMessage(`已复制: ${ref}`, 1500, 'info')
+                  if (config.showNotification !== false) {
+                    showMessage(`已复制: ${ref}`, 1500, 'info')
+                  }
                 } else {
                   showMessage(`复制失败`, 3000, 'error')
                 }
@@ -1809,7 +1961,9 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
                 const eventDown = new KeyboardEvent('keydown', keyEvent)
                 editArea.dispatchEvent(eventDown)
 
-                showMessage(`执行: ${config.shortcutKey}`, 1500, 'info')
+                if (config.showNotification !== false) {
+                  showMessage(`执行: ${config.shortcutKey}`, 1500, 'info')
+                }
               }, 50)
               return
             }
@@ -1820,7 +1974,9 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
           window.dispatchEvent(eventDown)
 
           console.log('已触发键盘事件:', hotkeyToTrigger, '目标: 全局')
-          showMessage(`执行: ${config.shortcutKey}`, 1500, 'info')
+          if (config.showNotification !== false) {
+            showMessage(`执行: ${config.shortcutKey}`, 1500, 'info')
+          }
           return
         }
       }
@@ -1836,7 +1992,9 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
           const eventDown = new KeyboardEvent('keydown', keyEvent)
           window.dispatchEvent(eventDown)
           console.log('已触发键盘事件:', siyuanHotkey)
-          showMessage(`执行: ${config.shortcutKey}`, 1500, 'info')
+          if (config.showNotification !== false) {
+            showMessage(`执行: ${config.shortcutKey}`, 1500, 'info')
+          }
         } catch (e) {
           // 思源内部处理此快捷键时出错（可能不是有效快捷键）
           console.warn('思源处理此快捷键时出错:', e)

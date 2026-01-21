@@ -60,20 +60,6 @@ export function showIconPicker(options: IconPickerOptions): void {
   closeBtn.onclick = () => document.body.removeChild(dialog)
   header.appendChild(closeBtn)
 
-  const searchWrapper = document.createElement('div')
-  searchWrapper.style.padding = '12px 20px'
-  searchWrapper.style.borderBottom = '1px solid var(--b3-border-color)'
-
-  const searchInput = document.createElement('input')
-  searchInput.className = 'b3-text-field'
-  searchInput.type = 'text'
-  searchInput.placeholder = '搜索图标...'
-  searchInput.style.cssText = `
-    width: 100%;
-    box-sizing: border-box;
-  `
-  searchWrapper.appendChild(searchInput)
-
   const content = document.createElement('div')
   content.style.cssText = `
     flex: 1;
@@ -92,7 +78,7 @@ export function showIconPicker(options: IconPickerOptions): void {
 
   let activeCategory = iconCategories[0].id
 
-  const renderContent = (category: string, filter: string = '') => {
+  const renderContent = (category: string) => {
     // 清空内容但保留 tabs
     const existingGrid = content.querySelector('.icon-grid')
     if (existingGrid) {
@@ -113,8 +99,7 @@ export function showIconPicker(options: IconPickerOptions): void {
     const cat = iconCategories.find(c => c.id === category)
 
     if (cat) {
-      // 使用找到的分类的图标
-      icons = cat.icons.filter(icon => !filter || icon.includes(filter))
+      icons = cat.icons
     }
 
     icons.forEach(icon => {
@@ -200,23 +185,17 @@ export function showIconPicker(options: IconPickerOptions): void {
           b.style.borderColor = 'var(--b3-border-color)'
         }
       })
-      renderContent(cat.id, searchInput.value)
+      renderContent(cat.id)
     }
 
     tabs.appendChild(tab)
   })
-
-  // 搜索功能
-  searchInput.oninput = () => {
-    renderContent(activeCategory, searchInput.value)
-  }
 
   content.appendChild(tabs)
   // 默认显示第一个分类
   renderContent(iconCategories[0].id)
 
   panel.appendChild(header)
-  panel.appendChild(searchWrapper)
   panel.appendChild(content)
   dialog.appendChild(panel)
 

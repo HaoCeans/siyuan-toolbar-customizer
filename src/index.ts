@@ -85,7 +85,9 @@ export default class ToolbarCustomizer extends Plugin {
     hideReadonlyButton: true,   // 锁定编辑按钮隐藏
     hideDocMenuButton: true,    // 文档菜单按钮隐藏
     hideMoreButton: true,       // 更多按钮隐藏
-    toolbarButtonWidth: 20      // 工具栏按钮全局宽度（px）
+    toolbarButtonWidth: 20,     // 工具栏按钮全局宽度（px）
+    toolbarHeight: 32,          // 工具栏高度（px）
+    disableCustomButtons: false // 禁用所有自定义按钮（恢复思源原始状态，仅桌面端）
   }
 
   // 手机端小功能配置
@@ -184,7 +186,7 @@ export default class ToolbarCustomizer extends Plugin {
       const savedLegacyFeatureConfig = await this.loadData('featureConfig')
       if (savedLegacyFeatureConfig) {
         // 只迁移新配置中存在的属性
-        const desktopProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'toolbarButtonWidth']
+        const desktopProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'toolbarButtonWidth', 'toolbarHeight', 'disableCustomButtons']
         const mobileProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'toolbarButtonWidth', 'disableMobileSwipe', 'disableFileTree', 'disableSettingMenu']
 
         // 迁移到电脑端配置（只迁移电脑端支持的属性）
@@ -461,6 +463,39 @@ export default class ToolbarCustomizer extends Plugin {
         widthItem.appendChild(widthDesc)
         container.appendChild(widthItem)
 
+        // 工具栏高度
+        const heightItem = document.createElement('div')
+        heightItem.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
+
+        const heightRow = document.createElement('div')
+        heightRow.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+
+        const heightLabel = document.createElement('label')
+        heightLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
+        heightLabel.textContent = '工具栏高度'
+
+        const heightInput = document.createElement('input')
+        heightInput.type = 'number'
+        heightInput.value = this.desktopFeatureConfig.toolbarHeight?.toString() || '32'
+        heightInput.className = 'b3-text-field'
+        heightInput.style.cssText = 'width: 80px;'
+        heightInput.onchange = async () => {
+          this.desktopFeatureConfig.toolbarHeight = parseInt(heightInput.value) || 32
+          await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
+          this.applyFeatures()
+        }
+
+        heightRow.appendChild(heightLabel)
+        heightRow.appendChild(heightInput)
+
+        const heightDesc = document.createElement('div')
+        heightDesc.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
+        heightDesc.textContent = '💡 调整工具栏的整体高度（仅桌面端）'
+
+        heightItem.appendChild(heightRow)
+        heightItem.appendChild(heightDesc)
+        container.appendChild(heightItem)
+
         container.appendChild(createSwitchItem('面包屑图标隐藏', this.desktopFeatureConfig.hideBreadcrumbIcon, (v) => {
           this.desktopFeatureConfig.hideBreadcrumbIcon = v
         }))
@@ -476,6 +511,48 @@ export default class ToolbarCustomizer extends Plugin {
         container.appendChild(createSwitchItem('更多按钮隐藏', this.desktopFeatureConfig.hideMoreButton, (v) => {
           this.desktopFeatureConfig.hideMoreButton = v
         }))
+
+        // ⚠️ 特殊醒目样式：禁用自定义按钮
+        const dangerItem = document.createElement('div')
+        dangerItem.style.cssText = `
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 8px !important;
+          padding: 16px !important;
+          margin-top: 12px !important;
+          background: linear-gradient(135deg, rgba(255, 77, 77, 0.15), rgba(255, 120, 77, 0.1)) !important;
+          border: 2px solid rgba(255, 77, 77, 0.4) !important;
+          border-radius: 8px !important;
+        `
+
+        const dangerHeader = document.createElement('div')
+        dangerHeader.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+
+        const dangerLabel = document.createElement('label')
+        dangerLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #ff4d4d; min-width: 180px;'
+        dangerLabel.textContent = '⚠️ 完全恢复思源原始状态'
+
+        const dangerSwitch = document.createElement('input')
+        dangerSwitch.type = 'checkbox'
+        dangerSwitch.className = 'b3-switch'
+        dangerSwitch.checked = this.desktopFeatureConfig.disableCustomButtons
+        dangerSwitch.onchange = async () => {
+          this.desktopFeatureConfig.disableCustomButtons = dangerSwitch.checked
+          await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
+          this.applyFeatures()
+        }
+
+        dangerHeader.appendChild(dangerLabel)
+        dangerHeader.appendChild(dangerSwitch)
+
+        const dangerDesc = document.createElement('div')
+        dangerDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
+        dangerDesc.textContent = '💡 开启后：隐藏所有自定义按钮 + 取消所有工具栏样式修改（按钮宽度、工具栏高度、隐藏原生按钮等），让思源恢复到未安装插件时的原始状态'
+
+        dangerItem.appendChild(dangerHeader)
+        dangerItem.appendChild(dangerDesc)
+
+        container.appendChild(dangerItem)
 
         return container
       }
@@ -908,69 +985,131 @@ export default class ToolbarCustomizer extends Plugin {
       }
     })
 
-    // 工具栏背景颜色
+    // 工具栏背景颜色（明亮模式 + 黑暗模式）
     setting.addItem({
       title: '②工具栏背景颜色',
       description: '💡点击色块选择颜色，或直接输入颜色值，或跟随主题',
       createActionElement: () => {
         const container = document.createElement('div')
-        container.style.cssText = 'display: flex; align-items: center; gap: 8px;'
+        container.style.cssText = 'display: flex; flex-direction: column; gap: 10px;'
 
-        // 颜色选择器
-        const colorPicker = document.createElement('input')
-        colorPicker.type = 'color'
-        colorPicker.value = this.mobileConfig.toolbarBackgroundColor
-        colorPicker.style.cssText = 'width: 50px; height: 36px; border: 1px solid var(--b3-border-color); border-radius: 4px; cursor: pointer; flex-shrink: 0;'
+        // 明亮模式颜色行
+        const lightRow = document.createElement('div')
+        lightRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
 
-        // 文本输入框（鸿蒙系统备用）
-        const textInput = document.createElement('input')
-        textInput.className = 'b3-text-field'
-        textInput.type = 'text'
-        textInput.value = this.mobileConfig.toolbarBackgroundColor
-        textInput.placeholder = '#f8f9fa'
-        textInput.style.cssText = 'width: 80px; font-size: 14px; padding: 6px 8px;'
+        const lightLabel = document.createElement('span')
+        lightLabel.textContent = '☀️ 明亮模式：'
+        lightLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 85px;'
+
+        // 明亮模式颜色选择器
+        const lightColorPicker = document.createElement('input')
+        lightColorPicker.type = 'color'
+        lightColorPicker.value = this.mobileConfig.toolbarBackgroundColor || '#f8f9fa'
+        lightColorPicker.style.cssText = 'width: 50px; height: 36px; border: 1px solid var(--b3-border-color); border-radius: 4px; cursor: pointer; flex-shrink: 0;'
+
+        // 明亮模式文本输入框
+        const lightTextInput = document.createElement('input')
+        lightTextInput.className = 'b3-text-field'
+        lightTextInput.type = 'text'
+        lightTextInput.value = this.mobileConfig.toolbarBackgroundColor || '#f8f9fa'
+        lightTextInput.placeholder = '#f8f9fa'
+        lightTextInput.style.cssText = 'width: 80px; font-size: 14px; padding: 6px 8px;'
+
+        lightColorPicker.onchange = async () => {
+          this.mobileConfig.toolbarBackgroundColor = lightColorPicker.value
+          lightTextInput.value = lightColorPicker.value
+          await this.saveData('mobileConfig', this.mobileConfig)
+          this.applyMobileToolbarStyle()
+        }
+
+        lightTextInput.onchange = async () => {
+          const colorValue = lightTextInput.value.trim()
+          if (colorValue) {
+            this.mobileConfig.toolbarBackgroundColor = colorValue
+            lightColorPicker.value = colorValue.startsWith('#') ? colorValue : '#f8f9fa'
+            await this.saveData('mobileConfig', this.mobileConfig)
+            this.applyMobileToolbarStyle()
+          }
+        }
+
+        lightRow.appendChild(lightLabel)
+        lightRow.appendChild(lightColorPicker)
+        lightRow.appendChild(lightTextInput)
+
+        // 黑暗模式颜色行
+        const darkRow = document.createElement('div')
+        darkRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
+
+        const darkLabel = document.createElement('span')
+        darkLabel.textContent = '🌙 黑暗模式：'
+        darkLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 85px;'
+
+        // 黑暗模式颜色选择器
+        const darkColorPicker = document.createElement('input')
+        darkColorPicker.type = 'color'
+        darkColorPicker.value = this.mobileConfig.toolbarBackgroundColorDark || '#1a1a1a'
+        darkColorPicker.style.cssText = 'width: 50px; height: 36px; border: 1px solid var(--b3-border-color); border-radius: 4px; cursor: pointer; flex-shrink: 0;'
+
+        // 黑暗模式文本输入框
+        const darkTextInput = document.createElement('input')
+        darkTextInput.className = 'b3-text-field'
+        darkTextInput.type = 'text'
+        darkTextInput.value = this.mobileConfig.toolbarBackgroundColorDark || '#1a1a1a'
+        darkTextInput.placeholder = '#1a1a1a'
+        darkTextInput.style.cssText = 'width: 80px; font-size: 14px; padding: 6px 8px;'
+
+        darkColorPicker.onchange = async () => {
+          this.mobileConfig.toolbarBackgroundColorDark = darkColorPicker.value
+          darkTextInput.value = darkColorPicker.value
+          await this.saveData('mobileConfig', this.mobileConfig)
+          this.applyMobileToolbarStyle()
+        }
+
+        darkTextInput.onchange = async () => {
+          const colorValue = darkTextInput.value.trim()
+          if (colorValue) {
+            this.mobileConfig.toolbarBackgroundColorDark = colorValue
+            darkColorPicker.value = colorValue.startsWith('#') ? colorValue : '#1a1a1a'
+            await this.saveData('mobileConfig', this.mobileConfig)
+            this.applyMobileToolbarStyle()
+          }
+        }
+
+        darkRow.appendChild(darkLabel)
+        darkRow.appendChild(darkColorPicker)
+        darkRow.appendChild(darkTextInput)
+
+        // 跟随主题开关行
+        const themeRow = document.createElement('div')
+        themeRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
 
         // 跟随主题颜色开关
         const themeCheckbox = document.createElement('input')
         themeCheckbox.type = 'checkbox'
         themeCheckbox.className = 'b3-switch'
         themeCheckbox.checked = this.mobileConfig.useThemeColor || false
-        themeCheckbox.style.cssText = 'transform: scale(0.8); margin-left: 4px;'
+        themeCheckbox.style.cssText = 'transform: scale(0.8);'
 
         // 主题色标签
         const themeLabel = document.createElement('span')
-        themeLabel.textContent = '跟随主题'
-        themeLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); margin-left: 2px;'
+        themeLabel.textContent = '🎨 跟随主题颜色（自动适应明暗模式）'
+        themeLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background);'
 
         // 更新禁用状态
         const updateDisabledState = () => {
           const isTheme = themeCheckbox.checked
-          colorPicker.disabled = isTheme
-          textInput.disabled = isTheme
-          colorPicker.style.opacity = isTheme ? '0.4' : ''
-          textInput.style.opacity = isTheme ? '0.4' : ''
+          lightColorPicker.disabled = isTheme
+          lightTextInput.disabled = isTheme
+          darkColorPicker.disabled = isTheme
+          darkTextInput.disabled = isTheme
+          lightColorPicker.style.opacity = isTheme ? '0.4' : ''
+          lightTextInput.style.opacity = isTheme ? '0.4' : ''
+          darkColorPicker.style.opacity = isTheme ? '0.4' : ''
+          darkTextInput.style.opacity = isTheme ? '0.4' : ''
         }
 
         // 初始化禁用状态
         updateDisabledState()
-
-        // 同步颜色选择器和文本框
-        colorPicker.onchange = async () => {
-          this.mobileConfig.toolbarBackgroundColor = colorPicker.value
-          textInput.value = colorPicker.value
-          await this.saveData('mobileConfig', this.mobileConfig)
-          this.applyMobileToolbarStyle()
-        }
-
-        textInput.onchange = async () => {
-          const colorValue = textInput.value.trim()
-          if (colorValue) {
-            this.mobileConfig.toolbarBackgroundColor = colorValue
-            colorPicker.value = colorValue.startsWith('#') ? colorValue : '#f8f9fa'
-            await this.saveData('mobileConfig', this.mobileConfig)
-            this.applyMobileToolbarStyle()
-          }
-        }
 
         // 主题色开关变化
         themeCheckbox.onchange = async () => {
@@ -980,10 +1119,13 @@ export default class ToolbarCustomizer extends Plugin {
           this.applyMobileToolbarStyle()
         }
 
-        container.appendChild(colorPicker)
-        container.appendChild(textInput)
-        container.appendChild(themeCheckbox)
-        container.appendChild(themeLabel)
+        themeRow.appendChild(themeCheckbox)
+        themeRow.appendChild(themeLabel)
+
+        container.appendChild(lightRow)
+        container.appendChild(darkRow)
+        container.appendChild(themeRow)
+
         return container
       }
     })
@@ -2969,7 +3111,8 @@ export default class ToolbarCustomizer extends Plugin {
     let styleContent = ''
 
     // 面包屑图标隐藏（使用 transform 缩放到 0，保持按钮位置不变）
-    if (this.featureConfig.hideBreadcrumbIcon) {
+    // 当桌面端禁用自定义按钮时，跳过此设置
+    if (this.featureConfig.hideBreadcrumbIcon && !(this.desktopFeatureConfig.disableCustomButtons && !this.isMobile)) {
       styleContent += `
         .protyle-breadcrumb__icon {
           transform: scale(0) !important;
@@ -2983,7 +3126,7 @@ export default class ToolbarCustomizer extends Plugin {
     }
 
     // 锁定编辑按钮隐藏（使用 transform 缩放到 0，保持按钮位置不变）
-    if (this.featureConfig.hideReadonlyButton) {
+    if (this.featureConfig.hideReadonlyButton && !(this.desktopFeatureConfig.disableCustomButtons && !this.isMobile)) {
       styleContent += `
         .protyle-breadcrumb__bar button[data-type="readonly"],
         .protyle-breadcrumb button[data-type="readonly"] {
@@ -2998,7 +3141,7 @@ export default class ToolbarCustomizer extends Plugin {
     }
 
     // 文档菜单按钮隐藏（使用 transform 缩放到 0，保持按钮位置不变）
-    if (this.featureConfig.hideDocMenuButton) {
+    if (this.featureConfig.hideDocMenuButton && !(this.desktopFeatureConfig.disableCustomButtons && !this.isMobile)) {
       styleContent += `
         .protyle-breadcrumb__bar button[data-type="doc"],
         .protyle-breadcrumb button[data-type="doc"] {
@@ -3013,7 +3156,7 @@ export default class ToolbarCustomizer extends Plugin {
     }
 
     // 更多按钮隐藏（使用 transform 缩放到 0，保持按钮位置不变）
-    if (this.featureConfig.hideMoreButton) {
+    if (this.featureConfig.hideMoreButton && !(this.desktopFeatureConfig.disableCustomButtons && !this.isMobile)) {
       styleContent += `
         .protyle-breadcrumb__bar button[data-type="more"],
         .protyle-breadcrumb button[data-type="more"] {
@@ -3027,8 +3170,8 @@ export default class ToolbarCustomizer extends Plugin {
       `
     }
     
-    // 工具栏按钮全局宽度
-    if (this.featureConfig.toolbarButtonWidth !== 32) {
+    // 工具栏按钮全局宽度（当桌面端禁用自定义按钮时，跳过此设置）
+    if (this.featureConfig.toolbarButtonWidth !== 32 && !(this.desktopFeatureConfig.disableCustomButtons && !this.isMobile)) {
       styleContent += `
         .protyle-breadcrumb__bar button[data-custom-button],
         .protyle-breadcrumb button[data-custom-button] {
@@ -3036,7 +3179,34 @@ export default class ToolbarCustomizer extends Plugin {
         }
       `
     }
-    
+
+    // 桌面端工具栏高度（仅桌面端生效，禁用自定义按钮时跳过）
+    if (!this.isMobile && this.desktopFeatureConfig.toolbarHeight !== undefined && this.desktopFeatureConfig.toolbarHeight !== 32 && !this.desktopFeatureConfig.disableCustomButtons) {
+      styleContent += `
+        .protyle-breadcrumb__bar,
+        .protyle-breadcrumb {
+          height: ${this.desktopFeatureConfig.toolbarHeight}px !important;
+          min-height: ${this.desktopFeatureConfig.toolbarHeight}px !important;
+        }
+        .protyle-breadcrumb__bar > button,
+        .protyle-breadcrumb > button {
+          height: ${this.desktopFeatureConfig.toolbarHeight}px !important;
+        }
+      `
+    }
+
+    // 桌面端：禁用自定义按钮（恢复思源原始状态）
+    // 前面的所有修改CSS都已跳过，这里只需要隐藏自定义按钮
+    if (!this.isMobile && this.desktopFeatureConfig.disableCustomButtons) {
+      styleContent += `
+        /* 隐藏所有自定义按钮 */
+        .protyle-breadcrumb__bar button[data-custom-button],
+        .protyle-breadcrumb button[data-custom-button] {
+          display: none !important;
+        }
+      `
+    }
+
     // 手机端禁止左右滑动弹出
     if (this.isMobile && this.featureConfig.disableMobileSwipe) {
       const { disableFileTree, disableSettingMenu } = this.featureConfig
@@ -3178,24 +3348,53 @@ export default class ToolbarCustomizer extends Plugin {
     const cssRules: string[] = []
 
     // 判断是否使用主题颜色
-    const bgColor = this.mobileConfig.useThemeColor
-      ? 'var(--b3-theme-surface)'
-      : this.mobileConfig.toolbarBackgroundColor
-
-    // 通用设置：应用于顶部和底部工具栏（包括底部置底工具栏）
-    cssRules.push(`
-      @media (max-width: 768px) {
-        .protyle-breadcrumb,
-        .protyle-breadcrumb__bar,
-        .protyle-breadcrumb__bar[data-input-method],
-        .protyle-breadcrumb[data-input-method] {
-          background-color: ${bgColor} !important;
-          opacity: ${this.mobileConfig.toolbarOpacity} !important;
-          height: ${this.mobileConfig.toolbarHeight} !important;
-          min-height: ${this.mobileConfig.toolbarHeight} !important;
+    if (this.mobileConfig.useThemeColor) {
+      // 使用主题颜色
+      cssRules.push(`
+        @media (max-width: 768px) {
+          .protyle-breadcrumb,
+          .protyle-breadcrumb__bar,
+          .protyle-breadcrumb__bar[data-input-method],
+          .protyle-breadcrumb[data-input-method] {
+            background-color: var(--b3-theme-surface) !important;
+            opacity: ${this.mobileConfig.toolbarOpacity} !important;
+            height: ${this.mobileConfig.toolbarHeight} !important;
+            min-height: ${this.mobileConfig.toolbarHeight} !important;
+          }
         }
-      }
-    `)
+      `)
+    } else {
+      // 使用自定义颜色，分别处理明亮和黑暗模式
+      const lightColor = this.mobileConfig.toolbarBackgroundColor || '#f8f9fa'
+      const darkColor = this.mobileConfig.toolbarBackgroundColorDark || '#1a1a1a'
+
+      // 通用设置（默认明亮模式）
+      cssRules.push(`
+        @media (max-width: 768px) {
+          .protyle-breadcrumb,
+          .protyle-breadcrumb__bar,
+          .protyle-breadcrumb__bar[data-input-method],
+          .protyle-breadcrumb[data-input-method] {
+            background-color: ${lightColor} !important;
+            opacity: ${this.mobileConfig.toolbarOpacity} !important;
+            height: ${this.mobileConfig.toolbarHeight} !important;
+            min-height: ${this.mobileConfig.toolbarHeight} !important;
+          }
+        }
+      `)
+
+      // 黑暗模式（使用思源的主题模式属性）
+      cssRules.push(`
+        @media (max-width: 768px) {
+          html[data-theme-mode="dark"] .protyle-breadcrumb,
+          html[data-theme-mode="dark"] .protyle-breadcrumb__bar,
+          html[data-theme-mode="dark"] .protyle-breadcrumb__bar[data-input-method],
+          html[data-theme-mode="dark"] .protyle-breadcrumb[data-input-method] {
+            background-color: ${darkColor} !important;
+          }
+        }
+      `)
+    }
 
     // 底部专用设置：仅应用于置底工具栏
     if (this.mobileConfig.enableBottomToolbar) {

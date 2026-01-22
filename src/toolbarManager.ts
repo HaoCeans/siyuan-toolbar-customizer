@@ -11,7 +11,8 @@ export interface MobileToolbarConfig {
   openInputOffset: string;    // 打开输入框时距离底部高度
   closeInputOffset: string;   // 关闭输入框时距离底部高度
   heightThreshold: number;    // 高度变化阈值百分比
-  toolbarBackgroundColor: string; // 工具栏背景颜色
+  toolbarBackgroundColor: string; // 工具栏背景颜色（明亮模式）
+  toolbarBackgroundColorDark: string; // 工具栏背景颜色（黑暗模式）
   toolbarOpacity: number;     // 工具栏透明度 (0-1)
   toolbarHeight: string;      // 工具栏高度
   toolbarZIndex: number;      // 工具栏层级
@@ -43,6 +44,7 @@ export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
   closeInputOffset: '0px',
   heightThreshold: 70,
   toolbarBackgroundColor: '#f8f9fa',
+  toolbarBackgroundColorDark: '#1a1a1a',
   toolbarOpacity: 1.0,        // 100% 透明度
   toolbarHeight: '40px',      // 工具栏高度
   toolbarZIndex: 5,

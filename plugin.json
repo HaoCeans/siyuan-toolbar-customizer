@@ -2,7 +2,7 @@
   "name": "siyuan-toolbar-customizer",
   "author": "whale🐋",
   "url": "https://github.com/HaoCeans/siyuan-toolbar-customizer",
-  "version": "2.4.7",
+  "version": "2.4.8",
   "minAppVersion": "3.0.0",
   "backends": [
     "all"

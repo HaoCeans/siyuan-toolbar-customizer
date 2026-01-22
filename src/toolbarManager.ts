@@ -309,6 +309,9 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
 
   // 如果未启用工具栏置底，则移除相关样式并返回
   if (!config.enableBottomToolbar) {
+    // 移除 body 标记类
+    document.body.classList.remove('siyuan-toolbar-customizer-enabled')
+
     // 移除所有相关样式
     const existingStyle = document.getElementById('mobile-toolbar-custom-style')
     if (existingStyle) {
@@ -336,14 +339,17 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
       toolbar.style.paddingBottom = ''
     })
 
-    // 重置 protyle 的底部内边距
+    // 重置 protyle 的底部内边距（使用 !important 覆盖 CSS 样式）
     const protyles = document.querySelectorAll('.protyle') as NodeListOf<HTMLElement>
     protyles.forEach(protyle => {
-      protyle.style.paddingBottom = ''
+      protyle.style.setProperty('padding-bottom', '0', 'important')
     })
 
     return
   }
+
+  // 启用底部工具栏时，添加 body 标记类
+  document.body.classList.add('siyuan-toolbar-customizer-enabled')
   
   const setupToolbar = () => {
     // 优先查找 .protyle-breadcrumb（移动端使用）
@@ -478,8 +484,8 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
           bottom: var(--mobile-toolbar-offset, 0px) !important;
         }
 
-        /* 防止编辑器内容被遮挡 */
-        .protyle {
+        /* 防止编辑器内容被遮挡 - 仅在启用底部工具栏且工具栏显示时应用 */
+        body.siyuan-toolbar-customizer-enabled .protyle {
           padding-bottom: calc(${config.toolbarHeight} + 10px) !important;
         }
 
@@ -1170,6 +1176,9 @@ function clickElement(element: HTMLElement): void {
 
 // ===== 清理函数 =====
 export function cleanup() {
+  // 移除 body 标记类
+  document.body.classList.remove('siyuan-toolbar-customizer-enabled')
+
   // 清理所有定时器
   clearAllTimers()
 

@@ -451,13 +451,14 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
         .protyle-breadcrumb__bar[data-input-method],
         .protyle-breadcrumb[data-input-method] {
           position: fixed !important;
-          bottom: var(--mobile-toolbar-offset, 0px) !important;
+          bottom: calc(var(--mobile-toolbar-offset, 0px) + env(safe-area-inset-bottom)) !important;
           top: auto !important;
           left: 0 !important;
           right: 0 !important;
           z-index: ${config.toolbarZIndex} !important;
           border-top: 1px solid var(--b3-border-color) !important;
           padding: 8px 12px !important;
+          padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
           display: flex !important;
           justify-content: center !important;
           align-items: center !important;
@@ -476,23 +477,17 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
 
         .protyle-breadcrumb__bar[data-input-method="open"],
         .protyle-breadcrumb[data-input-method="open"] {
-          bottom: var(--mobile-toolbar-offset, 50px) !important;
+          bottom: calc(var(--mobile-toolbar-offset, 50px) + env(safe-area-inset-bottom)) !important;
         }
 
         .protyle-breadcrumb__bar[data-input-method="close"],
         .protyle-breadcrumb[data-input-method="close"] {
-          bottom: var(--mobile-toolbar-offset, 0px) !important;
+          bottom: calc(var(--mobile-toolbar-offset, 0px) + env(safe-area-inset-bottom)) !important;
         }
 
         /* 防止编辑器内容被遮挡 - 仅在启用底部工具栏且工具栏显示时应用 */
         body.siyuan-toolbar-customizer-enabled .protyle {
-          padding-bottom: calc(${config.toolbarHeight} + 10px) !important;
-        }
-
-        /* 安全区域适配 */
-        .protyle-breadcrumb__bar[data-input-method],
-        .protyle-breadcrumb[data-input-method] {
-          padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+          padding-bottom: calc(${config.toolbarHeight} + env(safe-area-inset-bottom) + 10px) !important;
         }
 
         /* 使用思源原生的隐藏类 */

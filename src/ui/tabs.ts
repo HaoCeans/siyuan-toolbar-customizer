@@ -3,6 +3,23 @@
  * 负责创建桌面端/手机端配置的标签切换功能
  */
 
+// 保存注入的样式引用，用于清理和复用
+let injectedStyle: HTMLStyleElement | null = null
+// 递归调用计数器，防止无限循环
+let tabSwitcherAttempts = 0
+const MAX_TAB_SWITCHER_ATTEMPTS = 50  // 最多尝试 50 次（5秒）
+
+/**
+ * 清理标签切换器资源
+ */
+export function cleanupTabSwitcher(): void {
+  tabSwitcherAttempts = 0
+  if (injectedStyle && injectedStyle.parentNode) {
+    injectedStyle.parentNode.removeChild(injectedStyle)
+    injectedStyle = null
+  }
+}
+
 /**
  * 注入标签切换器
  * 在设置对话框顶部创建电脑端/手机端配置的切换标签
@@ -16,13 +33,25 @@ export function injectTabSwitcher(): void {
     // 检查是否有设置项，如果没有则等待更长时间
     const configItems = dialogContent.querySelectorAll('.config__item')
     if (configItems.length === 0) {
-      // 设置项还没创建，再等待一段时间
-      setTimeout(() => injectTabSwitcher(), 200)
+      // 设置项还没创建，再等待一段时间（有最大重试次数限制）
+      tabSwitcherAttempts++
+      if (tabSwitcherAttempts < MAX_TAB_SWITCHER_ATTEMPTS) {
+        setTimeout(() => injectTabSwitcher(), 100)
+      }
       return
     }
 
+    // 重置计数器
+    tabSwitcherAttempts = 0
+
     // 隐藏配置项的标题部分（左边的 .fn__flex-1），因为我们用标签切换器了
+    // 先清理已存在的样式，避免累积
+    if (injectedStyle && injectedStyle.parentNode) {
+      injectedStyle.parentNode.removeChild(injectedStyle)
+    }
+
     const style = document.createElement('style')
+    injectedStyle = style  // 保存引用
     style.textContent = `
       /* 隐藏标题和间距，让它们不占空间 */
       .b3-dialog__content .config__item > .fn__flex-1 {

@@ -40,7 +40,7 @@ import { showIconPicker as showIconPickerModal } from './ui/iconPicker'
 import { showClickSequenceSelector } from './ui/clickSequenceSelector'
 import { updateIconDisplay as updateIconDisplayUtil } from './data/icons'
 // 导入标签切换器
-import { injectTabSwitcher as injectTabSwitcherUtil } from './ui/tabs'
+import { injectTabSwitcher as injectTabSwitcherUtil, cleanupTabSwitcher } from './ui/tabs'
 // 导入字段创建工具
 import {
   updateIconDisplay,
@@ -101,6 +101,9 @@ export default class ToolbarCustomizer extends Plugin {
   private touchStartHandler: any = null
   private touchMoveHandler: any = null
   private touchEndHandler: any = null
+
+  // 待保存的欢迎标记（延迟到用户保存设置时写入）
+  private _pendingWelcomeSave = false
 
   // 动态获取当前平台的按钮配置
   get buttonConfigs(): ButtonConfig[] {
@@ -303,8 +306,8 @@ export default class ToolbarCustomizer extends Plugin {
           } else {
             showMessage('欢迎使用本插件🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦伺服浏览器', 0, 'info')
           }
-          // 标记已显示过欢迎提示
-          this.saveData('hasShownWelcome', true)
+          // 只设置标记，不立即写入，等待用户保存设置时一并写入
+          this._pendingWelcomeSave = true
         }, 2000)
       }
     } catch (error) {
@@ -350,6 +353,9 @@ export default class ToolbarCustomizer extends Plugin {
     cleanup()
     destroy()
 
+    // 清理标签切换器资源
+    cleanupTabSwitcher()
+
     // 移除动态样式
     this.removeFeatureStyles()
 
@@ -386,6 +392,12 @@ export default class ToolbarCustomizer extends Plugin {
         await this.saveData('mobileButtonConfigs', this.mobileButtonConfigs)
         await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
         await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
+
+        // 如果有待保存的欢迎标记，一并保存
+        if (this._pendingWelcomeSave) {
+          await this.saveData('hasShownWelcome', true)
+          this._pendingWelcomeSave = false
+        }
         
         showMessage('设置已保存，正在重载...', 2000, 'info')
         

@@ -572,9 +572,13 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
 
   // 监听DOM变化，确保工具栏加载后能应用样式
   // 只监听 childList，不监听属性变化，减少触发频率
+  // 优化：只监听工具栏所在的容器，而不是整个 body
+  const toolbarContainer = document.querySelector('.layout__center') ||
+                          document.querySelector('.fn__flex-1.fn__flex-column') ||
+                          document.body
   mutationObserver = new MutationObserver(handleMutation)
 
-  mutationObserver.observe(document.body, {
+  mutationObserver.observe(toolbarContainer, {
     childList: true,
     subtree: true
   })

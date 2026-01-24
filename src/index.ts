@@ -28,6 +28,8 @@ import {
   DEFAULT_MOBILE_CONFIG,
   MobileToolbarConfig,
   ButtonConfig,
+  GlobalButtonConfig,
+  DEFAULT_GLOBAL_BUTTON_CONFIG,
   isMobileDevice
 } from './toolbarManager'
 
@@ -65,6 +67,15 @@ export default class ToolbarCustomizer extends Plugin {
   private mobileButtonConfigs: ButtonConfig[] = []   // 手机端按钮配置
   private currentEditingButton: ButtonConfig | null = null
 
+  // 全局按钮配置（批量设置所有按钮的默认值）
+  private desktopGlobalButtonConfig: GlobalButtonConfig = { ...DEFAULT_GLOBAL_BUTTON_CONFIG }
+  private mobileGlobalButtonConfig: GlobalButtonConfig = { ...DEFAULT_GLOBAL_BUTTON_CONFIG }
+
+  // 全局事件处理器引用（用于清理）
+  private touchStartHandler: any = null
+  private touchMoveHandler: any = null
+  private touchEndHandler: any = null
+
   // 动态获取当前平台的按钮配置
   get buttonConfigs(): ButtonConfig[] {
     return this.isMobile ? this.mobileButtonConfigs : this.desktopButtonConfigs
@@ -87,7 +98,10 @@ export default class ToolbarCustomizer extends Plugin {
     hideMoreButton: true,       // 更多按钮隐藏
     toolbarButtonWidth: 20,     // 工具栏按钮全局宽度（px）
     toolbarHeight: 32,          // 工具栏高度（px）
-    disableCustomButtons: false // 禁用所有自定义按钮（恢复思源原始状态，仅桌面端）
+    disableCustomButtons: false,// 禁用所有自定义按钮（恢复思源原始状态，仅桌面端）
+    showAllNotifications: true, // 一键开启所有按钮右上角提示
+    authorActivated: false,     // 作者自用工具是否已激活
+    authorCode: ''              // 作者自用工具激活码
   }
 
   // 手机端小功能配置
@@ -99,7 +113,16 @@ export default class ToolbarCustomizer extends Plugin {
     toolbarButtonWidth: 32,     // 工具栏按钮全局宽度（px）
     disableMobileSwipe: true,   // 手机端禁止左右滑动弹出
     disableFileTree: true,      // 禁止右滑弹出文档树
-    disableSettingMenu: true    // 禁止左滑弹出设置菜单
+    disableSettingMenu: true,   // 禁止左滑弹出设置菜单
+    showAllNotifications: true, // 一键开启所有按钮右上角提示
+    authorActivated: false,     // 作者自用工具是否已激活
+    authorCode: ''              // 作者自用工具激活码
+  }
+
+  // 检查作者功能是否已激活
+  private isAuthorToolActivated(): boolean {
+    // 电脑端和手机端共享激活状态
+    return this.desktopFeatureConfig.authorActivated || this.mobileFeatureConfig.authorActivated
   }
 
   // 获取当前平台的功能配置（向后兼容）
@@ -111,7 +134,7 @@ export default class ToolbarCustomizer extends Plugin {
     // ===== 环境检测 =====
     const frontEnd = getFrontend();
     this.platform = frontEnd
-    
+
     this.isMobile = frontEnd === "mobile" || frontEnd === "browser-mobile"
     this.isBrowser = frontEnd.includes('browser')
     this.isLocal = location.href.includes('127.0.0.1') || location.href.includes('localhost')
@@ -182,12 +205,44 @@ export default class ToolbarCustomizer extends Plugin {
         }
       }
 
+      // 加载电脑端全局按钮配置
+      const savedDesktopGlobalButtonConfig = await this.loadData('desktopGlobalButtonConfig')
+      if (savedDesktopGlobalButtonConfig) {
+        this.desktopGlobalButtonConfig = {
+          ...this.desktopGlobalButtonConfig,
+          ...savedDesktopGlobalButtonConfig
+        }
+      }
+
+      // 加载手机端全局按钮配置
+      const savedMobileGlobalButtonConfig = await this.loadData('mobileGlobalButtonConfig')
+      if (savedMobileGlobalButtonConfig) {
+        this.mobileGlobalButtonConfig = {
+          ...this.mobileGlobalButtonConfig,
+          ...savedMobileGlobalButtonConfig
+        }
+      }
+
+      // 同步 showAllNotifications 设置到所有按钮
+      // 电脑端
+      this.desktopButtonConfigs.forEach(btn => {
+        if (this.desktopFeatureConfig.showAllNotifications !== undefined) {
+          btn.showNotification = this.desktopFeatureConfig.showAllNotifications
+        }
+      })
+      // 手机端
+      this.mobileButtonConfigs.forEach(btn => {
+        if (this.mobileFeatureConfig.showAllNotifications !== undefined) {
+          btn.showNotification = this.mobileFeatureConfig.showAllNotifications
+        }
+      })
+
       // 向后兼容：尝试加载旧的 featureConfig 并迁移到对应平台
       const savedLegacyFeatureConfig = await this.loadData('featureConfig')
       if (savedLegacyFeatureConfig) {
         // 只迁移新配置中存在的属性
-        const desktopProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'toolbarButtonWidth', 'toolbarHeight', 'disableCustomButtons']
-        const mobileProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'toolbarButtonWidth', 'disableMobileSwipe', 'disableFileTree', 'disableSettingMenu']
+        const desktopProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'toolbarButtonWidth', 'toolbarHeight', 'disableCustomButtons', 'showAllNotifications']
+        const mobileProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'toolbarButtonWidth', 'disableMobileSwipe', 'disableFileTree', 'disableSettingMenu', 'showAllNotifications']
 
         // 迁移到电脑端配置（只迁移电脑端支持的属性）
         desktopProps.forEach(prop => {
@@ -254,10 +309,10 @@ export default class ToolbarCustomizer extends Plugin {
   private initPluginFunctions() {
     // 清理旧的功能
     cleanup()
-    
+  
     // ===== 初始化移动端工具栏调整 =====
     initMobileToolbarAdjuster(this.mobileConfig)
-    
+
     // ===== 初始化自定义按钮 =====
     // 根据当前平台选择对应的按钮配置
     const buttonsToInit = this.isMobile ? this.mobileButtonConfigs : this.desktopButtonConfigs
@@ -268,9 +323,23 @@ export default class ToolbarCustomizer extends Plugin {
     // 清理资源
     cleanup()
     destroy()
-    
+
     // 移除动态样式
     this.removeFeatureStyles()
+
+    // 清理全局 touch 事件监听器
+    if (this.touchStartHandler) {
+      document.removeEventListener('touchstart', this.touchStartHandler, true)
+      this.touchStartHandler = null
+    }
+    if (this.touchMoveHandler) {
+      document.removeEventListener('touchmove', this.touchMoveHandler, false)
+      this.touchMoveHandler = null
+    }
+    if (this.touchEndHandler) {
+      document.removeEventListener('touchend', this.touchEndHandler, false)
+      this.touchEndHandler = null
+    }
   }
 
   async uninstall() {
@@ -397,6 +466,119 @@ export default class ToolbarCustomizer extends Plugin {
       }
     })
 
+    // === 电脑端全局按钮配置 ===
+    const createDesktopGlobalButtonConfig = () => {
+      const container = document.createElement('div')
+      container.className = 'toolbar-customizer-content'
+      container.dataset.tabGroup = 'desktop'
+      container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 8px 0;'
+
+      const createRow = (label: string, inputValue: string | number, inputType: 'text' | 'number' | 'checkbox', onChange: (input: HTMLInputElement) => void) => {
+        const row = document.createElement('div')
+        row.style.cssText = 'display: flex; align-items: center; justify-content: space-between;'
+
+        const labelSpan = document.createElement('span')
+        labelSpan.textContent = label
+        labelSpan.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background);'
+
+        const input = document.createElement('input')
+        input.className = inputType === 'checkbox' ? 'b3-switch' : 'b3-text-field'
+        input.type = inputType
+
+        if (inputType === 'checkbox') {
+          input.checked = inputValue as boolean
+          input.style.cssText = 'transform: scale(1.2);'
+        } else {
+          input.value = inputValue.toString()
+          input.style.cssText = 'width: 80px; font-size: 14px; padding: 6px 8px;'
+        }
+
+        input.onchange = () => onChange(input)
+
+        row.appendChild(labelSpan)
+        row.appendChild(input)
+        return { row, input }
+      }
+
+      // 图标大小
+      const { row: iconSizeRow, input: iconSizeInput } = createRow(
+        '图标大小 (px)',
+        this.desktopGlobalButtonConfig.iconSize,
+        'number',
+        async (input) => {
+          const newValue = parseInt(input.value) || 16
+          this.desktopGlobalButtonConfig.iconSize = newValue
+          this.desktopButtonConfigs.forEach(btn => btn.iconSize = newValue)
+          await this.saveData('desktopGlobalButtonConfig', this.desktopGlobalButtonConfig)
+          await this.saveData('desktopButtonConfigs', this.desktopButtonConfigs)
+          showMessage('图标大小已应用到所有按钮', 1500, 'info')
+        }
+      )
+      container.appendChild(iconSizeRow)
+
+      // 按钮宽度
+      const { row: widthRow, input: widthInput } = createRow(
+        '按钮宽度 (px)',
+        this.desktopGlobalButtonConfig.minWidth,
+        'number',
+        async (input) => {
+          const newValue = parseInt(input.value) || 32
+          this.desktopGlobalButtonConfig.minWidth = newValue
+          this.desktopButtonConfigs.forEach(btn => btn.minWidth = newValue)
+          await this.saveData('desktopGlobalButtonConfig', this.desktopGlobalButtonConfig)
+          await this.saveData('desktopButtonConfigs', this.desktopButtonConfigs)
+          showMessage('按钮宽度已应用到所有按钮', 1500, 'info')
+        }
+      )
+      container.appendChild(widthRow)
+
+      // 右边距
+      const { row: marginRow, input: marginInput } = createRow(
+        '右边距 (px)',
+        this.desktopGlobalButtonConfig.marginRight,
+        'number',
+        async (input) => {
+          const newValue = parseInt(input.value) || 8
+          this.desktopGlobalButtonConfig.marginRight = newValue
+          this.desktopButtonConfigs.forEach(btn => btn.marginRight = newValue)
+          await this.saveData('desktopGlobalButtonConfig', this.desktopGlobalButtonConfig)
+          await this.saveData('desktopButtonConfigs', this.desktopButtonConfigs)
+          showMessage('右边距已应用到所有按钮', 1500, 'info')
+        }
+      )
+      container.appendChild(marginRow)
+
+      // 右上角提示
+      const { row: notifyRow, input: notifyToggle } = createRow(
+        '右上角提示',
+        this.desktopGlobalButtonConfig.showNotification,
+        'checkbox',
+        async (input) => {
+          this.desktopGlobalButtonConfig.showNotification = input.checked
+          this.desktopButtonConfigs.forEach(btn => btn.showNotification = input.checked)
+          await this.saveData('desktopGlobalButtonConfig', this.desktopGlobalButtonConfig)
+          await this.saveData('desktopButtonConfigs', this.desktopButtonConfigs)
+          showMessage(input.checked ? '已开启所有按钮提示' : '已关闭所有按钮提示', 1500, 'info')
+        }
+      )
+      container.appendChild(notifyRow)
+
+      // 说明文字
+      const hint = document.createElement('div')
+      hint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light); margin-top: 8px; padding: 8px; background: var(--b3-theme-background); border-radius: 4px;'
+      hint.innerHTML = '💡 修改后会批量应用到所有按钮<br>单个按钮的独立配置优先级更高'
+      container.appendChild(hint)
+
+      return container
+    }
+
+    setting.addItem({
+      title: '🔧 电脑端全局按钮配置',
+      description: '批量设置所有按钮的默认值（图标大小、宽度、边距、提示）',
+      createActionElement: createDesktopGlobalButtonConfig
+    })
+
+
     // 小功能选择
     setting.addItem({
       title: '⚙️ 小功能选择',
@@ -405,7 +587,7 @@ export default class ToolbarCustomizer extends Plugin {
         const container = document.createElement('div')
         container.className = 'toolbar-customizer-content'
         container.dataset.tabGroup = 'desktop'
-        container.style.cssText = 'display: flex; flex-direction: column; gap: 12px;'
+        container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; width: 100% !important; max-width: 100% !important;'
 
         const createSwitchItem = (labelText: string, checked: boolean, onChange: (value: boolean) => void) => {
           const item = document.createElement('div')
@@ -554,6 +736,87 @@ export default class ToolbarCustomizer extends Plugin {
 
         container.appendChild(dangerItem)
 
+        // 作者自用工具激活码输入
+        const activationItem = document.createElement('div')
+        activationItem.style.cssText = `
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          padding: 16px;
+          margin-top: 12px;
+          background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(59, 130, 246, 0.1));
+          border: 2px solid rgba(139, 92, 246, 0.4);
+          border-radius: 8px;
+        `
+
+        const activationHeader = document.createElement('div')
+        activationHeader.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+
+        const activationLabel = document.createElement('label')
+        activationLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #8b5cf6; min-width: 180px;'
+        activationLabel.textContent = '🔐 作者自用工具激活'
+
+        const activationStatus = document.createElement('span')
+        activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px;'
+        if (this.isAuthorToolActivated()) {
+          activationStatus.style.cssText += ' background: rgba(34, 197, 94, 0.2); color: #22c55e;'
+          activationStatus.textContent = '✓ 已激活'
+        } else {
+          activationStatus.style.cssText += ' background: rgba(255, 77, 77, 0.2); color: #ff4d4d;'
+          activationStatus.textContent = '✗ 未激活'
+        }
+
+        activationHeader.appendChild(activationLabel)
+        activationHeader.appendChild(activationStatus)
+
+        const activationDesc = document.createElement('div')
+        activationDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
+        activationDesc.textContent = '💡 输入激活码后可解锁「⑥作者自用工具」功能类型'
+
+        const activationInputRow = document.createElement('div')
+        activationInputRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-top: 4px;'
+
+        const activationInput = document.createElement('input')
+        activationInput.type = 'text'
+        activationInput.className = 'b3-text-field'
+        activationInput.placeholder = '请输入激活码'
+        activationInput.value = this.desktopFeatureConfig.authorCode || ''
+        activationInput.style.cssText = 'flex: 1; max-width: 200px;'
+
+        const activationBtn = document.createElement('button')
+        activationBtn.className = 'b3-button b3-button--text'
+        activationBtn.textContent = '验证激活'
+        activationBtn.onclick = async () => {
+          const code = activationInput.value.trim()
+          if (code === '88888888') {
+            // 同时激活两端
+            this.desktopFeatureConfig.authorActivated = true
+            this.desktopFeatureConfig.authorCode = code
+            this.mobileFeatureConfig.authorActivated = true
+            this.mobileFeatureConfig.authorCode = code
+            await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
+            await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
+            activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px; background: rgba(34, 197, 94, 0.2); color: #22c55e;'
+            activationStatus.textContent = '✓ 已激活'
+            showMessage('作者自用工具已激活！请重新打开设置页面', 3000, 'success')
+            // 延迟后重新加载设置页面
+            setTimeout(() => {
+              window.location.reload()
+            }, 1500)
+          } else {
+            showMessage('激活码错误，请重试', 3000, 'error')
+          }
+        }
+
+        activationInputRow.appendChild(activationInput)
+        activationInputRow.appendChild(activationBtn)
+
+        activationItem.appendChild(activationHeader)
+        activationItem.appendChild(activationDesc)
+        activationItem.appendChild(activationInputRow)
+
+        container.appendChild(activationItem)
+
         return container
       }
     })
@@ -635,7 +898,7 @@ export default class ToolbarCustomizer extends Plugin {
         const container = document.createElement('div')
         container.className = 'toolbar-customizer-content'
         container.dataset.tabGroup = 'mobile'
-        container.style.cssText = 'display: flex; flex-direction: column; gap: 12px;'
+        container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; width: 100% !important; max-width: 100% !important;'
 
         // 是否将工具栏置底
         const toggleRow = document.createElement('div')
@@ -939,6 +1202,127 @@ export default class ToolbarCustomizer extends Plugin {
         container.appendChild(listContainer)
         return container
       }
+    })
+
+    // === 手机端全局按钮配置 ===
+    createGroupTitle('🔧', '手机端全局按钮配置')
+
+    const createGlobalButtonConfig = (
+      config: GlobalButtonConfig,
+      configs: ButtonConfig[],
+      storageKey: string
+    ) => {
+      const container = document.createElement('div')
+      container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 8px 0;'
+
+      // 图标大小
+      const iconSizeRow = document.createElement('div')
+      iconSizeRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between;'
+      iconSizeRow.innerHTML = `
+        <span style="font-size: 13px; color: var(--b3-theme-on-background);">图标大小 (px)</span>
+      `
+      const iconSizeInput = document.createElement('input')
+      iconSizeInput.type = 'number'
+      iconSizeInput.className = 'b3-text-field'
+      iconSizeInput.value = config.iconSize.toString()
+      iconSizeInput.style.cssText = 'width: 80px; font-size: 14px; padding: 6px 8px;'
+      iconSizeInput.onchange = async () => {
+        const newValue = parseInt(iconSizeInput.value) || 16
+        config.iconSize = newValue
+        // 批量赋值给所有按钮
+        configs.forEach(btn => btn.iconSize = newValue)
+        await this.saveData(storageKey, config)
+        await this.saveData(this.isMobile ? 'mobileButtonConfigs' : 'desktopButtonConfigs', configs)
+        showMessage('图标大小已应用到所有按钮', 1500, 'info')
+      }
+      iconSizeRow.appendChild(iconSizeInput)
+      container.appendChild(iconSizeRow)
+
+      // 按钮宽度
+      const widthRow = document.createElement('div')
+      widthRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between;'
+      widthRow.innerHTML = `
+        <span style="font-size: 13px; color: var(--b3-theme-on-background);">按钮宽度 (px)</span>
+      `
+      const widthInput = document.createElement('input')
+      widthInput.type = 'number'
+      widthInput.className = 'b3-text-field'
+      widthInput.value = config.minWidth.toString()
+      widthInput.style.cssText = 'width: 80px; font-size: 14px; padding: 6px 8px;'
+      widthInput.onchange = async () => {
+        const newValue = parseInt(widthInput.value) || 32
+        config.minWidth = newValue
+        // 批量赋值给所有按钮
+        configs.forEach(btn => btn.minWidth = newValue)
+        await this.saveData(storageKey, config)
+        await this.saveData(this.isMobile ? 'mobileButtonConfigs' : 'desktopButtonConfigs', configs)
+        showMessage('按钮宽度已应用到所有按钮', 1500, 'info')
+      }
+      widthRow.appendChild(widthInput)
+      container.appendChild(widthRow)
+
+      // 右边距
+      const marginRow = document.createElement('div')
+      marginRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between;'
+      marginRow.innerHTML = `
+        <span style="font-size: 13px; color: var(--b3-theme-on-background);">右边距 (px)</span>
+      `
+      const marginInput = document.createElement('input')
+      marginInput.type = 'number'
+      marginInput.className = 'b3-text-field'
+      marginInput.value = config.marginRight.toString()
+      marginInput.style.cssText = 'width: 80px; font-size: 14px; padding: 6px 8px;'
+      marginInput.onchange = async () => {
+        const newValue = parseInt(marginInput.value) || 8
+        config.marginRight = newValue
+        // 批量赋值给所有按钮
+        configs.forEach(btn => btn.marginRight = newValue)
+        await this.saveData(storageKey, config)
+        await this.saveData(this.isMobile ? 'mobileButtonConfigs' : 'desktopButtonConfigs', configs)
+        showMessage('右边距已应用到所有按钮', 1500, 'info')
+      }
+      marginRow.appendChild(marginInput)
+      container.appendChild(marginRow)
+
+      // 右上角提示
+      const notifyRow = document.createElement('div')
+      notifyRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between;'
+      notifyRow.innerHTML = `
+        <span style="font-size: 13px; color: var(--b3-theme-on-background);">右上角提示</span>
+      `
+      const notifyToggle = document.createElement('input')
+      notifyToggle.type = 'checkbox'
+      notifyToggle.className = 'b3-switch'
+      notifyToggle.checked = config.showNotification
+      notifyToggle.style.cssText = 'transform: scale(1.2);'
+      notifyToggle.onchange = async () => {
+        config.showNotification = notifyToggle.checked
+        // 批量赋值给所有按钮
+        configs.forEach(btn => btn.showNotification = notifyToggle.checked)
+        await this.saveData(storageKey, config)
+        await this.saveData(this.isMobile ? 'mobileButtonConfigs' : 'desktopButtonConfigs', configs)
+        showMessage(notifyToggle.checked ? '已开启所有按钮提示' : '已关闭所有按钮提示', 1500, 'info')
+      }
+      notifyRow.appendChild(notifyToggle)
+      container.appendChild(notifyRow)
+
+      // 说明文字
+      const hint = document.createElement('div')
+      hint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light); margin-top: 8px; padding: 8px; background: var(--b3-theme-background); border-radius: 4px;'
+      hint.innerHTML = '💡 修改后会批量应用到所有按钮<br>单个按钮的独立配置优先级更高'
+      container.appendChild(hint)
+
+      return container
+    }
+
+    setting.addItem({
+      title: '📐 全局按钮样式',
+      description: '批量设置所有按钮的默认值',
+      createActionElement: () => createGlobalButtonConfig(
+        this.mobileGlobalButtonConfig,
+        this.mobileButtonConfigs,
+        'mobileGlobalButtonConfig'
+      )
     })
 
 
@@ -1361,6 +1745,70 @@ export default class ToolbarCustomizer extends Plugin {
       }
     })
 
+    // 作者自用工具激活码输入
+    setting.addItem({
+      title: '🔐 作者自用工具激活',
+      description: '💡输入激活码解锁「⑥作者自用工具」功能类型',
+      createActionElement: () => {
+        const container = document.createElement('div')
+        container.style.cssText = 'display: flex; flex-direction: column; gap: 10px; width: 100%;'
+
+        // 激活状态显示
+        const statusEl = document.createElement('div')
+        statusEl.style.cssText = 'font-size: 13px; padding: 4px 10px; border-radius: 4px; display: inline-block; width: fit-content;'
+        if (this.isAuthorToolActivated()) {
+          statusEl.style.cssText += ' background: rgba(34, 197, 94, 0.2); color: #22c55e;'
+          statusEl.textContent = '✓ 已激活'
+        } else {
+          statusEl.style.cssText += ' background: rgba(255, 77, 77, 0.2); color: #ff4d4d;'
+          statusEl.textContent = '✗ 未激活'
+        }
+        container.appendChild(statusEl)
+
+        // 输入框和按钮容器
+        const inputRow = document.createElement('div')
+        inputRow.style.cssText = 'display: flex; gap: 8px; align-items: center;'
+
+        const input = document.createElement('input')
+        input.type = 'text'
+        input.className = 'b3-text-field'
+        input.placeholder = '请输入激活码'
+        input.value = this.mobileFeatureConfig.authorCode || ''
+        input.style.cssText = 'flex: 1;'
+
+        const btn = document.createElement('button')
+        btn.className = 'b3-button b3-button--text'
+        btn.textContent = '验证激活'
+        btn.onclick = async () => {
+          const code = input.value.trim()
+          if (code === '88888888') {
+            // 同时激活两端
+            this.mobileFeatureConfig.authorActivated = true
+            this.mobileFeatureConfig.authorCode = code
+            this.desktopFeatureConfig.authorActivated = true
+            this.desktopFeatureConfig.authorCode = code
+            await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
+            await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
+            statusEl.style.cssText = 'font-size: 13px; padding: 4px 10px; border-radius: 4px; display: inline-block; width: fit-content; background: rgba(34, 197, 94, 0.2); color: #22c55e;'
+            statusEl.textContent = '✓ 已激活'
+            showMessage('作者自用工具已激活！请重新打开设置页面', 3000, 'success')
+            // 延迟后重新加载设置页面
+            setTimeout(() => {
+              window.location.reload()
+            }, 1500)
+          } else {
+            showMessage('激活码错误，请重试', 3000, 'error')
+          }
+        }
+
+        inputRow.appendChild(input)
+        inputRow.appendChild(btn)
+        container.appendChild(inputRow)
+
+        return container
+      }
+    })
+
     // === 使用帮助 ===
     createGroupTitle('💡', '使用帮助')
 
@@ -1603,10 +2051,18 @@ export default class ToolbarCustomizer extends Plugin {
     // 使用 infoDiv 来显示名称和类型描述（手机端风格）
     const infoDiv = document.createElement('div')
     infoDiv.style.cssText = 'flex: 1; min-width: 0;'
+    const typeLabels: Record<string, string> = {
+      'builtin': '①思源内置功能【简单】',
+      'template': '①手写模板插入【简单】',
+      'shortcut': '②电脑端快捷键【简单】',
+      'click-sequence': '③自动化模拟点击【难】',
+      'author-tool': '⑥作者自用工具'
+    }
+    const typeLabel = typeLabels[button.type] || button.type
     infoDiv.innerHTML = `
       <div style="font-weight: 500; font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 4px;">${button.name}</div>
       <div style="font-size: 11px; color: var(--b3-theme-on-surface-light);">
-        ${button.type === 'builtin' ? '①思源内置功能【简单】' : button.type === 'template' ? '①手写模板插入【简单】' : button.type === 'shortcut' ? '②电脑端快捷键【简单】' : '③自动化模拟点击【难】'}
+        ${typeLabel}
       </div>
     `
 
@@ -1689,11 +2145,18 @@ export default class ToolbarCustomizer extends Plugin {
       infoDiv.querySelector('div:first-child')!.textContent = v
     })
     editForm.appendChild(nameField)
-    editForm.appendChild(this.createDesktopSelectField('选择功能', button.type, [
+
+    // 构建功能类型选项数组（根据激活状态决定是否显示作者自用工具）
+    const typeOptions = [
       { value: 'template', label: '①手写模板插入【简单】' },
       { value: 'shortcut', label: '②电脑端快捷键【简单】' },
       { value: 'click-sequence', label: '③自动化模拟点击【难】' }
-    ], (v) => {
+    ]
+    if (this.isAuthorToolActivated()) {
+      typeOptions.push({ value: 'author-tool', label: '⑥作者自用工具' })
+    }
+
+    editForm.appendChild(this.createDesktopSelectField('选择功能', button.type, typeOptions, (v) => {
       button.type = v as any
 
       // 保存当前展开状态
@@ -1710,7 +2173,14 @@ export default class ToolbarCustomizer extends Plugin {
       // 更新类型描述显示
       const typeDesc = infoDiv.querySelector('div:last-child')
       if (typeDesc) {
-        typeDesc.textContent = button.type === 'builtin' ? '①思源内置功能【简单】' : button.type === 'template' ? '①手写模板插入【简单】' : button.type === 'shortcut' ? '②电脑端快捷键【简单】' : '③自动化模拟点击【难】'
+        const typeLabels: Record<string, string> = {
+          'builtin': '①思源内置功能【简单】',
+          'template': '①手写模板插入【简单】',
+          'shortcut': '②电脑端快捷键【简单】',
+          'click-sequence': '③自动化模拟点击【难】',
+          'author-tool': '⑥作者自用工具'
+        }
+        typeDesc.textContent = typeLabels[button.type] || button.type
       }
     }))
     
@@ -1749,11 +2219,11 @@ export default class ToolbarCustomizer extends Plugin {
     //       }, 100)
     //     }
     //   }
-    //   
+    //
     //   builtinContainer.appendChild(hint)
     //   editForm.appendChild(builtinContainer)
-    // } else 
-    
+    // }
+
     if (button.type === 'template') {
       const templateField = document.createElement('div')
       templateField.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
@@ -1789,7 +2259,9 @@ export default class ToolbarCustomizer extends Plugin {
       templateField.appendChild(textarea)
       templateField.appendChild(hint)
       editForm.appendChild(templateField)
-    } else if (button.type === 'click-sequence') {
+    }
+
+    if (button.type === 'click-sequence') {
       // 点击序列配置
       const clickSequenceField = document.createElement('div')
       clickSequenceField.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
@@ -1841,7 +2313,9 @@ export default class ToolbarCustomizer extends Plugin {
       clickSequenceField.appendChild(hint)
 
       editForm.appendChild(clickSequenceField)
-    } else if (button.type === 'shortcut') {
+    }
+
+    if (button.type === 'shortcut') {
       // 快捷键配置
       const shortcutField = document.createElement('div')
       shortcutField.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
@@ -1886,7 +2360,287 @@ export default class ToolbarCustomizer extends Plugin {
       shortcutField.appendChild(hint)
       editForm.appendChild(shortcutField)
     }
-    
+
+    if (button.type === 'author-tool') {
+      // 作者自用工具配置
+      const authorToolField = document.createElement('div')
+      authorToolField.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 12px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.08)); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 6px;'
+
+      const header = document.createElement('div')
+      header.style.cssText = 'display: flex; align-items: center; gap: 8px;'
+      header.innerHTML = '<span style="font-size: 16px;">🔐</span><span style="font-weight: 600; color: #8b5cf6;">作者自用工具配置</span>'
+      authorToolField.appendChild(header)
+
+      const desc = document.createElement('div')
+      desc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light);'
+      desc.textContent = '选择功能类型并配置相关参数。'
+      authorToolField.appendChild(desc)
+
+      // 子类型选择
+      const subtypeLabel = document.createElement('label')
+      subtypeLabel.textContent = '功能类型'
+      subtypeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
+      authorToolField.appendChild(subtypeLabel)
+
+      const subtypeSelect = document.createElement('select')
+      subtypeSelect.className = 'b3-text-field'
+      subtypeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
+      const currentSubtype = button.authorToolSubtype || 'script'
+      subtypeSelect.innerHTML = `
+        <option value="script" ${currentSubtype === 'script' ? 'selected' : ''}>① 自定义脚本</option>
+        <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库查询</option>
+        <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
+      `
+      subtypeSelect.onchange = () => {
+        button.authorToolSubtype = subtypeSelect.value as 'script' | 'database' | 'diary-bottom'
+        // 刷新表单以显示/隐藏相关配置
+        if ((subtypeSelect as any).refreshForm) {
+          (subtypeSelect as any).refreshForm()
+        }
+      }
+      authorToolField.appendChild(subtypeSelect)
+
+      // 自定义脚本配置区
+      const scriptConfigDiv = document.createElement('div')
+      scriptConfigDiv.id = 'script-config'
+      scriptConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+      const scriptLabel = document.createElement('label')
+      scriptLabel.textContent = '自定义脚本代码'
+      scriptLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      scriptConfigDiv.appendChild(scriptLabel)
+
+      const scriptInput = document.createElement('textarea')
+      scriptInput.className = 'b3-text-field'
+      scriptInput.placeholder = '在此输入自定义 JavaScript 代码...'
+      scriptInput.value = button.authorScript || ''
+      scriptInput.style.cssText = 'resize: vertical; min-height: 100px; font-family: monospace; font-size: 12px;'
+      scriptInput.onchange = () => { button.authorScript = scriptInput.value }
+      scriptConfigDiv.appendChild(scriptInput)
+
+      const scriptHint = document.createElement('div')
+      scriptHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+      scriptHint.textContent = '可用变量: config, fetchSyncPost, showMessage'
+      scriptConfigDiv.appendChild(scriptHint)
+
+      // 目标文档ID（脚本模式使用）
+      const docIdLabel = document.createElement('label')
+      docIdLabel.textContent = '目标文档ID'
+      docIdLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 4px;'
+      scriptConfigDiv.appendChild(docIdLabel)
+
+      const docIdInput = document.createElement('input')
+      docIdInput.type = 'text'
+      docIdInput.className = 'b3-text-field'
+      docIdInput.placeholder = '输入要打开的文档ID...'
+      docIdInput.value = button.targetDocId || ''
+      docIdInput.style.cssText = 'font-size: 13px;'
+      docIdInput.onchange = () => { button.targetDocId = docIdInput.value }
+      scriptConfigDiv.appendChild(docIdInput)
+
+      authorToolField.appendChild(scriptConfigDiv)
+
+      // 数据库查询配置区
+      const dbConfigDiv = document.createElement('div')
+      dbConfigDiv.id = 'db-config'
+      dbConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 10px; background: rgba(255, 255, 255, 0.5); border-radius: 6px;'
+
+      // 日记底部配置区（说明）
+      const diaryConfigDiv = document.createElement('div')
+      diaryConfigDiv.id = 'diary-config'
+      diaryConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 15px; background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(59, 130, 246, 0.1)); border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3);'
+
+      const diaryTitle = document.createElement('div')
+      diaryTitle.style.cssText = 'font-size: 14px; font-weight: 600; color: #22c55e; display: flex; align-items: center; gap: 8px;'
+      diaryTitle.innerHTML = '<span>📇</span><span>功能说明</span>'
+      diaryConfigDiv.appendChild(diaryTitle)
+
+      const diaryDesc = document.createElement('div')
+      diaryDesc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.6;'
+      diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 打开日记<br>2. 自动滚动到文档底部<br><br>无需配置，点击按钮即可使用。'
+      diaryConfigDiv.appendChild(diaryDesc)
+
+      authorToolField.appendChild(diaryConfigDiv)
+
+      // 数据库块ID
+      const dbBlockIdLabel = document.createElement('label')
+      dbBlockIdLabel.textContent = '数据库块ID'
+      dbBlockIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(dbBlockIdLabel)
+
+      const dbBlockIdInput = document.createElement('input')
+      dbBlockIdInput.type = 'text'
+      dbBlockIdInput.className = 'b3-text-field'
+      dbBlockIdInput.placeholder = '如: 20251215234003-j3i7wjc'
+      dbBlockIdInput.value = button.dbBlockId || ''
+      dbBlockIdInput.style.cssText = 'font-size: 13px;'
+      dbBlockIdInput.onchange = () => { button.dbBlockId = dbBlockIdInput.value }
+      dbConfigDiv.appendChild(dbBlockIdInput)
+
+      // 数据库ID（可选）
+      const dbIdLabel = document.createElement('label')
+      dbIdLabel.textContent = '数据库ID（可选，留空则从块ID获取）'
+      dbIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(dbIdLabel)
+
+      const dbIdInput = document.createElement('input')
+      dbIdInput.type = 'text'
+      dbIdInput.className = 'b3-text-field'
+      dbIdInput.placeholder = '如: 20251215234003-4kzcfp3'
+      dbIdInput.value = button.dbId || ''
+      dbIdInput.style.cssText = 'font-size: 13px;'
+      dbIdInput.onchange = () => { button.dbId = dbIdInput.value }
+      dbConfigDiv.appendChild(dbIdInput)
+
+      // 视图名称
+      const viewNameLabel = document.createElement('label')
+      viewNameLabel.textContent = '视图名称'
+      viewNameLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(viewNameLabel)
+
+      const viewNameInput = document.createElement('input')
+      viewNameInput.type = 'text'
+      viewNameInput.className = 'b3-text-field'
+      viewNameInput.placeholder = '如: 今日DO表格'
+      viewNameInput.value = button.viewName || ''
+      viewNameInput.style.cssText = 'font-size: 13px;'
+      viewNameInput.onchange = () => { button.viewName = viewNameInput.value }
+      dbConfigDiv.appendChild(viewNameInput)
+
+      // 主键列
+      const primaryKeyLabel = document.createElement('label')
+      primaryKeyLabel.textContent = '主键列名称（用于点击跳转）'
+      primaryKeyLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(primaryKeyLabel)
+
+      const primaryKeyInput = document.createElement('input')
+      primaryKeyInput.type = 'text'
+      primaryKeyInput.className = 'b3-text-field'
+      primaryKeyInput.placeholder = '如: DO'
+      primaryKeyInput.value = button.primaryKeyColumn || 'DO'
+      primaryKeyInput.style.cssText = 'font-size: 13px;'
+      primaryKeyInput.onchange = () => { button.primaryKeyColumn = primaryKeyInput.value }
+      dbConfigDiv.appendChild(primaryKeyInput)
+
+      // 起始时间
+      const startTimeLabel = document.createElement('label')
+      startTimeLabel.textContent = '起始时间（now 或 HH:MM）'
+      startTimeLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(startTimeLabel)
+
+      const startTimeInput = document.createElement('input')
+      startTimeInput.type = 'text'
+      startTimeInput.className = 'b3-text-field'
+      startTimeInput.placeholder = '如: now 或 09:00'
+      startTimeInput.value = button.startTimeStr || 'now'
+      startTimeInput.style.cssText = 'font-size: 13px;'
+      startTimeInput.onchange = () => { button.startTimeStr = startTimeInput.value }
+      dbConfigDiv.appendChild(startTimeInput)
+
+      // 行间额外分钟
+      const extraMinutesLabel = document.createElement('label')
+      extraMinutesLabel.textContent = '行间额外分钟数（第一行不加）'
+      extraMinutesLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(extraMinutesLabel)
+
+      const extraMinutesInput = document.createElement('input')
+      extraMinutesInput.type = 'number'
+      extraMinutesInput.className = 'b3-text-field'
+      extraMinutesInput.placeholder = '如: 20'
+      extraMinutesInput.value = (button.extraMinutes ?? 20).toString()
+      extraMinutesInput.style.cssText = 'font-size: 13px;'
+      extraMinutesInput.onchange = () => { button.extraMinutes = parseInt(extraMinutesInput.value) || 20 }
+      dbConfigDiv.appendChild(extraMinutesInput)
+
+      // 最大显示行数
+      const maxRowsLabel = document.createElement('label')
+      maxRowsLabel.textContent = '最大显示行数'
+      maxRowsLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(maxRowsLabel)
+
+      const maxRowsInput = document.createElement('input')
+      maxRowsInput.type = 'number'
+      maxRowsInput.className = 'b3-text-field'
+      maxRowsInput.placeholder = '如: 5'
+      maxRowsInput.value = (button.maxRows ?? 5).toString()
+      maxRowsInput.style.cssText = 'font-size: 13px;'
+      maxRowsInput.onchange = () => { button.maxRows = parseInt(maxRowsInput.value) || 5 }
+      dbConfigDiv.appendChild(maxRowsInput)
+
+      // 显示模式
+      const displayModeLabel = document.createElement('label')
+      displayModeLabel.textContent = '显示模式'
+      displayModeLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(displayModeLabel)
+
+      const displayModeSelect = document.createElement('select')
+      displayModeSelect.className = 'b3-text-field'
+      displayModeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
+      const currentDisplayMode = button.dbDisplayMode || 'cards'
+      displayModeSelect.innerHTML = `
+        <option value="cards" ${currentDisplayMode === 'cards' ? 'selected' : ''}>卡片模式</option>
+        <option value="table" ${currentDisplayMode === 'table' ? 'selected' : ''}>表格模式</option>
+      `
+      displayModeSelect.onchange = () => { button.dbDisplayMode = displayModeSelect.value as 'cards' | 'table' }
+      dbConfigDiv.appendChild(displayModeSelect)
+
+      // 要显示的列名（逗号分隔）
+      const showColumnsLabel = document.createElement('label')
+      showColumnsLabel.textContent = '要显示的列名（逗号分隔）'
+      showColumnsLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(showColumnsLabel)
+
+      const showColumnsInput = document.createElement('input')
+      showColumnsInput.type = 'text'
+      showColumnsInput.className = 'b3-text-field'
+      showColumnsInput.placeholder = '如: DO,预计分钟,时间段'
+      showColumnsInput.value = (button.showColumns || []).join(',')
+      showColumnsInput.style.cssText = 'font-size: 13px;'
+      showColumnsInput.onchange = () => {
+        button.showColumns = showColumnsInput.value.split(',').map(s => s.trim()).filter(s => s)
+      }
+      dbConfigDiv.appendChild(showColumnsInput)
+
+      // 时间段列名
+      const timeRangeColLabel = document.createElement('label')
+      timeRangeColLabel.textContent = '时间段列名'
+      timeRangeColLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(timeRangeColLabel)
+
+      const timeRangeColInput = document.createElement('input')
+      timeRangeColInput.type = 'text'
+      timeRangeColInput.className = 'b3-text-field'
+      timeRangeColInput.placeholder = '如: 时间段'
+      timeRangeColInput.value = button.timeRangeColumnName || '时间段'
+      timeRangeColInput.style.cssText = 'font-size: 13px;'
+      timeRangeColInput.onchange = () => { button.timeRangeColumnName = timeRangeColInput.value }
+      dbConfigDiv.appendChild(timeRangeColInput)
+
+      authorToolField.appendChild(dbConfigDiv)
+
+      // 根据当前选择显示/隐藏配置区
+      const updateVisibility = () => {
+        const subtype = subtypeSelect.value
+        if (subtype === 'database') {
+          scriptConfigDiv.style.display = 'none'
+          dbConfigDiv.style.display = 'flex'
+          diaryConfigDiv.style.display = 'none'
+        } else if (subtype === 'diary-bottom') {
+          scriptConfigDiv.style.display = 'none'
+          dbConfigDiv.style.display = 'none'
+          diaryConfigDiv.style.display = 'flex'
+        } else {
+          scriptConfigDiv.style.display = 'flex'
+          dbConfigDiv.style.display = 'none'
+          diaryConfigDiv.style.display = 'none'
+        }
+      }
+      subtypeSelect.refreshForm = updateVisibility
+      updateVisibility()
+
+      editForm.appendChild(authorToolField)
+    }
+
     editForm.appendChild(this.createDesktopIconField('图标', button.icon, (v) => { 
       button.icon = v
       // 更新显示的图标
@@ -1954,11 +2708,16 @@ export default class ToolbarCustomizer extends Plugin {
       const nameEl = infoDiv.querySelector('div:first-child')
       if (nameEl) nameEl.textContent = v
     }))
-    form.appendChild(this.createDesktopSelectField('选择功能', button.type, [
+    // 构建功能类型选项数组（根据激活状态决定是否显示作者自用工具）
+    const typeOptions = [
       { value: 'template', label: '①手写模板插入【简单】' },
       { value: 'shortcut', label: '②电脑端快捷键【简单】' },
       { value: 'click-sequence', label: '③自动化模拟点击【难】' }
-    ], (v) => {
+    ]
+    if (this.isAuthorToolActivated()) {
+      typeOptions.push({ value: 'author-tool', label: '⑥作者自用工具' })
+    }
+    form.appendChild(this.createDesktopSelectField('选择功能', button.type, typeOptions, (v) => {
       button.type = v as any
 
       // 保存当前展开状态
@@ -1974,7 +2733,7 @@ export default class ToolbarCustomizer extends Plugin {
       // 更新类型描述显示
       const typeDesc = infoDiv.querySelector('div:last-child')
       if (typeDesc) {
-        typeDesc.textContent = button.type === 'builtin' ? '①思源内置功能【简单】' : button.type === 'template' ? '①手写模板插入【简单】' : button.type === 'shortcut' ? '②电脑端快捷键【简单】' : '③自动化模拟点击【难】'
+        typeDesc.textContent = button.type === 'builtin' ? '①思源内置功能【简单】' : button.type === 'template' ? '①手写模板插入【简单】' : button.type === 'shortcut' ? '②电脑端快捷键【简单】' : button.type === 'click-sequence' ? '③自动化模拟点击【难】' : button.type === 'author-tool' ? '⑥作者自用工具' : button.type
       }
     }))
 
@@ -2150,7 +2909,311 @@ export default class ToolbarCustomizer extends Plugin {
       shortcutField.appendChild(hint)
       form.appendChild(shortcutField)
     }
-    
+
+    if (button.type === 'author-tool') {
+      // 作者自用工具配置
+      const authorToolField = document.createElement('div')
+      authorToolField.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 12px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.08)); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 6px;'
+
+      const header = document.createElement('div')
+      header.style.cssText = 'display: flex; align-items: center; gap: 8px;'
+      header.innerHTML = '<span style="font-size: 16px;">🔐</span><span style="font-weight: 600; color: #8b5cf6;">作者自用工具配置</span>'
+      authorToolField.appendChild(header)
+
+      const desc = document.createElement('div')
+      desc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light);'
+      desc.textContent = '选择功能类型并配置相关参数。'
+      authorToolField.appendChild(desc)
+
+      // 子类型选择
+      const subtypeLabel = document.createElement('label')
+      subtypeLabel.textContent = '功能类型'
+      subtypeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
+      authorToolField.appendChild(subtypeLabel)
+
+      const subtypeSelect = document.createElement('select')
+      subtypeSelect.className = 'b3-text-field'
+      subtypeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
+      const currentSubtype = button.authorToolSubtype || 'script'
+      subtypeSelect.innerHTML = `
+        <option value="script" ${currentSubtype === 'script' ? 'selected' : ''}>① 自定义脚本</option>
+        <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库查询</option>
+        <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
+      `
+      subtypeSelect.onchange = () => {
+        button.authorToolSubtype = subtypeSelect.value as 'script' | 'database' | 'diary-bottom'
+        ;(subtypeSelect as any).refreshForm?.()
+      }
+      authorToolField.appendChild(subtypeSelect)
+
+      // 自定义脚本配置区
+      const scriptConfigDiv = document.createElement('div')
+      scriptConfigDiv.id = 'script-config'
+      scriptConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+      const scriptLabel = document.createElement('label')
+      scriptLabel.textContent = '自定义脚本代码'
+      scriptLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      scriptConfigDiv.appendChild(scriptLabel)
+
+      const scriptInput = document.createElement('textarea')
+      scriptInput.className = 'b3-text-field'
+      scriptInput.placeholder = '在此输入自定义 JavaScript 代码...'
+      scriptInput.value = button.authorScript || ''
+      scriptInput.style.cssText = 'resize: vertical; min-height: 100px; font-family: monospace; font-size: 12px;'
+      scriptInput.onchange = () => { button.authorScript = scriptInput.value }
+      scriptConfigDiv.appendChild(scriptInput)
+
+      const scriptHint = document.createElement('div')
+      scriptHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+      scriptHint.textContent = '可用变量: config, fetchSyncPost, showMessage'
+      scriptConfigDiv.appendChild(scriptHint)
+
+      // 目标文档ID（脚本模式使用）
+      const docIdLabel = document.createElement('label')
+      docIdLabel.textContent = '目标文档ID'
+      docIdLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 4px;'
+      scriptConfigDiv.appendChild(docIdLabel)
+
+      const docIdInput = document.createElement('input')
+      docIdInput.type = 'text'
+      docIdInput.className = 'b3-text-field'
+      docIdInput.placeholder = '输入要打开的文档ID...'
+      docIdInput.value = button.targetDocId || ''
+      docIdInput.style.cssText = 'font-size: 13px;'
+      docIdInput.onchange = () => { button.targetDocId = docIdInput.value }
+      scriptConfigDiv.appendChild(docIdInput)
+
+      authorToolField.appendChild(scriptConfigDiv)
+
+      // 数据库查询配置区
+      const dbConfigDiv = document.createElement('div')
+      dbConfigDiv.id = 'db-config'
+      dbConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 10px; background: rgba(255, 255, 255, 0.5); border-radius: 6px;'
+
+      // 数据库块ID
+      const dbBlockIdLabel = document.createElement('label')
+      dbBlockIdLabel.textContent = '数据库块ID'
+      dbBlockIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(dbBlockIdLabel)
+
+      const dbBlockIdInput = document.createElement('input')
+      dbBlockIdInput.type = 'text'
+      dbBlockIdInput.className = 'b3-text-field'
+      dbBlockIdInput.placeholder = '如: 20251215234003-j3i7wjc'
+      dbBlockIdInput.value = button.dbBlockId || ''
+      dbBlockIdInput.style.cssText = 'font-size: 13px;'
+      dbBlockIdInput.onchange = () => { button.dbBlockId = dbBlockIdInput.value }
+      dbConfigDiv.appendChild(dbBlockIdInput)
+
+      // 数据库ID（可选）
+      const dbIdLabel = document.createElement('label')
+      dbIdLabel.textContent = '数据库ID（可选，留空则从块ID获取）'
+      dbIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(dbIdLabel)
+
+      const dbIdInput = document.createElement('input')
+      dbIdInput.type = 'text'
+      dbIdInput.className = 'b3-text-field'
+      dbIdInput.placeholder = '如: 20251215234003-4kzcfp3'
+      dbIdInput.value = button.dbId || ''
+      dbIdInput.style.cssText = 'font-size: 13px;'
+      dbIdInput.onchange = () => { button.dbId = dbIdInput.value }
+      dbConfigDiv.appendChild(dbIdInput)
+
+      // 视图名称
+      const viewNameLabel = document.createElement('label')
+      viewNameLabel.textContent = '视图名称'
+      viewNameLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(viewNameLabel)
+
+      const viewNameInput = document.createElement('input')
+      viewNameInput.type = 'text'
+      viewNameInput.className = 'b3-text-field'
+      viewNameInput.placeholder = '如: 今日DO表格'
+      viewNameInput.value = button.viewName || ''
+      viewNameInput.style.cssText = 'font-size: 13px;'
+      viewNameInput.onchange = () => { button.viewName = viewNameInput.value }
+      dbConfigDiv.appendChild(viewNameInput)
+
+      // 主键列
+      const primaryKeyLabel = document.createElement('label')
+      primaryKeyLabel.textContent = '主键列名称（用于点击跳转）'
+      primaryKeyLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(primaryKeyLabel)
+
+      const primaryKeyInput = document.createElement('input')
+      primaryKeyInput.type = 'text'
+      primaryKeyInput.className = 'b3-text-field'
+      primaryKeyInput.placeholder = '如: DO'
+      primaryKeyInput.value = button.primaryKeyColumn || 'DO'
+      primaryKeyInput.style.cssText = 'font-size: 13px;'
+      primaryKeyInput.onchange = () => { button.primaryKeyColumn = primaryKeyInput.value }
+      dbConfigDiv.appendChild(primaryKeyInput)
+
+      // 起始时间
+      const startTimeLabel = document.createElement('label')
+      startTimeLabel.textContent = '起始时间（now 或 HH:MM）'
+      startTimeLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(startTimeLabel)
+
+      const startTimeInput = document.createElement('input')
+      startTimeInput.type = 'text'
+      startTimeInput.className = 'b3-text-field'
+      startTimeInput.placeholder = '如: now 或 09:00'
+      startTimeInput.value = button.startTimeStr || 'now'
+      startTimeInput.style.cssText = 'font-size: 13px;'
+      startTimeInput.onchange = () => { button.startTimeStr = startTimeInput.value }
+      dbConfigDiv.appendChild(startTimeInput)
+
+      // 行间额外分钟
+      const extraMinutesInput = document.createElement('input')
+      extraMinutesInput.type = 'number'
+      extraMinutesInput.className = 'b3-text-field'
+      extraMinutesInput.placeholder = '如: 20'
+      extraMinutesInput.value = (button.extraMinutes ?? 20).toString()
+      extraMinutesInput.style.cssText = 'font-size: 13px;'
+      extraMinutesInput.onchange = () => { button.extraMinutes = parseInt(extraMinutesInput.value) || 20 }
+      dbConfigDiv.appendChild(extraMinutesInput)
+
+      // 最大显示行数
+      const maxRowsInput = document.createElement('input')
+      maxRowsInput.type = 'number'
+      maxRowsInput.className = 'b3-text-field'
+      maxRowsInput.placeholder = '如: 5'
+      maxRowsInput.value = (button.maxRows ?? 5).toString()
+      maxRowsInput.style.cssText = 'font-size: 13px;'
+      maxRowsInput.onchange = () => { button.maxRows = parseInt(maxRowsInput.value) || 5 }
+      dbConfigDiv.appendChild(maxRowsInput)
+
+      // 显示模式
+      const displayModeSelect = document.createElement('select')
+      displayModeSelect.className = 'b3-text-field'
+      displayModeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
+      const currentDisplayMode = button.dbDisplayMode || 'cards'
+      displayModeSelect.innerHTML = `
+        <option value="cards" ${currentDisplayMode === 'cards' ? 'selected' : ''}>卡片模式</option>
+        <option value="table" ${currentDisplayMode === 'table' ? 'selected' : ''}>表格模式</option>
+      `
+      displayModeSelect.onchange = () => {
+        button.dbDisplayMode = displayModeSelect.value as 'cards' | 'table'
+        // 切换卡片模式配置显示
+        const cardConfigDiv = document.getElementById('card-mode-config-mobile')
+        if (cardConfigDiv) {
+          cardConfigDiv.style.display = displayModeSelect.value === 'cards' ? 'flex' : 'none'
+        }
+      }
+      dbConfigDiv.appendChild(displayModeSelect)
+
+      // 卡片模式配置（仅卡片模式显示）
+      const cardConfigDiv = document.createElement('div')
+      cardConfigDiv.id = 'card-mode-config-mobile'
+      cardConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px; margin-top: 8px;'
+      if (currentDisplayMode !== 'cards') {
+        cardConfigDiv.style.display = 'none'
+      }
+
+      // 容器高度
+      const containerHeightLabel = document.createElement('label')
+      containerHeightLabel.textContent = '容器高度（卡片模式）'
+      containerHeightLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      cardConfigDiv.appendChild(containerHeightLabel)
+
+      const containerHeightInput = document.createElement('input')
+      containerHeightInput.type = 'text'
+      containerHeightInput.className = 'b3-text-field'
+      containerHeightInput.placeholder = '如: 700px（留空自动适应）'
+      containerHeightInput.value = button.cardContainerHeight || ''
+      containerHeightInput.style.cssText = 'font-size: 13px;'
+      containerHeightInput.onchange = () => { button.cardContainerHeight = containerHeightInput.value }
+      cardConfigDiv.appendChild(containerHeightInput)
+
+      // 可滚动容器最大高度
+      const scrollMaxHeightLabel = document.createElement('label')
+      scrollMaxHeightLabel.textContent = '可滚动容器最大高度（卡片模式）'
+      scrollMaxHeightLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      cardConfigDiv.appendChild(scrollMaxHeightLabel)
+
+      const scrollMaxHeightInput = document.createElement('input')
+      scrollMaxHeightInput.type = 'text'
+      scrollMaxHeightInput.className = 'b3-text-field'
+      scrollMaxHeightInput.placeholder = '如: 700px'
+      scrollMaxHeightInput.value = button.cardScrollMaxHeight || '700px'
+      scrollMaxHeightInput.style.cssText = 'font-size: 13px;'
+      scrollMaxHeightInput.onchange = () => { button.cardScrollMaxHeight = scrollMaxHeightInput.value }
+      cardConfigDiv.appendChild(scrollMaxHeightInput)
+
+      dbConfigDiv.appendChild(cardConfigDiv)
+
+      // 要显示的列名（逗号分隔）
+      const showColumnsInput = document.createElement('input')
+      showColumnsInput.type = 'text'
+      showColumnsInput.className = 'b3-text-field'
+      showColumnsInput.placeholder = '如: DO,预计分钟,时间段'
+      showColumnsInput.value = (button.showColumns || []).join(',')
+      showColumnsInput.style.cssText = 'font-size: 13px;'
+      showColumnsInput.onchange = () => {
+        button.showColumns = showColumnsInput.value.split(',').map(s => s.trim()).filter(s => s)
+      }
+      dbConfigDiv.appendChild(showColumnsInput)
+
+      // 时间段列名
+      const timeRangeColLabel = document.createElement('label')
+      timeRangeColLabel.textContent = '时间段列名'
+      timeRangeColLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      dbConfigDiv.appendChild(timeRangeColLabel)
+
+      const timeRangeColInput = document.createElement('input')
+      timeRangeColInput.type = 'text'
+      timeRangeColInput.className = 'b3-text-field'
+      timeRangeColInput.placeholder = '如: 时间段'
+      timeRangeColInput.value = button.timeRangeColumnName || '时间段'
+      timeRangeColInput.style.cssText = 'font-size: 13px;'
+      timeRangeColInput.onchange = () => { button.timeRangeColumnName = timeRangeColInput.value }
+      dbConfigDiv.appendChild(timeRangeColInput)
+
+      authorToolField.appendChild(dbConfigDiv)
+
+      // 日记底部配置区（说明）
+      const diaryConfigDiv = document.createElement('div')
+      diaryConfigDiv.id = 'diary-config'
+      diaryConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 15px; background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(59, 130, 246, 0.1)); border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3);'
+
+      const diaryTitle = document.createElement('div')
+      diaryTitle.style.cssText = 'font-size: 14px; font-weight: 600; color: #22c55e; display: flex; align-items: center; gap: 8px;'
+      diaryTitle.innerHTML = '<span>📇</span><span>功能说明</span>'
+      diaryConfigDiv.appendChild(diaryTitle)
+
+      const diaryDesc = document.createElement('div')
+      diaryDesc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.6;'
+      diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 打开日记<br>2. 自动滚动到文档底部<br><br>无需配置，点击按钮即可使用。'
+      diaryConfigDiv.appendChild(diaryDesc)
+
+      authorToolField.appendChild(diaryConfigDiv)
+
+      // 根据当前选择显示/隐藏配置区
+      const updateVisibility = () => {
+        const subtype = subtypeSelect.value
+        if (subtype === 'database') {
+          scriptConfigDiv.style.display = 'none'
+          dbConfigDiv.style.display = 'flex'
+          diaryConfigDiv.style.display = 'none'
+        } else if (subtype === 'diary-bottom') {
+          scriptConfigDiv.style.display = 'none'
+          dbConfigDiv.style.display = 'none'
+          diaryConfigDiv.style.display = 'flex'
+        } else {
+          scriptConfigDiv.style.display = 'flex'
+          dbConfigDiv.style.display = 'none'
+          diaryConfigDiv.style.display = 'none'
+        }
+      }
+      subtypeSelect.refreshForm = updateVisibility
+      updateVisibility()
+
+      form.appendChild(authorToolField)
+    }
+
     form.appendChild(this.createDesktopIconField('图标', button.icon, (v) => { 
       button.icon = v
       // 需要找到对应的 iconSpan 来更新，这里简化处理
@@ -2521,10 +3584,18 @@ export default class ToolbarCustomizer extends Plugin {
     
     const infoDiv = document.createElement('div')
     infoDiv.style.cssText = 'flex: 1; min-width: 0;'
+    const typeLabels: Record<string, string> = {
+      'builtin': '①思源内置功能【简单】',
+      'template': '①手写模板插入【简单】',
+      'shortcut': '②电脑端快捷键【简单】',
+      'click-sequence': '③自动化模拟点击【难】',
+      'author-tool': '⑥作者自用工具'
+    }
+    const typeLabel = typeLabels[button.type] || button.type
     infoDiv.innerHTML = `
       <div style="font-weight: 500; font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 4px;">${button.name}</div>
       <div style="font-size: 11px; color: var(--b3-theme-on-surface-light);">
-        ${button.type === 'builtin' ? '①思源内置功能【简单】' : button.type === 'template' ? '②手写模板插入【简单】' : button.type === 'shortcut' ? '③电脑端快捷键【简单】' : '④自动化模拟点击【难】'}
+        ${typeLabel}
       </div>
     `
     
@@ -2606,14 +3677,19 @@ export default class ToolbarCustomizer extends Plugin {
     })
     editForm.appendChild(nameField)
     const nameInput = nameField.querySelector('input') as HTMLInputElement
-    
-    // 类型选择 - 需要动态更新表单
-    const typeField = this.createSelectField('选择功能', button.type, [
+
+    // 类型选择 - 需要动态更新表单（始终包含作者自用工具）
+    // 构建功能类型选项数组（根据激活状态决定是否显示作者自用工具）
+    const typeOptions = [
       { value: 'builtin', label: '①思源内置功能【简单】' },
       { value: 'template', label: '②手写模板插入【简单】' },
       { value: 'shortcut', label: '③电脑端快捷键【简单】' },
       { value: 'click-sequence', label: '④自动化模拟点击【难】' }
-    ], (v) => { 
+    ]
+    if (this.isAuthorToolActivated()) {
+      typeOptions.push({ value: 'author-tool', label: '⑥作者自用工具' })
+    }
+    const typeField = this.createSelectField('选择功能', button.type, typeOptions, (v) => {
       button.type = v as any
       // 重新渲染整个表单
       updateTypeFields()
@@ -2826,9 +3902,158 @@ export default class ToolbarCustomizer extends Plugin {
             <tr><td><code>Ctrl+W</code></td><td>关闭标签页</td></tr>
           </table>
         `
-        
+
         shortcutContainer.appendChild(hint)
         typeFieldsContainer.appendChild(shortcutContainer)
+      } else if (button.type === 'author-tool') {
+        // 作者自用工具配置
+        const authorToolContainer = document.createElement('div')
+        authorToolContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 12px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.08)); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 6px;'
+
+        const header = document.createElement('div')
+        header.style.cssText = 'display: flex; align-items: center; gap: 8px;'
+        header.innerHTML = '<span style="font-size: 16px;">🔐</span><span style="font-weight: 600; color: #8b5cf6;">作者自用工具配置</span>'
+        authorToolContainer.appendChild(header)
+
+        const desc = document.createElement('div')
+        desc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light);'
+        desc.textContent = '选择功能类型并配置相关参数。'
+        authorToolContainer.appendChild(desc)
+
+        // 子类型选择
+        const subtypeLabel = document.createElement('label')
+        subtypeLabel.textContent = '功能类型'
+        subtypeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
+        authorToolContainer.appendChild(subtypeLabel)
+
+        const subtypeSelect = document.createElement('select')
+        subtypeSelect.className = 'b3-text-field'
+        subtypeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
+        const currentSubtype = button.authorToolSubtype || 'script'
+        subtypeSelect.innerHTML = `
+          <option value="script" ${currentSubtype === 'script' ? 'selected' : ''}>① 自定义脚本</option>
+          <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库查询</option>
+          <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
+        `
+        subtypeSelect.onchange = () => {
+          button.authorToolSubtype = subtypeSelect.value as 'script' | 'database' | 'diary-bottom'
+          ;(subtypeSelect as any).refreshForm?.()
+        }
+        authorToolContainer.appendChild(subtypeSelect)
+
+        // 自定义脚本配置区
+        const scriptConfigDiv = document.createElement('div')
+        scriptConfigDiv.id = 'script-config-mobile'
+
+        const scriptLabel = document.createElement('label')
+        scriptLabel.textContent = '自定义脚本代码'
+        scriptLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+        scriptConfigDiv.appendChild(scriptLabel)
+
+        const scriptInput = document.createElement('textarea')
+        scriptInput.className = 'b3-text-field'
+        scriptInput.placeholder = '在此输入自定义 JavaScript 代码...'
+        scriptInput.value = button.authorScript || ''
+        scriptInput.style.cssText = 'resize: vertical; min-height: 80px; font-family: monospace; font-size: 12px;'
+        scriptInput.onchange = () => { button.authorScript = scriptInput.value }
+        scriptConfigDiv.appendChild(scriptInput)
+
+        // 目标文档ID（脚本模式使用）
+        scriptConfigDiv.appendChild(this.createInputField('目标文档ID', button.targetDocId || '', '要打开的文档ID', (v) => { button.targetDocId = v }))
+
+        authorToolContainer.appendChild(scriptConfigDiv)
+
+        // 数据库查询配置区
+        const dbConfigDiv = document.createElement('div')
+        dbConfigDiv.id = 'db-config-mobile'
+        dbConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+        // 数据库块ID
+        dbConfigDiv.appendChild(this.createInputField('数据库块ID', button.dbBlockId || '', '如: 20251215234003-j3i7wjc', (v) => { button.dbBlockId = v }))
+
+        // 数据库ID
+        dbConfigDiv.appendChild(this.createInputField('数据库ID（可选）', button.dbId || '', '如: 20251215234003-4kzcfp3', (v) => { button.dbId = v }))
+
+        // 视图名称
+        dbConfigDiv.appendChild(this.createInputField('视图名称', button.viewName || '', '如: 今日DO表格', (v) => { button.viewName = v }))
+
+        // 主键列
+        dbConfigDiv.appendChild(this.createInputField('主键列名称', button.primaryKeyColumn || 'DO', '如: DO', (v) => { button.primaryKeyColumn = v }))
+
+        // 起始时间
+        dbConfigDiv.appendChild(this.createInputField('起始时间', button.startTimeStr || 'now', 'now 或 HH:MM', (v) => { button.startTimeStr = v }))
+
+        // 行间额外分钟
+        dbConfigDiv.appendChild(this.createInputField('行间额外分钟数', (button.extraMinutes ?? 20).toString(), '如: 20', (v) => { button.extraMinutes = parseInt(v) || 20 }, 'number'))
+
+        // 最大显示行数
+        dbConfigDiv.appendChild(this.createInputField('最大显示行数', (button.maxRows ?? 5).toString(), '如: 5', (v) => { button.maxRows = parseInt(v) || 5 }, 'number'))
+
+        // 显示模式
+        const displayModeLabel = document.createElement('label')
+        displayModeLabel.textContent = '显示模式'
+        displayModeLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+        dbConfigDiv.appendChild(displayModeLabel)
+
+        const displayModeSelect = document.createElement('select')
+        displayModeSelect.className = 'b3-text-field'
+        displayModeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
+        const currentDisplayMode = button.dbDisplayMode || 'cards'
+        displayModeSelect.innerHTML = `
+          <option value="cards" ${currentDisplayMode === 'cards' ? 'selected' : ''}>卡片模式</option>
+          <option value="table" ${currentDisplayMode === 'table' ? 'selected' : ''}>表格模式</option>
+        `
+        displayModeSelect.onchange = () => { button.dbDisplayMode = displayModeSelect.value as 'cards' | 'table' }
+        dbConfigDiv.appendChild(displayModeSelect)
+
+        // 要显示的列名
+        dbConfigDiv.appendChild(this.createInputField('显示列名（逗号分隔）', (button.showColumns || []).join(','), 'DO,预计分钟,时间段', (v) => {
+          button.showColumns = v.split(',').map(s => s.trim()).filter(s => s)
+        }))
+
+        // 时间段列名
+        dbConfigDiv.appendChild(this.createInputField('时间段列名', button.timeRangeColumnName || '时间段', '如: 时间段', (v) => { button.timeRangeColumnName = v }))
+
+        authorToolContainer.appendChild(dbConfigDiv)
+
+        // 日记底部配置区（说明）
+        const diaryConfigDiv = document.createElement('div')
+        diaryConfigDiv.id = 'diary-config-mobile'
+        diaryConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 15px; background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(59, 130, 246, 0.1)); border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3);'
+
+        const diaryTitle = document.createElement('div')
+        diaryTitle.style.cssText = 'font-size: 14px; font-weight: 600; color: #22c55e; display: flex; align-items: center; gap: 8px;'
+        diaryTitle.innerHTML = '<span>📇</span><span>功能说明</span>'
+        diaryConfigDiv.appendChild(diaryTitle)
+
+        const diaryDesc = document.createElement('div')
+        diaryDesc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.6;'
+        diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 打开日记<br>2. 自动滚动到文档底部<br><br>无需配置，点击按钮即可使用。'
+        diaryConfigDiv.appendChild(diaryDesc)
+
+        authorToolContainer.appendChild(diaryConfigDiv)
+
+        // 根据当前选择显示/隐藏配置区
+        const updateVisibility = () => {
+          const subtype = subtypeSelect.value
+          if (subtype === 'database') {
+            scriptConfigDiv.style.display = 'none'
+            dbConfigDiv.style.display = 'flex'
+            diaryConfigDiv.style.display = 'none'
+          } else if (subtype === 'diary-bottom') {
+            scriptConfigDiv.style.display = 'none'
+            dbConfigDiv.style.display = 'none'
+            diaryConfigDiv.style.display = 'flex'
+          } else {
+            scriptConfigDiv.style.display = 'flex'
+            dbConfigDiv.style.display = 'none'
+            diaryConfigDiv.style.display = 'none'
+          }
+        }
+        subtypeSelect.refreshForm = updateVisibility
+        updateVisibility()
+
+        typeFieldsContainer.appendChild(authorToolContainer)
       }
     }
 
@@ -3208,8 +4433,8 @@ export default class ToolbarCustomizer extends Plugin {
     }
 
     // 手机端禁止左右滑动弹出
-    if (this.isMobile && this.featureConfig.disableMobileSwipe) {
-      const { disableFileTree, disableSettingMenu } = this.featureConfig
+    if (this.isMobile && this.mobileFeatureConfig.disableMobileSwipe) {
+      const { disableFileTree, disableSettingMenu } = this.mobileFeatureConfig
       
       if (disableFileTree && disableSettingMenu) {
         // 同时禁用文档树和设置菜单
@@ -3244,76 +4469,83 @@ export default class ToolbarCustomizer extends Plugin {
     }
   }
 
+  // 手机端滑动禁用的状态变量
+  private swipeStartX = 0
+  private swipeIsFirstMove = true
+  private swipeMask: HTMLElement | null = null
+
   // 设置手机端滑动禁用
   private setupMobileSwipeDisable() {
-    if (!this.isMobile || !this.featureConfig.disableMobileSwipe) return
+    if (!this.isMobile || !this.mobileFeatureConfig.disableMobileSwipe) return
     if (!document.getElementById('sidebar')) return
-    
-    let startX = 0
-    let isFristMove = true
-    let mask: HTMLElement | null = null
-    
-    const touchStartHandler = (e: TouchEvent) => {
-      const target = e.target as HTMLElement
-      if (target.closest('#menu, #sidebar')) return
-      
-      isFristMove = true
-      const touch = e.touches[0]
-      startX = touch.clientX
+
+    // 移除旧监听器（如果存在）
+    if (this.touchStartHandler) {
+      document.removeEventListener('touchstart', this.touchStartHandler, true)
     }
-    
-    const touchMoveHandler = (e: TouchEvent) => {
+    if (this.touchMoveHandler) {
+      document.removeEventListener('touchmove', this.touchMoveHandler, false)
+    }
+    if (this.touchEndHandler) {
+      document.removeEventListener('touchend', this.touchEndHandler, false)
+    }
+
+    this.touchStartHandler = (e: TouchEvent) => {
       const target = e.target as HTMLElement
       if (target.closest('#menu, #sidebar')) return
-      
-      if (isFristMove) {
-        isFristMove = false
+
+      this.swipeIsFirstMove = true
+      const touch = e.touches[0]
+      this.swipeStartX = touch.clientX
+    }
+
+    this.touchMoveHandler = (e: TouchEvent) => {
+      const target = e.target as HTMLElement
+      if (target.closest('#menu, #sidebar')) return
+
+      if (this.swipeIsFirstMove) {
+        this.swipeIsFirstMove = false
         document.getElementById('menu')?.classList.add('moving')
         document.getElementById('sidebar')?.classList.add('moving')
-        mask = document.querySelector('.side-mask')
-        mask?.classList.add('moving')
+        this.swipeMask = document.querySelector('.side-mask')
+        this.swipeMask?.classList.add('moving')
       }
-      
+
       const touch = e.touches[0]
       const currentX = touch?.clientX || 0
-      const diffX = currentX - startX
-      
-      if (Math.abs(diffX) > 0 && mask) {
+      const diffX = currentX - this.swipeStartX
+
+      if (Math.abs(diffX) > 0 && this.swipeMask) {
         if (diffX < 0) {
           // 左滑 设置菜单
-          if (mask.classList.contains('move-right')) mask.classList.remove('move-right')
-          if (!mask.classList.contains('move-left')) mask.classList.add('move-left')
+          if (this.swipeMask.classList.contains('move-right')) this.swipeMask.classList.remove('move-right')
+          if (!this.swipeMask.classList.contains('move-left')) this.swipeMask.classList.add('move-left')
         } else {
           // 右滑 文档树
-          if (mask.classList.contains('move-left')) mask.classList.remove('move-left')
-          if (!mask.classList.contains('move-right')) mask.classList.add('move-right')
+          if (this.swipeMask.classList.contains('move-left')) this.swipeMask.classList.remove('move-left')
+          if (!this.swipeMask.classList.contains('move-right')) this.swipeMask.classList.add('move-right')
         }
-        startX = currentX
+        this.swipeStartX = currentX
       }
     }
-    
-    const touchEndHandler = (e: TouchEvent) => {
+
+    this.touchEndHandler = (e: TouchEvent) => {
       const target = e.target as HTMLElement
       if (target.closest('#menu, #sidebar')) return
-      
-      if (!isFristMove) {
+
+      if (!this.swipeIsFirstMove) {
         this.closeMobilePanel()
       }
-      isFristMove = true
+      this.swipeIsFirstMove = true
       document.getElementById('menu')?.classList.remove('moving')
       document.getElementById('sidebar')?.classList.remove('moving')
       document.querySelector('.side-mask')?.classList.remove('moving')
     }
-    
-    // 移除旧监听器（如果存在）
-    document.removeEventListener('touchstart', touchStartHandler as any, true)
-    document.removeEventListener('touchmove', touchMoveHandler as any, false)
-    document.removeEventListener('touchend', touchEndHandler as any, false)
-    
+
     // 添加新监听器
-    document.addEventListener('touchstart', touchStartHandler as any, true)
-    document.addEventListener('touchmove', touchMoveHandler as any, false)
-    document.addEventListener('touchend', touchEndHandler as any, false)
+    document.addEventListener('touchstart', this.touchStartHandler, true)
+    document.addEventListener('touchmove', this.touchMoveHandler, false)
+    document.addEventListener('touchend', this.touchEndHandler, false)
   }
   
   // 关闭手机端侧边栏

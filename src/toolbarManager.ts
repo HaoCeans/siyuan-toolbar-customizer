@@ -3,7 +3,7 @@
  * 负责移动端工具栏调整和自定义按钮功能
  */
 
-import { getFrontend, showMessage } from "siyuan";
+import { Dialog, fetchSyncPost, getFrontend, showMessage } from "siyuan";
 
 // ===== 配置接口 =====
 export interface MobileToolbarConfig {
@@ -22,11 +22,25 @@ export interface MobileToolbarConfig {
 export interface ButtonConfig {
   id: string;                 // 唯一标识
   name: string;              // 按钮名称
-  type: 'builtin' | 'template' | 'click-sequence' | 'shortcut'; // 功能类型
+  type: 'builtin' | 'template' | 'click-sequence' | 'shortcut' | 'author-tool'; // 功能类型
   builtinId?: string;        // 思源功能ID（如：menuSearch）
   template?: string;         // 模板内容
   clickSequence?: string[];  // 模拟点击选择器序列
   shortcutKey?: string;      // 快捷键组合
+  targetDocId?: string;      // 作者自用工具：目标文档ID
+  authorScript?: string;     // 作者自用工具：自定义脚本
+  // 作者自用工具 - 数据库查询配置
+  authorToolSubtype?: 'script' | 'database' | 'diary-bottom'; // 作者工具子类型：script=自定义脚本, database=数据库查询, diary-bottom=日记底部
+  dbBlockId?: string;        // 数据库块ID
+  dbId?: string;             // 数据库ID（属性视图ID）
+  viewName?: string;         // 视图名称
+  primaryKeyColumn?: string; // 主键列名称（用于点击跳转）
+  startTimeStr?: string;     // 起始时间：'now' 或 'HH:MM' 格式
+  extraMinutes?: number;     // 行间额外分钟数（第一行不加）
+  maxRows?: number;          // 最大显示行数
+  dbDisplayMode?: 'cards' | 'table'; // 显示模式：cards=卡片, table=表格
+  showColumns?: string[];    // 要显示的列名数组
+  timeRangeColumnName?: string; // 时间段列的名称
   icon: string;              // 图标（思源图标或Emoji）
   iconSize: number;          // 图标大小（px）
   minWidth: number;          // 按钮最小宽度（px）
@@ -35,6 +49,21 @@ export interface ButtonConfig {
   platform: 'desktop' | 'mobile' | 'both'; // 显示平台
   showNotification: boolean; // 是否显示右上角提示
   enabled?: boolean;         // 是否启用（默认true）
+}
+
+// 全局按钮配置（用于批量设置所有按钮的默认值）
+export interface GlobalButtonConfig {
+  iconSize: number;          // 图标大小（px）
+  minWidth: number;          // 按钮最小宽度（px）
+  marginRight: number;       // 右侧边距（px）
+  showNotification: boolean; // 是否显示右上角提示
+}
+
+export const DEFAULT_GLOBAL_BUTTON_CONFIG: GlobalButtonConfig = {
+  iconSize: 16,
+  minWidth: 32,
+  marginRight: 8,
+  showNotification: true
 }
 
 // ===== 默认配置 =====
@@ -749,6 +778,9 @@ function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = 
   } else if (config.type === 'shortcut') {
     // 执行快捷键，传递保存的选区
     executeShortcut(config, savedSelection, lastActiveElement)
+  } else if (config.type === 'author-tool') {
+    // 执行作者自用工具
+    executeAuthorTool(config)
   }
 }
 
@@ -1045,7 +1077,11 @@ function waitForElement(selector: string, timeout: number = 5000): Promise<HTMLE
       const element = findElement()
       if (element) {
         observer.disconnect()
-        clearTimeout(timeoutId)
+        // 清理超时定时器
+        if (activeTimers.has(timerId)) {
+          clearTimeout(timerId)
+          activeTimers.delete(timerId)
+        }
         resolve(element)
       }
     })
@@ -1056,8 +1092,8 @@ function waitForElement(selector: string, timeout: number = 5000): Promise<HTMLE
       attributes: true
     })
 
-    // 超时处理
-    const timeoutId = setTimeout(() => {
+    // 超时处理 - 使用 tracked timeout
+    const timerId = safeSetTimeout(() => {
       observer.disconnect()
       resolve(null)
     }, timeout)
@@ -1169,6 +1205,670 @@ function clickElement(element: HTMLElement): void {
       // 点击元素失败
     }
   }
+}
+
+/**
+ * 执行日记底部功能
+ * 打开日记后跳转到文档底部
+ * 电脑端：直接触发 Alt+5 并滚动
+ * 手机端：触发 Alt+5，自动确认对话框，然后滚动
+ */
+async function executeDiaryBottom(config: ButtonConfig) {
+  try {
+    const windowObj = window as any
+
+    // 检测是否为手机端
+    const isMobile = /mobile|android|iphone|ipad/i.test(navigator.userAgent) ||
+                     windowObj.siyuan?.config?.fronted === 'mobile' ||
+                     document.body.classList.contains('mobile')
+
+    // 从思源 keymap 中获取 dailyNote 的快捷键
+    let hotkeyToTrigger = '⌥5' // 默认 Alt+5
+
+    if (windowObj.siyuan?.config?.keymap?.general?.dailyNote) {
+      const keymapItem = windowObj.siyuan.config.keymap.general.dailyNote
+      hotkeyToTrigger = keymapItem.custom || keymapItem.default
+    }
+
+    // ==================== 滚动到底部函数（电脑端和手机端共用） ====================
+    let scrollAttempts = 0
+    const maxScrollAttempts = 20
+    const retryDelay = 200
+
+    function startScrolling() {
+      scrollAttempts = 0
+      scrollToBottom()
+    }
+
+    function scrollToBottom() {
+      scrollAttempts++
+
+      // 查找所有 .protyle 元素
+      const allProtyles = document.querySelectorAll('.protyle') as NodeListOf<HTMLElement>
+      let scrolled = false
+
+      allProtyles.forEach((protyle) => {
+        // 尝试滚动 .protyle-content 元素
+        const content = protyle.querySelector('.protyle-content') as HTMLElement
+        if (content && content.scrollHeight > content.clientHeight) {
+          content.scrollTop = content.scrollHeight
+          scrolled = true
+        }
+      })
+
+      if (scrolled) {
+        if (config.showNotification !== false) {
+          showMessage('已打开日记并跳转到底部', 1500, 'info')
+        }
+        return
+      }
+
+      if (scrollAttempts < maxScrollAttempts) {
+        safeSetTimeout(scrollToBottom, retryDelay)
+      } else {
+        if (config.showNotification !== false) {
+          showMessage('日记已打开', 1500, 'info')
+        }
+      }
+    }
+
+    // ==================== 电脑端流程 ====================
+    if (!isMobile) {
+      // 1. 触发快捷键
+      const keyEvent = parseHotkeyToKeyEvent(hotkeyToTrigger)
+      if (keyEvent) {
+        window.dispatchEvent(new KeyboardEvent('keydown', keyEvent))
+      }
+
+      // 2. 等待文档加载后滚动到底部（800ms 延迟）
+      safeSetTimeout(startScrolling, 800)
+      return
+    }
+
+    // ==================== 手机端流程 ====================
+    // 1. 触发快捷键
+    const keyEvent = parseHotkeyToKeyEvent(hotkeyToTrigger)
+    if (keyEvent) {
+      window.dispatchEvent(new KeyboardEvent('keydown', keyEvent))
+    }
+
+    // 2. 等待对话框出现并自动确认（每步延迟500ms）
+    let dialogCheckAttempts = 0
+    const maxDialogChecks = 15
+
+    const checkAndConfirmDialog = () => {
+      dialogCheckAttempts++
+
+      // 查找日记笔记本选择对话框
+      const dialogs = document.querySelectorAll('.b3-dialog__container')
+      for (const dialog of dialogs) {
+        const select = dialog.querySelector('select.b3-select')
+        const header = dialog.querySelector('.b3-dialog__header')
+        const confirmBtn = dialog.querySelector('.b3-button--text:not(.b3-button--cancel)')
+
+        // 判断是否是日记选择对话框
+        if (select && header && confirmBtn) {
+          const headerText = header.textContent || ''
+          if (headerText.includes('选择') || headerText.includes('请先')) {
+            // 直接点击确定按钮
+            (confirmBtn as HTMLElement).click()
+            // 对话框确认后，延迟500ms再滚动
+            safeSetTimeout(startScrolling, 500)
+            return
+          }
+        }
+      }
+
+      if (dialogCheckAttempts < maxDialogChecks) {
+        safeSetTimeout(checkAndConfirmDialog, 100)
+      } else {
+        // 没有检测到对话框，延迟500ms后开始滚动
+        safeSetTimeout(startScrolling, 500)
+      }
+    }
+
+    // 延迟500ms后开始检查对话框
+    safeSetTimeout(checkAndConfirmDialog, 500)
+
+  } catch (error) {
+    console.error('日记底部功能失败:', error)
+    showMessage(`❌ 打开日记失败: ${error}`, 3000, 'error')
+  }
+}
+
+/**
+ * 执行作者自用工具
+ */
+function executeAuthorTool(config: ButtonConfig) {
+  const subtype = config.authorToolSubtype || 'script'
+
+  // 日记底部类型
+  if (subtype === 'diary-bottom') {
+    executeDiaryBottom(config)
+    return
+  }
+
+  // 数据库查询类型
+  if (subtype === 'database') {
+    executeDatabaseQuery(config)
+    return
+  }
+
+  // 自定义脚本类型（默认）
+  // 如果配置了目标文档ID，打开该文档
+  if (config.targetDocId) {
+    // 使用思源 API 打开块，忽略返回值
+    fetch('/api/block/openBlockDoc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: config.targetDocId })
+    }).catch(() => {})
+  }
+
+  // 如果配置了自定义脚本，执行它
+  if (config.authorScript) {
+    try {
+      // 使用 Function 构造器创建一个安全的执行环境
+      const scriptFn = new Function('config', 'fetchSyncPost', 'showMessage', config.authorScript)
+      scriptFn(config, fetchSyncPost, showMessage)
+    } catch (err) {
+      showMessage(`执行脚本失败: ${err}`, 3000, 'error')
+    }
+  }
+
+  showMessage(`执行作者工具: ${config.name}`, 1500, 'info')
+}
+
+/**
+ * 解析时间字符串为分钟数
+ */
+function parseTimeToMinutes(timeStr: string = 'now'): number {
+  if (timeStr === 'now' || !timeStr) {
+    const now = new Date()
+    return now.getHours() * 60 + now.getMinutes()
+  }
+
+  // 处理 HH:MM 格式
+  const match = timeStr.match(/^(\d{1,2}):(\d{2})$/)
+  if (match) {
+    const hours = parseInt(match[1], 10)
+    const minutes = parseInt(match[2], 10)
+    if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+      return hours * 60 + minutes
+    }
+  }
+
+  // 无效格式，使用当前时间
+  const now = new Date()
+  return now.getHours() * 60 + now.getMinutes()
+}
+
+/**
+ * 将分钟数转换为 HH:MM 格式
+ */
+function minutesToHHMM(minutes: number): string {
+  const hours = Math.floor(minutes / 60) % 24
+  const mins = minutes % 60
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`
+}
+
+/**
+ * 根据配置格式化时间段
+ */
+function formatTimeRange(startMinutes: number, endMinutes: number): string {
+  const startTime = minutesToHHMM(startMinutes)
+  const endTime = minutesToHHMM(endMinutes)
+
+  // 计算是否跨天
+  if (endMinutes < startMinutes) {
+    return `⏳${startTime} - ${endTime}（次日）`
+  }
+  return `⏳${startTime} - ${endTime}`
+}
+
+/**
+ * 解析单元格值
+ */
+function parseCellValue(cell: any): { content: string; blockId: string } {
+  if (!cell || !cell.value) {
+    return { content: '', blockId: '' }
+  }
+
+  const value = cell.value
+  const type = value.type
+
+  switch (type) {
+    case 'text':
+      return { content: value.text?.content || '', blockId: '' }
+    case 'block':
+      return { content: value.block?.content || '', blockId: value.block?.id || '' }
+    case 'select':
+    case 'mSelect':
+      // select 类型也用 mSelect 存储值
+      if (value.mSelect && Array.isArray(value.mSelect) && value.mSelect.length > 0) {
+        return { content: value.mSelect[0].content || '', blockId: '' }
+      }
+      return { content: '', blockId: '' }
+    case 'number':
+      return { content: value.number?.content?.toString() || '', blockId: '' }
+    case 'date':
+      if (value.date?.content) {
+        return { content: new Date(value.date.content).toLocaleDateString(), blockId: '' }
+      }
+      return { content: '', blockId: '' }
+    case 'checkbox':
+      return { content: value.checkbox?.checked ? '✓' : '✗', blockId: '' }
+    default:
+      return { content: '', blockId: '' }
+  }
+}
+
+/**
+ * 执行数据库查询
+ */
+async function executeDatabaseQuery(config: ButtonConfig) {
+  try {
+    // 获取配置参数
+    const dbBlockId = config.dbBlockId || ''
+    const dbId = config.dbId || ''
+    const viewName = config.viewName || ''
+    const primaryKeyColumn = config.primaryKeyColumn || 'DO'
+    const startTimeStr = config.startTimeStr || 'now'
+    const extraMinutes = config.extraMinutes || 20
+    const maxRows = config.maxRows || 5
+    const displayMode = config.dbDisplayMode || 'cards'
+    const showColumns = config.showColumns || [primaryKeyColumn, '预计分钟', '时间段']
+    const timeRangeColumnName = config.timeRangeColumnName || '时间段'
+
+    // 确定 avId
+    let avId = dbId
+
+    // 如果没有提供 dbId，尝试从 blockId 获取
+    if (!avId && dbBlockId) {
+      const blockResponse = await fetchSyncPost('/api/query/sql', {
+        stmt: `SELECT content FROM blocks WHERE id='${dbBlockId}'`
+      })
+      if (blockResponse.code === 0 && blockResponse.data?.length > 0) {
+        const content = blockResponse.data[0].content
+        const match = content.match(/data-av-id="([^"]+)"/)
+        if (match) avId = match[1]
+      }
+    }
+
+    if (!avId) {
+      showMessage('❌ 无法获取数据库ID，请检查配置', 3000, 'error')
+      return
+    }
+
+    // 获取属性视图信息
+    const avResponse = await fetchSyncPost('/api/av/getAttributeView', {
+      id: avId
+    })
+
+    if (avResponse.code !== 0 || !avResponse.data) {
+      showMessage('❌ 获取数据库信息失败', 3000, 'error')
+      return
+    }
+
+    const attributeView = avResponse.data.av
+
+    // 查找视图ID
+    let viewId = ''
+    if (viewName && attributeView.views) {
+      const matchedView = attributeView.views.find((v: any) => v.name === viewName)
+      if (matchedView) viewId = matchedView.id
+      else if (attributeView.views.length > 0) viewId = attributeView.views[0].id
+    } else if (attributeView.views?.length > 0) {
+      viewId = attributeView.views[0].id
+    }
+
+    // 获取视图数据
+    const renderResponse = await fetchSyncPost('/api/av/renderAttributeView', {
+      id: avId,
+      viewID: viewId,
+      page: 1,
+      pageSize: maxRows + 10
+    })
+
+    if (renderResponse.code !== 0 || !renderResponse.data) {
+      showMessage('❌ 获取数据失败', 3000, 'error')
+      return
+    }
+
+    // 构建键映射 - 从 renderResponse.data.view.columns 获取
+    const keyMap: Record<string, { name: string; type: string }> = {}
+    if (renderResponse.data.view?.columns) {
+      renderResponse.data.view.columns.forEach((col: any) => {
+        keyMap[col.id] = { name: col.name, type: col.type }
+      })
+    }
+
+    // 处理数据 - 从 renderResponse.data.view.rows 获取
+    const rows = renderResponse.data.view?.rows || []
+    const processedRows: Array<{ id: string; blockId: string; values: Record<string, string> }> = []
+
+    // 计算时间段
+    let currentTime = parseTimeToMinutes(startTimeStr)
+
+    rows.slice(0, maxRows).forEach((row: any, rowIndex) => {
+      const rowData: Record<string, string> = {}
+      let rowBlockId = ''
+
+      if (row.cells) {
+        row.cells.forEach((cell: any) => {
+          if (!cell.value?.keyID) return
+
+          const keyInfo = keyMap[cell.value.keyID]
+          if (!keyInfo) return
+
+          const parsed = parseCellValue(cell)
+          rowData[keyInfo.name] = parsed.content
+
+          if (keyInfo.name === primaryKeyColumn) {
+            rowBlockId = parsed.blockId
+          }
+        })
+      }
+
+      // 计算时间
+      const durationStr = rowData['预计分钟'] || rowData['分钟'] || rowData['时长'] || '0'
+      const durationMatch = durationStr.match(/\d+/)
+      const duration = durationMatch ? parseInt(durationMatch[0]) : 0
+
+      // 第一行不加额外分钟，后续行加
+      const extraToAdd = (processedRows.length > 0) ? extraMinutes : 0
+      const startTime = currentTime + extraToAdd
+      const endTime = startTime + duration
+
+      rowData[timeRangeColumnName] = formatTimeRange(startTime, endTime)
+
+      // 更新 currentTime 为本行结束时间（供下一行使用）
+      currentTime = endTime
+
+      processedRows.push({
+        id: row.id,
+        blockId: rowBlockId,
+        values: rowData
+      })
+    })
+
+    // 显示弹窗
+    showDatabasePopup(processedRows, config, primaryKeyColumn, timeRangeColumnName, displayMode, showColumns, attributeView.name)
+
+  } catch (error: any) {
+    console.error('数据库查询失败:', error)
+    showMessage(`❌ 查询失败: ${error.message || error}`, 3000, 'error')
+  }
+}
+
+/**
+ * 显示数据库查询结果弹窗
+ */
+function showDatabasePopup(
+  rows: Array<{ id: string; blockId: string; values: Record<string, string> }>,
+  config: ButtonConfig,
+  primaryKeyColumn: string,
+  timeRangeColumnName: string,
+  displayMode: string,
+  showColumns: string[],
+  dbName: string = '查询结果'
+) {
+  const rowCount = rows.length
+
+  if (rowCount === 0) {
+    showMessage('没有数据', 3000, 'info')
+    return
+  }
+
+  let contentHtml = ''
+
+  if (displayMode === 'table') {
+    // 表格模式
+    let tableHtml = '<table style="width: 100%; border-collapse: collapse; font-size: 13px;"><thead><tr>'
+
+    // 表头
+    showColumns.forEach(col => {
+      tableHtml += `<th style="border-bottom: 2px solid #007AFF; padding: 8px 6px; text-align: ${col === timeRangeColumnName ? 'center' : 'left'}; font-weight: 600; color: ${col === primaryKeyColumn ? '#800080' : '#1D1D1F'}; background-color: #F8F8F8; white-space: nowrap;">${col}</th>`
+    })
+
+    tableHtml += '</tr></thead><tbody>'
+
+    // 表体
+    rows.forEach((rowData, rowIndex) => {
+      tableHtml += `<tr style="background-color: ${rowIndex % 2 === 0 ? '#FFFFFF' : '#F9F9F9'};">`
+
+      showColumns.forEach(col => {
+        const value = rowData.values[col] || ''
+
+        if (col === primaryKeyColumn && rowData.blockId) {
+          const displayValue = value.length > 25 ? value.substring(0, 25) + '...' : value
+          tableHtml += `<td style="border-bottom: 1px solid #E5E5E5; padding: 8px 6px;"><span class="block-link" data-block-id="${rowData.blockId}" style="color: #800080; text-decoration: underline; cursor: pointer; font-weight: 600;">${displayValue}</span></td>`
+        } else {
+          tableHtml += `<td style="border-bottom: 1px solid #E5E5E5; padding: 8px 6px; color: ${col === timeRangeColumnName ? '#007AFF' : '#1D1D1D'}; text-align: ${col === timeRangeColumnName ? 'center' : 'left'}; ${col === timeRangeColumnName ? 'font-weight: bold; background: rgba(0, 122, 255, 0.08);' : ''}">${value}</td>`
+        }
+      })
+
+      tableHtml += '</tr>'
+    })
+
+    tableHtml += '</tbody></table>'
+    contentHtml = tableHtml
+  } else {
+    // 卡片模式
+    let cardsHtml = `<style>
+      .cards-container {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 650px;
+        overflow-y: auto;
+      }
+      .task-card {
+        background-color: #FFFFFF;
+        border: 1px solid #E5E5E5;
+        border-radius: 8px;
+        padding: 10px 13px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      }
+      .task-field {
+        margin-bottom: 5px;
+        line-height: 1.4;
+        display: flex;
+        align-items: center;
+      }
+      .task-field-label {
+        color: #8E8E93;
+        font-size: 13px;
+        margin-right: 10px;
+        display: inline-block;
+        width: 40px;
+        flex-shrink: 0;
+        font-weight: 500;
+      }
+      .task-field-value {
+        color: #1D1D1F;
+        font-size: 13px;
+        font-weight: 400;
+        flex-grow: 1;
+        word-break: break-word;
+      }
+      .task-field-value.primary-key {
+        color: #800080;
+        font-weight: 600;
+        text-decoration: underline;
+        cursor: pointer;
+      }
+      .time-range-display {
+        display: inline-block;
+        background: linear-gradient(135deg, #FF8A00, #FFB347);
+        color: #ffffff;
+        padding: 6px 14px;
+        font-size: 14px;
+        font-weight: 700;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(255, 138, 0, 0.25);
+        letter-spacing: 0.5px;
+        text-align: center;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .time-range-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 4px;
+        width: 100%;
+      }
+    </style><div class="cards-container">`
+
+    rows.forEach((rowData) => {
+      cardsHtml += '<div class="task-card">'
+
+      showColumns.forEach(col => {
+        const value = rowData.values[col] || ''
+        const isTimeRange = col === timeRangeColumnName
+
+        if (col === primaryKeyColumn && rowData.blockId) {
+          cardsHtml += `<div class="task-field"><span class="block-link task-field-value primary-key" data-block-id="${rowData.blockId}">${value}</span></div>`
+        } else if (isTimeRange) {
+          cardsHtml += `<div class="time-range-container"><span class="time-range-display">${value}</span></div>`
+        } else {
+          const shortLabel = col.length > 4 ? col.substring(0, 4) : col
+          cardsHtml += `<div class="task-field"><span class="task-field-label">${shortLabel}</span><span class="task-field-value">${value}</span></div>`
+        }
+      })
+
+      cardsHtml += '</div>'
+    })
+
+    cardsHtml += '</div>'
+    contentHtml = cardsHtml
+  }
+
+  // 构建说明文字
+  const noteHtml = '<div style="margin-top: 14px; font-size: 11px; color: #8E8E93; text-align: center;">双击关闭 | 点击紫色文字可跳转</div>'
+
+  // 创建 Dialog，使用数据库名称作为标题
+  const dialog = new Dialog({
+    title: dbName || '查询结果',
+    content: `
+      <div class="b3-dialog__content" style="padding: ${displayMode === 'table' ? '0' : '12px'};">
+        ${contentHtml}
+        ${noteHtml}
+      </div>
+    `,
+    width: displayMode === 'table' ? '500px' : '380px',
+    destroyCallback: () => {
+      // 弹窗关闭时的回调
+    }
+  })
+
+  // 设置标题居中
+  const headerElement = dialog.element.querySelector('.b3-dialog__header')
+  if (headerElement) {
+    (headerElement as HTMLElement).style.textAlign = 'center'
+  }
+
+  // 双击关闭弹窗（绑定到整个 dialog，排除 block-link）
+  dialog.element.addEventListener('dblclick', (e) => {
+    if ((e.target as HTMLElement).classList.contains('block-link')) {
+      return
+    }
+    dialog.destroy()
+  })
+
+  // 手机端触摸双击关闭
+  let lastTapTime = 0
+  dialog.element.addEventListener('touchend', (e) => {
+    const target = e.target as HTMLElement
+    if (target.classList.contains('block-link')) {
+      return
+    }
+
+    const currentTime = new Date().getTime()
+    const tapLength = currentTime - lastTapTime
+
+    if (tapLength < 300 && tapLength > 0) {
+      // 双击检测到
+      dialog.destroy()
+      e.preventDefault()
+    }
+    lastTapTime = currentTime
+  })
+
+  // 使用事件委托处理 block-link 点击
+  dialog.element.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement
+    if (!target.classList.contains('block-link')) {
+      return
+    }
+
+    const blockId = target.dataset.blockId
+    if (!blockId) {
+      return
+    }
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    // 关闭弹窗
+    dialog.destroy()
+
+    const isMobile = isMobileDevice()
+
+    if (isMobile) {
+      // 手机端：模拟点击文件树
+      fetchSyncPost('/api/block/getBlockInfo', { id: blockId }).then((response) => {
+        if (response.code === 0 && response.data) {
+          const rootId = response.data.rootID
+
+          const findDocElement = (id: string) => {
+            const selectors = [
+              `[data-node-id="${id}"]`,
+              `[data-url-id="${id}"]`,
+              `.b3-list-item[data-url-id="${id}"]`,
+              `[data-type="doc"][data-id="${id}"]`,
+              `li[data-id="${id}"]`
+            ]
+            for (const selector of selectors) {
+              const el = document.querySelector(selector)
+              if (el) return el
+            }
+            return null
+          }
+
+          let retries = 0
+          const tryOpenDoc = () => {
+            const fileTreeDoc = findDocElement(rootId)
+            if (fileTreeDoc) {
+              fileTreeDoc.click()
+              setTimeout(() => {
+                const block = document.querySelector(`[data-node-id="${blockId}"]`)
+                if (block) {
+                  block.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                  block.dispatchEvent(new MouseEvent('click', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                  }))
+                }
+              }, 500)
+            } else if (retries < 5) {
+              retries++
+              setTimeout(tryOpenDoc, 200)
+            }
+          }
+
+          tryOpenDoc()
+        }
+      }).catch((err) => {
+        console.log('手机端打开失败:', err)
+      })
+    } else {
+      // 电脑端：直接使用 siyuan:// 超链接
+      window.location.href = 'siyuan://blocks/' + blockId
+    }
+  })
 }
 
 // ===== 清理函数 =====

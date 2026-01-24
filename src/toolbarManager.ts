@@ -1312,8 +1312,8 @@ async function executeDiaryBottom(config: ButtonConfig) {
           if (headerText.includes('选择') || headerText.includes('请先')) {
             // 直接点击确定按钮
             (confirmBtn as HTMLElement).click()
-            // 对话框确认后，延迟500ms再滚动
-            safeSetTimeout(startScrolling, 500)
+            // 对话框确认后，延迟1000ms再滚动
+            safeSetTimeout(startScrolling, 1000)
             return
           }
         }

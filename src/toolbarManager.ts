@@ -49,6 +49,7 @@ export interface ButtonConfig {
   platform: 'desktop' | 'mobile' | 'both'; // 显示平台
   showNotification: boolean; // 是否显示右上角提示
   enabled?: boolean;         // 是否启用（默认true）
+  layers?: number;           // 扩展工具栏层数（1-5），仅扩展工具栏按钮使用
 }
 
 // 全局按钮配置（用于批量设置所有按钮的默认值）
@@ -177,8 +178,22 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
   }
 ]
 
-// 移动端默认按钮（7个）
+// 移动端默认按钮（8个，包含扩展工具栏按钮）
 export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
+  {
+    id: 'overflow-button-mobile',
+    name: '扩展工具栏',
+    type: 'builtin',
+    builtinId: 'overflow',
+    icon: '⋯',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 0,
+    platform: 'mobile',
+    showNotification: false,
+    layers: 1
+  },
   {
     id: 'more-mobile',
     name: '更多',

@@ -211,6 +211,28 @@ export default class ToolbarCustomizer extends Plugin {
           showNotification: btn.showNotification !== undefined ? btn.showNotification : true,
           clickSequence: btn.clickSequence || []
         }))
+        // 检查是否有扩展工具栏按钮，没有则添加
+        const hasOverflowButton = this.mobileButtonConfigs.some(btn => btn.id === 'overflow-button-mobile')
+        if (!hasOverflowButton) {
+          this.mobileButtonConfigs.unshift({
+            id: 'overflow-button-mobile',
+            name: '扩展工具栏',
+            type: 'builtin',
+            builtinId: 'overflow',
+            icon: '⋯',
+            iconSize: 18,
+            minWidth: 32,
+            marginRight: 8,
+            sort: 0,
+            platform: 'mobile',
+            showNotification: false,
+            layers: 1
+          })
+          // 重新分配排序值
+          this.mobileButtonConfigs.forEach((btn, idx) => {
+            btn.sort = idx
+          })
+        }
       } else {
         // 配置不存在或格式错误，使用默认配置（首次加载时不保存，等用户修改时再保存）
         this.mobileButtonConfigs = DEFAULT_MOBILE_BUTTONS.map(btn => ({...btn}))

@@ -47,17 +47,32 @@ export function createMobileButtonItem(
   configsArray: ButtonConfig[],
   context: MobileButtonContext
 ): HTMLElement {
+  const isOverflowButton = button.id === 'overflow-button-mobile'
   const item = document.createElement('div')
-  item.style.cssText = `
-    border: 1px solid var(--b3-border-color);
-    border-radius: 6px;
-    padding: 12px;
-    background: var(--b3-theme-surface);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    position: relative;
-    transition: all 0.2s ease;
-  `
-  item.draggable = true
+  // 扩展工具栏按钮使用特殊样式凸显
+  if (isOverflowButton) {
+    item.style.cssText = `
+      border: 2px solid var(--b3-theme-primary);
+      border-radius: 6px;
+      padding: 12px;
+      background: linear-gradient(135deg, rgba(66, 133, 244, 0.1), rgba(102, 126, 234, 0.08));
+      box-shadow: 0 2px 8px rgba(66, 133, 244, 0.2);
+      position: relative;
+      transition: all 0.2s ease;
+    `
+  } else {
+    item.style.cssText = `
+      border: 1px solid var(--b3-border-color);
+      border-radius: 6px;
+      padding: 12px;
+      background: var(--b3-theme-surface);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      position: relative;
+      transition: all 0.2s ease;
+    `
+  }
+  // 扩展工具栏按钮不可拖动
+  item.draggable = !isOverflowButton
 
   let isExpanded = false
 
@@ -70,51 +85,55 @@ export function createMobileButtonItem(
   let placeholder: HTMLElement | null = null
   let initialTouchY = 0
 
-  // 桌面端拖拽事件
-  item.ondragstart = (e) => {
-    e.dataTransfer!.effectAllowed = 'move'
-    e.dataTransfer!.setData('text/plain', index.toString())
-    item.style.opacity = '0.4'
-  }
+  // 桌面端拖拽事件（扩展工具栏按钮跳过）
+  if (!isOverflowButton) {
+    item.ondragstart = (e) => {
+      e.dataTransfer!.effectAllowed = 'move'
+      e.dataTransfer!.setData('text/plain', index.toString())
+      item.style.opacity = '0.4'
+    }
 
-  item.ondragend = (e) => {
-    item.style.opacity = '1'
-  }
+    item.ondragend = (e) => {
+      item.style.opacity = '1'
+    }
 
-  item.ondragover = (e) => {
-    e.preventDefault()
-    e.dataTransfer!.dropEffect = 'move'
-    item.style.borderColor = 'var(--b3-theme-primary)'
-  }
+    item.ondragover = (e) => {
+      e.preventDefault()
+      e.dataTransfer!.dropEffect = 'move'
+      item.style.borderColor = 'var(--b3-theme-primary)'
+    }
 
-  item.ondragleave = (e) => {
-    item.style.borderColor = 'var(--b3-border-color)'
-  }
+    item.ondragleave = (e) => {
+      item.style.borderColor = 'var(--b3-border-color)'
+    }
 
-  item.ondrop = (e) => {
-    e.preventDefault()
-    item.style.borderColor = 'var(--b3-border-color)'
+    item.ondrop = (e) => {
+      e.preventDefault()
+      item.style.borderColor = 'var(--b3-border-color)'
 
-    const fromIndex = parseInt(e.dataTransfer!.getData('text/plain'))
-    const toIndex = index
+      const fromIndex = parseInt(e.dataTransfer!.getData('text/plain'))
+      const toIndex = index
 
-    if (fromIndex !== toIndex) {
-      // 交换按钮位置
-      const sortedButtons = [...configsArray].sort((a, b) => a.sort - b.sort)
-      const [movedButton] = sortedButtons.splice(fromIndex, 1)
-      sortedButtons.splice(toIndex, 0, movedButton)
+      if (fromIndex !== toIndex) {
+        // 交换按钮位置
+        const sortedButtons = [...configsArray].sort((a, b) => a.sort - b.sort)
+        const [movedButton] = sortedButtons.splice(fromIndex, 1)
+        sortedButtons.splice(toIndex, 0, movedButton)
 
-      // 重新分配 sort 值
-      sortedButtons.forEach((btn, idx) => {
-        btn.sort = idx + 1
-      })
+        // 重新分配 sort 值
+        sortedButtons.forEach((btn, idx) => {
+          btn.sort = idx + 1
+        })
 
-      renderList()
+        renderList()
+      }
     }
   }
 
-  // 移动端触摸拖拽事件
+  // 移动端触摸拖拽事件（扩展工具栏按钮跳过）
   const handleTouchStart = (e: TouchEvent) => {
+    // 扩展工具栏按钮不可拖动
+    if (isOverflowButton) return
     // 如果已经在拖拽或展开状态，不响应
     if (isDragging || isExpanded) return
 
@@ -408,12 +427,17 @@ export function createMobileButtonItem(
     item.style.opacity = '0.5'
   }
 
-  header.appendChild(dragHandle)
+  // 扩展工具栏按钮不显示拖动手柄和删除按钮
+  if (!isOverflowButton) {
+    header.appendChild(dragHandle)
+  }
   header.appendChild(iconSpan)
   header.appendChild(infoDiv)
   header.appendChild(expandIcon)
   header.appendChild(enabledToggle)
-  header.appendChild(deleteBtn)
+  if (!isOverflowButton) {
+    header.appendChild(deleteBtn)
+  }
 
   const editForm = document.createElement('div')
   editForm.style.cssText = `
@@ -433,28 +457,73 @@ export function createMobileButtonItem(
   editForm.appendChild(nameField)
   const nameInput = nameField.querySelector('input') as HTMLInputElement
 
-  // 类型选择 - 需要动态更新表单（始终包含作者自用工具）
-  // 构建功能类型选项数组（根据激活状态决定是否显示作者自用工具）
-  const typeOptions = [
-    { value: 'builtin', label: '①思源内置功能【简单】' },
-    { value: 'template', label: '②手写模板插入【简单】' },
-    { value: 'shortcut', label: '③电脑端快捷键【简单】' },
-    { value: 'click-sequence', label: '④自动化模拟点击【难】' }
-  ]
-  if (context.isAuthorToolActivated()) {
-    typeOptions.push({ value: 'author-tool', label: '⑥作者自用工具' })
-  }
-  const typeField = createSelectField('选择功能', button.type, typeOptions, (v) => {
-    button.type = v as any
-    // 重新渲染整个表单
-    updateTypeFields()
-  })
-  editForm.appendChild(typeField)
+  // 扩展工具栏按钮：添加层数配置，跳过类型选择
+  if (isOverflowButton) {
+    // 层数设置容器（凸显样式）
+    const layersContainer = document.createElement('div')
+    layersContainer.style.cssText = `
+      padding: 12px;
+      border: 2px solid var(--b3-theme-primary);
+      border-radius: 6px;
+      background: linear-gradient(135deg, rgba(66, 133, 244, 0.1), rgba(102, 126, 234, 0.08));
+    `
 
-  // 类型相关字段的容器
+    // 层数输入
+    const layersField = createInputField('扩展工具栏层数', (button.layers || 1).toString(), '1-5层，点击后弹出对应层数的工具栏', (v) => {
+      let num = parseInt(v) || 1
+      if (num < 1) num = 1
+      if (num > 5) num = 5
+      button.layers = num
+    }, 'number')
+    layersField.querySelector('input')!.min = '1'
+    layersField.querySelector('input')!.max = '5'
+    layersContainer.appendChild(layersField)
+
+    // 说明文字
+    const descDiv = document.createElement('div')
+    descDiv.style.cssText = `
+      margin-top: 10px;
+      padding: 10px;
+      background: var(--b3-theme-background);
+      border-radius: 4px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--b3-theme-on-surface);
+    `
+    descDiv.innerHTML = `
+      <div style="font-weight: 600; margin-bottom: 6px; color: var(--b3-theme-primary);">💡 扩展工具栏说明</div>
+      <div>• <strong>关闭按钮</strong>：只显示思源默认工具栏</div>
+      <div>• <strong>开启按钮</strong>：工具栏第一位显示"⋯"按钮</div>
+      <div>• <strong>点击"⋯"</strong>：弹出扩展工具栏</div>
+      <div style="margin-top: 4px;">📊 <strong>层数设置</strong>：1层=1个工具栏，最多5层</div>
+    `
+    layersContainer.appendChild(descDiv)
+
+    editForm.appendChild(layersContainer)
+  } else {
+    // 类型选择 - 普通按钮显示
+    const typeOptions = [
+      { value: 'builtin', label: '①思源内置功能【简单】' },
+      { value: 'template', label: '②手写模板插入【简单】' },
+      { value: 'shortcut', label: '③电脑端快捷键【简单】' },
+      { value: 'click-sequence', label: '④自动化模拟点击【难】' }
+    ]
+    if (context.isAuthorToolActivated()) {
+      typeOptions.push({ value: 'author-tool', label: '⑥作者自用工具' })
+    }
+    const typeField = createSelectField('选择功能', button.type, typeOptions, (v) => {
+      button.type = v as any
+      updateTypeFields()
+    })
+    editForm.appendChild(typeField)
+  }
+
+  // 类型相关字段的容器（扩展工具栏按钮不显示）
   const typeFieldsContainer = document.createElement('div')
   typeFieldsContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px;'
-  editForm.appendChild(typeFieldsContainer)
+  if (!isOverflowButton) {
+    editForm.appendChild(typeFieldsContainer)
+  }
 
   // 更新类型相关字段的函数
   const updateTypeFields = () => {
@@ -812,8 +881,10 @@ export function createMobileButtonItem(
     }
   }
 
-  // 初始化类型字段
-  updateTypeFields()
+  // 初始化类型字段（扩展工具栏按钮跳过）
+  if (!isOverflowButton) {
+    updateTypeFields()
+  }
 
   // 图标输入框 - 需要保存引用以便在选择按钮时更新
   const iconField = createIconField('图标', button.icon, (v) => {
@@ -828,15 +899,18 @@ export function createMobileButtonItem(
   editForm.appendChild(createInputField('图标大小', button.iconSize.toString(), '18', (v) => { button.iconSize = parseInt(v) || 18 }, 'number'))
   editForm.appendChild(createInputField('按钮宽度', button.minWidth.toString(), '32', (v) => { button.minWidth = parseInt(v) || 32 }, 'number'))
   editForm.appendChild(createInputField('右边距', button.marginRight.toString(), '8', (v) => { button.marginRight = parseInt(v) || 8 }, 'number'))
-  editForm.appendChild(createInputField('排序', button.sort.toString(), '数字越小越靠左', (v) => {
-    button.sort = parseInt(v) || 1
-    // 重新分配排序值
-    const sortedButtons = [...context.buttonConfigs].sort((a, b) => a.sort - b.sort)
-    sortedButtons.forEach((btn, idx) => {
-      btn.sort = idx + 1
-    })
-    renderList()
-  }, 'number'))
+  // 扩展工具栏按钮不显示排序字段（固定第一位）
+  if (!isOverflowButton) {
+    editForm.appendChild(createInputField('排序', button.sort.toString(), '数字越小越靠左', (v) => {
+      button.sort = parseInt(v) || 1
+      // 重新分配排序值
+      const sortedButtons = [...context.buttonConfigs].sort((a, b) => a.sort - b.sort)
+      sortedButtons.forEach((btn, idx) => {
+        btn.sort = idx + 1
+      })
+      renderList()
+    }, 'number'))
+  }
 
   // 右上角提示开关（手机端）
   editForm.appendChild(createSwitchField('右上角提示', button.showNotification, (v) => {

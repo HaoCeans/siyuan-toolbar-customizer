@@ -566,7 +566,7 @@ export default class ToolbarCustomizer extends Plugin {
       // 说明文字
       const hint = document.createElement('div')
       hint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light); margin-top: 8px; padding: 8px; background: var(--b3-theme-background); border-radius: 4px;'
-      hint.innerHTML = '💡 修改后会批量应用到所有按钮<br>单个按钮的独立配置优先级更高'
+      hint.innerHTML = '💡 修改后会批量应用到所有按钮单个按钮的独立配置优先级更高'
       container.appendChild(hint)
 
       return container
@@ -591,7 +591,7 @@ export default class ToolbarCustomizer extends Plugin {
 
         const createSwitchItem = (labelText: string, checked: boolean, onChange: (value: boolean) => void) => {
           const item = document.createElement('div')
-          item.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+          item.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
 
           const label = document.createElement('label')
           label.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
@@ -617,7 +617,7 @@ export default class ToolbarCustomizer extends Plugin {
         widthItem.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
 
         const widthRow = document.createElement('div')
-        widthRow.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+        widthRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
 
         const widthLabel = document.createElement('label')
         widthLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
@@ -650,7 +650,7 @@ export default class ToolbarCustomizer extends Plugin {
         heightItem.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
 
         const heightRow = document.createElement('div')
-        heightRow.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+        heightRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
 
         const heightLabel = document.createElement('label')
         heightLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
@@ -708,7 +708,7 @@ export default class ToolbarCustomizer extends Plugin {
         `
 
         const dangerHeader = document.createElement('div')
-        dangerHeader.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+        dangerHeader.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
 
         const dangerLabel = document.createElement('label')
         dangerLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #ff4d4d; min-width: 180px;'
@@ -750,7 +750,7 @@ export default class ToolbarCustomizer extends Plugin {
         `
 
         const activationHeader = document.createElement('div')
-        activationHeader.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+        activationHeader.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
 
         const activationLabel = document.createElement('label')
         activationLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #8b5cf6; min-width: 180px;'
@@ -945,6 +945,7 @@ export default class ToolbarCustomizer extends Plugin {
       // 隐藏配置项的标题部分（左边的 .fn__flex-1），因为我们用标签切换器了
       const style = document.createElement('style')
       style.textContent = `
+        /* 隐藏标题和间距，让它们不占空间 */
         .b3-dialog__content .config__item > .fn__flex-1 {
           display: none !important;
         }
@@ -952,6 +953,18 @@ export default class ToolbarCustomizer extends Plugin {
           display: none !important;
         }
         .b3-dialog__content .config__item > .fn__flex-column {
+          width: 100% !important;
+          max-width: none !important;
+        }
+        /* 覆盖宽度限制类，让内容容器与父容器同宽 */
+        .b3-dialog__content .config__item > .fn__size200,
+        .b3-dialog__content .config__item > .fn__flex-center.fn__size200 {
+          width: 100% !important;
+          max-width: none !important;
+          min-width: auto !important;
+        }
+        /* 确保自定义按钮内容区域全宽 */
+        .b3-dialog__content .toolbar-customizer-content {
           width: 100% !important;
           max-width: none !important;
         }
@@ -1107,13 +1120,13 @@ export default class ToolbarCustomizer extends Plugin {
         description: '',
         createActionElement: () => {
           const titleEl = document.createElement('div')
+          titleEl.className = 'fn__flex-center fn__size200'
           titleEl.style.cssText = `
             padding: 16px 16px 8px 16px;
             margin: 8px -16px 0 -16px;
             font-size: 15px;
             font-weight: 600;
             color: var(--b3-theme-on-background);
-            border-bottom: 1px solid var(--b3-border-color);
             background: var(--b3-theme-surface);
             display: flex;
             align-items: center;
@@ -1205,124 +1218,99 @@ export default class ToolbarCustomizer extends Plugin {
     })
 
     // === 手机端全局按钮配置 ===
-    createGroupTitle('🔧', '手机端全局按钮配置')
+    createGroupTitle('📱', '手机端全局按钮配置')
 
-    const createGlobalButtonConfig = (
-      config: GlobalButtonConfig,
-      configs: ButtonConfig[],
-      storageKey: string
-    ) => {
-      const container = document.createElement('div')
-      container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 8px 0;'
-
-      // 图标大小
-      const iconSizeRow = document.createElement('div')
-      iconSizeRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between;'
-      iconSizeRow.innerHTML = `
-        <span style="font-size: 13px; color: var(--b3-theme-on-background);">图标大小 (px)</span>
-      `
-      const iconSizeInput = document.createElement('input')
-      iconSizeInput.type = 'number'
-      iconSizeInput.className = 'b3-text-field'
-      iconSizeInput.value = config.iconSize.toString()
-      iconSizeInput.style.cssText = 'width: 80px; font-size: 14px; padding: 6px 8px;'
-      iconSizeInput.onchange = async () => {
-        const newValue = parseInt(iconSizeInput.value) || 16
-        config.iconSize = newValue
-        // 批量赋值给所有按钮
-        configs.forEach(btn => btn.iconSize = newValue)
-        await this.saveData(storageKey, config)
-        await this.saveData(this.isMobile ? 'mobileButtonConfigs' : 'desktopButtonConfigs', configs)
-        showMessage('图标大小已应用到所有按钮', 1500, 'info')
-      }
-      iconSizeRow.appendChild(iconSizeInput)
-      container.appendChild(iconSizeRow)
-
-      // 按钮宽度
-      const widthRow = document.createElement('div')
-      widthRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between;'
-      widthRow.innerHTML = `
-        <span style="font-size: 13px; color: var(--b3-theme-on-background);">按钮宽度 (px)</span>
-      `
-      const widthInput = document.createElement('input')
-      widthInput.type = 'number'
-      widthInput.className = 'b3-text-field'
-      widthInput.value = config.minWidth.toString()
-      widthInput.style.cssText = 'width: 80px; font-size: 14px; padding: 6px 8px;'
-      widthInput.onchange = async () => {
-        const newValue = parseInt(widthInput.value) || 32
-        config.minWidth = newValue
-        // 批量赋值给所有按钮
-        configs.forEach(btn => btn.minWidth = newValue)
-        await this.saveData(storageKey, config)
-        await this.saveData(this.isMobile ? 'mobileButtonConfigs' : 'desktopButtonConfigs', configs)
-        showMessage('按钮宽度已应用到所有按钮', 1500, 'info')
-      }
-      widthRow.appendChild(widthInput)
-      container.appendChild(widthRow)
-
-      // 右边距
-      const marginRow = document.createElement('div')
-      marginRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between;'
-      marginRow.innerHTML = `
-        <span style="font-size: 13px; color: var(--b3-theme-on-background);">右边距 (px)</span>
-      `
-      const marginInput = document.createElement('input')
-      marginInput.type = 'number'
-      marginInput.className = 'b3-text-field'
-      marginInput.value = config.marginRight.toString()
-      marginInput.style.cssText = 'width: 80px; font-size: 14px; padding: 6px 8px;'
-      marginInput.onchange = async () => {
-        const newValue = parseInt(marginInput.value) || 8
-        config.marginRight = newValue
-        // 批量赋值给所有按钮
-        configs.forEach(btn => btn.marginRight = newValue)
-        await this.saveData(storageKey, config)
-        await this.saveData(this.isMobile ? 'mobileButtonConfigs' : 'desktopButtonConfigs', configs)
-        showMessage('右边距已应用到所有按钮', 1500, 'info')
-      }
-      marginRow.appendChild(marginInput)
-      container.appendChild(marginRow)
-
-      // 右上角提示
-      const notifyRow = document.createElement('div')
-      notifyRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between;'
-      notifyRow.innerHTML = `
-        <span style="font-size: 13px; color: var(--b3-theme-on-background);">右上角提示</span>
-      `
-      const notifyToggle = document.createElement('input')
-      notifyToggle.type = 'checkbox'
-      notifyToggle.className = 'b3-switch'
-      notifyToggle.checked = config.showNotification
-      notifyToggle.style.cssText = 'transform: scale(1.2);'
-      notifyToggle.onchange = async () => {
-        config.showNotification = notifyToggle.checked
-        // 批量赋值给所有按钮
-        configs.forEach(btn => btn.showNotification = notifyToggle.checked)
-        await this.saveData(storageKey, config)
-        await this.saveData(this.isMobile ? 'mobileButtonConfigs' : 'desktopButtonConfigs', configs)
-        showMessage(notifyToggle.checked ? '已开启所有按钮提示' : '已关闭所有按钮提示', 1500, 'info')
-      }
-      notifyRow.appendChild(notifyToggle)
-      container.appendChild(notifyRow)
-
-      // 说明文字
-      const hint = document.createElement('div')
-      hint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light); margin-top: 8px; padding: 8px; background: var(--b3-theme-background); border-radius: 4px;'
-      hint.innerHTML = '💡 修改后会批量应用到所有按钮<br>单个按钮的独立配置优先级更高'
-      container.appendChild(hint)
-
-      return container
-    }
-
+    // 图标大小
     setting.addItem({
-      title: '📐 全局按钮样式',
-      description: '批量设置所有按钮的默认值',
-      createActionElement: () => createGlobalButtonConfig(
-        this.mobileGlobalButtonConfig,
-        this.mobileButtonConfigs,
-        'mobileGlobalButtonConfig'
-      )
+      title: '图标大小 (px)',
+      description: '所有按钮的图标大小',
+      createActionElement: () => {
+        const input = document.createElement('input')
+        input.className = 'b3-text-field fn__flex-center fn__size200'
+        input.type = 'number'
+        input.value = this.mobileGlobalButtonConfig.iconSize.toString()
+        input.style.cssText = 'font-size: 14px; padding: 8px;'
+        input.onchange = async () => {
+          const newValue = parseInt(input.value) || 16
+          this.mobileGlobalButtonConfig.iconSize = newValue
+          this.mobileButtonConfigs.forEach(btn => btn.iconSize = newValue)
+          await this.saveData('mobileGlobalButtonConfig', this.mobileGlobalButtonConfig)
+          await this.saveData('mobileButtonConfigs', this.mobileButtonConfigs)
+          showMessage('图标大小已应用到所有按钮', 1500, 'info')
+        }
+        return input
+      }
+    })
+
+    // 按钮宽度
+    setting.addItem({
+      title: '按钮宽度 (px)',
+      description: '所有按钮的最小宽度',
+      createActionElement: () => {
+        const input = document.createElement('input')
+        input.className = 'b3-text-field fn__flex-center fn__size200'
+        input.type = 'number'
+        input.value = this.mobileGlobalButtonConfig.minWidth.toString()
+        input.style.cssText = 'font-size: 14px; padding: 8px;'
+        input.onchange = async () => {
+          const newValue = parseInt(input.value) || 32
+          this.mobileGlobalButtonConfig.minWidth = newValue
+          this.mobileButtonConfigs.forEach(btn => btn.minWidth = newValue)
+          await this.saveData('mobileGlobalButtonConfig', this.mobileGlobalButtonConfig)
+          await this.saveData('mobileButtonConfigs', this.mobileButtonConfigs)
+          showMessage('按钮宽度已应用到所有按钮', 1500, 'info')
+        }
+        return input
+      }
+    })
+
+    // 右边距
+    setting.addItem({
+      title: '右边距 (px)',
+      description: '所有按钮的右侧边距',
+      createActionElement: () => {
+        const input = document.createElement('input')
+        input.className = 'b3-text-field fn__flex-center fn__size200'
+        input.type = 'number'
+        input.value = this.mobileGlobalButtonConfig.marginRight.toString()
+        input.style.cssText = 'font-size: 14px; padding: 8px;'
+        input.onchange = async () => {
+          const newValue = parseInt(input.value) || 8
+          this.mobileGlobalButtonConfig.marginRight = newValue
+          this.mobileButtonConfigs.forEach(btn => btn.marginRight = newValue)
+          await this.saveData('mobileGlobalButtonConfig', this.mobileGlobalButtonConfig)
+          await this.saveData('mobileButtonConfigs', this.mobileButtonConfigs)
+          showMessage('右边距已应用到所有按钮', 1500, 'info')
+        }
+        return input
+      }
+    })
+
+    // 右上角提示
+    setting.addItem({
+      title: '右上角提示',
+      description: '所有按钮是否显示右上角提示',
+      createActionElement: () => {
+        const toggle = document.createElement('input')
+        toggle.type = 'checkbox'
+        toggle.className = 'b3-switch'
+        toggle.checked = this.mobileGlobalButtonConfig.showNotification
+        toggle.style.cssText = 'transform: scale(1.2);'
+        toggle.onchange = async () => {
+          this.mobileGlobalButtonConfig.showNotification = toggle.checked
+          this.mobileButtonConfigs.forEach(btn => btn.showNotification = toggle.checked)
+          await this.saveData('mobileGlobalButtonConfig', this.mobileGlobalButtonConfig)
+          await this.saveData('mobileButtonConfigs', this.mobileButtonConfigs)
+          showMessage(toggle.checked ? '已开启所有按钮提示' : '已关闭所有按钮提示', 1500, 'info')
+        }
+        return toggle
+      }
+    })
+
+    // 说明文字
+    setting.addItem({
+      title: '💡注意',
+      description: '修改后会批量应用到所有按钮，并修改每个按钮配置值，单个按钮的独立配置优先级更高'
     })
 
 
@@ -1868,7 +1856,7 @@ export default class ToolbarCustomizer extends Plugin {
   // 电脑端图标字段（支持emoji和lucide图标）
   private createDesktopIconField(label: string, value: string, onChange: (value: string) => void): HTMLElement {
     const field = document.createElement('div')
-    field.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+    field.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
     
     const labelEl = document.createElement('label')
     labelEl.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
@@ -1932,7 +1920,7 @@ export default class ToolbarCustomizer extends Plugin {
   // 电脑端普通输入字段
   private createDesktopField(label: string, value: string, placeholder: string, onChange: (value: string) => void, type: string = 'text'): HTMLElement {
     const field = document.createElement('div')
-    field.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+    field.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
     
     const labelEl = document.createElement('label')
     labelEl.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
@@ -2661,7 +2649,7 @@ export default class ToolbarCustomizer extends Plugin {
     
     // 右上角提示开关
     const notificationItem = document.createElement('div')
-    notificationItem.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+    notificationItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
     
     const notificationLabel = document.createElement('label')
     notificationLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
@@ -3233,7 +3221,7 @@ export default class ToolbarCustomizer extends Plugin {
     
     // 右上角提示开关
     const notificationItem = document.createElement('div')
-    notificationItem.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+    notificationItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
     
     const notificationLabel = document.createElement('label')
     notificationLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
@@ -3253,7 +3241,7 @@ export default class ToolbarCustomizer extends Plugin {
   // 电脑端选择框
   private createDesktopSelectField(label: string, value: string, options: Array<{value: string, label: string}>, onChange: (value: string) => void): HTMLElement {
     const field = document.createElement('div')
-    field.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+    field.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
 
     const labelEl = document.createElement('label')
     labelEl.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'

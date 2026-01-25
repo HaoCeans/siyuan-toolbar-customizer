@@ -111,6 +111,14 @@ export function updateIconDisplay(element: HTMLElement, iconValue: string): void
   if (iconValue.startsWith('icon')) {
     element.innerHTML = `<svg style="width: 16px; height: 16px;"><use xlink:href="#${iconValue}"></use></svg>`
   }
+  // 检查是否是 Lucide 图标（格式：lucide:IconName）
+  else if (iconValue.startsWith('lucide:')) {
+    const iconName = iconValue.substring(7) // 去掉 'lucide:' 前缀
+    // 在设置界面显示为文本，因为无法动态加载 lucide
+    element.textContent = `[${iconName}]`
+    element.style.fontSize = '12px'
+    element.style.fontFamily = 'monospace'
+  }
   // 否则当作 emoji 或文本
   else {
     element.textContent = iconValue

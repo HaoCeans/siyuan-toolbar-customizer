@@ -30,7 +30,8 @@ import {
   ButtonConfig,
   GlobalButtonConfig,
   DEFAULT_GLOBAL_BUTTON_CONFIG,
-  isMobileDevice
+  isMobileDevice,
+  calculateButtonOverflow
 } from './toolbarManager'
 
 // 导入 UI 组件
@@ -409,6 +410,47 @@ export default class ToolbarCustomizer extends Plugin {
       width: this.isMobile ? '100%' : '800px',
       height: this.isMobile ? '100%' : '70vh',
       confirmCallback: async () => {
+        // 同步全局按钮配置到所有按钮（在保存前）
+        // 获取当前的全局配置值
+        const globalIconSize = this.mobileGlobalButtonConfig.iconSize
+        const globalMinWidth = this.mobileGlobalButtonConfig.minWidth
+        const globalMarginRight = this.mobileGlobalButtonConfig.marginRight
+        const globalShowNotification = this.mobileGlobalButtonConfig.showNotification
+
+        // 应用到所有移动端按钮
+        this.mobileButtonConfigs.forEach(btn => {
+          // 只有当按钮使用的是默认值时才更新（避免覆盖用户自定义值）
+          // 这里简单处理：总是更新，因为用户可以在全局配置中修改
+          btn.iconSize = globalIconSize
+          btn.minWidth = globalMinWidth
+          btn.marginRight = globalMarginRight
+          // showNotification 暂时保留原有逻辑，如果未设置则使用全局值
+          if (btn.showNotification === undefined) {
+            btn.showNotification = globalShowNotification
+          }
+        })
+
+        // 如果扩展工具栏按钮启用，强制隐藏相关按钮
+        const overflowBtn = this.mobileButtonConfigs.find(btn => btn.id === 'overflow-button-mobile')
+        if (overflowBtn && overflowBtn.enabled !== false) {
+          this.mobileFeatureConfig.hideBreadcrumbIcon = true
+          this.mobileFeatureConfig.hideReadonlyButton = true
+          this.mobileFeatureConfig.hideDocMenuButton = true
+          this.mobileFeatureConfig.hideMoreButton = true
+
+          // 重新计算所有按钮的溢出层级
+          const overflowLayers = overflowBtn.layers || 1
+          console.log('[保存设置] 准备调用溢出检测，层数:', overflowLayers)
+          const updatedButtons = calculateButtonOverflow(this.mobileButtonConfigs, overflowLayers)
+          // 更新按钮的溢出层级
+          updatedButtons.forEach(btn => {
+            const original = this.mobileButtonConfigs.find(b => b.id === btn.id)
+            if (original) {
+              original.overflowLevel = btn.overflowLevel
+            }
+          })
+        }
+
         await this.saveData('mobileToolbarConfig', this.mobileConfig)
         await this.saveData('desktopButtonConfigs', this.desktopButtonConfigs)
         await this.saveData('mobileButtonConfigs', this.mobileButtonConfigs)
@@ -420,9 +462,9 @@ export default class ToolbarCustomizer extends Plugin {
           await this.saveData('hasShownWelcome', true)
           this._pendingWelcomeSave = false
         }
-        
+
         showMessage('设置已保存，正在重载...', 2000, 'info')
-        
+
         // 使用官方 API 重载界面
         await fetchSyncPost('/api/system/reloadUI', {})
       }
@@ -509,7 +551,7 @@ export default class ToolbarCustomizer extends Plugin {
 
   // 图标选择器（已迁移到 ui/iconPicker.ts）
   private showIconPicker(currentValue: string, onSelect: (icon: string) => void) {
-    showIconPickerModal(currentValue, onSelect)
+    showIconPickerModal({ currentValue, onSelect })
   }
 
   // 应用小功能

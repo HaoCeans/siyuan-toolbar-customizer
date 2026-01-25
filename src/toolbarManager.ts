@@ -50,6 +50,7 @@ export interface ButtonConfig {
   showNotification: boolean; // 是否显示右上角提示
   enabled?: boolean;         // 是否启用（默认true）
   layers?: number;           // 扩展工具栏层数（1-5），仅扩展工具栏按钮使用
+  overflowLevel?: number;    // 溢出层级（0=底部工具栏可见，1-N=第几层扩展工具栏）
 }
 
 // 全局按钮配置（用于批量设置所有按钮的默认值）
@@ -312,10 +313,161 @@ function safeSetTimeout(callback: () => void, delay: number): number {
 /**
  * 清除所有活动的定时器
  */
-function clearAllTimers(): void {
+function clearAllTimers() {
   activeTimers.forEach(timerId => clearTimeout(timerId))
   activeTimers.clear()
 }
+
+/**
+ * 获取底部工具栏的宽度
+ * 动态检测，适配不同手机屏幕
+ * @returns 工具栏宽度（px），找不到时返回 0
+ */
+export function getBottomToolbarWidth(): number {
+  // 优先查找 .protyle-breadcrumb（移动端使用）
+  let breadcrumb = document.querySelector('.protyle-breadcrumb:not(.protyle-breadcrumb__bar)') as HTMLElement
+
+  // 如果没找到，尝试查找 .protyle-breadcrumb__bar（桌面端使用）
+  if (!breadcrumb) {
+    breadcrumb = document.querySelector('.protyle-breadcrumb__bar') as HTMLElement
+  }
+
+  if (!breadcrumb) {
+    return 0
+  }
+
+  // 获取工具栏的实际宽度
+  const rect = breadcrumb.getBoundingClientRect()
+  return rect.width
+}
+
+/**
+ * 获取底部工具栏内可用宽度（排除内边距和固定元素）
+ * @returns 可用宽度（px）
+ */
+export function getToolbarAvailableWidth(): number {
+  const breadcrumb = document.querySelector('.protyle-breadcrumb:not(.protyle-breadcrumb__bar)') as HTMLElement ||
+                     document.querySelector('.protyle-breadcrumb__bar') as HTMLElement
+
+  if (!breadcrumb) {
+    return 0
+  }
+
+  const computedStyle = window.getComputedStyle(breadcrumb)
+  const rect = breadcrumb.getBoundingClientRect()
+
+  // 减去左右内边距
+  const paddingLeft = parseFloat(computedStyle.paddingLeft) || 0
+  const paddingRight = parseFloat(computedStyle.paddingRight) || 0
+
+  return rect.width - paddingLeft - paddingRight
+}
+
+/**
+ * 计算按钮的占用宽度（包括图标、边距）
+ * @param button 按钮配置
+ * @returns 占用宽度（px）
+ */
+function getButtonWidth(button: ButtonConfig): number {
+  // 底部工具栏按钮的宽度计算（用于溢出检测）
+  // CSS: min-width + padding(4px*2=8px) + margin-right
+  const paddingX = 8 // 底部工具栏按钮 padding: 4px (all sides)
+  const buttonWidth = button.minWidth + paddingX
+  const totalWidth = buttonWidth + button.marginRight
+  return totalWidth
+}
+
+/**
+ * 重新计算所有按钮的溢出层级
+ * 根据底部工具栏宽度，将按钮分配到可见区域或扩展工具栏
+ * @param buttons 所有按钮配置
+ * @param overflowToolbarLayers 扩展工具栏层数
+ * @returns 更新后的按钮配置
+ */
+export function calculateButtonOverflow(buttons: ButtonConfig[], overflowToolbarLayers: number = 1): ButtonConfig[] {
+  // 过滤出启用的移动端按钮，按排序值排序（从左到右）
+  const enabledButtons = buttons.filter(btn =>
+    btn.enabled !== false &&
+    (btn.platform === 'mobile' || btn.platform === 'both') &&
+    btn.id !== 'overflow-button-mobile'
+  ).sort((a, b) => a.sort - b.sort)
+
+  // 获取扩展工具栏按钮（⋯）
+  const overflowButton = buttons.find(btn => btn.id === 'overflow-button-mobile')
+
+  // 获取可用宽度
+  let availableWidth = getToolbarAvailableWidth()
+
+  // 如果扩展工具栏按钮已启用，需要减去它占用的宽度
+  if (overflowButton && overflowButton.enabled !== false) {
+    const overflowButtonWidth = getButtonWidth(overflowButton)
+    availableWidth -= overflowButtonWidth
+  }
+
+  if (availableWidth <= 0) {
+    return buttons.map(btn => ({ ...btn, overflowLevel: 0 }))
+  }
+
+  // 计算每个按钮的宽度
+  const buttonWidths = enabledButtons.map(btn => ({
+    button: btn,
+    width: getButtonWidth(btn)
+  }))
+
+  // 创建按钮ID到溢出层级的映射
+  const overflowMap = new Map<string, number>()
+
+  // 按层级分配按钮
+  // 0层=底部工具栏可见，1-N层=扩展工具栏
+  // 策略：从左往右填，当前层满了移到下一层
+  // buttonWidths 已按 sort 升序：sort0(右) → sort1 → sort2 → ... → sortN(左)
+
+  const maxLayers = overflowToolbarLayers || 1
+
+  // 逐个按钮计算层号：从左往右填
+  let currentWidth = 0
+  let currentLayer = 0
+
+  for (const { button, width } of buttonWidths) {
+    // 检查当前层是否已满
+    if (currentWidth + width > availableWidth) {
+      currentLayer++
+      currentWidth = 0
+      // 超过最大层数就放在最后一层
+      if (currentLayer > maxLayers) {
+        currentLayer = maxLayers
+      }
+    }
+
+    overflowMap.set(button.id, currentLayer)
+    currentWidth += width
+    console.log(`  [分配] ${button.name} (sort=${button.sort}, 宽度=${width}) → 第${currentLayer}层`)
+  }
+
+  // 更新所有按钮的 overflowLevel
+  const result = buttons.map(btn => {
+    if (btn.id === 'overflow-button-mobile') {
+      return { ...btn, overflowLevel: 0 }
+    }
+
+    const newLevel = overflowMap.get(btn.id)
+    if (newLevel !== undefined) {
+      return { ...btn, overflowLevel: newLevel }
+    }
+    return { ...btn, overflowLevel: btn.overflowLevel ?? 0 }
+  })
+
+  // 输出层级分配结果
+  console.log('[溢出检测] 层级分配结果:')
+  enabledButtons.forEach(btn => {
+    const layer = overflowMap.get(btn.id) ?? 0
+    console.log(`  - ${btn.name}: 第${layer}层${layer === 0 ? '(可见)' : '(扩展工具栏)'}`)
+  })
+
+  return result
+}
+
+// ===== 移动端工具栏调整 =====
 
 /**
  * 判断是否为移动端
@@ -341,11 +493,24 @@ function shouldShowButton(button: ButtonConfig): boolean {
   // 检查是否启用
   if (button.enabled === false) return false
 
+  // 检查平台
   if (button.platform === 'both') return true
   if (button.platform === 'mobile' && isMobile) return true
   if (button.platform === 'desktop' && !isMobile) return true
 
   return false
+}
+
+/**
+ * 检查按钮是否应该显示在主工具栏（而非扩展工具栏）
+ */
+function shouldShowInMainToolbar(button: ButtonConfig): boolean {
+  // 扩展工具栏按钮永远显示
+  if (button.id === 'overflow-button-mobile') return true
+
+  // 检查 overflowLevel：0 表示在主工具栏可见，>0 表示在扩展工具栏
+  const overflowLevel = button.overflowLevel ?? 0
+  return overflowLevel === 0
 }
 
 // ===== 移动端工具栏调整 =====
@@ -636,6 +801,9 @@ function cleanupCustomButtons() {
 }
 
 function setupEditorButtons(configs: ButtonConfig[]) {
+  // 保存按钮配置到全局变量，供扩展工具栏使用
+  (window as any).__mobileButtonConfigs = configs
+
   // 找到所有编辑器
   const editors = document.querySelectorAll('.protyle')
 
@@ -645,10 +813,10 @@ function setupEditorButtons(configs: ButtonConfig[]) {
                         editor.querySelector('.protyle-breadcrumb [data-type="exit-focus"]')
     if (!exitFocusBtn) return
 
-    // 过滤并排序按钮
+    // 过滤并排序按钮（sort升序：小→大，这样sort 0的扩展工具栏按钮在最右边）
     const buttonsToAdd = configs
-      .filter(button => shouldShowButton(button))
-      .sort((a, b) => a.sort - b.sort)
+      .filter(button => shouldShowButton(button) && shouldShowInMainToolbar(button))
+      .sort((a, b) => a.sort - b.sort) // 升序
 
     // 清理旧的插件按钮
     const oldButtons = editor.querySelectorAll('[data-custom-button]')
@@ -766,15 +934,220 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     e.stopPropagation()
     e.preventDefault()
 
+    // 移除焦点，避免按钮保持点击状态
+    ;(e.currentTarget as HTMLElement).blur()
+
+    // 扩展工具栏按钮特殊处理
+    if (config.id === 'overflow-button-mobile') {
+      showOverflowToolbar(config)
+      return
+    }
+
     // 将保存的选区传递给处理函数
     handleButtonClick(config, savedSelection, lastActiveElement)
-
-    // 清理
-    savedSelection = null
-    lastActiveElement = null
   })
 
   return button
+}
+
+/**
+ * 显示/隐藏扩展工具栏弹窗
+ * @param config 扩展工具栏按钮配置
+ */
+function showOverflowToolbar(config: ButtonConfig) {
+  // 检查是否已存在扩展工具栏（存在则关闭）
+  const existingLayers = document.querySelectorAll('.overflow-toolbar-layer')
+
+  if (existingLayers.length > 0) {
+    // 移除所有工具栏层
+    existingLayers.forEach(el => el.remove())
+    // 移除溢出按钮的焦点
+    const overflowButton = document.querySelector(`[data-custom-button="${config.id}"]`) as HTMLElement
+    if (overflowButton) {
+      overflowButton.blur()
+    }
+    showMessage('扩展工具栏已关闭', 1000, 'info')
+    return
+  }
+
+  // 获取层数配置（1-5层）
+  const layers = config.layers || 1
+
+  // 工具栏高度和间距
+  const toolbarHeight = 40
+  const toolbarSpacing = 4
+  const bottomOffset = 60  // 底部工具栏上方距离
+
+  // 获取所有按钮配置
+  const allButtons = (window as any).__mobileButtonConfigs || []
+
+  // 过滤出启用的按钮（排除扩展工具栏按钮本身）
+  const enabledButtons = allButtons.filter((btn: ButtonConfig) =>
+    btn.enabled !== false &&
+    (btn.platform === 'mobile' || btn.platform === 'both') &&
+    btn.id !== 'overflow-button-mobile'
+  )
+
+  // 添加动画样式
+  let animationStyle = document.getElementById('overflow-toolbar-animation')
+  if (!animationStyle) {
+    animationStyle = document.createElement('style')
+    animationStyle.id = 'overflow-toolbar-animation'
+    animationStyle.textContent = `
+      @keyframes slideUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .overflow-toolbar-layer {
+        animation: slideUp 0.2s ease-out;
+      }
+    `
+    document.head.appendChild(animationStyle)
+  }
+
+  // 根据层数创建多个工具栏，并在每层显示对应的按钮
+  for (let i = 0; i < layers; i++) {
+    const layerNum = i + 1
+
+    // 找出属于当前层的按钮，按 sort 降序排序（大→小，左→右，即视觉上从右到左）
+    const layerButtons = enabledButtons
+      .filter((btn: ButtonConfig) => (btn.overflowLevel ?? 0) === layerNum)
+      .sort((a, b) => b.sort - a.sort) // 降序
+
+    // 空层不显示
+    if (layerButtons.length === 0) {
+      continue
+    }
+
+    const toolbar = document.createElement('div')
+    toolbar.className = 'overflow-toolbar-layer'
+    toolbar.id = `overflow-toolbar-layer-${layerNum}`
+
+    // 计算位置：从下往上堆叠
+    const bottomPos = bottomOffset + (i * (toolbarHeight + toolbarSpacing))
+
+    // 获取第一个按钮的 marginRight 作为 gap 值（所有按钮的 marginRight 应该相同）
+    const buttonGap = layerButtons[0]?.marginRight || 8
+
+    toolbar.style.cssText = `
+      position: fixed;
+      bottom: ${bottomPos}px;
+      left: 10px;
+      right: 10px;
+      height: ${toolbarHeight}px;
+      background: var(--b3-theme-surface);
+      border: 1px solid var(--b3-theme-primary);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0 12px;
+      gap: ${buttonGap}px;
+      z-index: ${1000 + i};
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    `
+
+    // 添加该层的所有按钮
+    layerButtons.forEach((btn: ButtonConfig) => {
+      const layerBtn = document.createElement('button')
+      layerBtn.className = 'b3-button b3-button--outline'
+      layerBtn.style.minWidth = `${btn.minWidth}px`
+      layerBtn.style.height = `32px`
+      layerBtn.style.padding = `0 8px`
+      layerBtn.style.marginRight = `${btn.marginRight}px`
+      layerBtn.style.fontSize = `${btn.iconSize}px`
+      layerBtn.style.display = `flex`
+      layerBtn.style.alignItems = `center`
+      layerBtn.style.justifyContent = `center`
+      layerBtn.style.gap = `4px`
+      layerBtn.style.border = `1px solid var(--b3-theme-border)`
+      layerBtn.style.borderRadius = `4px`
+      layerBtn.style.background = `var(--b3-theme-background)`
+      layerBtn.style.cursor = `pointer`
+
+      // 清空按钮内容
+      layerBtn.innerHTML = ''
+
+      // 根据图标类型渲染
+      if (btn.icon.startsWith('icon')) {
+        // 思源内置图标 - 检查图标是否存在
+        const iconExists = document.querySelector(`#${btn.icon}`)
+        if (iconExists) {
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+          svg.setAttribute('width', `${btn.iconSize}`)
+          svg.setAttribute('height', `${btn.iconSize}`)
+          svg.style.cssText = 'display: block; flex-shrink: 0;'
+          const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
+          use.setAttribute('href', `#${btn.icon}`)
+          svg.appendChild(use)
+          layerBtn.appendChild(svg)
+        } else {
+          // 图标不存在，显示名称缩写
+          layerBtn.textContent = btn.name.substring(0, 2)
+        }
+      } else if (btn.icon.startsWith('lucide:')) {
+        // Lucide 图标
+        const iconName = btn.icon.substring(7)
+        try {
+          const lucideIcons = require('lucide')
+          const IconComponent = lucideIcons[iconName]
+          if (IconComponent) {
+            const svgString = IconComponent.toSvg({
+              width: btn.iconSize,
+              height: btn.iconSize
+            })
+            layerBtn.innerHTML = svgString
+          } else {
+            layerBtn.textContent = btn.icon
+          }
+        } catch (e) {
+          layerBtn.textContent = btn.icon
+        }
+      } else {
+        // Emoji 或文本图标
+        const iconSpan = document.createElement('span')
+        iconSpan.style.fontSize = `${btn.iconSize}px`
+        iconSpan.textContent = btn.icon
+        layerBtn.appendChild(iconSpan)
+      }
+
+      // 设置按钮提示（鼠标悬停显示名称）
+      layerBtn.title = btn.name
+
+      // 点击按钮执行功能
+      layerBtn.onclick = (e) => {
+        e.stopPropagation()
+        handleButtonClick(btn)
+        // 关闭扩展工具栏
+        document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove())
+      }
+
+      toolbar.appendChild(layerBtn)
+    })
+
+    document.body.appendChild(toolbar)
+  }
+
+  showMessage(`扩展工具栏已弹出（${layers}层）`, 1000, 'info')
+
+  // 点击外部关闭
+  const closeOnClickOutside = (e: MouseEvent) => {
+    const target = e.target as HTMLElement
+    const overflowButton = document.querySelector(`[data-custom-button="${config.id}"]`) as HTMLElement
+    const hasToolbar = document.querySelector('.overflow-toolbar-layer')
+
+    if (hasToolbar && !target.closest('.overflow-toolbar-layer') && (!overflowButton || !overflowButton.contains(target))) {
+      document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove())
+      // 移除溢出按钮的焦点
+      if (overflowButton) {
+        overflowButton.blur()
+      }
+      document.removeEventListener('click', closeOnClickOutside)
+    }
+  }
+  setTimeout(() => {
+    document.addEventListener('click', closeOnClickOutside)
+  }, 100)
 }
 
 function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
@@ -789,8 +1162,8 @@ function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = 
     // 执行思源内置功能
     executeBuiltinFunction(config)
   } else if (config.type === 'template') {
-    // 插入模板
-    insertTemplate(config)
+    // 插入模板，传递保存的选区和焦点元素
+    insertTemplate(config, savedSelection, lastActiveElement)
   } else if (config.type === 'click-sequence') {
     // 执行点击序列
     executeClickSequence(config)
@@ -865,14 +1238,15 @@ function executeBuiltinFunction(config: ButtonConfig) {
   showMessage(`未找到功能: ${config.builtinId}`, 3000, 'error')
 }
 
-function insertTemplate(config: ButtonConfig) {
+function insertTemplate(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
   if (!config.template) {
     showMessage(`按钮"${config.name}"未配置模板内容`, 3000, 'error')
     return
   }
-  
-  // 获取当前焦点所在的编辑器
-  const activeEditor = document.activeElement?.closest('.protyle')
+
+  // 优先使用保存的焦点元素，否则使用当前焦点元素
+  const targetElement = lastActiveElement || document.activeElement
+  const activeEditor = targetElement?.closest('.protyle')
   if (!activeEditor) {
     showMessage('请先聚焦到编辑器', 3000, 'info')
     return

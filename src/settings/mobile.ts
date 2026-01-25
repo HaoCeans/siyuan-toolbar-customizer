@@ -8,6 +8,7 @@ import type { GlobalButtonConfig } from '../toolbarManager'
 import type { ButtonConfig } from '../toolbarManager'
 import { showMessage } from 'siyuan'
 import { createMobileButtonItem, type MobileButtonContext } from '../ui/buttonItems/mobile'
+import { calculateButtonOverflow, getToolbarAvailableWidth, getButtonWidth } from '../toolbarManager'
 
 /**
  * 手机端工具栏配置接口
@@ -409,15 +410,34 @@ export function createMobileSettingLayout(
           name: '新按钮',
           type: 'builtin',
           builtinId: 'menuSearch',
-          icon: 'iconHeart',
+          icon: '♥️',
           iconSize: 18,
           minWidth: 32,
           marginRight: 8,
           sort: context.buttonConfigs.length + 1,
           platform: 'both',
-          showNotification: true
+          showNotification: true,
+          overflowLevel: 0 // 初始为可见，稍后重新计算
         }
         context.buttonConfigs.push(newButton)
+
+        // 获取扩展工具栏按钮的层数配置
+        const overflowBtn = context.mobileButtonConfigs.find(btn => btn.id === 'overflow-button-mobile')
+        const overflowLayers = (overflowBtn?.enabled !== false) ? (overflowBtn.layers || 1) : 0
+
+        // 如果启用了扩展工具栏，重新计算溢出层级
+        if (overflowLayers > 0) {
+          console.log('[添加按钮] 准备调用溢出检测，层数:', overflowLayers)
+          const updated = calculateButtonOverflow(context.buttonConfigs, overflowLayers)
+          // 更新所有按钮的溢出层级
+          updated.forEach(btn => {
+            const original = context.buttonConfigs.find(b => b.id === btn.id)
+            if (original) {
+              original.overflowLevel = btn.overflowLevel
+            }
+          })
+        }
+
         lastAddedButtonId = newButton.id
         renderList()
       }
@@ -854,6 +874,12 @@ export function createMobileSettingLayout(
   // === 小功能选择 ===
   createGroupTitle('⚙️', '小功能选择')
 
+  // 检查扩展工具栏按钮是否启用
+  const isOverflowButtonEnabled = () => {
+    const overflowBtn = context.mobileButtonConfigs.find(btn => btn.id === 'overflow-button-mobile')
+    return overflowBtn?.enabled !== false
+  }
+
 
   setting.addItem({
     title: '面包屑图标隐藏',
@@ -862,8 +888,13 @@ export function createMobileSettingLayout(
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
       toggle.className = 'b3-switch'
-      toggle.checked = context.mobileFeatureConfig.hideBreadcrumbIcon
+      const overflowEnabled = isOverflowButtonEnabled()
+      toggle.checked = overflowEnabled ? true : context.mobileFeatureConfig.hideBreadcrumbIcon
       toggle.style.cssText = 'transform: scale(1.2);'
+      if (overflowEnabled) {
+        toggle.disabled = true
+        toggle.style.opacity = '0.5'
+      }
       toggle.onchange = async () => {
         context.mobileFeatureConfig.hideBreadcrumbIcon = toggle.checked
         await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
@@ -880,8 +911,13 @@ export function createMobileSettingLayout(
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
       toggle.className = 'b3-switch'
-      toggle.checked = context.mobileFeatureConfig.hideReadonlyButton
+      const overflowEnabled = isOverflowButtonEnabled()
+      toggle.checked = overflowEnabled ? true : context.mobileFeatureConfig.hideReadonlyButton
       toggle.style.cssText = 'transform: scale(1.2);'
+      if (overflowEnabled) {
+        toggle.disabled = true
+        toggle.style.opacity = '0.5'
+      }
       toggle.onchange = async () => {
         context.mobileFeatureConfig.hideReadonlyButton = toggle.checked
         await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
@@ -898,8 +934,13 @@ export function createMobileSettingLayout(
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
       toggle.className = 'b3-switch'
-      toggle.checked = context.mobileFeatureConfig.hideDocMenuButton
+      const overflowEnabled = isOverflowButtonEnabled()
+      toggle.checked = overflowEnabled ? true : context.mobileFeatureConfig.hideDocMenuButton
       toggle.style.cssText = 'transform: scale(1.2);'
+      if (overflowEnabled) {
+        toggle.disabled = true
+        toggle.style.opacity = '0.5'
+      }
       toggle.onchange = async () => {
         context.mobileFeatureConfig.hideDocMenuButton = toggle.checked
         await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
@@ -916,8 +957,13 @@ export function createMobileSettingLayout(
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
       toggle.className = 'b3-switch'
-      toggle.checked = context.mobileFeatureConfig.hideMoreButton
+      const overflowEnabled = isOverflowButtonEnabled()
+      toggle.checked = overflowEnabled ? true : context.mobileFeatureConfig.hideMoreButton
       toggle.style.cssText = 'transform: scale(1.2);'
+      if (overflowEnabled) {
+        toggle.disabled = true
+        toggle.style.opacity = '0.5'
+      }
       toggle.onchange = async () => {
         context.mobileFeatureConfig.hideMoreButton = toggle.checked
         await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)

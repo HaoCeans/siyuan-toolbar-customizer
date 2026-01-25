@@ -366,10 +366,25 @@ export function createMobileButtonItem(
     'author-tool': '⑥作者自用工具'
   }
   const typeLabel = typeLabels[button.type] || button.type
+
+  // 获取溢出层级信息
+  const overflowLevel = button.overflowLevel ?? 0
+  const overflowBtn = context.mobileButtonConfigs.find(btn => btn.id === 'overflow-button-mobile')
+  const isOverflowEnabled = overflowBtn?.enabled !== false
+  const overflowLayers = (overflowBtn?.layers || 1)
+
+  // 只有在扩展工具栏启用时才显示层级信息
+  let levelLabel = ''
+  if (isOverflowEnabled && overflowLevel > 0) {
+    levelLabel = `<span style="color: var(--b3-theme-primary); font-weight: 600;"> · 第${overflowLevel}层</span>`
+  } else if (isOverflowEnabled && overflowLevel === 0) {
+    levelLabel = `<span style="color: #22c55e; font-weight: 600;"> · 可见</span>`
+  }
+
   infoDiv.innerHTML = `
     <div style="font-weight: 500; font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 4px;">${button.name}</div>
     <div style="font-size: 11px; color: var(--b3-theme-on-surface-light);">
-      ${typeLabel}
+      ${typeLabel}${levelLabel}
     </div>
   `
 

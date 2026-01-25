@@ -17,6 +17,7 @@ export interface MobileToolbarConfig {
   toolbarHeight: string;      // 工具栏高度
   toolbarZIndex: number;      // 工具栏层级
   useThemeColor: boolean;     // 是否使用主题颜色
+  topToolbarPaddingLeft: string; // 顶部工具栏左边距
 }
 
 export interface ButtonConfig {
@@ -80,6 +81,7 @@ export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
   toolbarHeight: '40px',      // 工具栏高度
   toolbarZIndex: 5,
   useThemeColor: true,        // 颜色跟随主题
+  topToolbarPaddingLeft: '10px', // 顶部工具栏左边距
 }
 
 export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = []
@@ -556,12 +558,49 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
       protyle.style.setProperty('padding-bottom', '0', 'important')
     })
 
+    // ===== 应用顶部工具栏样式 =====
+    let topToolbarStyle = document.getElementById('top-toolbar-custom-style')
+    if (!topToolbarStyle) {
+      topToolbarStyle = document.createElement('style')
+      topToolbarStyle.id = 'top-toolbar-custom-style'
+      document.head.appendChild(topToolbarStyle)
+    }
+    topToolbarStyle.textContent = `
+      /* 顶部工具栏样式 - 使用属性选择器确保不影响底部工具栏 */
+      body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) {
+        padding-left: 0 !important;
+      }
+      /* 隐藏空白间距 */
+      body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__space {
+        display: none !important;
+      }
+      /* 隐藏原生按钮 */
+      body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="mobile-menu"],
+      body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="exit-focus"] {
+        display: none !important;
+      }
+      /* 最左边的按钮左边距为0 */
+      body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .first-custom-button {
+        margin-left: 0 !important;
+      }
+    `
+
+    // 标记顶部工具栏模式（用于扩展工具栏判断方向）
+    document.body.classList.add('siyuan-toolbar-top-mode')
+
     return
   }
 
-  // 启用底部工具栏时，添加 body 标记类
+  // 启用底部工具栏时，添加 body 标记类，移除顶部模式标记
   document.body.classList.add('siyuan-toolbar-customizer-enabled')
-  
+  document.body.classList.remove('siyuan-toolbar-top-mode')
+
+  // 移除顶部工具栏样式
+  const topToolbarStyle = document.getElementById('top-toolbar-custom-style')
+  if (topToolbarStyle) {
+    topToolbarStyle.remove()
+  }
+
   const setupToolbar = () => {
     // 优先查找 .protyle-breadcrumb（移动端使用）
     let breadcrumb = document.querySelector('.protyle-breadcrumb:not(.protyle-breadcrumb__bar)')
@@ -808,24 +847,28 @@ function setupEditorButtons(configs: ButtonConfig[]) {
   const editors = document.querySelectorAll('.protyle')
 
   editors.forEach(editor => {
-    // 找到退出聚焦按钮
-    const exitFocusBtn = editor.querySelector('.protyle-breadcrumb__bar [data-type="exit-focus"]') ||
-                        editor.querySelector('.protyle-breadcrumb [data-type="exit-focus"]')
-    if (!exitFocusBtn) return
+    // 找到锁定编辑按钮
+    const readonlyBtn = editor.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]') ||
+                        editor.querySelector('.protyle-breadcrumb [data-type="readonly"]')
+    if (!readonlyBtn) return
 
-    // 过滤并排序按钮（sort升序：小→大，这样sort 0的扩展工具栏按钮在最右边）
+    // 过滤并排序按钮（sort降序：大→小，这样sort 0在最右边，紧挨锁定按钮）
     const buttonsToAdd = configs
       .filter(button => shouldShowButton(button) && shouldShowInMainToolbar(button))
-      .sort((a, b) => a.sort - b.sort) // 升序
+      .sort((a, b) => b.sort - a.sort) // 降序
 
     // 清理旧的插件按钮
     const oldButtons = editor.querySelectorAll('[data-custom-button]')
     oldButtons.forEach(btn => btn.remove())
 
-    // 添加新按钮
-    buttonsToAdd.forEach(buttonConfig => {
+    // 添加新按钮（插入到锁定按钮的左边）
+    buttonsToAdd.forEach((buttonConfig, index) => {
       const button = createButtonElement(buttonConfig)
-      exitFocusBtn.insertAdjacentElement('afterend', button)
+      // 第一个按钮（最左边）添加特殊类，用于移除左边距
+      if (index === 0) {
+        button.classList.add('first-custom-button')
+      }
+      readonlyBtn.insertAdjacentElement('beforebegin', button)
     })
   })
 }
@@ -970,13 +1013,19 @@ function showOverflowToolbar(config: ButtonConfig) {
     return
   }
 
+  // 检测工具栏位置：通过 body 类名判断是否启用了底部工具栏
+  const isBottomToolbar = document.body.classList.contains('siyuan-toolbar-customizer-enabled')
+
   // 获取层数配置（1-5层）
   const layers = config.layers || 1
 
   // 工具栏高度和间距
   const toolbarHeight = 40
   const toolbarSpacing = 4
-  const bottomOffset = 60  // 底部工具栏上方距离
+
+  // 顶部工具栏和底部工具栏的不同偏移
+  const topOffset = 100      // 顶部工具栏下方距离
+  const bottomOffset = 60   // 底部工具栏上方距离
 
   // 获取所有按钮配置
   const allButtons = (window as any).__mobileButtonConfigs || []
@@ -988,6 +1037,9 @@ function showOverflowToolbar(config: ButtonConfig) {
     btn.id !== 'overflow-button-mobile'
   )
 
+  // 根据工具栏位置选择动画方向
+  const animationName = isBottomToolbar ? 'slideUp' : 'slideDown'
+
   // 添加动画样式
   let animationStyle = document.getElementById('overflow-toolbar-animation')
   if (!animationStyle) {
@@ -998,11 +1050,30 @@ function showOverflowToolbar(config: ButtonConfig) {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }
       }
+      @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
       .overflow-toolbar-layer {
-        animation: slideUp 0.2s ease-out;
+        animation: ${animationName} 0.2s ease-out;
       }
     `
     document.head.appendChild(animationStyle)
+  } else {
+    // 更新动画方向
+    animationStyle.textContent = `
+      @keyframes slideUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .overflow-toolbar-layer {
+        animation: ${animationName} 0.2s ease-out;
+      }
+    `
   }
 
   // 根据层数创建多个工具栏，并在每层显示对应的按钮
@@ -1023,15 +1094,29 @@ function showOverflowToolbar(config: ButtonConfig) {
     toolbar.className = 'overflow-toolbar-layer'
     toolbar.id = `overflow-toolbar-layer-${layerNum}`
 
-    // 计算位置：从下往上堆叠
-    const bottomPos = bottomOffset + (i * (toolbarHeight + toolbarSpacing))
-
     // 获取第一个按钮的 marginRight 作为 gap 值（所有按钮的 marginRight 应该相同）
     const buttonGap = layerButtons[0]?.marginRight || 8
 
+    // 根据工具栏位置计算不同的 CSS
+    let positionCss = ''
+    if (isBottomToolbar) {
+      // 底部工具栏：从下往上堆叠
+      const bottomPos = bottomOffset + (i * (toolbarHeight + toolbarSpacing))
+      positionCss = `
+        position: fixed;
+        bottom: ${bottomPos}px;
+      `
+    } else {
+      // 顶部工具栏：从上往下堆叠
+      const topPos = topOffset + (i * (toolbarHeight + toolbarSpacing))
+      positionCss = `
+        position: fixed;
+        top: ${topPos}px;
+      `
+    }
+
     toolbar.style.cssText = `
-      position: fixed;
-      bottom: ${bottomPos}px;
+      ${positionCss}
       left: 10px;
       right: 10px;
       height: ${toolbarHeight}px;
@@ -2268,6 +2353,13 @@ function showDatabasePopup(
 export function cleanup() {
   // 移除 body 标记类
   document.body.classList.remove('siyuan-toolbar-customizer-enabled')
+  document.body.classList.remove('siyuan-toolbar-top-mode')
+
+  // 移除顶部工具栏样式
+  const topToolbarStyle = document.getElementById('top-toolbar-custom-style')
+  if (topToolbarStyle) {
+    topToolbarStyle.remove()
+  }
 
   // 清理所有定时器
   clearAllTimers()

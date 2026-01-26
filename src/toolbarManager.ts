@@ -1842,11 +1842,6 @@ async function executeClickSequence(config: ButtonConfig) {
     // 步骤之间稍微延迟，让界面有时间响应
     await delay(200)
   }
-
-  // 执行完成提示（受 showNotification 控制）
-  if (config.showNotification !== false) {
-    showMessage(`${config.name} 执行完成`, 1500, 'info')
-  }
 }
 
 /**
@@ -2238,8 +2233,6 @@ function executeAuthorTool(config: ButtonConfig) {
       showMessage(`执行脚本失败: ${err}`, 3000, 'error')
     }
   }
-
-  showMessage(`执行作者工具: ${config.name}`, 1500, 'info')
 }
 
 /**
@@ -3200,7 +3193,6 @@ function executeSiyuanCommand(command: string, protyle?: any) {
       console.log('已触发键盘事件:', keyEvent)
 
       // 快捷键触发成功，直接返回
-      showMessage(`执行: ${config.shortcutKey}`, 1500, 'info')
       return
     }
   }
@@ -3536,10 +3528,6 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
                 // 触发键盘事件
                 const eventDown = new KeyboardEvent('keydown', keyEvent)
                 editArea.dispatchEvent(eventDown)
-
-                if (config.showNotification !== false) {
-                  showMessage(`执行: ${config.shortcutKey}`, 1500, 'info')
-                }
               }, 50)
               return
             }
@@ -3550,9 +3538,6 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
           window.dispatchEvent(eventDown)
 
           console.log('已触发键盘事件:', hotkeyToTrigger, '目标: 全局')
-          if (config.showNotification !== false) {
-            showMessage(`执行: ${config.shortcutKey}`, 1500, 'info')
-          }
           return
         }
       }
@@ -3568,9 +3553,6 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
           const eventDown = new KeyboardEvent('keydown', keyEvent)
           window.dispatchEvent(eventDown)
           console.log('已触发键盘事件:', siyuanHotkey)
-          if (config.showNotification !== false) {
-            showMessage(`执行: ${config.shortcutKey}`, 1500, 'info')
-          }
         } catch (e) {
           // 思源内部处理此快捷键时出错（可能不是有效快捷键）
           console.warn('思源处理此快捷键时出错:', e)

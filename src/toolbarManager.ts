@@ -1356,9 +1356,6 @@ function showOverflowToolbar(config: ButtonConfig) {
     toolbar.className = 'overflow-toolbar-layer'
     toolbar.id = `overflow-toolbar-layer-${layerNum}`
 
-    // 获取第一个按钮的 marginRight 作为 gap 值（所有按钮的 marginRight 应该相同）
-    const buttonGap = layerButtons[0]?.marginRight || 8
-
     // 根据工具栏位置计算不同的 CSS
     let positionCss = ''
     if (isBottomToolbar) {
@@ -1390,7 +1387,6 @@ function showOverflowToolbar(config: ButtonConfig) {
       align-items: center;
       justify-content: flex-end;
       padding: 0 12px;
-      gap: ${buttonGap}px;
       z-index: ${1000 + i};
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     `

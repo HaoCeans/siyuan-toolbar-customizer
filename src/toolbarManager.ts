@@ -1104,6 +1104,9 @@ function getButtonBaseStyle(config: ButtonConfig): string {
     cursor: pointer !important;
     user-select: none !important;
 
+    /* 移除聚焦轮廓 */
+    outline: none !important;
+
     /* 过渡效果 */
     transition: all 0.2s ease !important;
 
@@ -1515,6 +1518,9 @@ function showOverflowToolbar(config: ButtonConfig) {
       // 点击按钮执行功能
       layerBtn.addEventListener('click', (e) => {
         e.stopPropagation()
+
+        // 移除按钮焦点，防止显示聚焦轮廓
+        layerBtn.blur()
 
         // 关闭扩展工具栏
         document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove())

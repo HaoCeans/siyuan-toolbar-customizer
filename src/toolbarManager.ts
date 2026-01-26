@@ -1104,8 +1104,9 @@ function getButtonBaseStyle(config: ButtonConfig): string {
     cursor: pointer !important;
     user-select: none !important;
 
-    /* 移除聚焦轮廓 */
+    /* 移除聚焦轮廓和 active 状态 */
     outline: none !important;
+    box-shadow: none !important;
 
     /* 过渡效果 */
     transition: all 0.2s ease !important;
@@ -1232,7 +1233,7 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
   button.addEventListener('click', (e) => {
     e.stopPropagation()
 
-    // 扩展工具栏按钮特殊处理
+    // 扩展工具栏按钮特殊处理（toggle 扩展工具栏）
     if (config.id === 'overflow-button-mobile') {
       // 立即恢复焦点，防止输入法关闭
       if (lastActiveElement && lastActiveElement !== document.activeElement) {
@@ -1240,6 +1241,18 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
       }
       showOverflowToolbar(config)
       return
+    }
+
+    // 如果扩展工具栏已打开，先关闭它（其他按钮点击会关闭扩展工具栏）
+    const existingLayers = document.querySelectorAll('.overflow-toolbar-layer')
+    if (existingLayers.length > 0) {
+      existingLayers.forEach(el => el.remove())
+      // 移除扩展工具栏按钮的激活状态
+      const overflowButton = document.querySelector('[data-custom-button="overflow-button-mobile"]') as HTMLElement
+      if (overflowButton) {
+        overflowButton.classList.remove('overflow-active')
+        overflowButton.style.backgroundColor = 'transparent'
+      }
     }
 
     // 将保存的选区传递给处理函数
@@ -1266,19 +1279,29 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
  * @param config 扩展工具栏按钮配置
  */
 function showOverflowToolbar(config: ButtonConfig) {
+  // 获取扩展工具栏按钮
+  const overflowButton = document.querySelector(`[data-custom-button="${config.id}"]`) as HTMLElement
+
   // 检查是否已存在扩展工具栏（存在则关闭）
   const existingLayers = document.querySelectorAll('.overflow-toolbar-layer')
 
   if (existingLayers.length > 0) {
     // 移除所有工具栏层
     existingLayers.forEach(el => el.remove())
-    // 移除溢出按钮的焦点
-    const overflowButton = document.querySelector(`[data-custom-button="${config.id}"]`) as HTMLElement
+    // 移除按钮的激活状态
     if (overflowButton) {
+      overflowButton.classList.remove('overflow-active')
+      overflowButton.style.backgroundColor = 'transparent'
       overflowButton.blur()
     }
     showMessage('扩展工具栏已关闭', 1000, 'info')
     return
+  }
+
+  // 添加按钮的激活状态
+  if (overflowButton) {
+    overflowButton.classList.add('overflow-active')
+    overflowButton.style.backgroundColor = 'var(--b3-list-hover)'
   }
 
   // 检测工具栏位置：通过 body 类名判断是否启用了底部工具栏
@@ -1308,7 +1331,7 @@ function showOverflowToolbar(config: ButtonConfig) {
   // 根据工具栏位置选择动画方向
   const animationName = isBottomToolbar ? 'slideUp' : 'slideDown'
 
-  // 添加动画样式
+  // 添加动画样式和按钮状态样式
   let animationStyle = document.getElementById('overflow-toolbar-animation')
   if (!animationStyle) {
     animationStyle = document.createElement('style')
@@ -1325,6 +1348,20 @@ function showOverflowToolbar(config: ButtonConfig) {
       .overflow-toolbar-layer {
         animation: ${animationName} 0.2s ease-out;
       }
+      /* 移除自定义按钮的 focus 状态样式（保留 active 状态以显示点击效果） */
+      [data-custom-button]:focus {
+        background-color: transparent !important;
+        box-shadow: none !important;
+        outline: none !important;
+        transform: none !important;
+      }
+      /* 移除扩展工具栏按钮的 focus 状态样式 */
+      .overflow-toolbar-layer button:focus {
+        background-color: transparent !important;
+        box-shadow: none !important;
+        outline: none !important;
+        transform: none !important;
+      }
     `
     document.head.appendChild(animationStyle)
   } else {
@@ -1340,6 +1377,20 @@ function showOverflowToolbar(config: ButtonConfig) {
       }
       .overflow-toolbar-layer {
         animation: ${animationName} 0.2s ease-out;
+      }
+      /* 移除自定义按钮的 focus 状态样式（保留 active 状态以显示点击效果） */
+      [data-custom-button]:focus {
+        background-color: transparent !important;
+        box-shadow: none !important;
+        outline: none !important;
+        transform: none !important;
+      }
+      /* 移除扩展工具栏按钮的 focus 状态样式 */
+      .overflow-toolbar-layer button:focus {
+        background-color: transparent !important;
+        box-shadow: none !important;
+        outline: none !important;
+        transform: none !important;
       }
     `
   }
@@ -1521,9 +1572,7 @@ function showOverflowToolbar(config: ButtonConfig) {
       // 点击按钮执行功能
       layerBtn.addEventListener('click', (e) => {
         e.stopPropagation()
-
-        // 移除按钮焦点，防止显示聚焦轮廓
-        layerBtn.blur()
+        e.preventDefault()  // 阻止默认行为，包括按钮获得焦点
 
         // 关闭扩展工具栏
         document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove())
@@ -1538,6 +1587,9 @@ function showOverflowToolbar(config: ButtonConfig) {
             ;(lastActiveElement as HTMLElement).focus()
           }
         }
+
+        // 确保按钮没有焦点（使用 setTimeout 确保在其他操作之后）
+        setTimeout(() => layerBtn.blur(), 0)
       })
 
       toolbar.appendChild(layerBtn)

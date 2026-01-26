@@ -1252,6 +1252,9 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
         ;(lastActiveElement as HTMLElement).focus()
       }
     }
+
+    // 点击完成后立即移除按钮焦点
+    button.blur()
   })
 
   return button

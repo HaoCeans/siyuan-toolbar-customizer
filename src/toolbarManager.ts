@@ -998,6 +998,10 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
 
     // 扩展工具栏按钮特殊处理
     if (config.id === 'overflow-button-mobile') {
+      // 立即恢复焦点，防止输入法关闭
+      if (lastActiveElement && lastActiveElement !== document.activeElement) {
+        ;(lastActiveElement as HTMLElement).focus()
+      }
       showOverflowToolbar(config)
       return
     }
@@ -1005,9 +1009,12 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     // 将保存的选区传递给处理函数
     handleButtonClick(config, savedSelection, lastActiveElement)
 
-    // 如果之前保存的是输入框，恢复焦点
-    if (lastActiveElement && lastActiveElement !== document.activeElement) {
-      ;(lastActiveElement as HTMLElement).focus()
+    // builtin 类型的按钮不恢复焦点，让输入法自然关闭
+    // 其他类型恢复焦点
+    if (config.type !== 'builtin') {
+      if (lastActiveElement && lastActiveElement !== document.activeElement) {
+        ;(lastActiveElement as HTMLElement).focus()
+      }
     }
   })
 
@@ -1123,10 +1130,11 @@ function showOverflowToolbar(config: ButtonConfig) {
     let positionCss = ''
     if (isBottomToolbar) {
       // 底部工具栏：从下往上堆叠
+      // 使用 --mobile-toolbar-offset 确保输入法打开时不会与底部工具栏重叠
       const bottomPos = bottomOffset + (i * (toolbarHeight + toolbarSpacing))
       positionCss = `
         position: fixed;
-        bottom: ${bottomPos}px;
+        bottom: calc(var(--mobile-toolbar-offset, 0px) + ${bottomPos}px);
       `
     } else {
       // 顶部工具栏：从上往下堆叠
@@ -1277,9 +1285,12 @@ function showOverflowToolbar(config: ButtonConfig) {
         // 将保存的选区传递给处理函数
         handleButtonClick(btn, savedSelection, lastActiveElement)
 
-        // 如果之前保存的是输入框，恢复焦点
-        if (lastActiveElement && lastActiveElement !== document.activeElement) {
-          ;(lastActiveElement as HTMLElement).focus()
+        // builtin 类型的按钮不恢复焦点，让输入法自然关闭
+        // 其他类型恢复焦点，保持输入法打开
+        if (btn.type !== 'builtin') {
+          if (lastActiveElement && lastActiveElement !== document.activeElement) {
+            ;(lastActiveElement as HTMLElement).focus()
+          }
         }
       })
 

@@ -1096,10 +1096,10 @@ function getButtonBaseStyle(config: ButtonConfig): string {
     margin-right: ${config.marginRight}px !important;
     padding: 0 8px !important;
 
-    /* 外观样式 */
-    border: 1px solid var(--b3-theme-border) !important;
+    /* 外观样式：与思源原生按钮一致（无边框、透明背景） */
+    border: none !important;
     border-radius: 4px !important;
-    background-color: var(--b3-theme-background) !important;
+    background-color: transparent !important;
     color: var(--b3-theme-on-surface) !important;
     cursor: pointer !important;
     user-select: none !important;
@@ -1177,13 +1177,13 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     button.appendChild(iconSpan)
   }
 
-  // 添加 hover 效果
+  // 添加 hover 效果（与思源原生按钮一致）
   button.addEventListener('mouseenter', () => {
     button.style.backgroundColor = 'var(--b3-list-hover) !important'
     button.style.color = 'var(--b3-theme-on-background) !important'
   })
   button.addEventListener('mouseleave', () => {
-    button.style.backgroundColor = 'var(--b3-theme-background) !important'
+    button.style.backgroundColor = 'transparent !important'
     button.style.color = 'var(--b3-theme-on-surface) !important'
   })
   button.addEventListener('touchstart', () => {
@@ -1191,7 +1191,7 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     button.style.color = 'var(--b3-theme-on-background) !important'
   }, { passive: true })
   button.addEventListener('touchend', () => {
-    button.style.backgroundColor = 'var(--b3-theme-background) !important'
+    button.style.backgroundColor = 'transparent !important'
     button.style.color = 'var(--b3-theme-on-surface) !important'
   })
 
@@ -1464,13 +1464,13 @@ function showOverflowToolbar(config: ButtonConfig) {
         layerBtn.appendChild(iconSpan)
       }
 
-      // 添加 hover 效果（与主工具栏保持一致）
+      // 添加 hover 效果（与思源原生按钮一致）
       layerBtn.addEventListener('mouseenter', () => {
         layerBtn.style.backgroundColor = 'var(--b3-list-hover) !important'
         layerBtn.style.color = 'var(--b3-theme-on-background) !important'
       })
       layerBtn.addEventListener('mouseleave', () => {
-        layerBtn.style.backgroundColor = 'var(--b3-theme-background) !important'
+        layerBtn.style.backgroundColor = 'transparent !important'
         layerBtn.style.color = 'var(--b3-theme-on-surface) !important'
       })
       layerBtn.addEventListener('touchstart', () => {
@@ -1478,7 +1478,7 @@ function showOverflowToolbar(config: ButtonConfig) {
         layerBtn.style.color = 'var(--b3-theme-on-background) !important'
       }, { passive: true })
       layerBtn.addEventListener('touchend', () => {
-        layerBtn.style.backgroundColor = 'var(--b3-theme-background) !important'
+        layerBtn.style.backgroundColor = 'transparent !important'
         layerBtn.style.color = 'var(--b3-theme-on-surface) !important'
       })
 

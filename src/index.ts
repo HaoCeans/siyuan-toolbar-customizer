@@ -31,9 +31,7 @@ import {
   GlobalButtonConfig,
   DEFAULT_GLOBAL_BUTTON_CONFIG,
   isMobileDevice,
-  calculateButtonOverflow,
-  initMobileToolbarAdjuster,
-  initCustomButtons
+  calculateButtonOverflow
 } from './toolbarManager'
 
 // 导入 UI 组件
@@ -558,6 +556,9 @@ export default class ToolbarCustomizer extends Plugin {
             }
           })
         }
+
+        // 重新创建主工具栏按钮，应用新的样式配置
+        initCustomButtons(this.mobileButtonConfigs)
       }
     }
 

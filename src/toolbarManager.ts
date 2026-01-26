@@ -385,9 +385,9 @@ export function getToolbarAvailableWidth(): number {
  * @returns 占用宽度（px）
  */
 function getButtonWidth(button: ButtonConfig): number {
-  // 底部工具栏按钮的宽度计算（用于溢出检测）
-  // CSS: min-width + padding(4px*2=8px) + margin-right
-  const paddingX = 8 // 底部工具栏按钮 padding: 4px (all sides)
+  // 主工具栏按钮的宽度计算（与 createButtonElement 的样式保持一致）
+  // CSS: min-width + padding(0 8px = 16px) + margin-right
+  const paddingX = 16 // padding: 0 8px (左右各 8px)
   const buttonWidth = button.minWidth + paddingX
   const totalWidth = buttonWidth + button.marginRight
   return totalWidth
@@ -1077,34 +1077,64 @@ function setupEditorButtons(configs: ButtonConfig[]) {
   })
 }
 
+/**
+ * 获取按钮的通用样式（与扩展工具栏保持一致的完全控制）
+ */
+function getButtonBaseStyle(config: ButtonConfig): string {
+  return `
+    /* 完全覆盖思源原生样式，使用 !important 确保优先级 */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    /* 尺寸控制 */
+    min-width: ${config.minWidth}px !important;
+    height: ${config.minWidth}px !important;
+
+    /* 间距控制 */
+    margin-left: 0 !important;
+    margin-right: ${config.marginRight}px !important;
+    padding: 0 8px !important;
+
+    /* 外观样式 */
+    border: 1px solid var(--b3-theme-border) !important;
+    border-radius: 4px !important;
+    background-color: var(--b3-theme-background) !important;
+    color: var(--b3-theme-on-surface) !important;
+    cursor: pointer !important;
+    user-select: none !important;
+
+    /* 过渡效果 */
+    transition: all 0.2s ease !important;
+
+    /* Flexbox 相关 */
+    flex-shrink: 0 !important;
+    gap: 4px !important;
+
+    /* 清除思源原生样式影响 */
+    opacity: 1 !important;
+    line-height: 1 !important;
+  `
+}
+
 function createButtonElement(config: ButtonConfig): HTMLElement {
   const button = document.createElement('button')
   button.dataset.customButton = config.id
-  button.className = 'block__icon fn__flex-center ariaLabel'
+  // 保留必要的功能性类，移除 block__icon（避免思源样式干扰）
+  button.className = 'fn__flex-center ariaLabel'
   button.setAttribute('aria-label', config.name)
   button.title = config.name
 
-  // 设置图标
+  // 应用基础样式（完全可控）
+  button.style.cssText = getButtonBaseStyle(config)
+
+  // 设置图标内容
   if (config.icon.startsWith('icon')) {
     // 思源图标
-    button.style.cssText = `
-      line-height: 1;
-      cursor: pointer;
-      user-select: none;
-      transition: all 0.2s ease;
-      min-height: 32px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 4px;
-      padding: 4px;
-      margin-right: ${config.marginRight}px;
-    `
-
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
     svg.setAttribute('width', `${config.iconSize}`)
     svg.setAttribute('height', `${config.iconSize}`)
-    svg.style.cssText = 'display: block;'
+    svg.style.cssText = 'flex-shrink: 0; display: block;'
 
     const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
     use.setAttribute('href', `#${config.icon}`)
@@ -1113,20 +1143,6 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     button.appendChild(svg)
   } else if (config.icon.startsWith('lucide:')) {
     // Lucide 图标
-    button.style.cssText = `
-      line-height: 1;
-      cursor: pointer;
-      user-select: none;
-      transition: all 0.2s ease;
-      min-height: 32px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 4px;
-      padding: 4px;
-      margin-right: ${config.marginRight}px;
-    `
-
     const iconName = config.icon.substring(7)
     try {
       const lucideIcons = require('lucide')
@@ -1138,30 +1154,46 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
           height: config.iconSize
         })
         button.innerHTML = svgString
+        // 确保 SVG 样式正确
+        const svg = button.querySelector('svg')
+        if (svg) {
+          svg.style.cssText = 'flex-shrink: 0; display: block;'
+        }
       } else {
+        // 图标不存在，使用文本
         button.textContent = config.icon
+        button.style.fontSize = `${config.iconSize}px`
       }
     } catch (e) {
       button.textContent = config.icon
+      button.style.fontSize = `${config.iconSize}px`
     }
   } else {
     // Emoji 或文本图标
-    button.style.cssText = `
-      line-height: 1;
-      cursor: pointer;
-      user-select: none;
-      transition: all 0.2s ease;
-      min-height: 32px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 4px;
-      padding: 4px;
-      font-size: ${config.iconSize}px;
-      margin-right: ${config.marginRight}px;
-    `
-    button.textContent = config.icon
+    const iconSpan = document.createElement('span')
+    iconSpan.style.fontSize = `${config.iconSize}px`
+    iconSpan.style.lineHeight = '1'
+    iconSpan.textContent = config.icon
+    button.appendChild(iconSpan)
   }
+
+  // 添加 hover 效果
+  button.addEventListener('mouseenter', () => {
+    button.style.backgroundColor = 'var(--b3-list-hover) !important'
+    button.style.color = 'var(--b3-theme-on-background) !important'
+  })
+  button.addEventListener('mouseleave', () => {
+    button.style.backgroundColor = 'var(--b3-theme-background) !important'
+    button.style.color = 'var(--b3-theme-on-surface) !important'
+  })
+  button.addEventListener('touchstart', () => {
+    button.style.backgroundColor = 'var(--b3-list-hover) !important'
+    button.style.color = 'var(--b3-theme-on-background) !important'
+  }, { passive: true })
+  button.addEventListener('touchend', () => {
+    button.style.backgroundColor = 'var(--b3-theme-background) !important'
+    button.style.color = 'var(--b3-theme-on-surface) !important'
+  })
 
   // 保存选区的变量（用于快捷键按钮）
   let savedSelection: Range | null = null
@@ -1382,41 +1414,25 @@ function showOverflowToolbar(config: ButtonConfig) {
     // 添加该层的所有按钮
     layerButtons.forEach((btn: ButtonConfig) => {
       const layerBtn = document.createElement('button')
-      layerBtn.className = 'b3-button b3-button--outline'
-      layerBtn.style.minWidth = `${btn.minWidth}px`
-      layerBtn.style.height = `32px`
-      layerBtn.style.padding = `0 8px`
-      layerBtn.style.marginRight = `${btn.marginRight}px`
-      layerBtn.style.fontSize = `${btn.iconSize}px`
-      layerBtn.style.display = `flex`
-      layerBtn.style.alignItems = `center`
-      layerBtn.style.justifyContent = `center`
-      layerBtn.style.gap = `4px`
-      layerBtn.style.border = `1px solid var(--b3-theme-border)`
-      layerBtn.style.borderRadius = `4px`
-      layerBtn.style.background = `var(--b3-theme-background)`
-      layerBtn.style.cursor = `pointer`
+      // 使用与主工具栏相同的样式函数，确保完全一致
+      layerBtn.className = 'fn__flex-center ariaLabel'
+      layerBtn.style.cssText = getButtonBaseStyle(btn)
+      layerBtn.title = btn.name
 
       // 清空按钮内容
       layerBtn.innerHTML = ''
 
-      // 根据图标类型渲染
+      // 根据图标类型渲染（与主工具栏保持一致）
       if (btn.icon.startsWith('icon')) {
-        // 思源内置图标 - 检查图标是否存在
-        const iconExists = document.querySelector(`#${btn.icon}`)
-        if (iconExists) {
-          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-          svg.setAttribute('width', `${btn.iconSize}`)
-          svg.setAttribute('height', `${btn.iconSize}`)
-          svg.style.cssText = 'display: block; flex-shrink: 0;'
-          const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
-          use.setAttribute('href', `#${btn.icon}`)
-          svg.appendChild(use)
-          layerBtn.appendChild(svg)
-        } else {
-          // 图标不存在，显示名称缩写
-          layerBtn.textContent = btn.name.substring(0, 2)
-        }
+        // 思源内置图标
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+        svg.setAttribute('width', `${btn.iconSize}`)
+        svg.setAttribute('height', `${btn.iconSize}`)
+        svg.style.cssText = 'flex-shrink: 0; display: block;'
+        const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
+        use.setAttribute('href', `#${btn.icon}`)
+        svg.appendChild(use)
+        layerBtn.appendChild(svg)
       } else if (btn.icon.startsWith('lucide:')) {
         // Lucide 图标
         const iconName = btn.icon.substring(7)
@@ -1429,22 +1445,46 @@ function showOverflowToolbar(config: ButtonConfig) {
               height: btn.iconSize
             })
             layerBtn.innerHTML = svgString
+            // 确保 SVG 样式正确
+            const svg = layerBtn.querySelector('svg')
+            if (svg) {
+              svg.style.cssText = 'flex-shrink: 0; display: block;'
+            }
           } else {
+            // 图标不存在，使用文本
             layerBtn.textContent = btn.icon
+            layerBtn.style.fontSize = `${btn.iconSize}px`
           }
         } catch (e) {
           layerBtn.textContent = btn.icon
+          layerBtn.style.fontSize = `${btn.iconSize}px`
         }
       } else {
         // Emoji 或文本图标
         const iconSpan = document.createElement('span')
         iconSpan.style.fontSize = `${btn.iconSize}px`
+        iconSpan.style.lineHeight = '1'
         iconSpan.textContent = btn.icon
         layerBtn.appendChild(iconSpan)
       }
 
-      // 设置按钮提示（鼠标悬停显示名称）
-      layerBtn.title = btn.name
+      // 添加 hover 效果（与主工具栏保持一致）
+      layerBtn.addEventListener('mouseenter', () => {
+        layerBtn.style.backgroundColor = 'var(--b3-list-hover) !important'
+        layerBtn.style.color = 'var(--b3-theme-on-background) !important'
+      })
+      layerBtn.addEventListener('mouseleave', () => {
+        layerBtn.style.backgroundColor = 'var(--b3-theme-background) !important'
+        layerBtn.style.color = 'var(--b3-theme-on-surface) !important'
+      })
+      layerBtn.addEventListener('touchstart', () => {
+        layerBtn.style.backgroundColor = 'var(--b3-list-hover) !important'
+        layerBtn.style.color = 'var(--b3-theme-on-background) !important'
+      }, { passive: true })
+      layerBtn.addEventListener('touchend', () => {
+        layerBtn.style.backgroundColor = 'var(--b3-theme-background) !important'
+        layerBtn.style.color = 'var(--b3-theme-on-surface) !important'
+      })
 
       // 保存选区的变量（每个按钮独立保存）
       let savedSelection: Range | null = null

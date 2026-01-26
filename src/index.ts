@@ -31,7 +31,9 @@ import {
   GlobalButtonConfig,
   DEFAULT_GLOBAL_BUTTON_CONFIG,
   isMobileDevice,
-  calculateButtonOverflow
+  calculateButtonOverflow,
+  initMobileToolbarAdjuster,
+  initCustomButtons
 } from './toolbarManager'
 
 // 导入 UI 组件
@@ -530,7 +532,12 @@ export default class ToolbarCustomizer extends Plugin {
       showButtonIdPicker: (currentValue, onSelect) => this.showButtonIdPicker(currentValue, onSelect),
       saveData: (key, value) => this.saveData(key, value),
       applyFeatures: () => this.applyFeatures(),
-      applyMobileToolbarStyle: () => this.applyMobileToolbarStyle()
+      applyMobileToolbarStyle: () => this.applyMobileToolbarStyle(),
+      updateMobileToolbar: () => {
+        initMobileToolbarAdjuster(this.mobileConfig)
+        const buttonsToInit = this.mobileButtonConfigs
+        initCustomButtons(buttonsToInit)
+      }
     }
 
     // 调用提取后的设置创建函数

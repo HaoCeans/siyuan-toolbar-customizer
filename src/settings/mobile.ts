@@ -58,6 +58,7 @@ export interface MobileSettingsContext {
   saveData: (key: string, value: any) => Promise<void>
   applyFeatures: () => void
   applyMobileToolbarStyle: () => void
+  updateMobileToolbar: () => void
 }
 
 /**
@@ -770,6 +771,8 @@ export function createMobileSettingLayout(
           (el as HTMLInputElement).disabled = !toggle.checked
           ;(el as HTMLInputElement).style.opacity = toggle.checked ? '' : '0.5'
         })
+        // 重新初始化工具栏，确保按钮正确显示
+        context.updateMobileToolbar()
       }
       return toggle
     }

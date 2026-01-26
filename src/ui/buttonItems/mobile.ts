@@ -592,42 +592,6 @@ export function createMobileButtonItem(
       inputWrapper.appendChild(selectBtn)
       builtinContainer.appendChild(label)
       builtinContainer.appendChild(inputWrapper)
-
-      // 添加帮助链接
-      const hint = document.createElement('div')
-      hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: -4px; padding-left: 4px;'
-      hint.innerHTML = '💡 <a href="#" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">查看常用ID →</a>'
-
-      const link = hint.querySelector('a')
-      if (link) {
-        link.onclick = (e) => {
-          e.preventDefault()
-          // 使用 setTimeout 确保 DOM 完全渲染后再查找
-          setTimeout(() => {
-            const settingItems = Array.from(document.querySelectorAll('.b3-label'))
-            const helpSection = settingItems.find(item => {
-              const descEl = item.querySelector('.b3-label__text')
-              const text = descEl?.textContent
-              // 查找包含"思源内置菜单ID参考"的项
-              return descEl && text?.includes('思源内置菜单ID参考')
-            })
-
-            if (helpSection) {
-              // 先滚动到该区域
-              helpSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
-              // 添加高亮效果
-              const helpElement = helpSection as HTMLElement
-              const originalBg = helpElement.style.background
-              helpElement.style.background = 'var(--b3-theme-primary-lightest)'
-              setTimeout(() => {
-                helpElement.style.background = originalBg
-              }, 2000)
-            }
-          }, 100)
-        }
-      }
-
-      builtinContainer.appendChild(hint)
       typeFieldsContainer.appendChild(builtinContainer)
     } else if (button.type === 'template') {
       const templateContainer = document.createElement('div')
@@ -706,7 +670,34 @@ export function createMobileButtonItem(
 
       const hint = document.createElement('div')
       hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
-      hint.innerHTML = '💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong>'
+      hint.innerHTML = '💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">思源笔记常用功能 ID 速查表（GitHub）</a><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">模拟点击序列使用说明（GitHub）</a><br><a href="#" id="view-common-ids-link" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">查看常用ID（部分） →</a>'
+
+      // 绑定"查看常用ID（部分）"链接点击事件
+      const link = hint.querySelector('#view-common-ids-link')
+      if (link) {
+        link.onclick = (e) => {
+          e.preventDefault()
+          setTimeout(() => {
+            const settingItems = Array.from(document.querySelectorAll('.b3-label'))
+            const helpSection = settingItems.find(item => {
+              const descEl = item.querySelector('.b3-label__text')
+              const text = descEl?.textContent
+              return descEl && text?.includes('思源内置菜单ID参考')
+            })
+
+            if (helpSection) {
+              helpSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              const helpElement = helpSection as HTMLElement
+              const originalBg = helpElement.style.background
+              helpElement.style.background = 'var(--b3-theme-primary-lightest)'
+              setTimeout(() => {
+                helpElement.style.background = originalBg
+              }, 2000)
+            }
+          }, 100)
+        }
+      }
+
       clickSequenceContainer.appendChild(hint)
 
       typeFieldsContainer.appendChild(clickSequenceContainer)

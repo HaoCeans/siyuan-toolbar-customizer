@@ -7,16 +7,23 @@ import { Dialog, fetchSyncPost, getFrontend, showMessage } from "siyuan";
 
 // ===== 配置接口 =====
 export interface MobileToolbarConfig {
+  // 底部工具栏配置
   enableBottomToolbar: boolean; // 是否将工具栏置底
   openInputOffset: string;    // 打开输入框时距离底部高度
   closeInputOffset: string;   // 关闭输入框时距离底部高度
   heightThreshold: number;    // 高度变化阈值百分比
+
+  // 共享样式配置（顶部和底部工具栏都使用）
   toolbarBackgroundColor: string; // 工具栏背景颜色（明亮模式）
   toolbarBackgroundColorDark: string; // 工具栏背景颜色（黑暗模式）
   toolbarOpacity: number;     // 工具栏透明度 (0-1)
   toolbarHeight: string;      // 工具栏高度
   toolbarZIndex: number;      // 工具栏层级
   useThemeColor: boolean;     // 是否使用主题颜色
+
+  // 顶部工具栏专用配置
+  enableTopToolbar: boolean;  // 是否启用顶部工具栏（固定定位模式）
+  topToolbarOffset: string;   // 顶部工具栏距离顶部的距离（如 "50px"）
   topToolbarPaddingLeft: string; // 顶部工具栏左边距
 }
 
@@ -71,17 +78,24 @@ export const DEFAULT_GLOBAL_BUTTON_CONFIG: GlobalButtonConfig = {
 
 // ===== 默认配置 =====
 export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
+  // 底部工具栏配置
   enableBottomToolbar: true,
   openInputOffset: '50px',
   closeInputOffset: '0px',
   heightThreshold: 70,
+
+  // 共享样式配置
   toolbarBackgroundColor: '#f8f9fa',
   toolbarBackgroundColorDark: '#1a1a1a',
   toolbarOpacity: 1.0,        // 100% 透明度
   toolbarHeight: '40px',      // 工具栏高度
-  toolbarZIndex: 5,
+  toolbarZIndex: 512,
   useThemeColor: true,        // 颜色跟随主题
-  topToolbarPaddingLeft: '10px', // 顶部工具栏左边距
+
+  // 顶部工具栏配置
+  enableTopToolbar: false,    // 默认不启用（与底部工具栏互斥）
+  topToolbarOffset: '50px',   // 距离顶部 50px
+  topToolbarPaddingLeft: '0px', // 顶部工具栏左边距（居中显示）
 }
 
 export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = []
@@ -515,6 +529,77 @@ function shouldShowInMainToolbar(button: ButtonConfig): boolean {
   return overflowLevel === 0
 }
 
+/**
+ * 应用工具栏背景颜色（顶部和底部工具栏通用）
+ */
+function applyToolbarBackgroundColor(config: MobileToolbarConfig) {
+  const backgroundColorStyleId = 'mobile-toolbar-background-color-style'
+  let backgroundColorStyle = document.getElementById(backgroundColorStyleId) as HTMLStyleElement
+
+  if (!backgroundColorStyle) {
+    backgroundColorStyle = document.createElement('style')
+    backgroundColorStyle.id = backgroundColorStyleId
+    document.head.appendChild(backgroundColorStyle)
+  }
+
+  // 根据配置应用背景颜色
+  if (config.useThemeColor) {
+    // 使用主题颜色时，只调整透明度，使用CSS变量
+    backgroundColorStyle.textContent = `
+      /* 顶部工具栏 - 使用主题颜色 */
+      body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]),
+      body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) {
+        background-color: var(--b3-theme-surface) !important;
+        opacity: ${config.toolbarOpacity} !important;
+      }
+
+      /* 底部工具栏 - 使用主题颜色 */
+      .protyle-breadcrumb__bar[data-input-method],
+      .protyle-breadcrumb[data-input-method] {
+        background-color: var(--b3-theme-surface) !important;
+        opacity: ${config.toolbarOpacity} !important;
+      }
+    `
+  } else {
+    // 使用自定义颜色
+    backgroundColorStyle.textContent = `
+      /* 明亮模式 */
+      html:not([data-theme-mode="dark"]) {
+        /* 顶部工具栏 - 自定义颜色 */
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]),
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) {
+          background-color: ${config.toolbarBackgroundColor} !important;
+          opacity: ${config.toolbarOpacity} !important;
+        }
+
+        /* 底部工具栏 - 自定义颜色 */
+        .protyle-breadcrumb__bar[data-input-method],
+        .protyle-breadcrumb[data-input-method] {
+          background-color: ${config.toolbarBackgroundColor} !important;
+          opacity: ${config.toolbarOpacity} !important;
+        }
+      }
+
+      /* 黑暗模式 */
+      html[data-theme-mode="dark"] {
+        /* 顶部工具栏 - 自定义颜色（黑暗模式） */
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]),
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) {
+          background-color: ${config.toolbarBackgroundColorDark} !important;
+          opacity: ${config.toolbarOpacity} !important;
+        }
+
+        /* 底部工具栏 - 自定义颜色（黑暗模式） */
+        .protyle-breadcrumb__bar[data-input-method],
+        .protyle-breadcrumb[data-input-method] {
+          background-color: ${config.toolbarBackgroundColorDark} !important;
+          opacity: ${config.toolbarOpacity} !important;
+        }
+      }
+    `
+  }
+}
+
 // ===== 移动端工具栏调整 =====
 export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
   // 仅在移动端初始化
@@ -523,28 +608,232 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
   // 保存配置到全局变量，供扩展工具栏使用
   (window as any).__mobileToolbarConfig = config
 
-  // 如果未启用工具栏置底，则移除相关样式并返回
-  if (!config.enableBottomToolbar) {
-    // 移除 body 标记类
-    document.body.classList.remove('siyuan-toolbar-customizer-enabled')
+  // 判断工具栏模式
+  if (config.enableBottomToolbar) {
+    // === 底部工具栏模式 ===
+    // 移除顶部模式标记，添加底部模式标记
+    document.body.classList.add('siyuan-toolbar-customizer-enabled')
+    document.body.classList.remove('siyuan-toolbar-top-mode')
 
-    // 移除所有相关样式
+    // 移除顶部工具栏样式
+    const topToolbarStyleToRemove = document.getElementById('top-toolbar-custom-style')
+    if (topToolbarStyleToRemove) {
+      topToolbarStyleToRemove.remove()
+    }
+
+    const setupToolbar = () => {
+      // 优先查找 .protyle-breadcrumb（移动端使用）
+      let breadcrumb = document.querySelector('.protyle-breadcrumb:not(.protyle-breadcrumb__bar)')
+
+      // 如果没找到，尝试查找 .protyle-breadcrumb__bar（桌面端使用）
+      if (!breadcrumb) {
+        breadcrumb = document.querySelector('.protyle-breadcrumb__bar')
+      }
+
+      if (!breadcrumb) {
+        return false
+      }
+
+      setupToolbarForElement(breadcrumb)
+      return true
+    }
+
+    const setupToolbarForElement = (toolbar: Element) => {
+      // 防止重复设置
+      if ((toolbar as HTMLElement).dataset.toolbarCustomized === 'true') return
+
+      // 标记已设置
+      (toolbar as HTMLElement).dataset.toolbarCustomized = 'true'
+
+      // 初始设置
+      let lastKnownHeight = window.innerHeight
+      let inputMethodOpen = false
+
+      // 创建CSS变量
+      document.documentElement.style.setProperty('--mobile-toolbar-offset', config.closeInputOffset)
+
+      // 更新工具栏位置
+      function updateToolbarPosition() {
+        const currentHeight = window.innerHeight
+
+        // 计算高度变化百分比
+        const heightRatio = currentHeight / lastKnownHeight
+
+        // 如果当前高度比上次记录的高度小阈值以上，认为输入法打开了
+        const threshold = config.heightThreshold / 100
+        const isNowOpen = heightRatio < threshold
+
+        if (isNowOpen !== inputMethodOpen) {
+          inputMethodOpen = isNowOpen
+
+          if (inputMethodOpen) {
+            // 输入法打开时
+            document.documentElement.style.setProperty('--mobile-toolbar-offset', config.openInputOffset)
+            toolbar.setAttribute('data-input-method', 'open')
+          } else {
+            // 输入法关闭时
+            document.documentElement.style.setProperty('--mobile-toolbar-offset', config.closeInputOffset)
+            toolbar.setAttribute('data-input-method', 'close')
+          }
+        }
+
+        // 更新记录的高度
+        lastKnownHeight = currentHeight
+      }
+
+      // 初始调用一次
+      updateToolbarPosition()
+
+      // 设置初始属性
+      toolbar.setAttribute('data-input-method', 'close')
+
+      // 监听窗口大小变化
+      resizeHandler = updateToolbarPosition
+      window.addEventListener('resize', resizeHandler)
+
+      // 监听焦点事件，作为辅助判断
+      const textInputs = document.querySelectorAll('textarea, input[type="text"], .protyle-wysiwyg, .protyle-content, .protyle-input')
+      textInputs.forEach(input => {
+        const focusHandler = () => {
+          safeSetTimeout(updateToolbarPosition, 300)
+        }
+        const blurHandler = () => {
+          safeSetTimeout(updateToolbarPosition, 300)
+        }
+        input.addEventListener('focus', focusHandler)
+        input.addEventListener('blur', blurHandler)
+        // 保存引用以便清理
+        focusEventHandlers.push({ element: input as HTMLElement, focusHandler, blurHandler })
+      })
+
+      // 添加CSS样式
+      const styleId = 'mobile-toolbar-custom-style'
+      let style = document.getElementById(styleId) as HTMLStyleElement
+      if (!style) {
+        style = document.createElement('style')
+        style.id = styleId
+        document.head.appendChild(style)
+      }
+
+      style.textContent = `
+        /* 移动端工具栏样式 - iOS z-index 修复版 */
+        @media (max-width: 768px) {
+          .protyle-breadcrumb__bar[data-input-method],
+          .protyle-breadcrumb[data-input-method] {
+            position: fixed !important;
+            bottom: calc(var(--mobile-toolbar-offset, 0px) + env(safe-area-inset-bottom)) !important;
+            top: auto !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: ${config.toolbarZIndex} !important;
+            border-top: 1px solid var(--b3-border-color) !important;
+            padding: 8px 12px !important;
+            padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1) !important;
+            transition: bottom 0.3s ease !important;
+            backdrop-filter: blur(10px);
+            height: ${config.toolbarHeight} !important;
+            min-height: ${config.toolbarHeight} !important;
+            /* iOS z-index 修复 - 启用硬件加速提升层级 */
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            will-change: transform;
+          }
+
+          .protyle-breadcrumb__bar[data-input-method="open"],
+          .protyle-breadcrumb[data-input-method="open"] {
+            bottom: calc(var(--mobile-toolbar-offset, 50px) + env(safe-area-inset-bottom)) !important;
+          }
+
+          .protyle-breadcrumb__bar[data-input-method="close"],
+          .protyle-breadcrumb[data-input-method="close"] {
+            bottom: calc(var(--mobile-toolbar-offset, 0px) + env(safe-area-inset-bottom)) !important;
+          }
+
+          /* 防止编辑器内容被遮挡 - 仅在启用底部工具栏且工具栏显示时应用 */
+          body.siyuan-toolbar-customizer-enabled .protyle {
+            padding-bottom: calc(${config.toolbarHeight} + env(safe-area-inset-bottom) + 10px) !important;
+          }
+
+          /* 使用思源原生的隐藏类 */
+          .protyle-breadcrumb__bar[data-input-method].fn__none,
+          .protyle-breadcrumb[data-input-method].fn__none {
+            display: none !important;
+          }
+        }
+      `
+    }
+
+    // 尝试设置工具栏
+    if (!setupToolbar()) {
+      // 如果没找到，延迟尝试
+      safeSetTimeout(() => {
+        setupToolbar()
+      }, 2000)
+    }
+
+    // 应用背景颜色
+    applyToolbarBackgroundColor(config)
+
+    // 防抖变量
+    let observerTimer: number | null = null
+
+    // 添加页面变化检测函数
+    function updateToolbarVisibility() {
+      const toolbars = document.querySelectorAll('[data-toolbar-customized="true"][data-input-method]') as NodeListOf<HTMLElement>
+      // 只添加自定义属性，不改变原生逻辑
+    }
+
+    // 合并的 MutationObserver 回调（添加防抖）
+    const handleMutation = () => {
+      if (observerTimer !== null) {
+        clearTimeout(observerTimer)
+      }
+      observerTimer = safeSetTimeout(() => {
+        setupToolbar()
+        updateToolbarVisibility()
+        observerTimer = null
+      }, 100)
+    }
+
+    // 监听DOM变化
+    const toolbarContainer = document.querySelector('.layout__center') ||
+                            document.querySelector('.fn__flex-1.fn__flex-column') ||
+                            document.body
+    mutationObserver = new MutationObserver(handleMutation)
+    mutationObserver.observe(toolbarContainer, {
+      childList: true,
+      subtree: true
+    })
+
+    // 页面加载完成后检查一次
+    updateToolbarVisibility()
+
+    return
+  }
+
+  // === 顶部工具栏模式 ===
+  if (config.enableTopToolbar) {
+    // 移除底部模式标记，添加顶部模式标记
+    document.body.classList.remove('siyuan-toolbar-customizer-enabled')
+    document.body.classList.add('siyuan-toolbar-top-mode')
+
+    // 移除底部工具栏相关样式
     const existingStyle = document.getElementById('mobile-toolbar-custom-style')
     if (existingStyle) {
       existingStyle.remove()
     }
-    const backgroundColorStyle = document.getElementById('mobile-toolbar-background-color-style')
-    if (backgroundColorStyle) {
-      backgroundColorStyle.remove()
-    }
 
-    // 移除工具栏的自定义属性，重置内联样式
+    // 移除工具栏的自定义属性
     const toolbars = document.querySelectorAll('[data-toolbar-customized="true"], .protyle-breadcrumb__bar[data-input-method], .protyle-breadcrumb[data-input-method]') as NodeListOf<HTMLElement>
-    const toolbarsArray = Array.from(toolbars)
-    toolbarsArray.forEach(toolbar => {
+    toolbars.forEach(toolbar => {
       toolbar.removeAttribute('data-toolbar-customized')
       toolbar.removeAttribute('data-input-method')
-      // 重置可能导致底部占位的样式
       toolbar.style.position = ''
       toolbar.style.bottom = ''
       toolbar.style.top = ''
@@ -555,7 +844,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
       toolbar.style.paddingBottom = ''
     })
 
-    // 重置 protyle 的底部内边距（使用 !important 覆盖 CSS 样式）
+    // 重置 protyle 的底部内边距
     const protyles = document.querySelectorAll('.protyle') as NodeListOf<HTMLElement>
     protyles.forEach(protyle => {
       protyle.style.setProperty('padding-bottom', '0', 'important')
@@ -568,159 +857,33 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
       topToolbarStyle.id = 'top-toolbar-custom-style'
       document.head.appendChild(topToolbarStyle)
     }
+
+    // 计算顶部偏移量（工具栏位置 + 工具栏高度 + 额外间距）
+    const topOffsetValue = parseInt(config.topToolbarOffset) || 50
+    const toolbarHeightValue = parseInt(config.toolbarHeight) || 52
+    const paddingTopValue = topOffsetValue + toolbarHeightValue + 10
+
     topToolbarStyle.textContent = `
-      /* 顶部工具栏样式 - 使用属性选择器确保不影响底部工具栏 */
-      body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) {
-        padding-left: 0 !important;
-      }
-      /* 隐藏空白间距 */
-      body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__space {
-        display: none !important;
-      }
-      /* 隐藏原生按钮 */
-      body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="mobile-menu"],
-      body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="exit-focus"] {
-        display: none !important;
-      }
-      /* 最左边的按钮左边距为0 */
-      body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .first-custom-button {
-        margin-left: 0 !important;
-      }
-    `
-
-    // 标记顶部工具栏模式（用于扩展工具栏判断方向）
-    document.body.classList.add('siyuan-toolbar-top-mode')
-
-    return
-  }
-
-  // 启用底部工具栏时，添加 body 标记类，移除顶部模式标记
-  document.body.classList.add('siyuan-toolbar-customizer-enabled')
-  document.body.classList.remove('siyuan-toolbar-top-mode')
-
-  // 移除顶部工具栏样式
-  const topToolbarStyle = document.getElementById('top-toolbar-custom-style')
-  if (topToolbarStyle) {
-    topToolbarStyle.remove()
-  }
-
-  const setupToolbar = () => {
-    // 优先查找 .protyle-breadcrumb（移动端使用）
-    let breadcrumb = document.querySelector('.protyle-breadcrumb:not(.protyle-breadcrumb__bar)')
-    
-    // 如果没找到，尝试查找 .protyle-breadcrumb__bar（桌面端使用）
-    if (!breadcrumb) {
-      breadcrumb = document.querySelector('.protyle-breadcrumb__bar')
-    }
-    
-    if (!breadcrumb) {
-      return false
-    }
-    
-    setupToolbarForElement(breadcrumb)
-    return true
-  }
-
-  const setupToolbarForElement = (toolbar: Element) => {
-    // 防止重复设置
-    if ((toolbar as HTMLElement).dataset.toolbarCustomized === 'true') return
-    
-    // 标记已设置
-    (toolbar as HTMLElement).dataset.toolbarCustomized = 'true'
-    
-    // 初始设置
-    let lastKnownHeight = window.innerHeight
-    let inputMethodOpen = false
-
-    // 创建CSS变量
-    document.documentElement.style.setProperty('--mobile-toolbar-offset', config.closeInputOffset)
-
-    // 更新工具栏位置
-    function updateToolbarPosition() {
-      const currentHeight = window.innerHeight
-      
-      // 计算高度变化百分比
-      const heightRatio = currentHeight / lastKnownHeight
-      
-      // 如果当前高度比上次记录的高度小阈值以上，认为输入法打开了
-      const threshold = config.heightThreshold / 100
-      const isNowOpen = heightRatio < threshold
-      
-      if (isNowOpen !== inputMethodOpen) {
-        inputMethodOpen = isNowOpen
-        
-        if (inputMethodOpen) {
-          // 输入法打开时
-          document.documentElement.style.setProperty('--mobile-toolbar-offset', config.openInputOffset)
-          toolbar.setAttribute('data-input-method', 'open')
-        } else {
-          // 输入法关闭时
-          document.documentElement.style.setProperty('--mobile-toolbar-offset', config.closeInputOffset)
-          toolbar.setAttribute('data-input-method', 'close')
-        }
-      }
-      
-      // 更新记录的高度
-      lastKnownHeight = currentHeight
-    }
-
-    // 初始调用一次
-    updateToolbarPosition()
-    
-    // 设置初始属性
-    toolbar.setAttribute('data-input-method', 'close')
-    
-    // 监听窗口大小变化
-    resizeHandler = updateToolbarPosition
-    window.addEventListener('resize', resizeHandler)
-    
-    // 监听焦点事件，作为辅助判断
-    const textInputs = document.querySelectorAll('textarea, input[type="text"], .protyle-wysiwyg, .protyle-content, .protyle-input')
-    textInputs.forEach(input => {
-      const focusHandler = () => {
-        safeSetTimeout(updateToolbarPosition, 300)
-      }
-      const blurHandler = () => {
-        safeSetTimeout(updateToolbarPosition, 300)
-      }
-      input.addEventListener('focus', focusHandler)
-      input.addEventListener('blur', blurHandler)
-      // 保存引用以便清理
-      focusEventHandlers.push({ element: input as HTMLElement, focusHandler, blurHandler })
-    })
-
-  // 添加CSS样式
-    const styleId = 'mobile-toolbar-custom-style'
-    let style = document.getElementById(styleId) as HTMLStyleElement
-    if (!style) {
-      style = document.createElement('style')
-      style.id = styleId
-      document.head.appendChild(style)
-    }
-
-    style.textContent = `
-      /* 移动端工具栏样式 - iOS z-index 修复版 */
+      /* 顶部工具栏样式 - 固定定位，脱离文档流，避免按钮重插导致的位置跳动 */
       @media (max-width: 768px) {
-        .protyle-breadcrumb__bar[data-input-method],
-        .protyle-breadcrumb[data-input-method] {
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) {
           position: fixed !important;
-          bottom: calc(var(--mobile-toolbar-offset, 0px) + env(safe-area-inset-bottom)) !important;
-          top: auto !important;
+          top: ${config.topToolbarOffset} !important;
+          bottom: auto !important;
           left: 0 !important;
           right: 0 !important;
           z-index: ${config.toolbarZIndex} !important;
-          border-top: 1px solid var(--b3-border-color) !important;
           padding: 8px 12px !important;
-          padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
           display: flex !important;
           justify-content: center !important;
           align-items: center !important;
-          box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1) !important;
-          transition: bottom 0.3s ease !important;
+          border-bottom: 1px solid var(--b3-border-color) !important;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+          transition: top 0.3s ease !important;
           backdrop-filter: blur(10px);
           height: ${config.toolbarHeight} !important;
           min-height: ${config.toolbarHeight} !important;
-          /* iOS z-index 修复 - 启用硬件加速提升层级 */
+          /* 硬件加速，提升层级稳定性 */
           -webkit-transform: translateZ(0);
           transform: translateZ(0);
           -webkit-backface-visibility: hidden;
@@ -728,86 +891,83 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
           will-change: transform;
         }
 
-        .protyle-breadcrumb__bar[data-input-method="open"],
-        .protyle-breadcrumb[data-input-method="open"] {
-          bottom: calc(var(--mobile-toolbar-offset, 50px) + env(safe-area-inset-bottom)) !important;
+        /* 隐藏空白间距 */
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__space {
+          display: none !important;
         }
 
-        .protyle-breadcrumb__bar[data-input-method="close"],
-        .protyle-breadcrumb[data-input-method="close"] {
-          bottom: calc(var(--mobile-toolbar-offset, 0px) + env(safe-area-inset-bottom)) !important;
+        /* 隐藏原生按钮 */
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="mobile-menu"],
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="exit-focus"] {
+          display: none !important;
         }
 
-        /* 防止编辑器内容被遮挡 - 仅在启用底部工具栏且工具栏显示时应用 */
-        body.siyuan-toolbar-customizer-enabled .protyle {
-          padding-bottom: calc(${config.toolbarHeight} + env(safe-area-inset-bottom) + 10px) !important;
+        /* 最左边的按钮左边距为0 */
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .first-custom-button {
+          margin-left: 0 !important;
+        }
+
+        /* 防止编辑器内容被顶部工具栏遮挡 */
+        body.siyuan-toolbar-top-mode .protyle {
+          padding-top: ${paddingTopValue}px !important;
         }
 
         /* 使用思源原生的隐藏类 */
-        .protyle-breadcrumb__bar[data-input-method].fn__none,
-        .protyle-breadcrumb[data-input-method].fn__none {
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]).fn__none {
           display: none !important;
         }
       }
-    `
-  }
 
-  // 尝试设置工具栏
-  if (!setupToolbar()) {
-    // 如果没找到，延迟尝试
-    safeSetTimeout(() => {
-      setupToolbar()
-    }, 2000)
-  }
+      /* 桌面端样式 */
+      @media (min-width: 769px) {
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) {
+          position: fixed !important;
+          top: ${config.topToolbarOffset} !important;
+          bottom: auto !important;
+          left: 0 !important;
+          right: 0 !important;
+          z-index: ${config.toolbarZIndex} !important;
+          padding: 8px 12px !important;
+          display: flex !important;
+          justify-content: center !important;
+          align-items: center !important;
+          border-bottom: 1px solid var(--b3-border-color) !important;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+          height: ${config.toolbarHeight} !important;
+          min-height: ${config.toolbarHeight} !important;
+          /* 硬件加速 */
+          -webkit-transform: translateZ(0);
+          transform: translateZ(0);
+          -webkit-backface-visibility: hidden;
+          backface-visibility: hidden;
+          will-change: transform;
+        }
 
-  // 防抖变量
-  let observerTimer: number | null = null
+        /* 隐藏空白间距（桌面端） */
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) > .protyle-breadcrumb__space {
+          display: none !important;
+        }
 
-  // 添加页面变化检测函数
-  function updateToolbarVisibility() {
-    // 获取所有工具栏元素
-    const toolbars = document.querySelectorAll('[data-toolbar-customized="true"][data-input-method]') as NodeListOf<HTMLElement>
-    const toolbarsArray = Array.from(toolbars)
+        /* 隐藏原生按钮（桌面端） */
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="mobile-menu"],
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="exit-focus"] {
+          display: none !important;
+        }
 
-    // 检查当前是否应该显示工具栏（基于原生逻辑）
-    // 我们只添加自定义属性，不应改变原生的显示/隐藏逻辑
-    toolbarsArray.forEach(toolbar => {
-      // 检查原生的隐藏类是否存在
-      // 如果原生逻辑需要隐藏工具栏，我们应该保留这个状态
-      // 不主动修改原生的隐藏类
-    })
-  }
+        /* 最左边的按钮左边距为0（桌面端） */
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) > .first-custom-button {
+          margin-left: 0 !important;
+        }
 
-  // 合并的 MutationObserver 回调（添加防抖）
-  const handleMutation = () => {
-    if (observerTimer !== null) {
-      clearTimeout(observerTimer)
-    }
-    observerTimer = safeSetTimeout(() => {
-      setupToolbar()
-      if (config.enableBottomToolbar) {
-        updateToolbarVisibility()
+        /* 防止编辑器内容被顶部工具栏遮挡（桌面端） */
+        body.siyuan-toolbar-top-mode .protyle {
+          padding-top: ${paddingTopValue}px !important;
+        }
       }
-      observerTimer = null
-    }, 100) // 100ms 防抖
-  }
+    `
 
-  // 监听DOM变化，确保工具栏加载后能应用样式
-  // 只监听 childList，不监听属性变化，减少触发频率
-  // 优化：只监听工具栏所在的容器，而不是整个 body
-  const toolbarContainer = document.querySelector('.layout__center') ||
-                          document.querySelector('.fn__flex-1.fn__flex-column') ||
-                          document.body
-  mutationObserver = new MutationObserver(handleMutation)
-
-  mutationObserver.observe(toolbarContainer, {
-    childList: true,
-    subtree: true
-  })
-
-  // 页面加载完成后检查一次
-  if (config.enableBottomToolbar) {
-    updateToolbarVisibility()
+    // ===== 应用顶部工具栏背景颜色 =====
+    applyToolbarBackgroundColor(config)
   }
 }
 
@@ -826,8 +986,19 @@ export function initCustomButtons(configs: ButtonConfig[]) {
 
   // 监听编辑器加载事件
   customButtonClickHandler = (e: Event) => {
-    // 检查是否点击了编辑器区域
     const target = e.target as HTMLElement
+
+    // 如果点击的是自定义按钮本身，不触发重新插入（避免按钮被重新插入导致位置变化）
+    if (target.closest('[data-custom-button]')) {
+      return
+    }
+
+    // 如果点击的是扩展工具栏弹出层，不触发重新插入
+    if (target.closest('.overflow-toolbar-layer')) {
+      return
+    }
+
+    // 检查是否点击了编辑器区域
     if (target.closest('.protyle')) {
       // 延迟执行，确保编辑器完全加载
       safeSetTimeout(() => setupEditorButtons(configs), 100)
@@ -845,6 +1016,36 @@ function cleanupCustomButtons() {
 function setupEditorButtons(configs: ButtonConfig[]) {
   // 保存按钮配置到全局变量，供扩展工具栏使用
   (window as any).__mobileButtonConfigs = configs
+
+  // 找到扩展工具栏按钮，获取层数配置
+  const overflowBtn = configs.find(btn => btn.id === 'overflow-button-mobile')
+  const overflowLayers = (overflowBtn && overflowBtn.enabled !== false) ? (overflowBtn.layers || 1) : 0
+
+  // 使用 requestAnimationFrame 确保工具栏已经渲染完成后再计算溢出
+  const calculateOverflowWithDelay = () => {
+    if (overflowLayers > 0) {
+      // 尝试获取工具栏宽度，如果为0则等待重试
+      const availableWidth = getToolbarAvailableWidth()
+      if (availableWidth <= 0) {
+        // 工具栏还没渲染完成，延迟重试
+        requestAnimationFrame(() => calculateOverflowWithDelay())
+        return
+      }
+
+      console.log('[setupEditorButtons] 准备调用溢出检测，层数:', overflowLayers, '可用宽度:', availableWidth)
+      const updatedButtons = calculateButtonOverflow(configs, overflowLayers)
+      // 更新 configs 中的 overflowLevel
+      updatedButtons.forEach(btn => {
+        const original = configs.find(b => b.id === btn.id)
+        if (original) {
+          original.overflowLevel = btn.overflowLevel
+        }
+      })
+    }
+  }
+
+  // 启动溢出计算
+  requestAnimationFrame(calculateOverflowWithDelay)
 
   // 找到所有编辑器
   const editors = document.querySelectorAll('.protyle')

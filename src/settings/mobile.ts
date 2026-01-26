@@ -14,16 +14,23 @@ import { calculateButtonOverflow, getToolbarAvailableWidth, getButtonWidth } fro
  * 手机端工具栏配置接口
  */
 export interface MobileToolbarConfig {
+  // 底部工具栏配置
   enableBottomToolbar: boolean
+  closeInputOffset?: string
+  openInputOffset?: string
+  heightThreshold?: number
+
+  // 共享样式配置
   toolbarHeight: string
   toolbarBackgroundColor?: string
   toolbarBackgroundColorDark?: string
   useThemeColor?: boolean
   toolbarOpacity?: number
-  closeInputOffset?: string
-  openInputOffset?: string
   toolbarZIndex?: number
-  heightThreshold?: number
+
+  // 顶部工具栏配置
+  enableTopToolbar?: boolean
+  topToolbarOffset?: string
 }
 
 /**
@@ -59,6 +66,7 @@ export interface MobileSettingsContext {
   applyFeatures: () => void
   applyMobileToolbarStyle: () => void
   updateMobileToolbar: () => void
+  recalculateOverflow: () => void
 }
 
 /**
@@ -469,7 +477,9 @@ export function createMobileSettingLayout(
         context.mobileButtonConfigs.forEach(btn => btn.iconSize = newValue)
         await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
         await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
-        showMessage('图标大小已应用到所有按钮', 1500, 'info')
+        // 重新计算溢出层级（按钮宽度可能变化）
+        context.recalculateOverflow()
+        showMessage('图标大小已修改，请点击保存生效', 1500, 'info')
       }
       return input
     }
@@ -491,7 +501,9 @@ export function createMobileSettingLayout(
         context.mobileButtonConfigs.forEach(btn => btn.minWidth = newValue)
         await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
         await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
-        showMessage('按钮宽度已应用到所有按钮', 1500, 'info')
+        // 重新计算溢出层级（按钮宽度变化）
+        context.recalculateOverflow()
+        showMessage('按钮宽度已修改，请点击保存生效', 1500, 'info')
       }
       return input
     }
@@ -513,7 +525,9 @@ export function createMobileSettingLayout(
         context.mobileButtonConfigs.forEach(btn => btn.marginRight = newValue)
         await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
         await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
-        showMessage('右边距已应用到所有按钮', 1500, 'info')
+        // 重新计算溢出层级（按钮宽度变化）
+        context.recalculateOverflow()
+        showMessage('右边距已修改，请点击保存生效', 1500, 'info')
       }
       return input
     }
@@ -751,36 +765,125 @@ export function createMobileSettingLayout(
     }
   })
 
-  // === 底部工具栏配置 ===
-  createGroupTitle('📱', '底部工具栏配置')
-
+  // 工具栏层级（共享配置）
   setting.addItem({
-    title: '是否将工具栏置底',
-    description: '💡开启后才能调整输入法位置相关设置',
+    title: '④工具栏层级',
+    description: '💡值越大，越不容易被遮挡。默认512，显示在设置上层为1000（顶部和底部通用）',
     createActionElement: () => {
-      const toggle = document.createElement('input')
-      toggle.type = 'checkbox'
-      toggle.className = 'b3-switch'
-      toggle.checked = context.mobileConfig.enableBottomToolbar
-      toggle.style.cssText = 'transform: scale(1.2);'
-      toggle.onchange = async () => {
-        context.mobileConfig.enableBottomToolbar = toggle.checked
+      const input = document.createElement('input')
+      input.className = 'b3-text-field fn__flex-center fn__size200'
+      input.type = 'number'
+      input.value = (context.mobileConfig.toolbarZIndex ?? 512).toString()
+      input.style.cssText = 'font-size: 14px; padding: 8px;'
+      input.min = '0'
+      input.max = '10000'
+      input.onchange = async () => {
+        context.mobileConfig.toolbarZIndex = parseInt(input.value) || 512
         await context.saveData('mobileConfig', context.mobileConfig)
-        // 动态更新底部专用设置的禁用状态
-        document.querySelectorAll('.bottom-toolbar-setting').forEach(el => {
-          (el as HTMLInputElement).disabled = !toggle.checked
-          ;(el as HTMLInputElement).style.opacity = toggle.checked ? '' : '0.5'
-        })
-        // 重新初始化工具栏，确保按钮正确显示
-        context.updateMobileToolbar()
+        context.applyMobileToolbarStyle()
       }
-      return toggle
+      return input
     }
   })
 
+  // === 工具栏位置配置 ===
+  createGroupTitle('📍', '工具栏位置配置')
+
   setting.addItem({
-    title: '①输入法关闭时高度',
-    description: '💡输入法关闭时，工具栏距底部距离（仅在工具栏置底时有效）',
+    title: '工具栏位置',
+    description: '💡选择工具栏显示位置（顶部固定/底部固定）',
+    createActionElement: () => {
+      const container = document.createElement('div')
+      container.style.cssText = 'display: flex; gap: 12px; align-items: center;'
+
+      const options = [
+        { value: 'top', label: '顶部固定' },
+        { value: 'bottom', label: '底部固定' }
+      ]
+
+      // 确定当前选中的值
+      const getCurrentValue = () => {
+        if (context.mobileConfig.enableTopToolbar) return 'top'
+        return 'bottom'  // 默认底部
+      }
+
+      options.forEach(option => {
+        const label = document.createElement('label')
+        label.style.cssText = 'display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 13px;'
+
+        const radio = document.createElement('input')
+        radio.type = 'radio'
+        radio.name = 'toolbar-position'
+        radio.value = option.value
+        radio.checked = getCurrentValue() === option.value
+        radio.style.cssText = 'cursor: pointer;'
+
+        radio.onchange = async () => {
+          // 更新配置（互斥，只启用一个）
+          context.mobileConfig.enableTopToolbar = option.value === 'top'
+          context.mobileConfig.enableBottomToolbar = option.value === 'bottom'
+
+          await context.saveData('mobileConfig', context.mobileConfig)
+
+          // 动态更新底部/顶部专用设置的禁用状态
+          const isBottom = option.value === 'bottom'
+          const isTop = option.value === 'top'
+
+          document.querySelectorAll('.bottom-toolbar-setting').forEach(el => {
+            (el as HTMLInputElement).disabled = !isBottom
+            ;(el as HTMLInputElement).style.opacity = isBottom ? '' : '0.5'
+          })
+
+          document.querySelectorAll('.top-toolbar-setting').forEach(el => {
+            (el as HTMLInputElement).disabled = !isTop
+            ;(el as HTMLInputElement).style.opacity = isTop ? '' : '0.5'
+          })
+
+          // 重新初始化工具栏
+          context.updateMobileToolbar()
+        }
+
+        const text = document.createElement('span')
+        text.textContent = option.label
+
+        label.appendChild(radio)
+        label.appendChild(text)
+        container.appendChild(label)
+      })
+
+      return container
+    }
+  })
+
+  // === 顶部工具栏专用配置 ===
+  createGroupTitle('⬆️', '顶部工具栏配置')
+
+  setting.addItem({
+    title: '距离顶部高度',
+    description: '💡顶部工具栏距离屏幕顶部的距离（仅在顶部固定时有效）',
+    createActionElement: () => {
+      const input = document.createElement('input')
+      input.className = 'b3-text-field fn__flex-center fn__size200 top-toolbar-setting'
+      input.type = 'text'
+      input.value = context.mobileConfig.topToolbarOffset ?? '50px'
+      input.style.cssText = 'font-size: 14px; padding: 8px;'
+      input.disabled = !context.mobileConfig.enableTopToolbar
+      if (!context.mobileConfig.enableTopToolbar) input.style.opacity = '0.5'
+      input.onchange = async () => {
+        context.mobileConfig.topToolbarOffset = input.value
+        await context.saveData('mobileConfig', context.mobileConfig)
+        context.applyMobileToolbarStyle()
+      }
+      return input
+    }
+  })
+
+  // === 底部工具栏专用配置 ===
+  createGroupTitle('⬇️', '底部工具栏配置')
+
+  setting.addItem({
+    title: '①输入法关闭时底部高度',
+    description: '💡输入法关闭时，工具栏距底部距离（仅在底部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
       input.className = 'b3-text-field fn__flex-center fn__size200 bottom-toolbar-setting'
@@ -789,8 +892,10 @@ export function createMobileSettingLayout(
       input.style.cssText = 'font-size: 14px; padding: 8px;'
       input.disabled = !context.mobileConfig.enableBottomToolbar
       if (!context.mobileConfig.enableBottomToolbar) input.style.opacity = '0.5'
-      input.onchange = () => {
+      input.onchange = async () => {
         context.mobileConfig.closeInputOffset = input.value
+        await context.saveData('mobileConfig', context.mobileConfig)
+        context.applyMobileToolbarStyle()
       }
       return input
     }
@@ -798,8 +903,8 @@ export function createMobileSettingLayout(
 
 
   setting.addItem({
-    title: '②输入法打开时高度',
-    description: '💡输入法弹出时，工具栏距底部距离（仅在工具栏置底时有效）',
+    title: '②输入法打开时底部高度',
+    description: '💡输入法弹出时，底部工具栏距底部距离（仅在底部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
       input.className = 'b3-text-field fn__flex-center fn__size200 bottom-toolbar-setting'
@@ -807,28 +912,9 @@ export function createMobileSettingLayout(
       input.style.cssText = 'font-size: 14px; padding: 8px;'
       input.disabled = !context.mobileConfig.enableBottomToolbar
       if (!context.mobileConfig.enableBottomToolbar) input.style.opacity = '0.5'
-      input.onchange = () => {
+      input.onchange = async () => {
         context.mobileConfig.openInputOffset = input.value
-      }
-      return input
-    }
-  })
-
-  setting.addItem({
-    title: '③工具栏层级',
-    description: '💡值越大，越不容易被遮挡。默认值为5,显示在设置上层为10,完全不隐藏为100。',
-    createActionElement: () => {
-      const input = document.createElement('input')
-      input.className = 'b3-text-field fn__flex-center fn__size200 bottom-toolbar-setting'
-      input.type = 'number'
-      input.value = (context.mobileConfig.toolbarZIndex ?? 5).toString()
-      input.style.cssText = 'font-size: 14px; padding: 8px;'
-      input.min = '0'
-      input.max = '100'
-      input.disabled = !context.mobileConfig.enableBottomToolbar
-      if (!context.mobileConfig.enableBottomToolbar) input.style.opacity = '0.5'
-      input.onchange = () => {
-        context.mobileConfig.toolbarZIndex = parseInt(input.value) || 2
+        await context.saveData('mobileConfig', context.mobileConfig)
         context.applyMobileToolbarStyle()
       }
       return input
@@ -836,8 +922,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '④输入法灵敏度检查',
-    description: '💡不建议修改：窗口高度变化超过此百分比触发：30-90（仅在工具栏置底时有效）',
+    title: '③输入法灵敏度检查',
+    description: '💡不建议修改：窗口高度变化超过此百分比触发：30-90（仅在底部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
       input.className = 'b3-text-field fn__flex-center fn__size200 bottom-toolbar-setting'
@@ -848,7 +934,12 @@ export function createMobileSettingLayout(
       input.max = '90'
       input.disabled = !context.mobileConfig.enableBottomToolbar
       if (!context.mobileConfig.enableBottomToolbar) input.style.opacity = '0.5'
-      input.onchange = () => { context.mobileConfig.heightThreshold = parseInt(input.value) || 70 }
+      input.onchange = async () => {
+        context.mobileConfig.heightThreshold = parseInt(input.value) || 70
+        await context.saveData('mobileConfig', context.mobileConfig)
+        // 需要重新初始化工具栏检测器以应用新阈值
+        initMobileToolbarAdjuster(context.mobileConfig)
+      }
       return input
     }
   })

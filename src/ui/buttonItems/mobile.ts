@@ -29,6 +29,7 @@ export interface MobileButtonContext {
   showButtonIdPicker: (currentValue: string, onSelect: (result: ButtonInfo) => void) => void
   buttonConfigs: ButtonConfig[]
   mobileButtonConfigs: ButtonConfig[]
+  recalculateOverflow: () => void
 }
 
 /**
@@ -125,6 +126,8 @@ export function createMobileButtonItem(
           btn.sort = idx + 1
         })
 
+        // 重新计算溢出层级
+        context.recalculateOverflow()
         renderList()
       }
     }
@@ -311,6 +314,8 @@ export function createMobileButtonItem(
           btn.sort = idx + 1
         })
 
+        // 重新计算溢出层级
+        context.recalculateOverflow()
         renderList()
       }
     }
@@ -418,6 +423,8 @@ export function createMobileButtonItem(
         configsArray.sort((a, b) => a.sort - b.sort).forEach((btn, idx) => {
           btn.sort = idx + 1
         })
+        // 重新计算溢出层级
+        context.recalculateOverflow()
         renderList()
       }
     }
@@ -436,6 +443,9 @@ export function createMobileButtonItem(
     enabledToggle.title = enabledToggle.checked ? '点击禁用按钮' : '点击启用按钮'
     // 更新按钮项的透明度
     item.style.opacity = enabledToggle.checked ? '1' : '0.5'
+    // 重新计算溢出层级（启用/禁用会影响按钮是否显示）
+    context.recalculateOverflow()
+    renderList()
   }
   // 根据启用状态设置透明度
   if (button.enabled === false) {
@@ -489,6 +499,9 @@ export function createMobileButtonItem(
       if (num < 1) num = 1
       if (num > 5) num = 5
       button.layers = num
+      // 重新计算溢出层级
+      context.recalculateOverflow()
+      renderList()
     }, 'number')
     layersField.querySelector('input')!.min = '1'
     layersField.querySelector('input')!.max = '5'

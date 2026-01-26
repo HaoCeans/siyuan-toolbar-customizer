@@ -537,6 +537,27 @@ export default class ToolbarCustomizer extends Plugin {
         initMobileToolbarAdjuster(this.mobileConfig)
         const buttonsToInit = this.mobileButtonConfigs
         initCustomButtons(buttonsToInit)
+      },
+      recalculateOverflow: () => {
+        // 获取扩展工具栏按钮的层数配置
+        const overflowBtn = this.mobileButtonConfigs.find(btn => btn.id === 'overflow-button-mobile')
+        const overflowLayers = (overflowBtn && overflowBtn.enabled !== false) ? (overflowBtn.layers || 1) : 0
+
+        // 如果扩展工具栏被禁用，重置所有按钮的溢出层级
+        if (overflowLayers === 0 || overflowBtn?.enabled === false) {
+          this.mobileButtonConfigs.forEach(btn => {
+            btn.overflowLevel = 0
+          })
+        } else {
+          // 重新计算所有按钮的溢出层级
+          const updatedButtons = calculateButtonOverflow(this.mobileButtonConfigs, overflowLayers)
+          updatedButtons.forEach(btn => {
+            const original = this.mobileButtonConfigs.find(b => b.id === btn.id)
+            if (original) {
+              original.overflowLevel = btn.overflowLevel
+            }
+          })
+        }
       }
     }
 
@@ -786,12 +807,15 @@ export default class ToolbarCustomizer extends Plugin {
     }
   }
 
-  // 应用手机端工具栏样式
+  // 应用手机端工具栏样式（仅用于动态更新样式，不处理背景颜色）
   private applyMobileToolbarStyle() {
     if (!this.isMobile) return
 
-    // 使用 style 标签来覆盖 toolbarManager 中的 !important 样式
-    const styleId = 'mobile-toolbar-background-color-style'
+    // 注意：背景颜色由 toolbarManager 中的 applyToolbarBackgroundColor 处理
+    // 这里只处理需要动态更新的样式（如工具栏高度）
+
+    // 使用不同的 style ID 来避免冲突
+    const styleId = 'mobile-toolbar-dynamic-style'
     let style = document.getElementById(styleId) as HTMLStyleElement
 
     if (!style) {
@@ -800,72 +824,22 @@ export default class ToolbarCustomizer extends Plugin {
       document.head.appendChild(style)
     }
 
-    // 生成 CSS 规则，使用 !important 来覆盖默认样式
     const cssRules: string[] = []
 
-    // 判断是否使用主题颜色
-    if (this.mobileConfig.useThemeColor) {
-      // 使用主题颜色
-      cssRules.push(`
-        @media (max-width: 768px) {
-          .protyle-breadcrumb,
-          .protyle-breadcrumb__bar,
-          .protyle-breadcrumb__bar[data-input-method],
-          .protyle-breadcrumb[data-input-method] {
-            background-color: var(--b3-theme-surface) !important;
-            opacity: ${this.mobileConfig.toolbarOpacity} !important;
-            height: ${this.mobileConfig.toolbarHeight} !important;
-            min-height: ${this.mobileConfig.toolbarHeight} !important;
-          }
+    // 工具栏高度设置（所有模式通用）
+    cssRules.push(`
+      @media (max-width: 768px) {
+        .protyle-breadcrumb,
+        .protyle-breadcrumb__bar,
+        .protyle-breadcrumb__bar[data-input-method],
+        .protyle-breadcrumb[data-input-method] {
+          height: ${this.mobileConfig.toolbarHeight} !important;
+          min-height: ${this.mobileConfig.toolbarHeight} !important;
         }
-      `)
-    } else {
-      // 使用自定义颜色，分别处理明亮和黑暗模式
-      const lightColor = this.mobileConfig.toolbarBackgroundColor || '#f8f9fa'
-      const darkColor = this.mobileConfig.toolbarBackgroundColorDark || '#1a1a1a'
-
-      // 通用设置（默认明亮模式）
-      cssRules.push(`
-        @media (max-width: 768px) {
-          .protyle-breadcrumb,
-          .protyle-breadcrumb__bar,
-          .protyle-breadcrumb__bar[data-input-method],
-          .protyle-breadcrumb[data-input-method] {
-            background-color: ${lightColor} !important;
-            opacity: ${this.mobileConfig.toolbarOpacity} !important;
-            height: ${this.mobileConfig.toolbarHeight} !important;
-            min-height: ${this.mobileConfig.toolbarHeight} !important;
-          }
-        }
-      `)
-
-      // 黑暗模式（使用思源的主题模式属性）
-      cssRules.push(`
-        @media (max-width: 768px) {
-          html[data-theme-mode="dark"] .protyle-breadcrumb,
-          html[data-theme-mode="dark"] .protyle-breadcrumb__bar,
-          html[data-theme-mode="dark"] .protyle-breadcrumb__bar[data-input-method],
-          html[data-theme-mode="dark"] .protyle-breadcrumb[data-input-method] {
-            background-color: ${darkColor} !important;
-          }
-        }
-      `)
-    }
-
-    // 底部专用设置：仅应用于置底工具栏
-    if (this.mobileConfig.enableBottomToolbar) {
-      cssRules.push(`
-        @media (max-width: 768px) {
-          .protyle-breadcrumb__bar[data-input-method],
-          .protyle-breadcrumb[data-input-method] {
-            z-index: ${this.mobileConfig.toolbarZIndex} !important;
-          }
-        }
-      `)
-    }
+      }
+    `)
 
     style.textContent = cssRules.join('\n')
-    // 确保样式在最后（最高优先级）
     document.head.appendChild(style)
   }
 

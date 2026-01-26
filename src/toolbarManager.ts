@@ -520,6 +520,9 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
   // 仅在移动端初始化
   if (!isMobileDevice()) return
 
+  // 保存配置到全局变量，供扩展工具栏使用
+  (window as any).__mobileToolbarConfig = config
+
   // 如果未启用工具栏置底，则移除相关样式并返回
   if (!config.enableBottomToolbar) {
     // 移除 body 标记类
@@ -962,9 +965,11 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
   // 保存选区的变量（用于快捷键按钮）
   let savedSelection: Range | null = null
   let lastActiveElement: HTMLElement | null = null
+  let isTouchEvent = false
 
   // 在 mousedown 时保存选区和焦点元素（此时编辑器还未失去焦点）
   button.addEventListener('mousedown', (e) => {
+    if (isTouchEvent) return // 如果是触摸事件，跳过 mousedown
     const selection = window.getSelection()
     if (selection && selection.rangeCount > 0) {
       savedSelection = selection.getRangeAt(0).cloneRange()
@@ -972,13 +977,24 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     lastActiveElement = document.activeElement as HTMLElement
   })
 
+  // 移动端：touchstart 时保存状态，但不阻止默认
+  button.addEventListener('touchstart', (e) => {
+    isTouchEvent = true
+    const selection = window.getSelection()
+    if (selection && selection.rangeCount > 0) {
+      savedSelection = selection.getRangeAt(0).cloneRange()
+    }
+    lastActiveElement = document.activeElement as HTMLElement
+  }, { passive: true })
+
+  // touchend 时重置标记
+  button.addEventListener('touchend', () => {
+    setTimeout(() => { isTouchEvent = false }, 100)
+  })
+
   // 绑定点击事件
   button.addEventListener('click', (e) => {
     e.stopPropagation()
-    e.preventDefault()
-
-    // 移除焦点，避免按钮保持点击状态
-    ;(e.currentTarget as HTMLElement).blur()
 
     // 扩展工具栏按钮特殊处理
     if (config.id === 'overflow-button-mobile') {
@@ -988,10 +1004,16 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
 
     // 将保存的选区传递给处理函数
     handleButtonClick(config, savedSelection, lastActiveElement)
+
+    // 如果之前保存的是输入框，恢复焦点
+    if (lastActiveElement && lastActiveElement !== document.activeElement) {
+      ;(lastActiveElement as HTMLElement).focus()
+    }
   })
 
   return button
 }
+
 
 /**
  * 显示/隐藏扩展工具栏弹窗
@@ -1132,6 +1154,22 @@ function showOverflowToolbar(config: ButtonConfig) {
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     `
 
+    // 应用工具栏背景颜色和透明度配置
+    const mobileConfig = (window as any).__mobileToolbarConfig as MobileToolbarConfig
+    if (mobileConfig) {
+      if (mobileConfig.useThemeColor) {
+        // 使用主题颜色时，只需要调整透明度
+        toolbar.style.backgroundColor = `var(--b3-theme-surface)`
+        toolbar.style.opacity = mobileConfig.toolbarOpacity.toString()
+      } else {
+        // 使用自定义颜色
+        const isDark = document.body.classList.contains('b3-theme-dark')
+        const bgColor = isDark ? mobileConfig.toolbarBackgroundColorDark : mobileConfig.toolbarBackgroundColor
+        toolbar.style.backgroundColor = bgColor
+        toolbar.style.opacity = mobileConfig.toolbarOpacity.toString()
+      }
+    }
+
     // 添加该层的所有按钮
     layerButtons.forEach((btn: ButtonConfig) => {
       const layerBtn = document.createElement('button')
@@ -1199,13 +1237,51 @@ function showOverflowToolbar(config: ButtonConfig) {
       // 设置按钮提示（鼠标悬停显示名称）
       layerBtn.title = btn.name
 
+      // 保存选区的变量（每个按钮独立保存）
+      let savedSelection: Range | null = null
+      let lastActiveElement: HTMLElement | null = null
+      let isTouchEvent = false
+
+      // 在 mousedown 时保存选区和焦点元素
+      layerBtn.addEventListener('mousedown', (e) => {
+        if (isTouchEvent) return
+        const selection = window.getSelection()
+        if (selection && selection.rangeCount > 0) {
+          savedSelection = selection.getRangeAt(0).cloneRange()
+        }
+        lastActiveElement = document.activeElement as HTMLElement
+      })
+
+      // 移动端：touchstart 时保存状态
+      layerBtn.addEventListener('touchstart', (e) => {
+        isTouchEvent = true
+        const selection = window.getSelection()
+        if (selection && selection.rangeCount > 0) {
+          savedSelection = selection.getRangeAt(0).cloneRange()
+        }
+        lastActiveElement = document.activeElement as HTMLElement
+      }, { passive: true })
+
+      // touchend 时重置标记
+      layerBtn.addEventListener('touchend', () => {
+        setTimeout(() => { isTouchEvent = false }, 100)
+      })
+
       // 点击按钮执行功能
-      layerBtn.onclick = (e) => {
+      layerBtn.addEventListener('click', (e) => {
         e.stopPropagation()
-        handleButtonClick(btn)
+
         // 关闭扩展工具栏
         document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove())
-      }
+
+        // 将保存的选区传递给处理函数
+        handleButtonClick(btn, savedSelection, lastActiveElement)
+
+        // 如果之前保存的是输入框，恢复焦点
+        if (lastActiveElement && lastActiveElement !== document.activeElement) {
+          ;(lastActiveElement as HTMLElement).focus()
+        }
+      })
 
       toolbar.appendChild(layerBtn)
     })

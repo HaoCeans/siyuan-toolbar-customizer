@@ -30,7 +30,6 @@ export interface MobileToolbarConfig {
  * 手机端功能配置接口
  */
 export interface MobileFeatureConfig {
-  toolbarButtonWidth: number
   hideBreadcrumbIcon: boolean
   hideReadonlyButton: boolean
   hideDocMenuButton: boolean
@@ -551,25 +550,6 @@ export function createMobileSettingLayout(
 
   // === 全局工具栏配置 ===
   createGroupTitle('📱', '全局工具栏配置')
-
-  // 工具栏按钮宽度
-  setting.addItem({
-    title: '📏栏内按钮均匀分布',
-    description: '💡可整体调整按钮间的宽度。<br>   调整建议：每次增加50，会明显变化，感觉合适后，再微调！',
-    createActionElement: () => {
-      const input = document.createElement('input')
-      input.className = 'b3-text-field fn__flex-center fn__size200'
-      input.type = 'number'
-      input.value = context.mobileFeatureConfig.toolbarButtonWidth.toString()
-      input.style.cssText = 'font-size: 14px; padding: 8px;'
-      input.onchange = async () => {
-        context.mobileFeatureConfig.toolbarButtonWidth = parseInt(input.value) || 32
-        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
-        context.applyFeatures()
-      }
-      return input
-    }
-  })
 
   // 工具栏自身高度
   setting.addItem({

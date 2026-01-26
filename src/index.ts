@@ -126,7 +126,6 @@ export default class ToolbarCustomizer extends Plugin {
     hideReadonlyButton: true,   // 锁定编辑按钮隐藏
     hideDocMenuButton: true,    // 文档菜单按钮隐藏
     hideMoreButton: true,       // 更多按钮隐藏
-    toolbarButtonWidth: 20,     // 工具栏按钮全局宽度（px）
     toolbarHeight: 32,          // 工具栏高度（px）
     disableCustomButtons: false,// 禁用所有自定义按钮（恢复思源原始状态，仅桌面端）
     showAllNotifications: true, // 一键开启所有按钮右上角提示
@@ -140,7 +139,6 @@ export default class ToolbarCustomizer extends Plugin {
     hideReadonlyButton: true,   // 锁定编辑按钮隐藏
     hideDocMenuButton: true,    // 文档菜单按钮隐藏
     hideMoreButton: true,       // 更多按钮隐藏
-    toolbarButtonWidth: 32,     // 工具栏按钮全局宽度（px）
     disableMobileSwipe: true,   // 手机端禁止左右滑动弹出
     disableFileTree: true,      // 禁止右滑弹出文档树
     disableSettingMenu: true,   // 禁止左滑弹出设置菜单
@@ -293,8 +291,8 @@ export default class ToolbarCustomizer extends Plugin {
       const savedLegacyFeatureConfig = await this.loadData('featureConfig')
       if (savedLegacyFeatureConfig) {
         // 只迁移新配置中存在的属性
-        const desktopProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'toolbarButtonWidth', 'toolbarHeight', 'disableCustomButtons', 'showAllNotifications']
-        const mobileProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'toolbarButtonWidth', 'disableMobileSwipe', 'disableFileTree', 'disableSettingMenu', 'showAllNotifications']
+        const desktopProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'toolbarHeight', 'disableCustomButtons', 'showAllNotifications']
+        const mobileProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'disableMobileSwipe', 'disableFileTree', 'disableSettingMenu', 'showAllNotifications']
 
         // 迁移到电脑端配置（只迁移电脑端支持的属性）
         desktopProps.forEach(prop => {
@@ -620,16 +618,6 @@ export default class ToolbarCustomizer extends Plugin {
           padding: 0 !important;
           margin: 0 !important;
           overflow: hidden !important;
-        }
-      `
-    }
-    
-    // 工具栏按钮全局宽度（当桌面端禁用自定义按钮时，跳过此设置）
-    if (this.featureConfig.toolbarButtonWidth !== 32 && !(this.desktopFeatureConfig.disableCustomButtons && !this.isMobile)) {
-      styleContent += `
-        .protyle-breadcrumb__bar button[data-custom-button],
-        .protyle-breadcrumb button[data-custom-button] {
-          min-width: ${this.featureConfig.toolbarButtonWidth}px !important;
         }
       `
     }

@@ -117,7 +117,6 @@ export function createDesktopGlobalButtonConfig(
  * 功能配置接口
  */
 export interface FeatureConfig {
-  toolbarButtonWidth: number
   toolbarHeight?: number
   hideBreadcrumbIcon: boolean
   hideReadonlyButton: boolean
@@ -178,37 +177,6 @@ export function createDesktopFeatureConfig(
   container.className = 'toolbar-customizer-content'
   container.dataset.tabGroup = 'desktop'
   container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; width: 100% !important; max-width: 100% !important;'
-
-  // 工具栏按钮宽度
-  const widthItem = document.createElement('div')
-  widthItem.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
-
-  const widthRow = document.createElement('div')
-  widthRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
-
-  const widthLabel = document.createElement('label')
-  widthLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
-  widthLabel.textContent = '工具栏按钮宽度'
-
-  const widthInput = document.createElement('input')
-  widthInput.type = 'number'
-  widthInput.value = config.toolbarButtonWidth.toString()
-  widthInput.className = 'b3-text-field'
-  widthInput.style.cssText = 'width: 80px;'
-  widthInput.onchange = () => {
-    onConfigChange({ ...config, toolbarButtonWidth: parseInt(widthInput.value) || 32 })
-  }
-
-  widthRow.appendChild(widthLabel)
-  widthRow.appendChild(widthInput)
-
-  const widthDesc = document.createElement('div')
-  widthDesc.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
-  widthDesc.textContent = '💡 可整体调整按钮间的宽度'
-
-  widthItem.appendChild(widthRow)
-  widthItem.appendChild(widthDesc)
-  container.appendChild(widthItem)
 
   // 工具栏高度
   const heightItem = document.createElement('div')
@@ -610,39 +578,6 @@ export function createDesktopSettingLayout(
         item.appendChild(switchEl)
         return item
       }
-
-      // 工具栏按钮宽度
-      const widthItem = document.createElement('div')
-      widthItem.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
-
-      const widthRow = document.createElement('div')
-      widthRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
-
-      const widthLabel = document.createElement('label')
-      widthLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
-      widthLabel.textContent = '工具栏按钮宽度'
-
-      const widthInput = document.createElement('input')
-      widthInput.type = 'number'
-      widthInput.value = context.desktopFeatureConfig.toolbarButtonWidth.toString()
-      widthInput.className = 'b3-text-field'
-      widthInput.style.cssText = 'width: 80px;'
-      widthInput.onchange = async () => {
-        context.desktopFeatureConfig.toolbarButtonWidth = parseInt(widthInput.value) || 32
-        await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
-        context.applyFeatures()
-      }
-
-      widthRow.appendChild(widthLabel)
-      widthRow.appendChild(widthInput)
-
-      const widthDesc = document.createElement('div')
-      widthDesc.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
-      widthDesc.textContent = '💡 可整体调整按钮间的宽度'
-
-      widthItem.appendChild(widthRow)
-      widthItem.appendChild(widthDesc)
-      container.appendChild(widthItem)
 
       // 工具栏高度
       const heightItem = document.createElement('div')

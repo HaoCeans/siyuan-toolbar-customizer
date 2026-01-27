@@ -139,9 +139,13 @@ export function createDesktopButtonItem(
     'author-tool': '⑥鲸鱼定制工具箱'
   }
   const typeLabel = typeLabels[button.type] || button.type
+  const isAuthorTool = button.type === 'author-tool'
+  const typeStyle = isAuthorTool
+    ? 'font-size: 11px; color: #a855f7; font-weight: 600;'
+    : 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
   infoDiv.innerHTML = `
     <div style="font-weight: 500; font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 4px;">${button.name}</div>
-    <div style="font-size: 11px; color: var(--b3-theme-on-surface-light);">
+    <div style="${typeStyle}">
       ${typeLabel}
     </div>
   `
@@ -465,14 +469,14 @@ export function createDesktopButtonItem(
     const subtypeSelect = document.createElement('select')
     subtypeSelect.className = 'b3-text-field'
     subtypeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
-    const currentSubtype = button.authorToolSubtype || 'script'
+    const currentSubtype = button.authorToolSubtype || 'open-doc'
     subtypeSelect.innerHTML = `
-      <option value="script" ${currentSubtype === 'script' ? 'selected' : ''}>① 自定义脚本</option>
-      <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库查询</option>
+      <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>① 打开指定ID文档</option>
+      <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库悬浮弹窗</option>
       <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'script' | 'database' | 'diary-bottom'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom'
       // 刷新表单以显示/隐藏相关配置
       if ((subtypeSelect as any).refreshForm) {
         (subtypeSelect as any).refreshForm()
@@ -480,52 +484,38 @@ export function createDesktopButtonItem(
     }
     authorToolField.appendChild(subtypeSelect)
 
-    // 自定义脚本配置区
-    const scriptConfigDiv = document.createElement('div')
-    scriptConfigDiv.id = 'script-config'
-    scriptConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+    // 打开指定ID文档配置区
+    const docConfigDiv = document.createElement('div')
+    docConfigDiv.id = 'open-doc-config'
+    docConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
-    const scriptLabel = document.createElement('label')
-    scriptLabel.textContent = '自定义脚本代码'
-    scriptLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
-    scriptConfigDiv.appendChild(scriptLabel)
-
-    const scriptInput = document.createElement('textarea')
-    scriptInput.className = 'b3-text-field'
-    scriptInput.placeholder = '在此输入自定义 JavaScript 代码...'
-    scriptInput.value = button.authorScript || ''
-    scriptInput.style.cssText = 'resize: vertical; min-height: 100px; font-family: monospace; font-size: 12px;'
-    scriptInput.onchange = () => { button.authorScript = scriptInput.value }
-    scriptConfigDiv.appendChild(scriptInput)
-
-    const scriptHint = document.createElement('div')
-    scriptHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    scriptHint.textContent = '可用变量: config, fetchSyncPost, showMessage'
-    scriptConfigDiv.appendChild(scriptHint)
-
-    // 目标文档ID（脚本模式使用）
     const docIdLabel = document.createElement('label')
-    docIdLabel.textContent = '目标文档ID'
-    docIdLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 4px;'
-    scriptConfigDiv.appendChild(docIdLabel)
+    docIdLabel.textContent = '📄 目标文档ID'
+    docIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+    docConfigDiv.appendChild(docIdLabel)
 
     const docIdInput = document.createElement('input')
     docIdInput.type = 'text'
     docIdInput.className = 'b3-text-field'
-    docIdInput.placeholder = '输入要打开的文档ID...'
+    docIdInput.placeholder = '如: 20251215234003-j3i7wjc'
     docIdInput.value = button.targetDocId || ''
     docIdInput.style.cssText = 'font-size: 13px;'
     docIdInput.onchange = () => { button.targetDocId = docIdInput.value }
-    scriptConfigDiv.appendChild(docIdInput)
+    docConfigDiv.appendChild(docIdInput)
 
-    authorToolField.appendChild(scriptConfigDiv)
+    const docIdHint = document.createElement('div')
+    docIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+    docIdHint.textContent = '💡 点击按钮后自动打开指定ID的文档'
+    docConfigDiv.appendChild(docIdHint)
 
-    // 数据库查询配置区
+    authorToolField.appendChild(docConfigDiv)
+
+    // 数据库悬浮弹窗配置区
     const dbConfigDiv = document.createElement('div')
     dbConfigDiv.id = 'db-config'
     dbConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 10px; background: rgba(255, 255, 255, 0.5); border-radius: 6px;'
 
-    // 日记底部配置区（说明）
+    // 日记底部配置区（说明 + 等待时间配置）
     const diaryConfigDiv = document.createElement('div')
     diaryConfigDiv.id = 'diary-config'
     diaryConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 15px; background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(59, 130, 246, 0.1)); border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3);'
@@ -537,8 +527,35 @@ export function createDesktopButtonItem(
 
     const diaryDesc = document.createElement('div')
     diaryDesc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.6;'
-    diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 打开日记<br>2. 自动滚动到文档底部<br><br>无需配置，点击按钮即可使用。'
+    diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 打开日记<br>2. 自动滚动到文档底部'
     diaryConfigDiv.appendChild(diaryDesc)
+
+    // 等待时间配置（移动端）
+    const waitTimeContainer = document.createElement('div')
+    waitTimeContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px; margin-top: 8px;'
+
+    const waitTimeLabel = document.createElement('label')
+    waitTimeLabel.textContent = '⏱ 移动端等待时间（毫秒）'
+    waitTimeLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); font-weight: 500;'
+    waitTimeContainer.appendChild(waitTimeLabel)
+
+    const waitTimeInput = document.createElement('input')
+    waitTimeInput.type = 'number'
+    waitTimeInput.className = 'b3-text-field'
+    waitTimeInput.value = String(button.diaryWaitTime || 1000)
+    waitTimeInput.placeholder = '默认 1000'
+    waitTimeInput.style.cssText = 'font-size: 13px;'
+    waitTimeInput.addEventListener('input', () => {
+      button.diaryWaitTime = parseInt(waitTimeInput.value) || 1000
+    })
+    waitTimeContainer.appendChild(waitTimeInput)
+
+    const waitTimeHint = document.createElement('div')
+    waitTimeHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
+    waitTimeHint.textContent = '💡 移动端加载日记较慢时可增加此值，范围 100-10000ms'
+    waitTimeContainer.appendChild(waitTimeHint)
+
+    diaryConfigDiv.appendChild(waitTimeContainer)
 
     authorToolField.appendChild(diaryConfigDiv)
 
@@ -702,15 +719,15 @@ export function createDesktopButtonItem(
     const updateVisibility = () => {
       const subtype = subtypeSelect.value
       if (subtype === 'database') {
-        scriptConfigDiv.style.display = 'none'
+        docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'flex'
         diaryConfigDiv.style.display = 'none'
       } else if (subtype === 'diary-bottom') {
-        scriptConfigDiv.style.display = 'none'
+        docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'flex'
       } else {
-        scriptConfigDiv.style.display = 'flex'
+        docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'
       }
@@ -1030,59 +1047,45 @@ export function populateDesktopEditForm(
     const subtypeSelect = document.createElement('select')
     subtypeSelect.className = 'b3-text-field'
     subtypeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
-    const currentSubtype = button.authorToolSubtype || 'script'
+    const currentSubtype = button.authorToolSubtype || 'open-doc'
     subtypeSelect.innerHTML = `
-      <option value="script" ${currentSubtype === 'script' ? 'selected' : ''}>① 自定义脚本</option>
-      <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库查询</option>
+      <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>① 打开指定ID文档</option>
+      <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库悬浮弹窗</option>
       <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'script' | 'database' | 'diary-bottom'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom'
       ;(subtypeSelect as any).refreshForm?.()
     }
     authorToolField.appendChild(subtypeSelect)
 
-    // 自定义脚本配置区
-    const scriptConfigDiv = document.createElement('div')
-    scriptConfigDiv.id = 'script-config'
-    scriptConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+    // 打开指定ID文档配置区
+    const docConfigDiv = document.createElement('div')
+    docConfigDiv.id = 'open-doc-config'
+    docConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
-    const scriptLabel = document.createElement('label')
-    scriptLabel.textContent = '自定义脚本代码'
-    scriptLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
-    scriptConfigDiv.appendChild(scriptLabel)
-
-    const scriptInput = document.createElement('textarea')
-    scriptInput.className = 'b3-text-field'
-    scriptInput.placeholder = '在此输入自定义 JavaScript 代码...'
-    scriptInput.value = button.authorScript || ''
-    scriptInput.style.cssText = 'resize: vertical; min-height: 100px; font-family: monospace; font-size: 12px;'
-    scriptInput.onchange = () => { button.authorScript = scriptInput.value }
-    scriptConfigDiv.appendChild(scriptInput)
-
-    const scriptHint = document.createElement('div')
-    scriptHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    scriptHint.textContent = '可用变量: config, fetchSyncPost, showMessage'
-    scriptConfigDiv.appendChild(scriptHint)
-
-    // 目标文档ID（脚本模式使用）
     const docIdLabel = document.createElement('label')
-    docIdLabel.textContent = '目标文档ID'
-    docIdLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 4px;'
-    scriptConfigDiv.appendChild(docIdLabel)
+    docIdLabel.textContent = '📄 目标文档ID'
+    docIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+    docConfigDiv.appendChild(docIdLabel)
 
     const docIdInput = document.createElement('input')
     docIdInput.type = 'text'
     docIdInput.className = 'b3-text-field'
-    docIdInput.placeholder = '输入要打开的文档ID...'
+    docIdInput.placeholder = '如: 20251215234003-j3i7wjc'
     docIdInput.value = button.targetDocId || ''
     docIdInput.style.cssText = 'font-size: 13px;'
     docIdInput.onchange = () => { button.targetDocId = docIdInput.value }
-    scriptConfigDiv.appendChild(docIdInput)
+    docConfigDiv.appendChild(docIdInput)
 
-    authorToolField.appendChild(scriptConfigDiv)
+    const docIdHint = document.createElement('div')
+    docIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+    docIdHint.textContent = '💡 点击按钮后自动打开指定ID的文档'
+    docConfigDiv.appendChild(docIdHint)
 
-    // 数据库查询配置区
+    authorToolField.appendChild(docConfigDiv)
+
+    // 数据库悬浮弹窗配置区
     const dbConfigDiv = document.createElement('div')
     dbConfigDiv.id = 'db-config'
     dbConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 10px; background: rgba(255, 255, 255, 0.5); border-radius: 6px;'
@@ -1270,7 +1273,7 @@ export function populateDesktopEditForm(
 
     authorToolField.appendChild(dbConfigDiv)
 
-    // 日记底部配置区（说明）
+    // 日记底部配置区（说明 + 等待时间配置）
     const diaryConfigDiv = document.createElement('div')
     diaryConfigDiv.id = 'diary-config'
     diaryConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 15px; background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(59, 130, 246, 0.1)); border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3);'
@@ -1282,8 +1285,35 @@ export function populateDesktopEditForm(
 
     const diaryDesc = document.createElement('div')
     diaryDesc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.6;'
-    diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 打开日记<br>2. 自动滚动到文档底部<br><br>无需配置，点击按钮即可使用。'
+    diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 打开日记<br>2. 自动滚动到文档底部'
     diaryConfigDiv.appendChild(diaryDesc)
+
+    // 等待时间配置（移动端）
+    const waitTimeContainer = document.createElement('div')
+    waitTimeContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px; margin-top: 8px;'
+
+    const waitTimeLabel = document.createElement('label')
+    waitTimeLabel.textContent = '⏱ 移动端等待时间（毫秒）'
+    waitTimeLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); font-weight: 500;'
+    waitTimeContainer.appendChild(waitTimeLabel)
+
+    const waitTimeInput = document.createElement('input')
+    waitTimeInput.type = 'number'
+    waitTimeInput.className = 'b3-text-field'
+    waitTimeInput.value = String(button.diaryWaitTime || 1000)
+    waitTimeInput.placeholder = '默认 1000'
+    waitTimeInput.style.cssText = 'font-size: 13px;'
+    waitTimeInput.addEventListener('input', () => {
+      button.diaryWaitTime = parseInt(waitTimeInput.value) || 1000
+    })
+    waitTimeContainer.appendChild(waitTimeInput)
+
+    const waitTimeHint = document.createElement('div')
+    waitTimeHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
+    waitTimeHint.textContent = '💡 移动端加载日记较慢时可增加此值，范围 100-10000ms'
+    waitTimeContainer.appendChild(waitTimeHint)
+
+    diaryConfigDiv.appendChild(waitTimeContainer)
 
     authorToolField.appendChild(diaryConfigDiv)
 
@@ -1291,15 +1321,15 @@ export function populateDesktopEditForm(
     const updateVisibility = () => {
       const subtype = subtypeSelect.value
       if (subtype === 'database') {
-        scriptConfigDiv.style.display = 'none'
+        docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'flex'
         diaryConfigDiv.style.display = 'none'
       } else if (subtype === 'diary-bottom') {
-        scriptConfigDiv.style.display = 'none'
+        docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'flex'
       } else {
-        scriptConfigDiv.style.display = 'flex'
+        docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'
       }

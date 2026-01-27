@@ -41,10 +41,9 @@ export interface ButtonConfig {
   template?: string;         // 模板内容
   clickSequence?: string[];  // 模拟点击选择器序列
   shortcutKey?: string;      // 快捷键组合
-  targetDocId?: string;      // 鲸鱼定制工具箱：目标文档ID
-  authorScript?: string;     // 鲸鱼定制工具箱：自定义脚本
-  // 鲸鱼定制工具箱 - 数据库查询配置
-  authorToolSubtype?: 'script' | 'database' | 'diary-bottom'; // 作者工具子类型：script=自定义脚本, database=数据库查询, diary-bottom=日记底部
+  targetDocId?: string;      // 打开指定ID文档：目标文档ID
+  // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
+  authorToolSubtype?: 'open-doc' | 'database' | 'diary-bottom'; // 作者工具子类型：open-doc=打开指定ID文档, database=数据库悬浮弹窗, diary-bottom=日记底部
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
   viewName?: string;         // 视图名称
@@ -55,6 +54,7 @@ export interface ButtonConfig {
   dbDisplayMode?: 'cards' | 'table'; // 显示模式：cards=卡片, table=表格
   showColumns?: string[];    // 要显示的列名数组
   timeRangeColumnName?: string; // 时间段列的名称
+  diaryWaitTime?: number;     // 日记底部功能：移动端等待时间（毫秒，默认 1000）
   icon: string;              // 图标（思源图标或Emoji）
   iconSize: number;          // 图标大小（px）
   minWidth: number;          // 按钮最小宽度（px）
@@ -2212,7 +2212,7 @@ async function executeDiaryBottom(config: ButtonConfig) {
 
     // ==================== 滚动到底部函数（电脑端和手机端共用） ====================
     let scrollAttempts = 0
-    const maxScrollAttempts = 20
+    const maxScrollAttempts = 5
     const retryDelay = 200
 
     function startScrolling() {
@@ -2292,8 +2292,9 @@ async function executeDiaryBottom(config: ButtonConfig) {
           if (headerText.includes('选择') || headerText.includes('请先')) {
             // 直接点击确定按钮
             (confirmBtn as HTMLElement).click()
-            // 对话框确认后，延迟1000ms再滚动
-            safeSetTimeout(startScrolling, 1000)
+            // 对话框确认后，使用配置的等待时间后再滚动
+            const waitTime = config.diaryWaitTime || 1000
+            safeSetTimeout(startScrolling, waitTime)
             return
           }
         }
@@ -2320,7 +2321,7 @@ async function executeDiaryBottom(config: ButtonConfig) {
  * 执行鲸鱼定制工具箱
  */
 function executeAuthorTool(config: ButtonConfig) {
-  const subtype = config.authorToolSubtype || 'script'
+  const subtype = config.authorToolSubtype || 'open-doc'
 
   // 日记底部类型
   if (subtype === 'diary-bottom') {
@@ -2328,32 +2329,20 @@ function executeAuthorTool(config: ButtonConfig) {
     return
   }
 
-  // 数据库查询类型
+  // 数据库悬浮弹窗类型
   if (subtype === 'database') {
     executeDatabaseQuery(config)
     return
   }
 
-  // 自定义脚本类型（默认）
-  // 如果配置了目标文档ID，打开该文档
+  // 打开指定ID文档类型（默认）
   if (config.targetDocId) {
-    // 使用思源 API 打开块，忽略返回值
+    // 使用思源 API 打开块
     fetch('/api/block/openBlockDoc', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: config.targetDocId })
     }).catch(() => {})
-  }
-
-  // 如果配置了自定义脚本，执行它
-  if (config.authorScript) {
-    try {
-      // 使用 Function 构造器创建一个安全的执行环境
-      const scriptFn = new Function('config', 'fetchSyncPost', 'showMessage', config.authorScript)
-      scriptFn(config, fetchSyncPost, showMessage)
-    } catch (err) {
-      Notify.showErrorScriptFailed(err)
-    }
   }
 }
 
@@ -2442,7 +2431,7 @@ function parseCellValue(cell: any): { content: string; blockId: string } {
 }
 
 /**
- * 执行数据库查询
+ * 执行数据库悬浮弹窗
  */
 async function executeDatabaseQuery(config: ButtonConfig) {
   try {
@@ -2574,13 +2563,13 @@ async function executeDatabaseQuery(config: ButtonConfig) {
     showDatabasePopup(processedRows, config, primaryKeyColumn, timeRangeColumnName, displayMode, showColumns, attributeView.name)
 
   } catch (error: any) {
-    console.error('数据库查询失败:', error)
+    console.error('数据库悬浮弹窗失败:', error)
     Notify.showErrorQueryFailed(error)
   }
 }
 
 /**
- * 显示数据库查询结果弹窗
+ * 显示数据库悬浮弹窗结果弹窗
  */
 function showDatabasePopup(
   rows: Array<{ id: string; blockId: string; values: Record<string, string> }>,

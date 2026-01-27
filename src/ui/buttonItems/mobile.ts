@@ -386,9 +386,13 @@ export function createMobileButtonItem(
     levelLabel = `<span style="color: #22c55e; font-weight: 600;"> · 常见</span>`
   }
 
+  const isAuthorTool = button.type === 'author-tool'
+  const typeStyle = isAuthorTool
+    ? 'font-size: 11px; color: #a855f7; font-weight: 600;'
+    : 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
   infoDiv.innerHTML = `
     <div style="font-weight: 500; font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 4px;">${button.name}</div>
-    <div style="font-size: 11px; color: var(--b3-theme-on-surface-light);">
+    <div style="${typeStyle}">
       ${typeLabel}${levelLabel}
     </div>
   `
@@ -772,41 +776,33 @@ export function createMobileButtonItem(
       const subtypeSelect = document.createElement('select')
       subtypeSelect.className = 'b3-text-field'
       subtypeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
-      const currentSubtype = button.authorToolSubtype || 'script'
+      const currentSubtype = button.authorToolSubtype || 'open-doc'
       subtypeSelect.innerHTML = `
-        <option value="script" ${currentSubtype === 'script' ? 'selected' : ''}>① 自定义脚本</option>
-        <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库查询</option>
+        <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>① 打开指定ID文档</option>
+        <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库悬浮弹窗</option>
         <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
       `
       subtypeSelect.onchange = () => {
-        button.authorToolSubtype = subtypeSelect.value as 'script' | 'database' | 'diary-bottom'
+        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom'
         ;(subtypeSelect as any).refreshForm?.()
       }
       authorToolContainer.appendChild(subtypeSelect)
 
-      // 自定义脚本配置区
-      const scriptConfigDiv = document.createElement('div')
-      scriptConfigDiv.id = 'script-config-mobile'
+      // 打开指定ID文档配置区
+      const docConfigDiv = document.createElement('div')
+      docConfigDiv.id = 'open-doc-config-mobile'
 
-      const scriptLabel = document.createElement('label')
-      scriptLabel.textContent = '自定义脚本代码'
-      scriptLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
-      scriptConfigDiv.appendChild(scriptLabel)
+      docConfigDiv.appendChild(createInputField('📄 目标文档ID', button.targetDocId || '', '如: 20251215234003-j3i7wjc', (v) => { button.targetDocId = v }))
 
-      const scriptInput = document.createElement('textarea')
-      scriptInput.className = 'b3-text-field'
-      scriptInput.placeholder = '在此输入自定义 JavaScript 代码...'
-      scriptInput.value = button.authorScript || ''
-      scriptInput.style.cssText = 'resize: vertical; min-height: 80px; font-family: monospace; font-size: 12px;'
-      scriptInput.onchange = () => { button.authorScript = scriptInput.value }
-      scriptConfigDiv.appendChild(scriptInput)
+      // 添加提示
+      const docHint = document.createElement('div')
+      docHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: 4px;'
+      docHint.textContent = '💡 点击按钮后自动打开指定ID的文档'
+      docConfigDiv.appendChild(docHint)
 
-      // 目标文档ID（脚本模式使用）
-      scriptConfigDiv.appendChild(createInputField('目标文档ID', button.targetDocId || '', '要打开的文档ID', (v) => { button.targetDocId = v }))
+      authorToolContainer.appendChild(docConfigDiv)
 
-      authorToolContainer.appendChild(scriptConfigDiv)
-
-      // 数据库查询配置区
+      // 数据库悬浮弹窗配置区
       const dbConfigDiv = document.createElement('div')
       dbConfigDiv.id = 'db-config-mobile'
       dbConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
@@ -859,7 +855,7 @@ export function createMobileButtonItem(
 
       authorToolContainer.appendChild(dbConfigDiv)
 
-      // 日记底部配置区（说明）
+      // 日记底部配置区（说明 + 等待时间配置）
       const diaryConfigDiv = document.createElement('div')
       diaryConfigDiv.id = 'diary-config-mobile'
       diaryConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 15px; background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(59, 130, 246, 0.1)); border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3);'
@@ -871,8 +867,36 @@ export function createMobileButtonItem(
 
       const diaryDesc = document.createElement('div')
       diaryDesc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.6;'
-      diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 打开日记<br>2. 自动滚动到文档底部<br><br>无需配置，点击按钮即可使用。'
+      diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 打开日记<br>2. 自动滚动到文档底部'
       diaryConfigDiv.appendChild(diaryDesc)
+
+      // 等待时间配置（移动端）
+      const waitTimeContainer = document.createElement('div')
+      waitTimeContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px; margin-top: 8px;'
+
+      const waitTimeLabel = document.createElement('label')
+      waitTimeLabel.textContent = '⏱ 移动端等待时间（毫秒）'
+      waitTimeLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); font-weight: 500;'
+      waitTimeContainer.appendChild(waitTimeLabel)
+
+      const waitTimeInput = document.createElement('input')
+      waitTimeInput.type = 'number'
+      waitTimeInput.value = String(button.diaryWaitTime || 1000)
+      waitTimeInput.min = '100'
+      waitTimeInput.max = '10000'
+      waitTimeInput.step = '100'
+      waitTimeInput.style.cssText = 'width: 100%; padding: 8px 12px; border: 1px solid var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-background); color: var(--b3-theme-on-background); font-size: 14px;'
+      waitTimeInput.addEventListener('input', () => {
+        button.diaryWaitTime = parseInt(waitTimeInput.value) || 1000
+      })
+      waitTimeContainer.appendChild(waitTimeInput)
+
+      const waitTimeHint = document.createElement('div')
+      waitTimeHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
+      waitTimeHint.textContent = '💡 移动端加载日记较慢时可增加此值，默认 1000ms'
+      waitTimeContainer.appendChild(waitTimeHint)
+
+      diaryConfigDiv.appendChild(waitTimeContainer)
 
       authorToolContainer.appendChild(diaryConfigDiv)
 
@@ -880,15 +904,15 @@ export function createMobileButtonItem(
       const updateVisibility = () => {
         const subtype = subtypeSelect.value
         if (subtype === 'database') {
-          scriptConfigDiv.style.display = 'none'
+          docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'flex'
           diaryConfigDiv.style.display = 'none'
         } else if (subtype === 'diary-bottom') {
-          scriptConfigDiv.style.display = 'none'
+          docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
           diaryConfigDiv.style.display = 'flex'
         } else {
-          scriptConfigDiv.style.display = 'flex'
+          docConfigDiv.style.display = 'flex'
           dbConfigDiv.style.display = 'none'
           diaryConfigDiv.style.display = 'none'
         }

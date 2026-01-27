@@ -212,7 +212,7 @@ export function showErrorCopyFailed(): void {
   showMessage(`复制失败`, NOTIFICATION_DURATION.ERROR, 'error')
 }
 
-// ===== 数据库查询通知 =====
+// ===== 数据库悬浮弹窗通知 =====
 
 /**
  * 显示无法获取数据库ID错误

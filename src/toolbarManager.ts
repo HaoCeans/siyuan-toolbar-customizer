@@ -41,9 +41,9 @@ export interface ButtonConfig {
   template?: string;         // 模板内容
   clickSequence?: string[];  // 模拟点击选择器序列
   shortcutKey?: string;      // 快捷键组合
-  targetDocId?: string;      // 鲸鱼定制工具：目标文档ID
-  authorScript?: string;     // 鲸鱼定制工具：自定义脚本
-  // 鲸鱼定制工具 - 数据库查询配置
+  targetDocId?: string;      // 鲸鱼定制工具箱：目标文档ID
+  authorScript?: string;     // 鲸鱼定制工具箱：自定义脚本
+  // 鲸鱼定制工具箱 - 数据库查询配置
   authorToolSubtype?: 'script' | 'database' | 'diary-bottom'; // 作者工具子类型：script=自定义脚本, database=数据库查询, diary-bottom=日记底部
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
@@ -1756,7 +1756,7 @@ function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = 
     // 执行快捷键，传递保存的选区
     executeShortcut(config, savedSelection, lastActiveElement)
   } else if (config.type === 'author-tool') {
-    // 执行鲸鱼定制工具
+    // 执行鲸鱼定制工具箱
     executeAuthorTool(config)
   }
 
@@ -2317,7 +2317,7 @@ async function executeDiaryBottom(config: ButtonConfig) {
 }
 
 /**
- * 执行鲸鱼定制工具
+ * 执行鲸鱼定制工具箱
  */
 function executeAuthorTool(config: ButtonConfig) {
   const subtype = config.authorToolSubtype || 'script'

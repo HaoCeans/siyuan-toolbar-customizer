@@ -266,7 +266,7 @@ export function createDesktopFeatureConfig(
   dangerItem.appendChild(dangerDesc)
   container.appendChild(dangerItem)
 
-  // 鲸鱼定制工具激活码输入
+  // 鲸鱼定制工具箱激活码输入
   const activationItem = document.createElement('div')
   activationItem.style.cssText = `
     display: flex;
@@ -284,7 +284,7 @@ export function createDesktopFeatureConfig(
 
   const activationLabel = document.createElement('label')
   activationLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #8b5cf6; min-width: 180px;'
-  activationLabel.textContent = '🔐 鲸鱼定制工具激活'
+  activationLabel.textContent = '🔐 鲸鱼定制工具箱激活'
 
   const activationStatus = document.createElement('span')
   activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px;'
@@ -301,7 +301,7 @@ export function createDesktopFeatureConfig(
 
   const activationDesc = document.createElement('div')
   activationDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-  activationDesc.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具」功能类型'
+  activationDesc.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型'
 
   const activationInputRow = document.createElement('div')
   activationInputRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-top: 4px;'
@@ -471,7 +471,7 @@ export function createDesktopSettingLayout(
 
     // 图标大小
     const { row: iconSizeRow, input: iconSizeInput } = createRow(
-      '图标大小 (px)',
+      '🆖 所有按钮图标大小 (px)',
       context.desktopGlobalButtonConfig.iconSize,
       'number',
       async (input) => {
@@ -487,7 +487,7 @@ export function createDesktopSettingLayout(
 
     // 按钮宽度
     const { row: widthRow, input: widthInput } = createRow(
-      '按钮宽度 (px)',
+      '📏 所有按钮宽度 (px)',
       context.desktopGlobalButtonConfig.minWidth,
       'number',
       async (input) => {
@@ -503,7 +503,7 @@ export function createDesktopSettingLayout(
 
     // 右边距
     const { row: marginRow, input: marginInput } = createRow(
-      '右边距 (px)',
+      '➡️ 所有按钮右边距 (px)',
       context.desktopGlobalButtonConfig.marginRight,
       'number',
       async (input) => {
@@ -519,7 +519,7 @@ export function createDesktopSettingLayout(
 
     // 右上角提示
     const { row: notifyRow, input: notifyToggle } = createRow(
-      '右上角提示',
+      '📢 所有按钮右上角提示',
       context.desktopGlobalButtonConfig.showNotification,
       'checkbox',
       async (input) => {
@@ -536,8 +536,8 @@ export function createDesktopSettingLayout(
 
     // 说明文字
     const hint = document.createElement('div')
-    hint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light); margin-top: 8px; padding: 8px; background: var(--b3-theme-background); border-radius: 4px;'
-    hint.innerHTML = '💡 修改后会批量应用到所有按钮单个按钮的独立配置优先级更高'
+    hint.style.cssText = 'font-size: 16px; color: var(--b3-theme-on-surface-light); margin-top: 8px; padding: 8px; background: var(--b3-theme-background); border-radius: 4px;'
+    hint.innerHTML = '💡 修改后会批量应用到所有按钮,单个按钮的独立配置优先级更高（仅限桌面端🖥️）'
     container.appendChild(hint)
 
     return container
@@ -609,7 +609,7 @@ export function createDesktopSettingLayout(
       heightRow.appendChild(heightInput)
 
       const heightDesc = document.createElement('div')
-      heightDesc.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
+      heightDesc.style.cssText = 'font-size: 16px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
       heightDesc.textContent = '💡 调整工具栏的整体高度（仅桌面端）'
 
       heightItem.appendChild(heightRow)
@@ -674,7 +674,7 @@ export function createDesktopSettingLayout(
 
       container.appendChild(dangerItem)
 
-      // 鲸鱼定制工具激活码输入
+      // 鲸鱼定制工具箱激活码输入
       const activationItem = document.createElement('div')
       activationItem.style.cssText = `
         display: flex;
@@ -692,7 +692,7 @@ export function createDesktopSettingLayout(
 
       const activationLabel = document.createElement('label')
       activationLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #8b5cf6; min-width: 180px;'
-      activationLabel.textContent = '🔐 鲸鱼定制工具激活'
+      activationLabel.textContent = '🔐 鲸鱼定制工具箱激活'
 
       const activationStatus = document.createElement('span')
       activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px;'
@@ -709,7 +709,7 @@ export function createDesktopSettingLayout(
 
       const activationDesc = document.createElement('div')
       activationDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-      activationDesc.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具」功能类型'
+      activationDesc.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型'
 
       const activationInputRow = document.createElement('div')
       activationInputRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-top: 4px;'

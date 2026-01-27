@@ -311,7 +311,7 @@ export function showInfoMarginRightModified(): void {
  * 显示作者工具已激活通知
  */
 export function showInfoAuthorToolActivated(): void {
-  showMessage('鲸鱼定制工具已激活！请重新打开设置页面', NOTIFICATION_DURATION.ERROR, 'success')
+  showMessage('鲸鱼定制工具箱已激活！请重新打开设置页面', NOTIFICATION_DURATION.ERROR, 'success')
 }
 
 /**

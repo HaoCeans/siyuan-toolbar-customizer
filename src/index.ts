@@ -129,8 +129,8 @@ export default class ToolbarCustomizer extends Plugin {
     toolbarHeight: 32,          // 工具栏高度（px）
     disableCustomButtons: false,// 禁用所有自定义按钮（恢复思源原始状态，仅桌面端）
     showAllNotifications: true, // 一键开启所有按钮右上角提示
-    authorActivated: false,     // 鲸鱼定制工具是否已激活
-    authorCode: ''              // 鲸鱼定制工具激活码
+    authorActivated: false,     // 鲸鱼定制工具箱是否已激活
+    authorCode: ''              // 鲸鱼定制工具箱激活码
   }
 
   // 手机端小功能配置
@@ -143,8 +143,8 @@ export default class ToolbarCustomizer extends Plugin {
     disableFileTree: true,      // 禁止右滑弹出文档树
     disableSettingMenu: true,   // 禁止左滑弹出设置菜单
     showAllNotifications: true, // 一键开启所有按钮右上角提示
-    authorActivated: false,     // 鲸鱼定制工具是否已激活
-    authorCode: ''              // 鲸鱼定制工具激活码
+    authorActivated: false,     // 鲸鱼定制工具箱是否已激活
+    authorCode: ''              // 鲸鱼定制工具箱激活码
   }
 
   // 检查作者功能是否已激活

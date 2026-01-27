@@ -482,7 +482,7 @@ export function createMobileSettingLayout(
 
   // 图标大小
   setting.addItem({
-    title: '图标大小 (px)',
+    title: '🆖 图标大小 (px)',
     description: '所有按钮的图标大小',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -506,7 +506,7 @@ export function createMobileSettingLayout(
 
   // 按钮宽度
   setting.addItem({
-    title: '按钮宽度 (px)',
+    title: '📏 按钮宽度 (px)',
     description: '所有按钮的最小宽度',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -530,7 +530,7 @@ export function createMobileSettingLayout(
 
   // 右边距
   setting.addItem({
-    title: '右边距 (px)',
+    title: '➡️ 右边距 (px)',
     description: '所有按钮的右侧边距',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -554,7 +554,7 @@ export function createMobileSettingLayout(
 
   // 右上角提示
   setting.addItem({
-    title: '右上角提示',
+    title: '📢 右上角提示',
     description: '所有按钮是否显示右上角提示',
     createActionElement: () => {
       const toggle = document.createElement('input')
@@ -578,7 +578,7 @@ export function createMobileSettingLayout(
   // 说明文字
   setting.addItem({
     title: '💡注意',
-    description: '修改后会批量应用到所有按钮，并修改每个按钮配置值，单个按钮的独立配置优先级更高'
+    description: '修改后会批量应用到每个按钮配置值，单个按钮的独立配置优先级更高（仅限手机端📱）'
   })
 
 
@@ -1163,10 +1163,10 @@ export function createMobileSettingLayout(
     }
   })
 
-  // 鲸鱼定制工具激活码输入
+  // 鲸鱼定制工具箱激活码输入
   setting.addItem({
-    title: '🔐 鲸鱼定制工具激活',
-    description: '💡输入激活码解锁「⑥鲸鱼定制工具」功能类型',
+    title: '🔐 鲸鱼定制工具箱激活',
+    description: '💡输入激活码解锁「⑥鲸鱼定制工具箱」功能类型',
     createActionElement: () => {
       const container = document.createElement('div')
       container.style.cssText = 'display: flex; flex-direction: column; gap: 10px; width: 100%;'

@@ -136,7 +136,7 @@ export function createDesktopButtonItem(
     'template': '①手写模板插入【简单】',
     'shortcut': '②电脑端快捷键【简单】',
     'click-sequence': '③自动化模拟点击【难】',
-    'author-tool': '⑥鲸鱼定制工具'
+    'author-tool': '⑥鲸鱼定制工具箱'
   }
   const typeLabel = typeLabels[button.type] || button.type
   infoDiv.innerHTML = `
@@ -226,14 +226,14 @@ export function createDesktopButtonItem(
   })
   editForm.appendChild(nameField)
 
-  // 构建功能类型选项数组（根据激活状态决定是否显示鲸鱼定制工具）
+  // 构建功能类型选项数组（根据激活状态决定是否显示鲸鱼定制工具箱）
   const typeOptions = [
     { value: 'template', label: '①手写模板插入【简单】' },
     { value: 'shortcut', label: '②电脑端快捷键【简单】' },
     { value: 'click-sequence', label: '③自动化模拟点击【难】' }
   ]
   if (context.isAuthorToolActivated()) {
-    typeOptions.push({ value: 'author-tool', label: '⑥鲸鱼定制工具' })
+    typeOptions.push({ value: 'author-tool', label: '⑥鲸鱼定制工具箱' })
   }
 
   editForm.appendChild(createDesktopSelectField('选择功能', button.type, typeOptions, (v) => {
@@ -258,7 +258,7 @@ export function createDesktopButtonItem(
         'template': '①手写模板插入【简单】',
         'shortcut': '②电脑端快捷键【简单】',
         'click-sequence': '③自动化模拟点击【难】',
-        'author-tool': '⑥鲸鱼定制工具'
+        'author-tool': '⑥鲸鱼定制工具箱'
       }
       typeDesc.textContent = typeLabels[button.type] || button.type
     }
@@ -442,13 +442,13 @@ export function createDesktopButtonItem(
   }
 
   if (button.type === 'author-tool') {
-    // 鲸鱼定制工具配置
+    // 鲸鱼定制工具箱配置
     const authorToolField = document.createElement('div')
     authorToolField.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 12px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.08)); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 6px;'
 
     const header = document.createElement('div')
     header.style.cssText = 'display: flex; align-items: center; gap: 8px;'
-    header.innerHTML = '<span style="font-size: 16px;">🔐</span><span style="font-weight: 600; color: #8b5cf6;">鲸鱼定制工具配置</span>'
+    header.innerHTML = '<span style="font-size: 16px;">🔐</span><span style="font-weight: 600; color: #8b5cf6;">鲸鱼定制工具箱配置</span>'
     authorToolField.appendChild(header)
 
     const desc = document.createElement('div')
@@ -805,14 +805,14 @@ export function populateDesktopEditForm(
     const nameEl = infoDiv.querySelector('div:first-child')
     if (nameEl) nameEl.textContent = v
   }))
-  // 构建功能类型选项数组（根据激活状态决定是否显示鲸鱼定制工具）
+  // 构建功能类型选项数组（根据激活状态决定是否显示鲸鱼定制工具箱）
   const typeOptions = [
     { value: 'template', label: '①手写模板插入【简单】' },
     { value: 'shortcut', label: '②电脑端快捷键【简单】' },
     { value: 'click-sequence', label: '③自动化模拟点击【难】' }
   ]
   if (context.isAuthorToolActivated()) {
-    typeOptions.push({ value: 'author-tool', label: '⑥鲸鱼定制工具' })
+    typeOptions.push({ value: 'author-tool', label: '⑥鲸鱼定制工具箱' })
   }
   form.appendChild(createDesktopSelectField('选择功能', button.type, typeOptions, (v) => {
     button.type = v as any
@@ -830,7 +830,7 @@ export function populateDesktopEditForm(
     // 更新类型描述显示
     const typeDesc = infoDiv.querySelector('div:last-child')
     if (typeDesc) {
-      typeDesc.textContent = button.type === 'builtin' ? '①思源内置功能【简单】' : button.type === 'template' ? '①手写模板插入【简单】' : button.type === 'shortcut' ? '②电脑端快捷键【简单】' : button.type === 'click-sequence' ? '③自动化模拟点击【难】' : button.type === 'author-tool' ? '⑥鲸鱼定制工具' : button.type
+      typeDesc.textContent = button.type === 'builtin' ? '①思源内置功能【简单】' : button.type === 'template' ? '①手写模板插入【简单】' : button.type === 'shortcut' ? '②电脑端快捷键【简单】' : button.type === 'click-sequence' ? '③自动化模拟点击【难】' : button.type === 'author-tool' ? '⑥鲸鱼定制工具箱' : button.type
     }
   }))
 
@@ -1007,13 +1007,13 @@ export function populateDesktopEditForm(
   }
 
   if (button.type === 'author-tool') {
-    // 鲸鱼定制工具配置
+    // 鲸鱼定制工具箱配置
     const authorToolField = document.createElement('div')
     authorToolField.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 12px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(59, 130, 246, 0.08)); border: 1px solid rgba(139, 92, 246, 0.3); border-radius: 6px;'
 
     const header = document.createElement('div')
     header.style.cssText = 'display: flex; align-items: center; gap: 8px;'
-    header.innerHTML = '<span style="font-size: 16px;">🔐</span><span style="font-weight: 600; color: #8b5cf6;">鲸鱼定制工具配置</span>'
+    header.innerHTML = '<span style="font-size: 16px;">🔐</span><span style="font-weight: 600; color: #8b5cf6;">鲸鱼定制工具箱配置</span>'
     authorToolField.appendChild(header)
 
     const desc = document.createElement('div')

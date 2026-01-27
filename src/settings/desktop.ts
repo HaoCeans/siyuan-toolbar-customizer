@@ -347,6 +347,7 @@ export interface DesktopSettingsContext {
   showIconPicker: (currentValue: string, onSelect: (icon: string) => void) => void
   saveData: (key: string, value: any) => Promise<void>
   applyFeatures: () => void
+  refreshButtons: () => void
 }
 
 /**
@@ -525,6 +526,8 @@ export function createDesktopSettingLayout(
         context.desktopButtonConfigs.forEach(btn => btn.showNotification = input.checked)
         await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
         await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
+        // 刷新按钮以应用新配置
+        context.refreshButtons()
         showMessage(input.checked ? '已开启所有按钮提示' : '已关闭所有按钮提示', 1500, 'info')
       }
     )

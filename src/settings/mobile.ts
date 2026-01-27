@@ -548,6 +548,8 @@ export function createMobileSettingLayout(
         context.mobileButtonConfigs.forEach(btn => btn.showNotification = toggle.checked)
         await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
         await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
+        // 刷新按钮以应用新配置
+        context.updateMobileToolbar()
         showMessage(toggle.checked ? '已开启所有按钮提示' : '已关闭所有按钮提示', 1500, 'info')
       }
       return toggle

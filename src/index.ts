@@ -495,7 +495,11 @@ export default class ToolbarCustomizer extends Plugin {
         showConfirmDialog: (msg) => this.showConfirmDialog(msg),
         showIconPicker: (current, onSelect) => this.showIconPicker(current, onSelect),
         saveData: (key, value) => this.saveData(key, value),
-        applyFeatures: () => this.applyFeatures()
+        applyFeatures: () => this.applyFeatures(),
+        refreshButtons: () => {
+          // 刷新桌面端按钮
+          initCustomButtons(this.desktopButtonConfigs)
+        }
       }
       createDesktopSettingLayout(setting, context)
     }

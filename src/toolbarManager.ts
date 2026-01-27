@@ -41,9 +41,9 @@ export interface ButtonConfig {
   template?: string;         // 模板内容
   clickSequence?: string[];  // 模拟点击选择器序列
   shortcutKey?: string;      // 快捷键组合
-  targetDocId?: string;      // 作者自用工具：目标文档ID
-  authorScript?: string;     // 作者自用工具：自定义脚本
-  // 作者自用工具 - 数据库查询配置
+  targetDocId?: string;      // 鲸鱼定制工具：目标文档ID
+  authorScript?: string;     // 鲸鱼定制工具：自定义脚本
+  // 鲸鱼定制工具 - 数据库查询配置
   authorToolSubtype?: 'script' | 'database' | 'diary-bottom'; // 作者工具子类型：script=自定义脚本, database=数据库查询, diary-bottom=日记底部
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
@@ -76,9 +76,9 @@ export interface GlobalButtonConfig {
 }
 
 export const DEFAULT_GLOBAL_BUTTON_CONFIG: GlobalButtonConfig = {
-  iconSize: 16,
-  minWidth: 32,
-  marginRight: 8,
+  iconSize: 20,
+  minWidth: 20,
+  marginRight: 15,
   showNotification: true
 }
 
@@ -95,7 +95,7 @@ export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
   toolbarBackgroundColorDark: '#1a1a1a',
   toolbarOpacity: 1.0,        // 100% 透明度
   toolbarHeight: '40px',      // 工具栏高度
-  toolbarZIndex: 512,
+  toolbarZIndex: 5,
   useThemeColor: true,        // 颜色跟随主题
 
   // 顶部工具栏配置
@@ -209,13 +209,13 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'builtin',
     builtinId: 'overflow',
     icon: '⋯',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
+    iconSize: 20,
+    minWidth: 20,
+    marginRight: 15,
     sort: 0,
     platform: 'mobile',
-    showNotification: false,
-    layers: 1
+    showNotification: true,
+    layers: 2
   },
   {
     id: 'more-mobile',
@@ -975,6 +975,35 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
 
 // ===== 自定义按钮功能 =====
 export function initCustomButtons(configs: ButtonConfig[]) {
+  // 添加全局样式：移除主工具栏按钮的 focus 和 active 状态阴影（排除扩展工具栏按钮）
+  if (!document.getElementById('custom-button-focus-style')) {
+    const focusStyle = document.createElement('style')
+    focusStyle.id = 'custom-button-focus-style'
+    focusStyle.textContent = `
+      /* 移除主工具栏自定义按钮的 focus 状态样式（包括阴影） */
+      .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus,
+      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus {
+        background-color: transparent !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        -webkit-box-shadow: none !important;
+        outline: none !important;
+        border: none !important;
+        transform: none !important;
+        filter: none !important;
+        text-shadow: none !important;
+        opacity: 1 !important;
+      }
+      /* 移除主工具栏自定义按钮的 active 状态阴影（点击时） */
+      .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):active,
+      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):active {
+        box-shadow: none !important;
+        -webkit-box-shadow: none !important;
+      }
+    `
+    document.head.appendChild(focusStyle)
+  }
+
   // 清理旧的插件按钮
   cleanupCustomButtons()
 
@@ -1139,6 +1168,11 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
   // 应用基础样式（完全可控）
   button.style.cssText = getButtonBaseStyle(config)
 
+  // 强制移除所有可能的阴影效果（覆盖思源全局样式）
+  button.style.setProperty('box-shadow', 'none', 'important')
+  button.style.setProperty('-webkit-box-shadow', 'none', 'important')
+  button.style.setProperty('filter', 'none', 'important')
+
   // 设置图标内容
   if (config.icon.startsWith('icon')) {
     // 思源图标
@@ -1242,13 +1276,24 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
 
     // 扩展工具栏按钮特殊处理（toggle 扩展工具栏）
     if (config.id === 'overflow-button-mobile') {
-      // 立即恢复焦点，防止输入法关闭
+      // 移除按钮焦点
+      button.blur()
+      // 如果之前保存的焦点元素是输入框，恢复焦点以保持输入法状态
       if (lastActiveElement && lastActiveElement !== document.activeElement) {
-        ;(lastActiveElement as HTMLElement).focus()
+        // 检查是否是输入框类型（textarea 或 input）
+        const tagName = lastActiveElement.tagName.toLowerCase()
+        if (tagName === 'textarea' || tagName === 'input') {
+          ;(lastActiveElement as HTMLElement).focus()
+        }
       }
       showOverflowToolbar(config)
       return
     }
+
+    // 主工具栏按钮点击后立即移除焦点和背景色（避免"阴影"一直显示）
+    button.blur()
+    button.style.setProperty('background-color', 'transparent', 'important')
+    button.style.setProperty('background', 'transparent', 'important')
 
     // 如果扩展工具栏已打开，先关闭它（其他按钮点击会关闭扩展工具栏）
     const existingLayers = document.querySelectorAll('.overflow-toolbar-layer')
@@ -1262,8 +1307,8 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
       }
     }
 
-    // 将保存的选区传递给处理函数
-    handleButtonClick(config, savedSelection, lastActiveElement)
+    // 将保存的选区和按钮元素传递给处理函数（不传 button，因为已经 blur 了）
+    handleButtonClick(config, savedSelection, lastActiveElement, null)
 
     // builtin 类型的按钮不恢复焦点，让输入法自然关闭
     // 其他类型恢复焦点
@@ -1272,9 +1317,6 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
         ;(lastActiveElement as HTMLElement).focus()
       }
     }
-
-    // 点击完成后立即移除按钮焦点
-    button.blur()
   })
 
   return button
@@ -1645,10 +1687,12 @@ function showOverflowToolbar(config: ButtonConfig) {
   }, 100)
 }
 
-function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
+function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null, clickedButton: HTMLElement | null = null) {
   // 如果开启了右上角提示，显示消息
-  Notify.showButtonExecNotification(config.name, config.showNotification !== false)
+  const notificationEnabled = config.showNotification !== false
+  Notify.showButtonExecNotification(config.name, notificationEnabled)
 
+  // 执行功能
   if (config.type === 'builtin') {
     // 执行思源内置功能
     executeBuiltinFunction(config)
@@ -1662,8 +1706,15 @@ function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = 
     // 执行快捷键，传递保存的选区
     executeShortcut(config, savedSelection, lastActiveElement)
   } else if (config.type === 'author-tool') {
-    // 执行作者自用工具
+    // 执行鲸鱼定制工具
     executeAuthorTool(config)
+  }
+
+  // 功能执行完成后，延迟移除按钮焦点（1000ms）
+  if (clickedButton) {
+    setTimeout(() => {
+      clickedButton.blur()
+    }, 1000)
   }
 }
 
@@ -2216,7 +2267,7 @@ async function executeDiaryBottom(config: ButtonConfig) {
 }
 
 /**
- * 执行作者自用工具
+ * 执行鲸鱼定制工具
  */
 function executeAuthorTool(config: ButtonConfig) {
   const subtype = config.authorToolSubtype || 'script'

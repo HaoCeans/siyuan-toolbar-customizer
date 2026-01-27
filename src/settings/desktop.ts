@@ -266,7 +266,7 @@ export function createDesktopFeatureConfig(
   dangerItem.appendChild(dangerDesc)
   container.appendChild(dangerItem)
 
-  // 作者自用工具激活码输入
+  // 鲸鱼定制工具激活码输入
   const activationItem = document.createElement('div')
   activationItem.style.cssText = `
     display: flex;
@@ -284,7 +284,7 @@ export function createDesktopFeatureConfig(
 
   const activationLabel = document.createElement('label')
   activationLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #8b5cf6; min-width: 180px;'
-  activationLabel.textContent = '🔐 作者自用工具激活'
+  activationLabel.textContent = '🔐 鲸鱼定制工具激活'
 
   const activationStatus = document.createElement('span')
   activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px;'
@@ -301,7 +301,7 @@ export function createDesktopFeatureConfig(
 
   const activationDesc = document.createElement('div')
   activationDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-  activationDesc.textContent = '💡 输入激活码后可解锁「⑥作者自用工具」功能类型'
+  activationDesc.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具」功能类型'
 
   const activationInputRow = document.createElement('div')
   activationInputRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-top: 4px;'
@@ -674,7 +674,7 @@ export function createDesktopSettingLayout(
 
       container.appendChild(dangerItem)
 
-      // 作者自用工具激活码输入
+      // 鲸鱼定制工具激活码输入
       const activationItem = document.createElement('div')
       activationItem.style.cssText = `
         display: flex;
@@ -692,7 +692,7 @@ export function createDesktopSettingLayout(
 
       const activationLabel = document.createElement('label')
       activationLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #8b5cf6; min-width: 180px;'
-      activationLabel.textContent = '🔐 作者自用工具激活'
+      activationLabel.textContent = '🔐 鲸鱼定制工具激活'
 
       const activationStatus = document.createElement('span')
       activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px;'
@@ -709,7 +709,7 @@ export function createDesktopSettingLayout(
 
       const activationDesc = document.createElement('div')
       activationDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-      activationDesc.textContent = '💡 输入激活码后可解锁「⑥作者自用工具」功能类型'
+      activationDesc.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具」功能类型'
 
       const activationInputRow = document.createElement('div')
       activationInputRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-top: 4px;'

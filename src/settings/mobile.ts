@@ -880,7 +880,7 @@ export function createMobileSettingLayout(
   createGroupTitle('⬆️', '顶部工具栏配置')
 
   setting.addItem({
-    title: '距离顶部高度',
+    title: '①距离顶部高度',
     description: '💡顶部工具栏距离屏幕顶部的距离（仅在顶部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -919,7 +919,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '③扩展工具栏高度',
+    title: '③扩展工具栏自身高度',
     description: '💡顶部模式时扩展工具栏每一层的高度',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1023,7 +1023,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '⑤扩展工具栏高度',
+    title: '⑤扩展工具栏自身高度',
     description: '💡底部模式时扩展工具栏每一层的高度',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1163,10 +1163,10 @@ export function createMobileSettingLayout(
     }
   })
 
-  // 作者自用工具激活码输入
+  // 鲸鱼定制工具激活码输入
   setting.addItem({
-    title: '🔐 作者自用工具激活',
-    description: '💡输入激活码解锁「⑥作者自用工具」功能类型',
+    title: '🔐 鲸鱼定制工具激活',
+    description: '💡输入激活码解锁「⑥鲸鱼定制工具」功能类型',
     createActionElement: () => {
       const container = document.createElement('div')
       container.style.cssText = 'display: flex; flex-direction: column; gap: 10px; width: 100%;'

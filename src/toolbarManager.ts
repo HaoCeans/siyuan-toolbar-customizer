@@ -459,7 +459,6 @@ export function calculateButtonOverflow(buttons: ButtonConfig[], overflowToolbar
 
     overflowMap.set(button.id, currentLayer)
     currentWidth += width
-    console.log(`  [分配] ${button.name} (sort=${button.sort}, 宽度=${width}) → 第${currentLayer}层`)
   }
 
   // 更新所有按钮的 overflowLevel
@@ -473,13 +472,6 @@ export function calculateButtonOverflow(buttons: ButtonConfig[], overflowToolbar
       return { ...btn, overflowLevel: newLevel }
     }
     return { ...btn, overflowLevel: btn.overflowLevel ?? 0 }
-  })
-
-  // 输出层级分配结果
-  console.log('[溢出检测] 层级分配结果:')
-  enabledButtons.forEach(btn => {
-    const layer = overflowMap.get(btn.id) ?? 0
-    console.log(`  - ${btn.name}: 第${layer}层${layer === 0 ? '(可见)' : '(扩展工具栏)'}`)
   })
 
   return result
@@ -1034,7 +1026,6 @@ function setupEditorButtons(configs: ButtonConfig[]) {
         return
       }
 
-      console.log('[setupEditorButtons] 准备调用溢出检测，层数:', overflowLayers, '可用宽度:', availableWidth)
       const updatedButtons = calculateButtonOverflow(configs, overflowLayers)
       // 更新 configs 中的 overflowLevel
       updatedButtons.forEach(btn => {

@@ -289,19 +289,8 @@ export default class ToolbarCustomizer extends Plugin {
         })
       }
 
-      // 同步 showAllNotifications 设置到所有按钮
-      // 电脑端
-      this.desktopButtonConfigs.forEach(btn => {
-        if (this.desktopFeatureConfig.showAllNotifications !== undefined) {
-          btn.showNotification = this.desktopFeatureConfig.showAllNotifications
-        }
-      })
-      // 手机端
-      this.mobileButtonConfigs.forEach(btn => {
-        if (this.mobileFeatureConfig.showAllNotifications !== undefined) {
-          btn.showNotification = this.mobileFeatureConfig.showAllNotifications
-        }
-      })
+      // 注意：已移除 showAllNotifications 的同步逻辑
+      // 因为该功能已被 mobileGlobalButtonConfig.showNotification 取代
 
       // 向后兼容：尝试加载旧的 featureConfig 并迁移到对应平台
       const savedLegacyFeatureConfig = await this.loadData('featureConfig')

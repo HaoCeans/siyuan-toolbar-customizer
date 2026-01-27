@@ -1296,7 +1296,7 @@ function showOverflowToolbar(config: ButtonConfig) {
       overflowButton.style.backgroundColor = 'transparent'
       overflowButton.blur()
     }
-    Notify.showOverflowToolbarClosed()
+    Notify.showOverflowToolbarClosed(config.showNotification !== false)
     return
   }
 
@@ -1600,7 +1600,7 @@ function showOverflowToolbar(config: ButtonConfig) {
     document.body.appendChild(toolbar)
   }
 
-  Notify.showOverflowToolbarOpened(layers)
+  Notify.showOverflowToolbarOpened(layers, config.showNotification !== false)
 
   // 点击外部关闭
   const closeOnClickOutside = (e: MouseEvent) => {

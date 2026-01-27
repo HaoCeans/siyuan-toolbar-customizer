@@ -40,16 +40,22 @@ export function showButtonExecNotification(buttonName: string, enabled: boolean)
 /**
  * 显示扩展工具栏已打开通知
  * @param layers 层数
+ * @param enabled 是否启用通知
  */
-export function showOverflowToolbarOpened(layers: number): void {
-  showMessage(`扩展工具栏已弹出（${layers}层）`, NOTIFICATION_DURATION.SHORT, 'info')
+export function showOverflowToolbarOpened(layers: number, enabled: boolean = true): void {
+  if (enabled) {
+    showMessage(`扩展工具栏已弹出（${layers}层）`, NOTIFICATION_DURATION.SHORT, 'info')
+  }
 }
 
 /**
  * 显示扩展工具栏已关闭通知
+ * @param enabled 是否启用通知
  */
-export function showOverflowToolbarClosed(): void {
-  showMessage('扩展工具栏已关闭', NOTIFICATION_DURATION.SHORT, 'info')
+export function showOverflowToolbarClosed(enabled: boolean = true): void {
+  if (enabled) {
+    showMessage('扩展工具栏已关闭', NOTIFICATION_DURATION.SHORT, 'info')
+  }
 }
 
 // ===== 错误通知 =====

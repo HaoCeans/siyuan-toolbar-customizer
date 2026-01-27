@@ -4,6 +4,8 @@
  */
 
 import { Dialog, fetchSyncPost, getFrontend, showMessage } from "siyuan";
+// 通知模块
+import * as Notify from "./notification";
 
 // ===== 配置接口 =====
 export interface MobileToolbarConfig {
@@ -1294,7 +1296,7 @@ function showOverflowToolbar(config: ButtonConfig) {
       overflowButton.style.backgroundColor = 'transparent'
       overflowButton.blur()
     }
-    showMessage('扩展工具栏已关闭', 1000, 'info')
+    Notify.showOverflowToolbarClosed()
     return
   }
 
@@ -1598,7 +1600,7 @@ function showOverflowToolbar(config: ButtonConfig) {
     document.body.appendChild(toolbar)
   }
 
-  showMessage(`扩展工具栏已弹出（${layers}层）`, 1000, 'info')
+  Notify.showOverflowToolbarOpened(layers)
 
   // 点击外部关闭
   const closeOnClickOutside = (e: MouseEvent) => {
@@ -1622,11 +1624,7 @@ function showOverflowToolbar(config: ButtonConfig) {
 
 function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
   // 如果开启了右上角提示，显示消息
-  // 注意：showNotification 默认为 true，只有明确设置为 false 时才不显示
-  const shouldShow = config.showNotification !== false
-  if (shouldShow) {
-    showMessage(`执行: ${config.name}`, 1500, 'info')
-  }
+  Notify.showButtonExecNotification(config.name, config.showNotification !== false)
 
   if (config.type === 'builtin') {
     // 执行思源内置功能
@@ -1648,7 +1646,7 @@ function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = 
 
 function executeBuiltinFunction(config: ButtonConfig) {
   if (!config.builtinId) {
-    showMessage(`按钮"${config.name}"未配置功能ID`, 3000, 'error')
+    Notify.showErrorButtonNotConfigured(config.name)
     return
   }
   
@@ -1705,12 +1703,12 @@ function executeBuiltinFunction(config: ButtonConfig) {
   }
   
   // 所有方法都失败
-  showMessage(`未找到功能: ${config.builtinId}`, 3000, 'error')
+  Notify.showErrorBuiltinNotFound(config.builtinId)
 }
 
 function insertTemplate(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
   if (!config.template) {
-    showMessage(`按钮"${config.name}"未配置模板内容`, 3000, 'error')
+    Notify.showErrorTemplateNotConfigured(config.name)
     return
   }
 
@@ -1718,7 +1716,7 @@ function insertTemplate(config: ButtonConfig, savedSelection: Range | null = nul
   const targetElement = lastActiveElement || document.activeElement
   const activeEditor = targetElement?.closest('.protyle')
   if (!activeEditor) {
-    showMessage('请先聚焦到编辑器', 3000, 'info')
+    Notify.showInfoEditorNotFocused()
     return
   }
   
@@ -1738,7 +1736,7 @@ function insertTemplate(config: ButtonConfig, savedSelection: Range | null = nul
       // 触发输入事件
       contentEditable.dispatchEvent(inputEvent)
     } catch (error) {
-      showMessage('插入模板失败，请确保编辑器处于可编辑状态', 3000, 'error')
+      Notify.showErrorInsertTemplateFailed()
     }
   }
 }
@@ -1795,7 +1793,7 @@ function processTemplateVariables(template: string): string {
  */
 async function executeClickSequence(config: ButtonConfig) {
   if (!config.clickSequence || config.clickSequence.length === 0) {
-    showMessage(`按钮"${config.name}"未配置点击序列`, 3000, 'error')
+    Notify.showErrorClickSequenceNotConfigured(config.name)
     return
   }
 
@@ -1826,7 +1824,7 @@ async function executeClickSequence(config: ButtonConfig) {
       } catch (error) {
         if (retry === 2) {
           // 最后一次重试也失败
-          showMessage(`点击序列失败: 步骤 ${i + 1} - ${selector}`, 3000, 'error')
+          Notify.showErrorClickSequenceStepFailed(i + 1, selector)
           return
         }
         
@@ -2116,7 +2114,7 @@ async function executeDiaryBottom(config: ButtonConfig) {
 
       if (scrolled) {
         if (config.showNotification !== false) {
-          showMessage('已打开日记并跳转到底部', 1500, 'info')
+          Notify.showInfoDiaryOpenedAndScrolled()
         }
         return
       }
@@ -2125,7 +2123,7 @@ async function executeDiaryBottom(config: ButtonConfig) {
         safeSetTimeout(scrollToBottom, retryDelay)
       } else {
         if (config.showNotification !== false) {
-          showMessage('日记已打开', 1500, 'info')
+          Notify.showInfoDiaryOpened()
         }
       }
     }
@@ -2190,7 +2188,7 @@ async function executeDiaryBottom(config: ButtonConfig) {
 
   } catch (error) {
     console.error('日记底部功能失败:', error)
-    showMessage(`❌ 打开日记失败: ${error}`, 3000, 'error')
+    Notify.showErrorDiaryFailed(error)
   }
 }
 
@@ -2230,7 +2228,7 @@ function executeAuthorTool(config: ButtonConfig) {
       const scriptFn = new Function('config', 'fetchSyncPost', 'showMessage', config.authorScript)
       scriptFn(config, fetchSyncPost, showMessage)
     } catch (err) {
-      showMessage(`执行脚本失败: ${err}`, 3000, 'error')
+      Notify.showErrorScriptFailed(err)
     }
   }
 }
@@ -2352,7 +2350,7 @@ async function executeDatabaseQuery(config: ButtonConfig) {
     }
 
     if (!avId) {
-      showMessage('❌ 无法获取数据库ID，请检查配置', 3000, 'error')
+      Notify.showErrorCannotGetDatabaseId()
       return
     }
 
@@ -2362,7 +2360,7 @@ async function executeDatabaseQuery(config: ButtonConfig) {
     })
 
     if (avResponse.code !== 0 || !avResponse.data) {
-      showMessage('❌ 获取数据库信息失败', 3000, 'error')
+      Notify.showErrorDatabaseInfoFailed()
       return
     }
 
@@ -2387,7 +2385,7 @@ async function executeDatabaseQuery(config: ButtonConfig) {
     })
 
     if (renderResponse.code !== 0 || !renderResponse.data) {
-      showMessage('❌ 获取数据失败', 3000, 'error')
+      Notify.showErrorDataFetchFailed()
       return
     }
 
@@ -2453,7 +2451,7 @@ async function executeDatabaseQuery(config: ButtonConfig) {
 
   } catch (error: any) {
     console.error('数据库查询失败:', error)
-    showMessage(`❌ 查询失败: ${error.message || error}`, 3000, 'error')
+    Notify.showErrorQueryFailed(error)
   }
 }
 
@@ -2472,7 +2470,7 @@ function showDatabasePopup(
   const rowCount = rows.length
 
   if (rowCount === 0) {
-    showMessage('没有数据', 3000, 'info')
+    Notify.showInfoNoData()
     return
   }
 
@@ -3332,7 +3330,7 @@ function executeSiyuanCommand(command: string, protyle?: any) {
     }
   }
 
-  showMessage(`无法执行命令: ${command}`, 3000, 'error')
+  Notify.showErrorCommandCannotExecute(command)
 }
 
 /**
@@ -3340,7 +3338,7 @@ function executeSiyuanCommand(command: string, protyle?: any) {
  */
 function executeShortcut(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
   if (!config.shortcutKey) {
-    showMessage(`按钮"${config.name}"未配置快捷键`, 3000, 'error')
+    Notify.showErrorShortcutNotConfigured(config.name)
     return
   }
 
@@ -3469,7 +3467,7 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
               try {
                 protyle[command]()
                 if (config.showNotification !== false) {
-                  showMessage(`复制成功`, 1500, 'info')
+                  Notify.showInfoCopySuccess()
                 }
                 return
               } catch (e) {
@@ -3494,10 +3492,10 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
               copyToClipboard(ref).then(success => {
                 if (success) {
                   if (config.showNotification !== false) {
-                    showMessage(`已复制: ${ref}`, 1500, 'info')
+                    Notify.showInfoCopied(ref)
                   }
                 } else {
-                  showMessage(`复制失败`, 3000, 'error')
+                  Notify.showErrorCopyFailed()
                 }
               })
               return
@@ -3542,7 +3540,7 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
         }
       }
 
-      showMessage(`无法执行命令: ${command}`, 3000, 'error')
+      Notify.showErrorCommandCannotExecute(command)
     } else {
       // 未在 keymap 中找到命令，直接触发用户输入的快捷键
       console.log('未在 keymap 中找到，直接触发快捷键:', siyuanHotkey)
@@ -3556,15 +3554,15 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
         } catch (e) {
           // 思源内部处理此快捷键时出错（可能不是有效快捷键）
           console.warn('思源处理此快捷键时出错:', e)
-          showMessage(`快捷键可能无效: ${config.shortcutKey}`, 2000, 'warning')
+          Notify.showWarningShortcutMaybeInvalid(config.shortcutKey)
         }
       } else {
-        showMessage(`无法解析快捷键: ${config.shortcutKey}`, 3000, 'error')
+        Notify.showErrorShortcutCannotParse(config.shortcutKey)
       }
     }
 
   } catch (error) {
     console.error('执行快捷键失败:', error)
-    showMessage(`执行快捷键失败: ${config.shortcutKey} - ${error}`, 3000, 'error')
+    Notify.showErrorShortcutFailed(config.shortcutKey, error)
   }
 }

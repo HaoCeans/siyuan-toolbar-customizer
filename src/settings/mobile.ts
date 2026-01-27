@@ -7,6 +7,7 @@ import type { Setting } from 'siyuan'
 import type { GlobalButtonConfig } from '../toolbarManager'
 import type { ButtonConfig } from '../toolbarManager'
 import { showMessage } from 'siyuan'
+import * as Notify from '../notification'
 import { createMobileButtonItem, type MobileButtonContext } from '../ui/buttonItems/mobile'
 import { calculateButtonOverflow, getToolbarAvailableWidth, getButtonWidth } from '../toolbarManager'
 
@@ -479,7 +480,7 @@ export function createMobileSettingLayout(
         await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
         // 重新计算溢出层级（按钮宽度可能变化）
         context.recalculateOverflow()
-        showMessage('图标大小已修改，请点击保存生效', 1500, 'info')
+        Notify.showInfoIconSizeModified()
       }
       return input
     }
@@ -503,7 +504,7 @@ export function createMobileSettingLayout(
         await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
         // 重新计算溢出层级（按钮宽度变化）
         context.recalculateOverflow()
-        showMessage('按钮宽度已修改，请点击保存生效', 1500, 'info')
+        Notify.showInfoButtonWidthModified()
       }
       return input
     }
@@ -527,7 +528,7 @@ export function createMobileSettingLayout(
         await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
         // 重新计算溢出层级（按钮宽度变化）
         context.recalculateOverflow()
-        showMessage('右边距已修改，请点击保存生效', 1500, 'info')
+        Notify.showInfoMarginRightModified()
       }
       return input
     }
@@ -550,7 +551,7 @@ export function createMobileSettingLayout(
         await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
         // 刷新按钮以应用新配置
         context.updateMobileToolbar()
-        showMessage(toggle.checked ? '已开启所有按钮提示' : '已关闭所有按钮提示', 1500, 'info')
+        Notify.showNotificationToggleStatus(toggle.checked)
       }
       return toggle
     }
@@ -1114,13 +1115,13 @@ export function createMobileSettingLayout(
           await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
           statusEl.style.cssText = 'font-size: 13px; padding: 4px 10px; border-radius: 4px; display: inline-block; width: fit-content; background: rgba(34, 197, 94, 0.2); color: #22c55e;'
           statusEl.textContent = '✓ 已激活'
-          showMessage('作者自用工具已激活！请重新打开设置页面', 3000, 'success')
+          Notify.showInfoAuthorToolActivated()
           // 延迟后重新加载设置页面
           setTimeout(() => {
             window.location.reload()
           }, 1500)
         } else {
-          showMessage('激活码错误，请重试', 3000, 'error')
+          Notify.showErrorActivationCodeInvalid()
         }
       }
 

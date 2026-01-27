@@ -8,6 +8,7 @@ import type { GlobalButtonConfig, ButtonConfig } from '../toolbarManager'
 import { createDesktopButtonItem, type DesktopButtonContext } from '../ui/buttonItems/desktop'
 import { createMobileButtonItem, type MobileButtonContext } from '../ui/buttonItems/mobile'
 import { showMessage } from 'siyuan'
+import * as Notify from '../notification'
 import { showButtonSelector } from '../ui/buttonSelector'
 
 /**
@@ -479,7 +480,7 @@ export function createDesktopSettingLayout(
         context.desktopButtonConfigs.forEach(btn => btn.iconSize = newValue)
         await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
         await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
-        showMessage('图标大小已应用到所有按钮', 1500, 'info')
+        Notify.showInfoIconSizeApplied()
       }
     )
     container.appendChild(iconSizeRow)
@@ -495,7 +496,7 @@ export function createDesktopSettingLayout(
         context.desktopButtonConfigs.forEach(btn => btn.minWidth = newValue)
         await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
         await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
-        showMessage('按钮宽度已应用到所有按钮', 1500, 'info')
+        Notify.showInfoButtonWidthApplied()
       }
     )
     container.appendChild(widthRow)
@@ -511,7 +512,7 @@ export function createDesktopSettingLayout(
         context.desktopButtonConfigs.forEach(btn => btn.marginRight = newValue)
         await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
         await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
-        showMessage('右边距已应用到所有按钮', 1500, 'info')
+        Notify.showInfoMarginRightApplied()
       }
     )
     container.appendChild(marginRow)
@@ -528,7 +529,7 @@ export function createDesktopSettingLayout(
         await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
         // 刷新按钮以应用新配置
         context.refreshButtons()
-        showMessage(input.checked ? '已开启所有按钮提示' : '已关闭所有按钮提示', 1500, 'info')
+        Notify.showNotificationToggleStatus(input.checked)
       }
     )
     container.appendChild(notifyRow)
@@ -735,13 +736,13 @@ export function createDesktopSettingLayout(
           await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
           activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px; background: rgba(34, 197, 94, 0.2); color: #22c55e;'
           activationStatus.textContent = '✓ 已激活'
-          showMessage('作者自用工具已激活！请重新打开设置页面', 3000, 'success')
+          Notify.showInfoAuthorToolActivated()
           // 延迟后重新加载设置页面
           setTimeout(() => {
             window.location.reload()
           }, 1500)
         } else {
-          showMessage('激活码错误，请重试', 3000, 'error')
+          Notify.showErrorActivationCodeInvalid()
         }
       }
 

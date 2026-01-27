@@ -264,6 +264,14 @@ export default class ToolbarCustomizer extends Plugin {
         }
       }
 
+      // 同步全局按钮配置的 showNotification 到所有电脑端按钮
+      // 确保全局配置和单个按钮配置保持一致
+      if (this.desktopGlobalButtonConfig.showNotification !== undefined) {
+        this.desktopButtonConfigs.forEach(btn => {
+          btn.showNotification = this.desktopGlobalButtonConfig.showNotification
+        })
+      }
+
       // 加载手机端全局按钮配置
       const savedMobileGlobalButtonConfig = await this.loadData('mobileGlobalButtonConfig')
       if (savedMobileGlobalButtonConfig) {
@@ -271,6 +279,14 @@ export default class ToolbarCustomizer extends Plugin {
           ...this.mobileGlobalButtonConfig,
           ...savedMobileGlobalButtonConfig
         }
+      }
+
+      // 同步全局按钮配置的 showNotification 到所有手机端按钮
+      // 确保全局配置和单个按钮配置保持一致
+      if (this.mobileGlobalButtonConfig.showNotification !== undefined) {
+        this.mobileButtonConfigs.forEach(btn => {
+          btn.showNotification = this.mobileGlobalButtonConfig.showNotification
+        })
       }
 
       // 同步 showAllNotifications 设置到所有按钮

@@ -681,8 +681,17 @@ export default class ToolbarCustomizer extends Plugin {
       styleContent += `
         /* 隐藏所有自定义按钮 */
         .protyle-breadcrumb__bar button[data-custom-button],
-        .protyle-breadcrumb button[data-custom-button] {
+        .protyle-breadcrumb button[data-custom-button],
+        .protyle-breadcrumb__bar [data-custom-button],
+        .protyle-breadcrumb [data-custom-button],
+        button[data-custom-button] {
           display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          width: 0 !important;
+          height: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
         }
       `
     }

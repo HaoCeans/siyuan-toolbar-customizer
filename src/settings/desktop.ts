@@ -660,6 +660,7 @@ export function createDesktopSettingLayout(
         context.desktopFeatureConfig.disableCustomButtons = dangerSwitch.checked
         await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
         context.applyFeatures()
+        context.refreshButtons()
       }
 
       dangerHeader.appendChild(dangerLabel)

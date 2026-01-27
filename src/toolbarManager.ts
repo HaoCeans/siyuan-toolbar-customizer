@@ -76,9 +76,9 @@ export interface GlobalButtonConfig {
 }
 
 export const DEFAULT_GLOBAL_BUTTON_CONFIG: GlobalButtonConfig = {
-  iconSize: 20,
-  minWidth: 20,
-  marginRight: 15,
+  iconSize: 23,
+  minWidth: 23,
+  marginRight: 10,
   showNotification: true
 }
 

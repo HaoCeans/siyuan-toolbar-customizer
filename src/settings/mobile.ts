@@ -460,7 +460,7 @@ export function createMobileSettingLayout(
   })
 
   // === 手机端全局按钮配置 ===
-  createGroupTitle('📱', '手机端全局按钮配置')
+  createGroupTitle('📱', '全局按钮配置')
 
   // 图标大小
   setting.addItem({

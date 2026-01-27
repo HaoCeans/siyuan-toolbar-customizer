@@ -1035,14 +1035,20 @@ function setupEditorButtons(configs: ButtonConfig[]) {
         }
       })
     }
+
+    // 溢出检测完成后再创建按钮（重新获取编辑器以确保 DOM 是最新的）
+    const editors = document.querySelectorAll('.protyle')
+    createButtonsForEditors(editors, configs)
   }
 
-  // 启动溢出计算
+  // 启动溢出计算（完成后会创建按钮）
   requestAnimationFrame(calculateOverflowWithDelay)
+}
 
-  // 找到所有编辑器
-  const editors = document.querySelectorAll('.protyle')
-
+/**
+ * 为编辑器创建按钮
+ */
+function createButtonsForEditors(editors: NodeListOf<Element>, configs: ButtonConfig[]) {
   editors.forEach(editor => {
     // 找到锁定编辑按钮
     const readonlyBtn = editor.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]') ||

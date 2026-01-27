@@ -440,7 +440,9 @@ export function calculateButtonOverflow(buttons: ButtonConfig[], overflowToolbar
   // 策略：从左往右填，当前层满了移到下一层
   // buttonWidths 已按 sort 升序：sort0(右) → sort1 → sort2 → ... → sortN(左)
 
-  const maxLayers = overflowToolbarLayers || 1
+  // 检查扩展工具栏是否启用：禁用时 maxLayers = 0，溢出的按钮将被隐藏
+  const isOverflowEnabled = overflowButton && overflowButton.enabled !== false
+  const maxLayers = isOverflowEnabled ? (overflowToolbarLayers || 1) : 0
 
   // 逐个按钮计算层号：从左往右填
   let currentWidth = 0
@@ -451,9 +453,9 @@ export function calculateButtonOverflow(buttons: ButtonConfig[], overflowToolbar
     if (currentWidth + width > availableWidth) {
       currentLayer++
       currentWidth = 0
-      // 超过最大层数就放在最后一层
+      // 超过最大层数就放在隐藏层（overflowLevel = maxLayers + 1）
       if (currentLayer > maxLayers) {
-        currentLayer = maxLayers
+        currentLayer = maxLayers + 1
       }
     }
 
@@ -515,8 +517,10 @@ function shouldShowButton(button: ButtonConfig): boolean {
  * 检查按钮是否应该显示在主工具栏（而非扩展工具栏）
  */
 function shouldShowInMainToolbar(button: ButtonConfig): boolean {
-  // 扩展工具栏按钮永远显示
-  if (button.id === 'overflow-button-mobile') return true
+  // 扩展工具栏按钮：启用时显示，禁用时隐藏
+  if (button.id === 'overflow-button-mobile') {
+    return button.enabled !== false
+  }
 
   // 检查 overflowLevel：0 表示在主工具栏可见，>0 表示在扩展工具栏
   const overflowLevel = button.overflowLevel ?? 0

@@ -391,7 +391,21 @@ export function createMobileSettingLayout(
             showIconPicker: context.showIconPicker,
             showButtonIdPicker: context.showButtonIdPicker,
             buttonConfigs: context.buttonConfigs,
-            mobileButtonConfigs: context.mobileButtonConfigs
+            mobileButtonConfigs: context.mobileButtonConfigs,
+            recalculateOverflow: () => {
+              // 获取扩展工具栏按钮的层数配置
+              const overflowBtn = context.buttonConfigs.find(btn => btn.id === 'overflow-button-mobile')
+              const overflowLayers = (overflowBtn && overflowBtn.enabled !== false) ? (overflowBtn.layers || 1) : 0
+              // 重新计算溢出层级
+              const updatedButtons = calculateButtonOverflow(context.buttonConfigs, overflowLayers)
+              // 更新配置中的 overflowLevel
+              updatedButtons.forEach(btn => {
+                const original = context.buttonConfigs.find(b => b.id === btn.id)
+                if (original) {
+                  original.overflowLevel = btn.overflowLevel
+                }
+              })
+            }
           }
           const item = createMobileButtonItem(button, index, renderList, context.buttonConfigs, mobileButtonContext)
           listContainer.appendChild(item)

@@ -14,6 +14,7 @@ export interface MobileToolbarConfig {
   openInputOffset: string;    // 打开输入框时距离底部高度
   closeInputOffset: string;   // 关闭输入框时距离底部高度
   heightThreshold: number;    // 高度变化阈值百分比
+  overflowToolbarDistanceBottom?: string;  // 扩展工具栏距离底部工具栏的距离
   overflowToolbarHeightBottom?: string;  // 底部模式扩展工具栏高度
 
   // 共享样式配置（顶部和底部工具栏都使用）
@@ -1334,7 +1335,14 @@ function showOverflowToolbar(config: ButtonConfig) {
     const mainToolbarHeight = parseInt(mobileConfig.toolbarHeight) || 40
     topOffset = topOffsetNum + mainToolbarHeight + distanceNum
   }
-  const bottomOffset = 60   // 底部工具栏上方距离（暂时保留硬编码）
+  // 底部模式：计算 = closeInputOffset + 主工具栏高度 + overflowToolbarDistanceBottom
+  let bottomOffset = 60   // 默认值
+  if (mobileConfig?.closeInputOffset) {
+    const bottomOffsetNum = parseInt(mobileConfig.closeInputOffset) || 0
+    const distanceNum = parseInt(mobileConfig.overflowToolbarDistanceBottom || '') || 8
+    const mainToolbarHeight = parseInt(mobileConfig.toolbarHeight) || 40
+    bottomOffset = bottomOffsetNum + mainToolbarHeight + distanceNum
+  }
 
   // 获取所有按钮配置
   const allButtons = (window as any).__mobileButtonConfigs || []

@@ -14,6 +14,7 @@ export interface MobileToolbarConfig {
   openInputOffset: string;    // 打开输入框时距离底部高度
   closeInputOffset: string;   // 关闭输入框时距离底部高度
   heightThreshold: number;    // 高度变化阈值百分比
+  overflowToolbarHeightBottom?: string;  // 底部模式扩展工具栏高度
 
   // 共享样式配置（顶部和底部工具栏都使用）
   toolbarBackgroundColor: string; // 工具栏背景颜色（明亮模式）
@@ -27,6 +28,8 @@ export interface MobileToolbarConfig {
   enableTopToolbar: boolean;  // 是否启用顶部工具栏（固定定位模式）
   topToolbarOffset: string;   // 顶部工具栏距离顶部的距离（如 "50px"）
   topToolbarPaddingLeft: string; // 顶部工具栏左边距
+  overflowToolbarDistanceTop?: string  // 扩展工具栏距离顶部工具栏的距离（如 "8px"）
+  overflowToolbarHeightTop?: string     // 顶部模式扩展工具栏高度（如 "40px"）
 }
 
 export interface ButtonConfig {
@@ -1313,13 +1316,25 @@ function showOverflowToolbar(config: ButtonConfig) {
   // 获取层数配置（1-5层）
   const layers = config.layers || 1
 
-  // 工具栏高度和间距
-  const toolbarHeight = 40
+  // 获取移动端工具栏配置
+  const mobileConfig = (window as any).__mobileToolbarConfig as MobileToolbarConfig
+
+  // 工具栏高度和间距（根据顶部/底部模式从不同配置读取，默认值 40px 和 4px）
+  const toolbarHeight = isBottomToolbar
+    ? (parseInt(mobileConfig?.overflowToolbarHeightBottom || '') || 40)
+    : (parseInt(mobileConfig?.overflowToolbarHeightTop || '') || 40)
   const toolbarSpacing = 4
 
   // 顶部工具栏和底部工具栏的不同偏移
-  const topOffset = 100      // 顶部工具栏下方距离
-  const bottomOffset = 60   // 底部工具栏上方距离
+  // 顶部模式：计算 = topToolbarOffset + 主工具栏高度 + overflowToolbarDistanceTop
+  let topOffset = 100  // 默认值
+  if (mobileConfig?.topToolbarOffset) {
+    const topOffsetNum = parseInt(mobileConfig.topToolbarOffset) || 50
+    const distanceNum = parseInt(mobileConfig.overflowToolbarDistanceTop || '') || 8
+    const mainToolbarHeight = parseInt(mobileConfig.toolbarHeight) || 40
+    topOffset = topOffsetNum + mainToolbarHeight + distanceNum
+  }
+  const bottomOffset = 60   // 底部工具栏上方距离（暂时保留硬编码）
 
   // 获取所有按钮配置
   const allButtons = (window as any).__mobileButtonConfigs || []
@@ -1452,7 +1467,6 @@ function showOverflowToolbar(config: ButtonConfig) {
     `
 
     // 应用工具栏背景颜色和透明度配置
-    const mobileConfig = (window as any).__mobileToolbarConfig as MobileToolbarConfig
     if (mobileConfig) {
       if (mobileConfig.useThemeColor) {
         // 使用主题颜色时，只需要调整透明度

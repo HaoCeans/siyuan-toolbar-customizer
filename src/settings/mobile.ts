@@ -20,6 +20,7 @@ export interface MobileToolbarConfig {
   closeInputOffset?: string
   openInputOffset?: string
   heightThreshold?: number
+  overflowToolbarHeightBottom?: string  // 底部模式扩展工具栏高度
 
   // 共享样式配置
   toolbarHeight: string
@@ -32,6 +33,8 @@ export interface MobileToolbarConfig {
   // 顶部工具栏配置
   enableTopToolbar?: boolean
   topToolbarOffset?: string
+  overflowToolbarDistanceTop?: string  // 扩展工具栏距离顶部工具栏的距离
+  overflowToolbarHeightTop?: string     // 顶部模式扩展工具栏高度
 }
 
 /**
@@ -895,6 +898,44 @@ export function createMobileSettingLayout(
     }
   })
 
+  setting.addItem({
+    title: '②扩展工具栏距离顶部工具栏',
+    description: '💡扩展工具栏第1层距离顶部主工具栏的距离（仅在顶部固定时有效）',
+    createActionElement: () => {
+      const input = document.createElement('input')
+      input.className = 'b3-text-field fn__flex-center fn__size200 top-toolbar-setting'
+      input.type = 'text'
+      input.value = context.mobileConfig.overflowToolbarDistanceTop ?? '8px'
+      input.style.cssText = 'font-size: 14px; padding: 8px;'
+      input.disabled = !context.mobileConfig.enableTopToolbar
+      if (!context.mobileConfig.enableTopToolbar) input.style.opacity = '0.5'
+      input.onchange = async () => {
+        context.mobileConfig.overflowToolbarDistanceTop = input.value
+        await context.saveData('mobileConfig', context.mobileConfig)
+      }
+      return input
+    }
+  })
+
+  setting.addItem({
+    title: '③扩展工具栏高度',
+    description: '💡顶部模式时扩展工具栏每一层的高度',
+    createActionElement: () => {
+      const input = document.createElement('input')
+      input.className = 'b3-text-field fn__flex-center fn__size200 top-toolbar-setting'
+      input.type = 'text'
+      input.value = context.mobileConfig.overflowToolbarHeightTop ?? '40px'
+      input.style.cssText = 'font-size: 14px; padding: 8px;'
+      input.disabled = !context.mobileConfig.enableTopToolbar
+      if (!context.mobileConfig.enableTopToolbar) input.style.opacity = '0.5'
+      input.onchange = async () => {
+        context.mobileConfig.overflowToolbarHeightTop = input.value
+        await context.saveData('mobileConfig', context.mobileConfig)
+      }
+      return input
+    }
+  })
+
   // === 底部工具栏专用配置 ===
   createGroupTitle('⬇️', '底部工具栏配置')
 
@@ -956,6 +997,25 @@ export function createMobileSettingLayout(
         await context.saveData('mobileConfig', context.mobileConfig)
         // 需要重新初始化工具栏检测器以应用新阈值
         initMobileToolbarAdjuster(context.mobileConfig)
+      }
+      return input
+    }
+  })
+
+  setting.addItem({
+    title: '④扩展工具栏高度',
+    description: '💡底部模式时扩展工具栏每一层的高度',
+    createActionElement: () => {
+      const input = document.createElement('input')
+      input.className = 'b3-text-field fn__flex-center fn__size200 bottom-toolbar-setting'
+      input.type = 'text'
+      input.value = context.mobileConfig.overflowToolbarHeightBottom ?? '40px'
+      input.style.cssText = 'font-size: 14px; padding: 8px;'
+      input.disabled = !context.mobileConfig.enableBottomToolbar
+      if (!context.mobileConfig.enableBottomToolbar) input.style.opacity = '0.5'
+      input.onchange = async () => {
+        context.mobileConfig.overflowToolbarHeightBottom = input.value
+        await context.saveData('mobileConfig', context.mobileConfig)
       }
       return input
     }

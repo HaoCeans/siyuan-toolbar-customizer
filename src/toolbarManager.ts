@@ -518,6 +518,32 @@ function shouldShowButton(button: ButtonConfig): boolean {
 }
 
 /**
+ * 检查元素是否是输入框或可编辑元素（用于判断是否需要保持输入法状态）
+ */
+function isInputOrEditable(element: HTMLElement): boolean {
+  if (!element) return false
+
+  const tagName = element.tagName.toLowerCase()
+
+  // 检查是否是输入框类型
+  if (tagName === 'textarea' || tagName === 'input') {
+    return true
+  }
+
+  // 检查是否是 contenteditable 元素（思源编辑器）
+  if (element.isContentEditable) {
+    return true
+  }
+
+  // 检查是否有 contenteditable 属性
+  if (element.getAttribute('contenteditable') === 'true') {
+    return true
+  }
+
+  return false
+}
+
+/**
  * 检查按钮是否应该显示在主工具栏（而非扩展工具栏）
  */
 function shouldShowInMainToolbar(button: ButtonConfig): boolean {
@@ -1165,6 +1191,11 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
   button.setAttribute('aria-label', config.name)
   button.title = config.name
 
+  // 扩展工具栏按钮：设置 tabindex="-1" 阻止通过 Tab 键获得焦点
+  if (config.id === 'overflow-button-mobile') {
+    button.setAttribute('tabindex', '-1')
+  }
+
   // 应用基础样式（完全可控）
   button.style.cssText = getButtonBaseStyle(config)
 
@@ -1245,30 +1276,53 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
   let lastActiveElement: HTMLElement | null = null
   let isTouchEvent = false
 
-  // 在 mousedown 时保存选区和焦点元素（此时编辑器还未失去焦点）
-  button.addEventListener('mousedown', (e) => {
-    if (isTouchEvent) return // 如果是触摸事件，跳过 mousedown
-    const selection = window.getSelection()
-    if (selection && selection.rangeCount > 0) {
-      savedSelection = selection.getRangeAt(0).cloneRange()
-    }
-    lastActiveElement = document.activeElement as HTMLElement
-  })
+  // 扩展工具栏按钮的特殊处理：阻止焦点转移
+  if (config.id === 'overflow-button-mobile') {
+    // 使用 pointerdown 事件（在鼠标/触摸按下时触发，早于 mousedown/touchstart）
+    // 设置 pointer-events: none 可以完全阻止焦点转移，但也会阻止点击
+    // 所以我们用另一种方法：阻止按钮成为默认焦点目标
+    button.addEventListener('pointerdown', (e) => {
+      // 保存当前焦点元素
+      lastActiveElement = document.activeElement as HTMLElement
+    })
 
-  // 移动端：touchstart 时保存状态，但不阻止默认
-  button.addEventListener('touchstart', (e) => {
-    isTouchEvent = true
-    const selection = window.getSelection()
-    if (selection && selection.rangeCount > 0) {
-      savedSelection = selection.getRangeAt(0).cloneRange()
-    }
-    lastActiveElement = document.activeElement as HTMLElement
-  }, { passive: true })
+    // touchstart 保存状态
+    button.addEventListener('touchstart', () => {
+      isTouchEvent = true
+      lastActiveElement = document.activeElement as HTMLElement
+    }, { passive: true })
 
-  // touchend 时重置标记
-  button.addEventListener('touchend', () => {
-    setTimeout(() => { isTouchEvent = false }, 100)
-  })
+    // touchend 清除标记
+    button.addEventListener('touchend', () => {
+      setTimeout(() => { isTouchEvent = false }, 100)
+    })
+  } else {
+    // 其他按钮：保持原有逻辑
+    // 在 mousedown 时保存选区和焦点元素（此时编辑器还未失去焦点）
+    button.addEventListener('mousedown', (e) => {
+      if (isTouchEvent) return // 如果是触摸事件，跳过 mousedown
+      const selection = window.getSelection()
+      if (selection && selection.rangeCount > 0) {
+        savedSelection = selection.getRangeAt(0).cloneRange()
+      }
+      lastActiveElement = document.activeElement as HTMLElement
+    })
+
+    // 移动端：touchstart 时保存状态
+    button.addEventListener('touchstart', (e) => {
+      isTouchEvent = true
+      const selection = window.getSelection()
+      if (selection && selection.rangeCount > 0) {
+        savedSelection = selection.getRangeAt(0).cloneRange()
+      }
+      lastActiveElement = document.activeElement as HTMLElement
+    }, { passive: true })
+
+    // touchend 时重置标记
+    button.addEventListener('touchend', () => {
+      setTimeout(() => { isTouchEvent = false }, 100)
+    })
+  }
 
   // 绑定点击事件
   button.addEventListener('click', (e) => {
@@ -1276,15 +1330,11 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
 
     // 扩展工具栏按钮特殊处理（toggle 扩展工具栏）
     if (config.id === 'overflow-button-mobile') {
-      // 移除按钮焦点
-      button.blur()
-      // 如果之前保存的焦点元素是输入框，恢复焦点以保持输入法状态
-      if (lastActiveElement && lastActiveElement !== document.activeElement) {
-        // 检查是否是输入框类型（textarea 或 input）
-        const tagName = lastActiveElement.tagName.toLowerCase()
-        if (tagName === 'textarea' || tagName === 'input') {
-          ;(lastActiveElement as HTMLElement).focus()
-        }
+      // 扩展工具栏按钮：立即移除焦点并恢复输入框焦点，保持输入法状态
+      button.blur() // 立即移除按钮焦点
+      // 如果之前有输入框焦点，立即恢复
+      if (lastActiveElement && isInputOrEditable(lastActiveElement)) {
+        lastActiveElement.focus()
       }
       showOverflowToolbar(config)
       return

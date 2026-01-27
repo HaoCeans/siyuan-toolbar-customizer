@@ -1,6 +1,6 @@
 /**
  * 手机端设置模块
- * 处理手机端工具栏定制器的设置界面
+ * 处理手机端思源手机端增强的设置界面
  */
 
 import type { Setting } from 'siyuan'
@@ -438,12 +438,12 @@ export function createMobileSettingLayout(
           type: 'builtin',
           builtinId: 'menuSearch',
           icon: '♥️',
-          iconSize: 18,
-          minWidth: 32,
-          marginRight: 8,
+          iconSize: context.mobileGlobalButtonConfig.iconSize,
+          minWidth: context.mobileGlobalButtonConfig.minWidth,
+          marginRight: context.mobileGlobalButtonConfig.marginRight,
           sort: context.buttonConfigs.length + 1,
           platform: 'both',
-          showNotification: true,
+          showNotification: context.mobileGlobalButtonConfig.showNotification,
           overflowLevel: 0 // 初始为可见，稍后重新计算
         }
         context.buttonConfigs.push(newButton)
@@ -1166,7 +1166,7 @@ export function createMobileSettingLayout(
   // 鲸鱼定制工具箱激活码输入
   setting.addItem({
     title: '🔐 鲸鱼定制工具箱激活',
-    description: '💡输入激活码解锁「⑥鲸鱼定制工具箱」功能类型',
+    description: '💡输入激活码解锁「⑥鲸鱼定制工具箱」功能类型。激活码获取：请进QQ群1018010924咨询群主！',
     createActionElement: () => {
       const container = document.createElement('div')
       container.style.cssText = 'display: flex; flex-direction: column; gap: 10px; width: 100%;'

@@ -1,6 +1,6 @@
 /**
  * 电脑端设置模块
- * 处理电脑端工具栏定制器的设置界面
+ * 处理电脑端思源手机端增强的设置界面
  */
 
 import type { Setting } from 'siyuan'
@@ -301,7 +301,7 @@ export function createDesktopFeatureConfig(
 
   const activationDesc = document.createElement('div')
   activationDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-  activationDesc.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型'
+  activationDesc.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型。激活码获取：请进QQ群1018010924咨询群主！'
 
   const activationInputRow = document.createElement('div')
   activationInputRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-top: 4px;'
@@ -415,12 +415,12 @@ export function createDesktopSettingLayout(
           type: 'builtin',
           builtinId: 'menuSearch',
           icon: '♥️',
-          iconSize: 18,
-          minWidth: 32,
-          marginRight: 8,
+          iconSize: context.desktopGlobalButtonConfig.iconSize,
+          minWidth: context.desktopGlobalButtonConfig.minWidth,
+          marginRight: context.desktopGlobalButtonConfig.marginRight,
           sort: context.desktopButtonConfigs.length + 1,
           platform: 'both',
-          showNotification: true,
+          showNotification: context.desktopGlobalButtonConfig.showNotification,
           enabled: true
         }
         context.desktopButtonConfigs.push(newButton)
@@ -710,7 +710,7 @@ export function createDesktopSettingLayout(
 
       const activationDesc = document.createElement('div')
       activationDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-      activationDesc.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型'
+      activationDesc.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型。若想获得激活码，请进QQ群1018010924咨询群主！'
 
       const activationInputRow = document.createElement('div')
       activationInputRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-top: 4px;'

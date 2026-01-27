@@ -2,7 +2,7 @@
   "name": "siyuan-toolbar-customizer",
   "author": "whale🐋",
   "url": "https://github.com/HaoCeans/siyuan-toolbar-customizer",
-  "version": "2.6.3",
+  "version": "3.0.0",
   "minAppVersion": "3.0.0",
   "backends": [
     "all"
@@ -12,12 +12,12 @@
   ],
   "disabledInPublish": true,
   "displayName": {
-    "default": "Toolbar Customizer",
-    "zh_CN": "工具栏定制器"
+    "default": "SiYuan Mobile Enhancer",
+    "zh_CN": "思源手机端增强"
   },
   "description": {
-    "default": "A powerful toolbar customization plugin for SiYuan Notes. Supports custom buttons, mobile toolbar positioning, click-sequence automation, and more.",
-    "zh_CN": "强大的思源笔记工具栏定制插件，支持自定义按钮、手机端工具栏位置调整、点击序列自动化等功能。"
+    "default": "Replace Quicker, FV, Notion automation within SiYuan! Click automation, quick access to built-in features, date templates, mobile shortcuts. Supports both mobile and desktop!",
+    "zh_CN": "可在思源内基本替换Quicker、FV悬浮球、notion自动化、宏命令等~自动化模拟点击！一键直达：思源内置功能、日期模板插入、手机快捷键、自动化模拟点击。手机端、电脑端均支持！"
   },
   "readme": {
     "default": "README.md",
@@ -35,9 +35,14 @@
     "工具栏",
     "自定义",
     "手机端",
+    "手机端增强",
+    "移动端",
+    "移动端增强",
+    "模拟点击",
     "自动化",
     "按钮",
-    "移动端",
-    "鲸鱼"
+    "鲸鱼",
+    "工具箱",
+    "鲸鱼工具箱"
   ]
 }

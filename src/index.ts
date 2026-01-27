@@ -29,7 +29,8 @@ import {
   MobileToolbarConfig,
   ButtonConfig,
   GlobalButtonConfig,
-  DEFAULT_GLOBAL_BUTTON_CONFIG,
+  DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG,
+  DEFAULT_MOBILE_GLOBAL_BUTTON_CONFIG,
   isMobileDevice,
   calculateButtonOverflow
 } from './toolbarManager'
@@ -95,8 +96,8 @@ export default class ToolbarCustomizer extends Plugin {
   private currentEditingButton: ButtonConfig | null = null
 
   // 全局按钮配置（批量设置所有按钮的默认值）
-  private desktopGlobalButtonConfig: GlobalButtonConfig = { ...DEFAULT_GLOBAL_BUTTON_CONFIG }
-  private mobileGlobalButtonConfig: GlobalButtonConfig = { ...DEFAULT_GLOBAL_BUTTON_CONFIG }
+  private desktopGlobalButtonConfig: GlobalButtonConfig = { ...DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG }
+  private mobileGlobalButtonConfig: GlobalButtonConfig = { ...DEFAULT_MOBILE_GLOBAL_BUTTON_CONFIG }
 
   // 全局事件处理器引用（用于清理）
   private touchStartHandler: any = null
@@ -324,8 +325,39 @@ export default class ToolbarCustomizer extends Plugin {
       // ===== 首次安装提示 =====
       // 检查是否显示过首次安装提示
       const hasShownWelcome = await this.loadData('hasShownWelcome')
-      if (!hasShownWelcome) {
-        // 延迟显示欢迎提示，确保界面完全加载
+      const v3MigrationAsked = await this.loadData('v3MigrationAsked')
+
+      // v3.0.0 大版本迁移：检测老用户并询问是否覆盖配置
+      if (hasShownWelcome && !v3MigrationAsked) {
+        // 这是老用户，且未询问过迁移
+        setTimeout(async () => {
+          const shouldReset = await this.showConfirmDialogModal({
+            title: '🎉 检测到《工具栏定制器》插件大版本更新 (v3.0.0)',
+            message: '本版本正式更名为《思源手机端增强》，进行了重大重构，推荐使用新的默认配置。\n\n是否覆盖旧配置？\n\n• 选择"覆盖配置"：使用新的默认按钮和设置\n• 选择"保留配置"：继续使用现有配置',
+            hint: '⚠️ 提示：若保留配置，可能会出现部分问题。\n欢迎进群反馈 QQ：1018010924',
+            confirmText: '覆盖配置',
+            cancelText: '保留配置'
+          })
+
+          if (shouldReset) {
+            // 用户选择覆盖配置：删除所有配置数据
+            await this.resetAllConfigs()
+            showMessage('已重置为新的默认配置，正在重载...', 3000, 'info')
+            // 保存迁移标记
+            await this.saveData('v3MigrationAsked', true)
+            // 重载界面
+            setTimeout(() => {
+              fetchSyncPost('/api/system/reloadUI', {})
+            }, 1000)
+          } else {
+            // 用户选择保留配置
+            showMessage('已保留现有配置', 2000, 'info')
+            // 保存迁移标记
+            await this.saveData('v3MigrationAsked', true)
+          }
+        }, 1000)
+      } else if (!hasShownWelcome) {
+        // 新用户，显示欢迎提示
         setTimeout(() => {
           if (this.isMobile) {
             showMessage('欢迎使用本插件！🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦搜索', 0, 'info')
@@ -509,7 +541,7 @@ export default class ToolbarCustomizer extends Plugin {
       createDesktopSettingLayout(setting, context)
     }
 
-    setting.open('工具栏定制器')
+    setting.open('思源手机端增强')
 
     // 电脑端：对话框打开后注入标签栏
     if (!this.isMobile) {
@@ -583,6 +615,25 @@ export default class ToolbarCustomizer extends Plugin {
   // 自定义确认对话框（已迁移到 ui/dialog.ts，兼容鸿蒙系统）
   private showConfirmDialog(message: string): Promise<boolean> {
     return showConfirmDialogModal({ message, confirmText: '删除', cancelText: '取消' })
+  }
+
+  // 带标题的确认对话框（用于 v3.0.0 迁移询问）
+  private showConfirmDialogModal(options: { title?: string; message: string; confirmText?: string; cancelText?: string }): Promise<boolean> {
+    return showConfirmDialogModal(options)
+  }
+
+  // 重置所有配置（用于 v3.0.0 迁移）
+  private async resetAllConfigs() {
+    // 删除所有配置数据
+    await this.removeData('desktopButtonConfigs')
+    await this.removeData('mobileButtonConfigs')
+    await this.removeData('desktopGlobalButtonConfig')
+    await this.removeData('mobileGlobalButtonConfig')
+    await this.removeData('desktopFeatureConfig')
+    await this.removeData('mobileFeatureConfig')
+    await this.removeData('mobileToolbarConfig')
+    await this.removeData('featureConfig')  // 旧版配置
+    // 注意：不删除 hasShownWelcome 和 v3MigrationAsked
   }
 
   // 图标选择器（已迁移到 ui/iconPicker.ts）

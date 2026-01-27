@@ -6,6 +6,7 @@
 export interface ConfirmDialogOptions {
   title?: string
   message: string
+  hint?: string  // 底部提示文字（带颜色）
   confirmText?: string
   cancelText?: string
 }
@@ -15,7 +16,7 @@ export interface ConfirmDialogOptions {
  * @returns Promise<boolean> - 用户选择结果
  */
 export function showConfirmDialog(options: ConfirmDialogOptions): Promise<boolean> {
-  const { title = '确认', message, confirmText = '确定', cancelText = '取消' } = options
+  const { title = '确认', message, hint, confirmText = '确定', cancelText = '取消' } = options
 
   return new Promise((resolve) => {
     const overlay = document.createElement('div')
@@ -63,10 +64,30 @@ export function showConfirmDialog(options: ConfirmDialogOptions): Promise<boolea
       font-size: 14px;
       color: var(--b3-theme-on-background);
       line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
     `
 
     content.appendChild(titleElement)
     content.appendChild(messageElement)
+
+    // 提示文字（带颜色）
+    if (hint) {
+      const hintElement = document.createElement('div')
+      hintElement.textContent = hint
+      hintElement.style.cssText = `
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px dashed var(--b3-border-color);
+        font-size: 13px;
+        color: #f59e0b;
+        font-weight: 500;
+        line-height: 1.5;
+        white-space: pre-wrap;
+        word-break: break-word;
+      `
+      content.appendChild(hintElement)
+    }
 
     const buttons = document.createElement('div')
     buttons.style.cssText = `

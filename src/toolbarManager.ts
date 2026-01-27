@@ -75,12 +75,24 @@ export interface GlobalButtonConfig {
   showNotification: boolean; // 是否显示右上角提示
 }
 
-export const DEFAULT_GLOBAL_BUTTON_CONFIG: GlobalButtonConfig = {
+// 桌面端全局按钮默认值
+export const DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG: GlobalButtonConfig = {
+  iconSize: 18,
+  minWidth: 32,
+  marginRight: 8,
+  showNotification: true
+}
+
+// 手机端全局按钮默认值
+export const DEFAULT_MOBILE_GLOBAL_BUTTON_CONFIG: GlobalButtonConfig = {
   iconSize: 23,
   minWidth: 23,
   marginRight: 10,
   showNotification: true
 }
+
+// 兼容性：保留旧的导出名称（默认为桌面端）
+export const DEFAULT_GLOBAL_BUTTON_CONFIG = DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG
 
 // ===== 默认配置 =====
 export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
@@ -151,7 +163,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
     id: 'plugin-settings-desktop',
     name: '插件设置',
     type: 'click-sequence',
-    clickSequence: ['barPlugins', 'text:工具栏定制器'],
+    clickSequence: ['barPlugins', 'text:思源手机端增强'],
     icon: '⚙️',
     iconSize: 18,
     minWidth: 32,
@@ -209,9 +221,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'builtin',
     builtinId: 'overflow',
     icon: '⋯',
-    iconSize: 20,
-    minWidth: 20,
-    marginRight: 15,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 0,
     platform: 'mobile',
     showNotification: true,
@@ -223,9 +235,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'builtin',
     builtinId: 'more',
     icon: '✨',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 1,
     platform: 'mobile',
     showNotification: true
@@ -236,9 +248,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'builtin',
     builtinId: 'doc',
     icon: '🧩',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 2,
     platform: 'mobile',
     showNotification: true
@@ -249,9 +261,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'builtin',
     builtinId: 'readonly',
     icon: '🔒',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 3,
     platform: 'mobile',
     showNotification: true
@@ -260,11 +272,11 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     id: 'plugin-settings-mobile',
     name: '插件设置',
     type: 'click-sequence',
-    clickSequence: ['toolbarMore', 'menuPlugin', 'text:工具栏定制器'],
+    clickSequence: ['toolbarMore', 'menuPlugin', 'text:思源手机端增强'],
     icon: '⚙️',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 4,
     platform: 'mobile',
     showNotification: true
@@ -275,9 +287,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'shortcut',
     shortcutKey: 'Alt+5',
     icon: '🗓️',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 5,
     platform: 'mobile',
     showNotification: true
@@ -288,9 +300,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'template',
     template: '{{hour}}时{{minute}}分',
     icon: '⏰',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 6,
     platform: 'mobile',
     showNotification: true
@@ -301,9 +313,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'builtin',
     builtinId: 'menuSearch',
     icon: '🔎',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 7,
     platform: 'mobile',
     showNotification: true

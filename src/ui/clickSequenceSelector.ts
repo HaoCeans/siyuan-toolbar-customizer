@@ -21,8 +21,8 @@ const PRESET_SEQUENCES: ClickSequenceOption[] = [
   {
     id: 'plugin-settings-desktop',
     name: '①打开插件设置',
-    description: '电脑端：插件 → 工具栏定制器',
-    sequence: ['barPlugins', 'text:工具栏定制器']
+    description: '电脑端：插件 → 思源手机端增强',
+    sequence: ['barPlugins', 'text:思源手机端增强']
   },
   {
     id: 'open-browser-desktop',
@@ -34,8 +34,8 @@ const PRESET_SEQUENCES: ClickSequenceOption[] = [
   {
     id: 'plugin-settings-mobile',
     name: '①打开插件设置',
-    description: '手机端：更多 → 插件 → 工具栏定制器',
-    sequence: ['toolbarMore', 'menuPlugin', 'text:工具栏定制器']
+    description: '手机端：更多 → 插件 → 思源手机端增强',
+    sequence: ['toolbarMore', 'menuPlugin', 'text:思源手机端增强']
   },
   {
     id: 'open-browser-mobile',

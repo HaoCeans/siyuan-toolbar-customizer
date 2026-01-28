@@ -3,9 +3,21 @@
  * 负责移动端工具栏调整和自定义按钮功能
  */
 
-import { Dialog, fetchSyncPost, getFrontend, showMessage } from "siyuan";
+import { Dialog, fetchSyncPost, getFrontend, showMessage, openTab as siyuanOpenTab } from "siyuan";
 // 通知模块
 import * as Notify from "./notification";
+// 导入 stressThreshold 的 openTab（与数据库悬浮弹窗使用相同的函数）
+import { openTab as stressThresholdOpenTab } from "./stressThreshold";
+
+// ===== 插件实例（用于需要 app 参数的 API 调用） =====
+let pluginInstance: any = null;
+
+/**
+ * 设置插件实例（在插件初始化时调用）
+ */
+export function setPluginInstance(plugin: any): void {
+  pluginInstance = plugin;
+}
 
 // ===== 配置接口 =====
 export interface MobileToolbarConfig {
@@ -41,9 +53,10 @@ export interface ButtonConfig {
   template?: string;         // 模板内容
   clickSequence?: string[];  // 模拟点击选择器序列
   shortcutKey?: string;      // 快捷键组合
-  targetDocId?: string;      // 打开指定ID文档：目标文档ID
+  targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
+  mobileTargetDocId?: string; // 打开指定ID块：目标块ID（移动端），支持文档ID或块ID
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
-  authorToolSubtype?: 'open-doc' | 'database' | 'diary-bottom'; // 作者工具子类型：open-doc=打开指定ID文档, database=数据库悬浮弹窗, diary-bottom=日记底部
+  authorToolSubtype?: 'open-doc' | 'database' | 'diary-bottom' | 'life-log'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary-bottom=日记底部, life-log=叶归LifeLog适配
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
   viewName?: string;         // 视图名称
@@ -55,6 +68,10 @@ export interface ButtonConfig {
   showColumns?: string[];    // 要显示的列名数组
   timeRangeColumnName?: string; // 时间段列的名称
   diaryWaitTime?: number;     // 日记底部功能：移动端等待时间（毫秒，默认 1000）
+  lifeLogCategories?: string[]; // 叶归LifeLog适配：分类选项列表
+  lifeLogNotebookId?: string; // 叶归LifeLog适配：目标笔记本ID
+  cardContainerHeight?: string; // 卡片模式容器高度
+  cardScrollMaxHeight?: string; // 卡片模式滚动容器最大高度
   icon: string;              // 图标（思源图标或Emoji）
   iconSize: number;          // 图标大小（px）
   minWidth: number;          // 按钮最小宽度（px）
@@ -69,6 +86,7 @@ export interface ButtonConfig {
 
 // 全局按钮配置（用于批量设置所有按钮的默认值）
 export interface GlobalButtonConfig {
+  enabled: boolean           // 是否启用全局配置批量应用（默认true，保持向后兼容）
   iconSize: number;          // 图标大小（px）
   minWidth: number;          // 按钮最小宽度（px）
   marginRight: number;       // 右侧边距（px）
@@ -77,6 +95,7 @@ export interface GlobalButtonConfig {
 
 // 桌面端全局按钮默认值
 export const DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG: GlobalButtonConfig = {
+  enabled: true,
   iconSize: 18,
   minWidth: 32,
   marginRight: 8,
@@ -85,6 +104,7 @@ export const DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG: GlobalButtonConfig = {
 
 // 手机端全局按钮默认值
 export const DEFAULT_MOBILE_GLOBAL_BUTTON_CONFIG: GlobalButtonConfig = {
+  enabled: true,
   iconSize: 23,
   minWidth: 23,
   marginRight: 10,
@@ -1020,7 +1040,9 @@ export function initCustomButtons(configs: ButtonConfig[]) {
     focusStyle.textContent = `
       /* 移除主工具栏自定义按钮的 focus 状态样式（包括阴影） */
       .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus,
-      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus {
+      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus,
+      .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus-visible,
+      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus-visible {
         background-color: transparent !important;
         background: transparent !important;
         box-shadow: none !important;
@@ -1035,9 +1057,21 @@ export function initCustomButtons(configs: ButtonConfig[]) {
       /* 移除主工具栏自定义按钮的 active 状态阴影（点击时） */
       .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):active,
       .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):active {
+        background-color: transparent !important;
+        background: transparent !important;
         box-shadow: none !important;
         -webkit-box-shadow: none !important;
+        outline: none !important;
+        border: none !important;
+        transform: none !important;
+        filter: none !important;
       }
+      /* 保留主工具栏自定义按钮的 hover 状态背景（桌面端） */
+      .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):hover,
+      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):hover {
+        /* 允许 JavaScript 控制悬停效果 */
+      }
+            
     `
     document.head.appendChild(focusStyle)
   }
@@ -1267,20 +1301,16 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
 
   // 添加 hover 效果（与思源原生按钮一致）
   button.addEventListener('mouseenter', () => {
-    button.style.backgroundColor = 'var(--b3-list-hover) !important'
-    button.style.color = 'var(--b3-theme-on-background) !important'
+    button.classList.add('custom-button-hover')
   })
   button.addEventListener('mouseleave', () => {
-    button.style.backgroundColor = 'transparent !important'
-    button.style.color = 'var(--b3-theme-on-surface) !important'
+    button.classList.remove('custom-button-hover')
   })
   button.addEventListener('touchstart', () => {
-    button.style.backgroundColor = 'var(--b3-list-hover) !important'
-    button.style.color = 'var(--b3-theme-on-background) !important'
+    button.classList.add('custom-button-hover')
   }, { passive: true })
   button.addEventListener('touchend', () => {
-    button.style.backgroundColor = 'transparent !important'
-    button.style.color = 'var(--b3-theme-on-surface) !important'
+    button.classList.remove('custom-button-hover')
   })
 
   // 保存选区的变量（用于快捷键按钮）
@@ -1337,7 +1367,7 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
   }
 
   // 绑定点击事件
-  button.addEventListener('click', (e) => {
+  button.addEventListener('click', async (e) => {
     e.stopPropagation()
 
     // 扩展工具栏按钮特殊处理（toggle 扩展工具栏）
@@ -1369,8 +1399,8 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
       }
     }
 
-    // 将保存的选区和按钮元素传递给处理函数（不传 button，因为已经 blur 了）
-    handleButtonClick(config, savedSelection, lastActiveElement, null)
+    // 将保存的选区和按钮元素传递给处理函数（使用 await 保持 async 链条）
+    await handleButtonClick(config, savedSelection, lastActiveElement, null)
 
     // builtin 类型的按钮不恢复焦点，让输入法自然关闭
     // 其他类型恢复焦点
@@ -1652,20 +1682,16 @@ function showOverflowToolbar(config: ButtonConfig) {
 
       // 添加 hover 效果（与思源原生按钮一致）
       layerBtn.addEventListener('mouseenter', () => {
-        layerBtn.style.backgroundColor = 'var(--b3-list-hover) !important'
-        layerBtn.style.color = 'var(--b3-theme-on-background) !important'
+        layerBtn.classList.add('custom-button-hover')
       })
       layerBtn.addEventListener('mouseleave', () => {
-        layerBtn.style.backgroundColor = 'transparent !important'
-        layerBtn.style.color = 'var(--b3-theme-on-surface) !important'
+        layerBtn.classList.remove('custom-button-hover')
       })
       layerBtn.addEventListener('touchstart', () => {
-        layerBtn.style.backgroundColor = 'var(--b3-list-hover) !important'
-        layerBtn.style.color = 'var(--b3-theme-on-background) !important'
+        layerBtn.classList.add('custom-button-hover')
       }, { passive: true })
       layerBtn.addEventListener('touchend', () => {
-        layerBtn.style.backgroundColor = 'transparent !important'
-        layerBtn.style.color = 'var(--b3-theme-on-surface) !important'
+        layerBtn.classList.remove('custom-button-hover')
       })
 
       // 保存选区的变量（每个按钮独立保存）
@@ -1699,15 +1725,15 @@ function showOverflowToolbar(config: ButtonConfig) {
       })
 
       // 点击按钮执行功能
-      layerBtn.addEventListener('click', (e) => {
+      layerBtn.addEventListener('click', async (e) => {
         e.stopPropagation()
         e.preventDefault()  // 阻止默认行为，包括按钮获得焦点
 
         // 关闭扩展工具栏
         document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove())
 
-        // 将保存的选区传递给处理函数
-        handleButtonClick(btn, savedSelection, lastActiveElement)
+        // 将保存的选区传递给处理函数（使用 await 保持 async 链条）
+        await handleButtonClick(btn, savedSelection, lastActiveElement)
 
         // builtin 类型的按钮不恢复焦点，让输入法自然关闭
         // 其他类型恢复焦点，保持输入法打开
@@ -1749,7 +1775,7 @@ function showOverflowToolbar(config: ButtonConfig) {
   }, 100)
 }
 
-function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null, clickedButton: HTMLElement | null = null) {
+async function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null, clickedButton: HTMLElement | null = null) {
   // 如果开启了右上角提示，显示消息
   const notificationEnabled = config.showNotification !== false
   Notify.showButtonExecNotification(config.name, notificationEnabled)
@@ -1769,7 +1795,7 @@ function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = 
     executeShortcut(config, savedSelection, lastActiveElement)
   } else if (config.type === 'author-tool') {
     // 执行鲸鱼定制工具箱
-    executeAuthorTool(config)
+    await executeAuthorTool(config)
   }
 
   // 功能执行完成后，延迟移除按钮焦点（1000ms）
@@ -2332,7 +2358,7 @@ async function executeDiaryBottom(config: ButtonConfig) {
 /**
  * 执行鲸鱼定制工具箱
  */
-function executeAuthorTool(config: ButtonConfig) {
+async function executeAuthorTool(config: ButtonConfig) {
   const subtype = config.authorToolSubtype || 'open-doc'
 
   // 日记底部类型
@@ -2347,14 +2373,189 @@ function executeAuthorTool(config: ButtonConfig) {
     return
   }
 
-  // 打开指定ID文档类型（默认）
-  if (config.targetDocId) {
-    // 使用思源 API 打开块
-    fetch('/api/block/openBlockDoc', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: config.targetDocId })
-    }).catch(() => {})
+  // 叶归LifeLog适配类型
+  if (subtype === 'life-log') {
+    try {
+      const categories = config.lifeLogCategories || ['学习', '工作', '生活']
+      
+      // 创建选择对话框
+      const selectedCategory = await showCategorySelectionDialog(categories)
+      
+      if (selectedCategory) {
+        // 弹出输入框，让用户输入具体内容
+        const inputContent = await showTextInputDialog('请输入内容', '例如：写插件')
+        
+        if (inputContent !== null) {
+          // 获取当前时间
+          const now = new Date()
+          const hours = String(now.getHours()).padStart(2, '0')
+          const minutes = String(now.getMinutes()).padStart(2, '0')
+          
+          // 生成内容格式：19:50 工作：输入内容\n
+          const content = `${hours}:${minutes} ${selectedCategory}：${inputContent}\n`
+          
+          // 获取笔记本ID
+          const notebookId = config.lifeLogNotebookId
+          
+          if (!notebookId) {
+            // 如果没有配置笔记本ID，给出提示
+            Notify.showErrorCommandCannotExecute('请先配置笔记本ID');
+            return;
+          }
+          
+          try {
+            // 尝试使用appendDailyNoteBlock API将内容追加到指定笔记本的每日笔记
+            const response = await fetchSyncPost('/api/block/appendDailyNoteBlock', {
+              data: content,
+              dataType: 'markdown',
+              notebook: notebookId
+            });
+            
+            if (response.code === 0) {
+              if (config.showNotification) {
+                Notify.showInfoCopySuccess() // 使用现有的成功通知
+              }
+            } else {
+              console.warn('[叶归LifeLog适配] 追加到每日笔记失败:', response.msg)
+              // 如果API调用失败，尝试使用替代方案
+              await appendToDailyNoteAlternative(notebookId, content, config.showNotification);
+            }
+          } catch (apiError) {
+            console.warn('[叶归LifeLog适配] appendDailyNoteBlock API调用失败，尝试替代方案:', apiError)
+            // 如果API调用失败，尝试使用替代方案
+            await appendToDailyNoteAlternative(notebookId, content, config.showNotification);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[叶归LifeLog适配] 执行失败:', error)
+      Notify.showErrorCommandCannotExecute('叶归LifeLog适配')
+    }
+    return
+  }
+
+  // 打开指定ID块类型（默认）
+  const frontend = getFrontend()
+  const isMobile = frontend === 'mobile' || frontend === 'browser-mobile'
+
+
+
+  if (isMobile) {
+    // 移动端处理
+    const targetId = config.mobileTargetDocId
+
+
+    if (targetId) {
+      try {
+        // 模仿数据库悬浮弹窗的手机端实现方式
+        const response = await fetchSyncPost('/api/block/getBlockInfo', { id: targetId });
+        if (response.code === 0 && response.data) {
+          const rootId = response.data.rootID;
+
+          // 尝试找到文档元素并点击打开
+          const findDocElement = (id: string) => {
+            const selectors = [
+              `[data-node-id="${id}"]`,
+              `[data-url-id="${id}"]`,
+              `.b3-list-item[data-url-id="${id}"]`,
+              `[data-type="doc"][data-id="${id}"]`,
+              `li[data-id="${id}"]`
+            ];
+            for (const selector of selectors) {
+              const el = document.querySelector(selector);
+              if (el) return el;
+            }
+            return null;
+          };
+
+          let retries = 0;
+          const tryOpenDoc = () => {
+            const fileTreeDoc = findDocElement(rootId);
+            if (fileTreeDoc) {
+              (fileTreeDoc as HTMLElement).click();
+              setTimeout(() => {
+                const block = document.querySelector(`[data-node-id="${targetId}"]`);
+                if (block) {
+                  block.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  block.dispatchEvent(new MouseEvent('click', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                  }));
+                } else {
+                  // 如果直接定位失败，回退到使用openTab
+                  stressThresholdOpenTab({
+                    app: pluginInstance.app,
+                    doc: {
+                      id: targetId
+                    }
+                  }).catch(err => {
+                    console.warn('[打开指定ID块] 移动端 - openTab方式也失败:', err);
+                  });
+                }
+              }, 500);
+            } else if (retries < 5) {
+              retries++;
+              setTimeout(tryOpenDoc, 200);
+            } else {
+              // 如果多次尝试后仍未找到文档元素，回退到使用openTab
+              stressThresholdOpenTab({
+                app: pluginInstance.app,
+                doc: {
+                  id: targetId
+                }
+              }).catch(err => {
+                console.warn('[打开指定ID块] 移动端 - openTab方式也失败:', err);
+              });
+            }
+          };
+
+          tryOpenDoc();
+        } else {
+          // 获取块信息失败时，回退到使用openTab
+          await stressThresholdOpenTab({
+            app: pluginInstance.app,
+            doc: {
+              id: targetId
+            }
+          });
+        }
+        
+
+      } catch (error) {
+        console.warn('[打开指定ID块] 移动端打开块失败:', error)
+        // 出错时也尝试使用openTab作为备用方式
+        try {
+          await stressThresholdOpenTab({
+            app: pluginInstance.app,
+            doc: {
+              id: targetId
+            }
+          });
+        } catch (fallbackError) {
+          console.warn('[打开指定ID块] 移动端备用方式也失败:', fallbackError);
+          Notify.showErrorCommandCannotExecute(`打开块: ${targetId}`);
+        }
+      }
+    } else {
+      Notify.showErrorCommandCannotExecute('未配置目标块ID')
+    }
+  } else {
+    // 桌面端处理
+    const targetId = config.targetDocId
+    if (targetId) {
+      try {
+        await siyuanOpenTab({
+          app: pluginInstance.app,
+          doc: { id: targetId }
+        })
+      } catch (error) {
+        console.warn('[打开指定ID块] 桌面端打开块失败:', error)
+        Notify.showErrorCommandCannotExecute(`打开块: ${targetId}`)
+      }
+    } else {
+      Notify.showErrorCommandCannotExecute('未配置目标块ID')
+    }
   }
 }
 
@@ -2389,6 +2590,504 @@ function minutesToHHMM(minutes: number): string {
   const hours = Math.floor(minutes / 60) % 24
   const mins = minutes % 60
   return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`
+}
+
+/**
+ * 显示分类选择对话框
+ */
+async function showCategorySelectionDialog(categories: string[]): Promise<string | null> {
+  return new Promise((resolve) => {
+    // 保存当前焦点元素
+    const activeElement = document.activeElement as HTMLElement;
+    
+    // 创建遮罩
+    const overlay = document.createElement('div')
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2147483647;
+    `
+    
+    // 防止遮罩捕获焦点
+    overlay.tabIndex = -1;
+
+    // 创建对话框容器
+    const dialog = document.createElement('div')
+    dialog.style.cssText = `
+      background: var(--b3-theme-background);
+      border-radius: 8px;
+      padding: 20px;
+      min-width: 200px;
+      max-width: 80vw;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    `
+
+    // 添加标题
+    const title = document.createElement('div')
+    title.textContent = '请选择分类'
+    title.style.cssText = `
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--b3-theme-on-background);
+      text-align: center;
+    `
+    dialog.appendChild(title)
+
+    // 为每个分类创建按钮
+    categories.forEach(category => {
+      const button = document.createElement('button')
+      button.textContent = category
+      button.style.cssText = `
+        padding: 12px 16px;
+        border: 1px solid var(--b3-border-color);
+        border-radius: 4px;
+        background: var(--b3-theme-surface);
+        color: var(--b3-theme-on-surface);
+        font-size: 14px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      `
+      button.onclick = () => {
+        // 先移除对话框，稍后插入内容以避免输入法冲突
+        document.body.removeChild(overlay)
+        // 添加短暂延迟以确保对话框完全移除后再插入内容
+        setTimeout(() => {
+          // 恢复焦点到原始元素
+          if (activeElement && document.contains(activeElement)) {
+            try {
+              activeElement.focus({ preventScroll: true });
+            } catch (e) {
+              // 如果无法聚焦原始元素，忽略错误
+            }
+          }
+          resolve(category)
+        }, 100)
+      }
+      dialog.appendChild(button)
+    })
+
+    // 添加取消按钮
+    const cancelButton = document.createElement('button')
+    cancelButton.textContent = '取消'
+    cancelButton.style.cssText = `
+      padding: 12px 16px;
+      border: 1px solid var(--b3-border-color);
+      border-radius: 4px;
+      background: var(--b3-theme-surface);
+      color: var(--b3-theme-on-surface);
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 12px;
+    `
+    cancelButton.onclick = () => {
+      document.body.removeChild(overlay)
+      setTimeout(() => {
+        // 恢复焦点到原始元素
+        if (activeElement && document.contains(activeElement)) {
+          try {
+            activeElement.focus({ preventScroll: true });
+          } catch (e) {
+            // 如果无法聚焦原始元素，忽略错误
+          }
+        }
+        resolve(null)
+      }, 100)
+    }
+    dialog.appendChild(cancelButton)
+
+    overlay.appendChild(dialog)
+    document.body.appendChild(overlay)
+    
+    // 尝试保持焦点在原始元素上（如果它还存在）
+    setTimeout(() => {
+      if (activeElement && document.contains(activeElement)) {
+        try {
+          activeElement.focus({ preventScroll: true });
+        } catch (e) {
+          // 如果无法聚焦原始元素，忽略错误
+        }
+      }
+    }, 0);
+
+    // 点击遮罩关闭
+    overlay.onclick = (e) => {
+      if (e.target === overlay) {
+        document.body.removeChild(overlay)
+        setTimeout(() => {
+          // 恢复焦点到原始元素
+          if (activeElement && document.contains(activeElement)) {
+            try {
+              activeElement.focus({ preventScroll: true });
+            } catch (e) {
+              // 如果无法聚焦原始元素，忽略错误
+            }
+          }
+          resolve(null)
+        }, 100)
+      }
+    }
+  })
+}
+
+async function showTextInputDialog(prompt: string, placeholder?: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    // 保存当前焦点元素
+    const activeElement = document.activeElement as HTMLElement;
+    
+    // 创建遮罩
+    const overlay = document.createElement('div')
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2147483647;
+    `;
+    
+    // 防止遮罩捕获焦点
+    overlay.tabIndex = -1;
+
+    // 创建对话框容器
+    const dialog = document.createElement('div')
+    dialog.style.cssText = `
+      background: var(--b3-theme-background);
+      border-radius: 8px;
+      padding: 20px;
+      min-width: 280px;
+      max-width: 80vw;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    `;
+
+    // 添加标题
+    const title = document.createElement('div')
+    title.textContent = prompt;
+    title.style.cssText = `
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--b3-theme-on-background);
+      text-align: center;
+    `;
+    dialog.appendChild(title);
+
+    // 添加输入框
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = placeholder || '';
+    input.style.cssText = `
+      padding: 10px 12px;
+      border: 1px solid var(--b3-border-color);
+      border-radius: 4px;
+      background: var(--b3-theme-surface);
+      color: var(--b3-theme-on-surface);
+      font-size: 14px;
+    `;
+    
+    // 确保输入框获得焦点
+    setTimeout(() => {
+      if (document.contains(input)) {
+        input.focus();
+      }
+    }, 0);
+    
+    dialog.appendChild(input);
+
+    // 按钮容器
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    `;
+
+    // 取消按钮
+    const cancelButton = document.createElement('button');
+    cancelButton.textContent = '取消';
+    cancelButton.style.cssText = `
+      flex: 1;
+      padding: 10px 16px;
+      border: 1px solid var(--b3-border-color);
+      border-radius: 4px;
+      background: var(--b3-theme-surface);
+      color: var(--b3-theme-on-surface);
+      font-size: 14px;
+      cursor: pointer;
+    `;
+    cancelButton.onclick = () => {
+      document.body.removeChild(overlay);
+      setTimeout(() => {
+        // 恢复焦点到原始元素
+        if (activeElement && document.contains(activeElement)) {
+          try {
+            activeElement.focus({ preventScroll: true });
+          } catch (e) {
+            // 如果无法聚焦原始元素，忽略错误
+          }
+        }
+        resolve(null);
+      }, 100);
+    };
+    buttonContainer.appendChild(cancelButton);
+
+    // 确认按钮
+    const confirmButton = document.createElement('button');
+    confirmButton.textContent = '确认';
+    confirmButton.style.cssText = `
+      flex: 1;
+      padding: 10px 16px;
+      border: 1px solid var(--b3-border-color);
+      border-radius: 4px;
+      background: var(--b3-theme-primary);
+      color: var(--b3-theme-on-primary);
+      font-size: 14px;
+      cursor: pointer;
+    `;
+    confirmButton.onclick = () => {
+      document.body.removeChild(overlay);
+      setTimeout(() => {
+        // 恢复焦点到原始元素
+        if (activeElement && document.contains(activeElement)) {
+          try {
+            activeElement.focus({ preventScroll: true });
+          } catch (e) {
+            // 如果无法聚焦原始元素，忽略错误
+          }
+        }
+        resolve(input.value.trim() || null);
+      }, 100);
+    };
+    buttonContainer.appendChild(confirmButton);
+
+    dialog.appendChild(buttonContainer);
+
+    // 点击遮罩关闭
+    overlay.onclick = (e) => {
+      if (e.target === overlay) {
+        document.body.removeChild(overlay);
+        setTimeout(() => {
+          // 恢复焦点到原始元素
+          if (activeElement && document.contains(activeElement)) {
+            try {
+              activeElement.focus({ preventScroll: true });
+            } catch (e) {
+              // 如果无法聚焦原始元素，忽略错误
+            }
+          }
+          resolve(null);
+        }, 100);
+      }
+    };
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    
+    // 尝试保持焦点在输入框上
+    setTimeout(() => {
+      if (activeElement && document.contains(activeElement)) {
+        try {
+          activeElement.focus({ preventScroll: true });
+        } catch (e) {
+          // 如果无法聚焦原始元素，忽略错误
+        }
+      }
+    }, 0);
+  });
+}
+
+/**
+ * 将内容追加到每日笔记的替代方案（当appendDailyNoteBlock API不可用时）
+ */
+async function appendToDailyNoteAlternative(notebookId: string, content: string, showNotification?: boolean) {
+  try {
+    // 首先获取每日笔记的ID
+    const dailyNoteResponse = await fetchSyncPost('/api/filetree/getDailyNote', {
+      notebook: notebookId
+    });
+    
+    if (dailyNoteResponse.code === 0 && dailyNoteResponse.data.box) {
+      const docId = dailyNoteResponse.data.id;
+      
+      // 使用appendBlock API将内容追加到每日笔记
+      const appendResponse = await fetchSyncPost('/api/block/appendBlock', {
+        dataType: 'markdown',
+        data: content,
+        parentID: docId
+      });
+      
+      if (appendResponse.code === 0) {
+        if (showNotification) {
+          Notify.showInfoCopySuccess();
+        }
+      } else {
+        console.warn('[叶归LifeLog适配] 替代方案追加失败:', appendResponse.msg);
+        // 如果追加失败，回退到插入到当前编辑器
+        await insertContentToEditor(content);
+      }
+    } else {
+      // 如果获取每日笔记失败，创建一个新的每日笔记
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      
+      const title = `${year}年${month}月${day}日`;
+      
+      const createResponse = await fetchSyncPost('/api/filetree/createDailyNote', {
+        notebook: notebookId,
+        title: title
+      });
+      
+      if (createResponse.code === 0 && createResponse.data) {
+        // 创建成功后，再追加内容
+        const appendResponse = await fetchSyncPost('/api/block/appendBlock', {
+          dataType: 'markdown',
+          data: content,
+          parentID: createResponse.data
+        });
+        
+        if (appendResponse.code === 0) {
+          if (showNotification) {
+            Notify.showInfoCopySuccess();
+          }
+        } else {
+          console.warn('[叶归LifeLog适配] 创建后追加失败:', appendResponse.msg);
+          // 如果追加失败，回退到插入到当前编辑器
+          await insertContentToEditor(content);
+        }
+      } else {
+        console.warn('[叶归LifeLog适配] 创建每日笔记失败:', createResponse.msg);
+        // 如果创建失败，回退到插入到当前编辑器
+        await insertContentToEditor(content);
+      }
+    }
+  } catch (error) {
+    console.warn('[叶归LifeLog适配] 替代方案执行失败:', error);
+    // 如果所有方法都失败，回退到插入到当前编辑器
+    await insertContentToEditor(content);
+  }
+}
+
+/**
+ * 将内容插入到编辑器
+ */
+async function insertContentToEditor(content: string): Promise<void> {
+  // 查找当前活动的编辑器
+  const activeProtyle = document.querySelector('.protyle:not(.fn__hidden)') as HTMLElement
+  
+  if (!activeProtyle) {
+    // 如果没有找到活动编辑器，尝试查找任何编辑器
+    const protyles = document.querySelectorAll('.protyle')
+    if (protyles.length > 0) {
+      // 使用最后一个编辑器
+      for (let i = protyles.length - 1; i >= 0; i--) {
+        const protyle = protyles[i] as HTMLElement
+        if (!protyle.classList.contains('fn__hidden')) {
+          await insertToSpecificProtyle(protyle, content)
+          return
+        }
+      }
+      // 如果都没有显示的，就用第一个
+      await insertToSpecificProtyle(protyles[0] as HTMLElement, content)
+      return
+    }
+  } else {
+    await insertToSpecificProtyle(activeProtyle, content)
+    return
+  }
+
+  // 如果仍然找不到编辑器，尝试通过思源API插入
+  console.warn('未找到编辑器，无法插入内容')
+}
+
+/**
+ * 模拟文本输入
+ */
+function simulateTextInput(text: string, targetElement: HTMLElement): void {
+  // 创建一个临时输入框
+  const tempInput = document.createElement('textarea')
+  tempInput.value = text
+  tempInput.style.cssText = 'position: fixed; top: 0; left: 0; opacity: 0;'
+  document.body.appendChild(tempInput)
+  tempInput.focus()
+  tempInput.select()
+  
+  // 复制内容
+  document.execCommand('copy')
+  
+  // 焦点回到目标元素
+  targetElement.focus()
+  
+  // 触发粘贴事件
+  const pasteEvent = new ClipboardEvent('paste', {
+    clipboardData: new DataTransfer(),
+    bubbles: true,
+    cancelable: true
+  })
+  targetElement.dispatchEvent(pasteEvent)
+  
+  // 清理临时元素
+  document.body.removeChild(tempInput)
+}
+
+/**
+ * 向特定编辑器插入内容
+ */
+async function insertToSpecificProtyle(protyle: HTMLElement, content: string): Promise<void> {
+  // 尝试获取编辑器实例
+  const contentElement = protyle.querySelector('.protyle-content')
+  if (contentElement) {
+    // 如果编辑器可见，尝试插入内容
+    try {
+      // 在移动端避免强制获取焦点以防止输入法弹跳
+      const frontend = getFrontend();
+      const isMobile = frontend === 'mobile' || frontend === 'browser-mobile';
+      
+      if (!isMobile) {
+        // 桌面端可以安全地获取焦点
+        (contentElement as HTMLElement).focus();
+      }
+      
+      // 使用document.execCommand插入内容
+      document.execCommand('insertText', false, content)
+    } catch (e) {
+      console.warn('使用execCommand插入失败:', e)
+      // 备用方法：直接在DOM中插入
+      try {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          range.deleteContents();
+          range.insertNode(document.createTextNode(content));
+          range.collapse(false);
+        } else {
+          // 如果没有选择区域，直接追加到内容末尾
+          contentElement.textContent += content;
+        }
+      } catch (domError) {
+        console.warn('DOM插入方法也失败:', domError);
+      }
+    }
+  }
 }
 
 /**
@@ -2820,7 +3519,7 @@ function showDatabasePopup(
           const tryOpenDoc = () => {
             const fileTreeDoc = findDocElement(rootId)
             if (fileTreeDoc) {
-              fileTreeDoc.click()
+              (fileTreeDoc as HTMLElement).click()
               setTimeout(() => {
                 const block = document.querySelector(`[data-node-id="${blockId}"]`)
                 if (block) {

@@ -28,7 +28,7 @@ export function createDesktopGlobalButtonConfig(
 
   const createRow = (
     label: string,
-    inputValue: string | number,
+    inputValue: string | number | boolean,
     inputType: 'text' | 'number' | 'checkbox',
     onChange: (input: HTMLInputElement) => void
   ) => {
@@ -44,7 +44,7 @@ export function createDesktopGlobalButtonConfig(
     input.type = inputType
 
     if (inputType === 'checkbox') {
-      input.checked = inputValue as boolean
+      input.checked = !!inputValue
       input.style.cssText = 'transform: scale(1.2);'
     } else {
       input.value = inputValue.toString()
@@ -343,6 +343,7 @@ export interface DesktopSettingsContext {
   desktopFeatureConfig: FeatureConfig
   mobileFeatureConfig: FeatureConfig
   mobileConfig: any
+  version?: string
   isAuthorToolActivated: () => boolean
   showConfirmDialog: (message: string) => Promise<boolean>
   showIconPicker: (currentValue: string, onSelect: (icon: string) => void) => void
@@ -360,6 +361,336 @@ export function createDesktopSettingLayout(
   setting: Setting,
   context: DesktopSettingsContext
 ): void {
+
+
+  // 版本检查
+  setting.addItem({
+    title: '🔍 版本检查',
+    description: '思源手机端增强插件信息',
+    createActionElement: () => {
+      const container = document.createElement('div')
+      container.className = 'toolbar-customizer-content'
+      container.dataset.tabGroup = 'version'
+      container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--b3-theme-background); border-radius: 8px;'
+
+      // 当前版本框
+      const versionBox = document.createElement('div')
+      versionBox.style.cssText = 'padding: 12px; border: 1px solid var(--b3-border-color); border-radius: 6px; margin-bottom: 8px;'
+      
+      // 版本比较函数
+      function compareVersions(current: string, latest: string): boolean {
+        const currentParts = current.split('.').map(Number);
+        const latestParts = latest.split('.').map(Number);
+        
+        for (let i = 0; i < Math.max(currentParts.length, latestParts.length); i++) {
+          const currentPart = currentParts[i] || 0;
+          const latestPart = latestParts[i] || 0;
+          
+          if (currentPart > latestPart) return true;
+          if (currentPart < latestPart) return false;
+        }
+        
+        return true; // 相同版本时返回true表示已是最新版
+      }
+      
+      const versionRow = document.createElement('div')
+      versionRow.style.cssText = 'display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--b3-theme-on-background);'
+      
+      // 版本号文本
+      const versionText = document.createElement('span')
+      versionText.style.cssText = 'display: flex; align-items: center; gap: 4px;'
+      
+      const versionPrefix = document.createElement('span')
+      versionPrefix.textContent = '当前版本：V'
+      versionPrefix.style.cssText = 'color: #1890ff; font-weight: bold;'
+      
+      const versionNumber = document.createElement('strong')
+      // 使用传入的上下文版本号
+      const pluginVersion = context.version || '1.0.0'
+      versionNumber.textContent = pluginVersion
+      versionNumber.style.cssText = 'color: var(--b3-theme-primary); font-size: 15px; font-weight: bold;'
+      
+      versionText.appendChild(versionPrefix)
+      versionText.appendChild(versionNumber)
+      
+      versionRow.appendChild(versionText)
+      
+      // 检查更新链接
+      const updateLink = document.createElement('a')
+      updateLink.href = '#'
+      updateLink.style.cssText = 'display: flex; align-items: center; gap: 4px; color: var(--b3-theme-primary); text-decoration: none; margin-left: auto; cursor: pointer;'
+      
+      const updateIcon = document.createElement('span')
+      updateIcon.innerHTML = '⬇️'
+      updateIcon.style.cssText = 'font-size: 18px;'
+      
+      const updateText = document.createElement('span')
+      updateText.textContent = '检查更新'
+      
+      updateLink.appendChild(updateIcon)
+      updateLink.appendChild(updateText)
+      
+      updateLink.onclick = async (e) => {
+        e.preventDefault();
+        
+        try {
+          // 显示检查中提示
+          const checkingMsg = document.createElement('div');
+          checkingMsg.textContent = '正在检查更新...';
+          checkingMsg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 12px 24px; background: var(--b3-menu-background); color: var(--b3-menu-item--hover); border: 1px solid var(--b3-border-color); border-radius: 4px; z-index: 9999;';
+          document.body.appendChild(checkingMsg);
+          
+          // 获取最新版本信息
+          const response = await fetch('https://api.github.com/repos/HaoCeans/siyuan-toolbar-customizer/releases/latest');
+          const releaseData = await response.json();
+          
+          // 移除检查提示
+          document.body.removeChild(checkingMsg);
+          
+          if (releaseData && releaseData.tag_name) {
+            const latestVersion = releaseData.tag_name.replace(/^v/i, ''); // 移除开头的v
+            const currentVersion = context.version || '1.0.0';
+            
+            // 比较版本号
+            if (compareVersions(currentVersion, latestVersion)) {
+              // 当前已是最新版本
+              const latestMsg = document.createElement('div');
+              latestMsg.innerHTML = `✅ 已是最新版本 v${currentVersion}`;
+              latestMsg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 24px 32px; background: var(--b3-menu-background); color: var(--b3-success-text); border: 2px solid var(--b3-border-color); border-radius: 8px; z-index: 9999; box-shadow: 0 8px 24px rgba(0,0,0,0.2); font-size: 18px; min-width: 300px; text-align: center;';
+              document.body.appendChild(latestMsg);
+              
+              // 3秒后自动移除提示
+              setTimeout(() => {
+                if (document.body.contains(latestMsg)) {
+                  document.body.removeChild(latestMsg);
+                }
+              }, 3000);
+            } else {
+              // 存在新版本，询问是否下载
+              const updateMsg = document.createElement('div');
+              updateMsg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 32px; background: var(--b3-menu-background); border: 3px solid var(--b3-theme-primary); border-radius: 16px; z-index: 9999; box-shadow: 0 12px 40px rgba(0,0,0,0.3); min-width: 500px; font-size: 18px;';
+              
+              const msgText = document.createElement('div');
+              msgText.textContent = `发现新版本 v${latestVersion}，是否前往下载？`;
+              msgText.style.cssText = 'margin-bottom: 20px; font-size: 18px; font-weight: bold;';
+              
+              const instructionText = document.createElement('div');
+              instructionText.innerHTML = '<strong style="color: var(--b3-theme-primary);">更新流程：</strong><br/>1. 点击下载<strong style="color: #ff6b35;">package.zip</strong>包<br/>2. 解压后，替换<strong style="color: #ff6b35;">插件文件夹</strong><br/><br/><strong style="color: var(--b3-theme-primary);">如何找到插件文件夹：</strong><br/>①打开插件市场   ②找到《手机端增强》插件   ③右边文件夹图标   ④点击打开';
+              instructionText.style.cssText = 'margin-bottom: 20px; font-size: 16px; color: var(--b3-font-color-secondary); line-height: 1.6; padding: 12px; background-color: var(--b3-list-background); border-radius: 6px; border-left: 4px solid var(--b3-theme-primary); border: 1px solid var(--b3-border-color);';
+              
+              const buttonContainer = document.createElement('div');
+              buttonContainer.style.cssText = 'display: flex; gap: 12px; justify-content: flex-end;';
+              
+              const confirmBtn = document.createElement('button');
+              confirmBtn.textContent = '前往下载';
+              confirmBtn.className = 'b3-button b3-button--outline';
+              confirmBtn.style.cssText = 'padding: 6px 12px; font-size: 13px;';
+              confirmBtn.onclick = () => {
+                window.open('https://github.com/HaoCeans/siyuan-toolbar-customizer/releases', '_blank');
+                document.body.removeChild(updateMsg);
+              };
+              
+              const cancelBtn = document.createElement('button');
+              cancelBtn.textContent = '取消';
+              cancelBtn.className = 'b3-button b3-button--outline';
+              cancelBtn.style.cssText = 'padding: 6px 12px; font-size: 13px;';
+              cancelBtn.onclick = () => {
+                document.body.removeChild(updateMsg);
+              };
+              
+              buttonContainer.appendChild(cancelBtn);
+              buttonContainer.appendChild(confirmBtn);
+              
+              updateMsg.appendChild(msgText);
+              updateMsg.appendChild(instructionText);
+              updateMsg.appendChild(buttonContainer);
+              document.body.appendChild(updateMsg);
+            }
+          } else {
+            // 获取版本信息失败
+            const errorMsg = document.createElement('div');
+            errorMsg.textContent = '获取版本信息失败';
+            errorMsg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 12px 24px; background: var(--b3-menu-background); color: #ff6b6b; border: 1px solid var(--b3-border-color); border-radius: 4px; z-index: 9999;';
+            document.body.appendChild(errorMsg);
+            
+            setTimeout(() => {
+              if (document.body.contains(errorMsg)) {
+                document.body.removeChild(errorMsg);
+              }
+            }, 3000);
+          }
+        } catch (error) {
+          // 移除检查提示（如果还存在）
+          const checkingMsgs = document.querySelectorAll('div');
+          checkingMsgs.forEach(el => {
+            if (el.textContent === '正在检查更新...') {
+              document.body.removeChild(el);
+            }
+          });
+          
+          // 显示错误信息
+          const errorMsg = document.createElement('div');
+          errorMsg.textContent = '网络错误，无法检查更新';
+          errorMsg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 12px 24px; background: var(--b3-menu-background); color: #ff6b6b; border: 1px solid var(--b3-border-color); border-radius: 4px; z-index: 9999;';
+          document.body.appendChild(errorMsg);
+          
+          setTimeout(() => {
+            if (document.body.contains(errorMsg)) {
+              document.body.removeChild(errorMsg);
+            }
+          }, 3000);
+        }
+      };
+      
+      versionRow.appendChild(updateLink)
+      
+      versionBox.appendChild(versionRow)
+      container.appendChild(versionBox)
+      
+      // 问题反馈框
+      const contactBox = document.createElement('div')
+      contactBox.style.cssText = 'padding: 12px; border: 1px solid var(--b3-border-color); border-radius: 6px; margin-bottom: 8px;'
+      
+      const contactRow = document.createElement('div')
+      contactRow.style.cssText = 'display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--b3-theme-on-background);'
+      
+      const contactText = document.createElement('span')
+      contactText.style.cssText = 'display: flex; align-items: center; gap: 4px;'
+      
+      const contactPrefix = document.createElement('span')
+      contactPrefix.textContent = '问题反馈：QQ群 '
+      contactPrefix.style.cssText = 'color: #ff6b35; font-weight: bold;'
+      
+      const qqNumber = document.createElement('strong')
+      qqNumber.textContent = '1018010924'
+      qqNumber.style.cssText = 'color: var(--b3-theme-primary); font-size: 15px; font-weight: bold;'
+      
+      const contactSuffix = document.createElement('span')
+      contactSuffix.textContent = ' （若右边链接无效，请搜索群添加）'
+      
+      contactText.appendChild(contactPrefix)
+      contactText.appendChild(qqNumber)
+      contactText.appendChild(contactSuffix)
+      
+      const qqLink = document.createElement('a')
+      qqLink.href = 'https://qm.qq.com/cgi-bin/qm/qr?k=1018010924&jump_from=webapi'
+      qqLink.target = '_blank'
+      qqLink.style.cssText = 'display: flex; align-items: center; gap: 4px; color: var(--b3-theme-primary); text-decoration: none; margin-left: auto;'
+      
+      const qqIcon = document.createElement('span')
+      qqIcon.innerHTML = '💬'
+      qqIcon.style.cssText = 'font-size: 18px;'
+      
+      const qqText = document.createElement('span')
+      qqText.textContent = '点击加群'
+      
+      qqLink.appendChild(qqIcon)
+      qqLink.appendChild(qqText)
+      
+      contactRow.appendChild(contactText)
+      contactRow.appendChild(qqLink)
+      
+      contactBox.appendChild(contactRow)
+      container.appendChild(contactBox)
+      
+      // 激活码获取方式框
+      const activationBox = document.createElement('div')
+      activationBox.style.cssText = 'padding: 16px; margin-top: 16px; border: 1px solid var(--b3-border-color); border-radius: 6px;'
+      
+      const activationTitle = document.createElement('div')
+      activationTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #52c41a; margin-bottom: 12px;'
+      activationTitle.textContent = '《鲸鱼定制工具箱》激活码获取：'
+      
+      const method1 = document.createElement('div')
+      method1.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 8px;'
+      method1.textContent = '1. 如果您觉得这个插件好用，不妨支持一下作者，任意金额的打赏，都可以进群私聊群主获得激活码。'
+      
+      const method2 = document.createElement('div')
+      method2.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 8px;'
+      method2.textContent = '2. 如果您是学生，可进群私聊群主，简单发一下能证明学生的信息，我会免费给您激活码。'
+      
+      const method3 = document.createElement('div')
+      method3.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 8px;'
+      method3.textContent = '3. 如果您只是想进群交流、体验或观望，也欢迎进群沟通，我会不定期随缘赠送激活码'
+      
+      const method4 = document.createElement('div')
+      method4.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 16px;'
+      method4.textContent = '4. 后续，随着《鲸鱼定制工具箱》功能大幅增加，是否更改激活码获取规则？视情况而定。'
+      
+      activationBox.appendChild(activationTitle)
+      activationBox.appendChild(method1)
+      activationBox.appendChild(method2)
+      activationBox.appendChild(method3)
+      activationBox.appendChild(method4)
+      
+      // 功能说明框
+      const featureBox = document.createElement('div')
+      featureBox.style.cssText = 'padding: 16px; margin-top: 16px; border: 1px solid var(--b3-border-color); border-radius: 6px;'
+      
+      const featureTitle = document.createElement('div')
+      featureTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #722ed1; margin-bottom: 12px;'
+      featureTitle.textContent = '《鲸鱼定制工具箱》功能说明：'
+      
+      const featureMethod1 = document.createElement('div')
+      featureMethod1.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 8px;'
+      featureMethod1.textContent = '1. 所有作者、个人的定制化需求，均会加入到工具箱。'
+      
+      const featureMethod2 = document.createElement('div')
+      featureMethod2.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 8px;'
+      featureMethod2.textContent = '2. 核心功能：开箱即用！除基础配置外，无需折腾！'
+      
+      const featureMethod3 = document.createElement('div')
+      featureMethod3.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background);'
+      featureMethod3.textContent = '3. 本插件的免费功能，已经占据99%，如果您仍然需要单独定制功能，请私聊作者，为您私人定制！完成后，按钮将加入工具箱。'
+      
+      featureBox.appendChild(featureTitle)
+      featureBox.appendChild(featureMethod1)
+      featureBox.appendChild(featureMethod2)
+      featureBox.appendChild(featureMethod3)
+      
+      container.appendChild(activationBox)
+      container.appendChild(featureBox)
+      
+      // 打赏支持框
+      const donationBox = document.createElement('div')
+      donationBox.style.cssText = 'padding: 16px; margin-top: 16px; border: 1px solid var(--b3-border-color); border-radius: 8px;'
+      
+      const donationTitle = document.createElement('div')
+      donationTitle.style.cssText = 'font-size: 20px; font-weight: bold; color: var(--b3-theme-on-background); text-align: center; margin-bottom: 12px;'
+      donationTitle.textContent = '🧧 打赏支持'
+      
+      const donationText = document.createElement('div')
+      donationText.style.cssText = 'font-size: 18px; color: var(--b3-theme-on-background); text-align: center; margin-bottom: 16px;'
+      donationText.textContent = '感谢您的支持与反馈，这将鼓励作者持续开发'
+      
+      // 二维码容器 - 横向排列
+      const qrContainer = document.createElement('div')
+      qrContainer.style.cssText = 'display: flex; gap: 16px; align-items: center; justify-content: center;'
+      
+      // 二维码图片
+      const qrImg1 = document.createElement('img')
+      qrImg1.src = 'https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment2.png'
+      qrImg1.alt = '打赏二维码'
+      qrImg1.style.cssText = 'width: 300px; height: 300px; object-fit: contain; border-radius: 4px;'
+      
+      const qrImg2 = document.createElement('img')
+      qrImg2.src = 'https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment1.png'
+      qrImg2.alt = '打赏二维码'
+      qrImg2.style.cssText = 'width: 300px; height: 300px; object-fit: contain; border-radius: 4px;'
+      
+      qrContainer.appendChild(qrImg1)
+      qrContainer.appendChild(qrImg2)
+      
+      donationBox.appendChild(donationTitle)
+      donationBox.appendChild(donationText)
+      donationBox.appendChild(qrContainer)
+      
+      container.appendChild(donationBox)
+      
+      return container
+    }
+  })
+
   // === 电脑端配置项 ===
 
   // 电脑端自定义按钮
@@ -442,7 +773,7 @@ export function createDesktopSettingLayout(
     container.dataset.tabGroup = 'desktop'
     container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 8px 0;'
 
-    const createRow = (label: string, inputValue: string | number, inputType: 'text' | 'number' | 'checkbox', onChange: (input: HTMLInputElement) => void) => {
+    const createRow = (label: string, inputValue: string | number | boolean, inputType: 'text' | 'number' | 'checkbox', onChange: (input: HTMLInputElement) => void) => {
       const row = document.createElement('div')
       row.style.cssText = 'display: flex; align-items: center; justify-content: space-between;'
 
@@ -455,7 +786,7 @@ export function createDesktopSettingLayout(
       input.type = inputType
 
       if (inputType === 'checkbox') {
-        input.checked = inputValue as boolean
+        input.checked = !!inputValue
         input.style.cssText = 'transform: scale(1.2);'
       } else {
         input.value = inputValue.toString()
@@ -469,6 +800,40 @@ export function createDesktopSettingLayout(
       return { row, input }
     }
 
+    // 全局配置启用开关（放在最前面）
+    const { row: enabledRow, input: enabledToggle } = createRow(
+      '🔘 启用全局按钮配置',
+      context.desktopGlobalButtonConfig.enabled ?? true,
+      'checkbox',
+      async (input) => {
+        context.desktopGlobalButtonConfig.enabled = input.checked
+        // 打开开关时，立即应用全局配置到所有按钮
+        if (input.checked) {
+          context.desktopButtonConfigs.forEach(btn => {
+            btn.iconSize = context.desktopGlobalButtonConfig.iconSize
+            btn.minWidth = context.desktopGlobalButtonConfig.minWidth
+            btn.marginRight = context.desktopGlobalButtonConfig.marginRight
+            btn.showNotification = context.desktopGlobalButtonConfig.showNotification
+          })
+          await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
+          context.refreshButtons()
+        }
+        await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
+        Notify.showGlobalConfigEnabledStatus(input.checked)
+        // 更新配置项的禁用状态
+        updateConfigItemsDisabled(!input.checked)
+      }
+    )
+    container.appendChild(enabledRow)
+
+    // 分隔线
+    const separator = document.createElement('div')
+    separator.style.cssText = 'height: 1px; background: var(--b3-border-color); margin: 4px 0;'
+    container.appendChild(separator)
+
+    // 收集所有配置项的 input，用于统一控制禁用状态
+    const configInputs: HTMLInputElement[] = []
+
     // 图标大小
     const { row: iconSizeRow, input: iconSizeInput } = createRow(
       '🆖 所有按钮图标大小 (px)',
@@ -477,13 +842,17 @@ export function createDesktopSettingLayout(
       async (input) => {
         const newValue = parseInt(input.value) || 16
         context.desktopGlobalButtonConfig.iconSize = newValue
-        context.desktopButtonConfigs.forEach(btn => btn.iconSize = newValue)
+        // 只有启用全局配置时才批量应用到按钮
+        if (context.desktopGlobalButtonConfig.enabled ?? true) {
+          context.desktopButtonConfigs.forEach(btn => btn.iconSize = newValue)
+          await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
+        }
         await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
-        await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
         Notify.showInfoIconSizeApplied()
       }
     )
     container.appendChild(iconSizeRow)
+    configInputs.push(iconSizeInput)
 
     // 按钮宽度
     const { row: widthRow, input: widthInput } = createRow(
@@ -493,13 +862,17 @@ export function createDesktopSettingLayout(
       async (input) => {
         const newValue = parseInt(input.value) || 32
         context.desktopGlobalButtonConfig.minWidth = newValue
-        context.desktopButtonConfigs.forEach(btn => btn.minWidth = newValue)
+        // 只有启用全局配置时才批量应用到按钮
+        if (context.desktopGlobalButtonConfig.enabled ?? true) {
+          context.desktopButtonConfigs.forEach(btn => btn.minWidth = newValue)
+          await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
+        }
         await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
-        await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
         Notify.showInfoButtonWidthApplied()
       }
     )
     container.appendChild(widthRow)
+    configInputs.push(widthInput)
 
     // 右边距
     const { row: marginRow, input: marginInput } = createRow(
@@ -509,13 +882,17 @@ export function createDesktopSettingLayout(
       async (input) => {
         const newValue = parseInt(input.value) || 8
         context.desktopGlobalButtonConfig.marginRight = newValue
-        context.desktopButtonConfigs.forEach(btn => btn.marginRight = newValue)
+        // 只有启用全局配置时才批量应用到按钮
+        if (context.desktopGlobalButtonConfig.enabled ?? true) {
+          context.desktopButtonConfigs.forEach(btn => btn.marginRight = newValue)
+          await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
+        }
         await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
-        await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
         Notify.showInfoMarginRightApplied()
       }
     )
     container.appendChild(marginRow)
+    configInputs.push(marginInput)
 
     // 右上角提示
     const { row: notifyRow, input: notifyToggle } = createRow(
@@ -524,15 +901,39 @@ export function createDesktopSettingLayout(
       'checkbox',
       async (input) => {
         context.desktopGlobalButtonConfig.showNotification = input.checked
-        context.desktopButtonConfigs.forEach(btn => btn.showNotification = input.checked)
+        // 只有启用全局配置时才批量应用到按钮
+        if (context.desktopGlobalButtonConfig.enabled ?? true) {
+          context.desktopButtonConfigs.forEach(btn => btn.showNotification = input.checked)
+          await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
+        }
         await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
-        await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
         // 刷新按钮以应用新配置
         context.refreshButtons()
         Notify.showNotificationToggleStatus(input.checked)
       }
     )
     container.appendChild(notifyRow)
+    configInputs.push(notifyToggle)
+
+    // 更新配置项禁用状态的函数
+    const updateConfigItemsDisabled = (disabled: boolean) => {
+      configInputs.forEach(input => {
+        input.disabled = disabled
+        if (disabled) {
+          input.style.opacity = '0.5'
+          input.style.cursor = 'not-allowed'
+        } else {
+          input.style.opacity = ''
+          input.style.cursor = ''
+        }
+      })
+    }
+
+    // 根据初始状态设置禁用
+    const isEnabled = context.desktopGlobalButtonConfig.enabled ?? true
+    if (!isEnabled) {
+      updateConfigItemsDisabled(true)
+    }
 
     // 说明文字
     const hint = document.createElement('div')
@@ -790,7 +1191,8 @@ export function createDesktopSettingLayout(
               showButtonSelector({ currentValue, onSelect })
             },
             buttonConfigs: context.mobileButtonConfigs,
-            mobileButtonConfigs: context.mobileButtonConfigs
+            mobileButtonConfigs: context.mobileButtonConfigs,
+            recalculateOverflow: () => {}
           }
           const item = createMobileButtonItem(button, index, renderList, context.mobileButtonConfigs, buttonContext)
           listContainer.appendChild(item)

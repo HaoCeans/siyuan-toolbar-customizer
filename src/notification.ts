@@ -128,7 +128,7 @@ export function showErrorShortcutNotConfigured(buttonName: string): void {
  * @param shortcutKey 快捷键
  */
 export function showWarningShortcutMaybeInvalid(shortcutKey: string): void {
-  showMessage(`快捷键可能无效: ${shortcutKey}`, NOTIFICATION_DURATION.LONG, 'warning')
+  showMessage(`快捷键可能无效: ${shortcutKey}`, NOTIFICATION_DURATION.LONG, 'info')
 }
 
 /**
@@ -195,6 +195,13 @@ export function showErrorDiaryFailed(error: unknown): void {
  */
 export function showInfoCopySuccess(): void {
   showMessage(`复制成功`, NOTIFICATION_DURATION.NORMAL, 'info')
+}
+
+/**
+ * 显示成功通知
+ */
+export function showSuccess(message: string): void {
+  showMessage(message, NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 /**
@@ -311,7 +318,7 @@ export function showInfoMarginRightModified(): void {
  * 显示作者工具已激活通知
  */
 export function showInfoAuthorToolActivated(): void {
-  showMessage('鲸鱼定制工具箱已激活！请重新打开设置页面', NOTIFICATION_DURATION.ERROR, 'success')
+  showMessage('鲸鱼定制工具箱已激活！请重新打开设置页面', NOTIFICATION_DURATION.ERROR, 'info')
 }
 
 /**
@@ -322,6 +329,14 @@ export function showErrorActivationCodeInvalid(): void {
 }
 
 // ===== 桌面端设置通知 =====
+
+/**
+ * 显示全局配置启用状态通知
+ * @param enabled 是否启用全局配置
+ */
+export function showGlobalConfigEnabledStatus(enabled: boolean): void {
+  showMessage(enabled ? '已启用全局按钮配置' : '已禁用全局按钮配置，各按钮使用独立配置', NOTIFICATION_DURATION.NORMAL, 'info')
+}
 
 /**
  * 显示图标大小已应用通知

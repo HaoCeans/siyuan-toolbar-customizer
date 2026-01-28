@@ -32,7 +32,8 @@ import {
   DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG,
   DEFAULT_MOBILE_GLOBAL_BUTTON_CONFIG,
   isMobileDevice,
-  calculateButtonOverflow
+  calculateButtonOverflow,
+  setPluginInstance
 } from './toolbarManager'
 
 // 导入 UI 组件
@@ -140,6 +141,7 @@ export default class ToolbarCustomizer extends Plugin {
     hideReadonlyButton: true,   // 锁定编辑按钮隐藏
     hideDocMenuButton: true,    // 文档菜单按钮隐藏
     hideMoreButton: true,       // 更多按钮隐藏
+    disableCustomButtons: false,// 禁用所有自定义按钮
     disableMobileSwipe: true,   // 手机端禁止左右滑动弹出
     disableFileTree: true,      // 禁止右滑弹出文档树
     disableSettingMenu: true,   // 禁止左滑弹出设置菜单
@@ -160,6 +162,9 @@ export default class ToolbarCustomizer extends Plugin {
   }
 
   async onload() {
+    // 设置插件实例（供 toolbarManager 中需要 app 参数的 API 调用使用）
+    setPluginInstance(this);
+
     // ===== 环境检测 =====
     const frontEnd = getFrontend();
     this.platform = frontEnd
@@ -266,8 +271,8 @@ export default class ToolbarCustomizer extends Plugin {
       }
 
       // 同步全局按钮配置的 showNotification 到所有电脑端按钮
-      // 确保全局配置和单个按钮配置保持一致
-      if (this.desktopGlobalButtonConfig.showNotification !== undefined) {
+      // 只有启用全局配置时才同步，否则保留各按钮的独立配置
+      if ((this.desktopGlobalButtonConfig.enabled ?? true) && this.desktopGlobalButtonConfig.showNotification !== undefined) {
         this.desktopButtonConfigs.forEach(btn => {
           btn.showNotification = this.desktopGlobalButtonConfig.showNotification
         })
@@ -283,8 +288,8 @@ export default class ToolbarCustomizer extends Plugin {
       }
 
       // 同步全局按钮配置的 showNotification 到所有手机端按钮
-      // 确保全局配置和单个按钮配置保持一致
-      if (this.mobileGlobalButtonConfig.showNotification !== undefined) {
+      // 只有启用全局配置时才同步，否则保留各按钮的独立配置
+      if ((this.mobileGlobalButtonConfig.enabled ?? true) && this.mobileGlobalButtonConfig.showNotification !== undefined) {
         this.mobileButtonConfigs.forEach(btn => {
           btn.showNotification = this.mobileGlobalButtonConfig.showNotification
         })
@@ -528,6 +533,7 @@ export default class ToolbarCustomizer extends Plugin {
         desktopFeatureConfig: this.desktopFeatureConfig,
         mobileFeatureConfig: this.mobileFeatureConfig,
         mobileConfig: this.mobileConfig,
+        version: this.version,
         isAuthorToolActivated: () => this.isAuthorToolActivated(),
         showConfirmDialog: (msg) => this.showConfirmDialog(msg),
         showIconPicker: (current, onSelect) => this.showIconPicker(current, onSelect),

@@ -480,6 +480,58 @@ export function createMobileSettingLayout(
   // === 手机端全局按钮配置 ===
   createGroupTitle('📱', '全局按钮配置')
 
+  // 存储所有配置项的 input 元素，用于统一控制禁用状态
+  const mobileConfigInputs: HTMLInputElement[] = []
+
+  // 更新配置项禁用状态的函数
+  const updateMobileConfigItemsDisabled = (disabled: boolean) => {
+    mobileConfigInputs.forEach(input => {
+      input.disabled = disabled
+      if (disabled) {
+        input.style.opacity = '0.5'
+        input.style.cursor = 'not-allowed'
+      } else {
+        input.style.opacity = ''
+        input.style.cursor = ''
+      }
+    })
+  }
+
+  // 全局配置启用开关（放在最前面）
+  setting.addItem({
+    title: '🔘 启用全局按钮配置',
+    description: '💡 关闭后，修改全局配置不会影响已有按钮，仅作为新建按钮的默认值',
+    createActionElement: () => {
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'b3-switch'
+      toggle.checked = context.mobileGlobalButtonConfig.enabled ?? true
+      toggle.style.cssText = 'transform: scale(1.2);'
+      toggle.onchange = async () => {
+        context.mobileGlobalButtonConfig.enabled = toggle.checked
+        // 打开开关时，立即应用全局配置到所有按钮
+        if (toggle.checked) {
+          context.mobileButtonConfigs.forEach(btn => {
+            btn.iconSize = context.mobileGlobalButtonConfig.iconSize
+            btn.minWidth = context.mobileGlobalButtonConfig.minWidth
+            btn.marginRight = context.mobileGlobalButtonConfig.marginRight
+            btn.showNotification = context.mobileGlobalButtonConfig.showNotification
+          })
+          await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
+          // 重新计算溢出层级（按钮宽度可能变化）
+          context.recalculateOverflow()
+          // 刷新按钮以应用新配置
+          context.updateMobileToolbar()
+        }
+        await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
+        Notify.showGlobalConfigEnabledStatus(toggle.checked)
+        // 更新配置项的禁用状态
+        updateMobileConfigItemsDisabled(!toggle.checked)
+      }
+      return toggle
+    }
+  })
+
   // 图标大小
   setting.addItem({
     title: '🆖 图标大小 (px)',
@@ -493,12 +545,22 @@ export function createMobileSettingLayout(
       input.onchange = async () => {
         const newValue = parseInt(input.value) || 16
         context.mobileGlobalButtonConfig.iconSize = newValue
-        context.mobileButtonConfigs.forEach(btn => btn.iconSize = newValue)
+        // 只有启用全局配置时才批量应用到按钮
+        if (context.mobileGlobalButtonConfig.enabled ?? true) {
+          context.mobileButtonConfigs.forEach(btn => btn.iconSize = newValue)
+          await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
+          // 重新计算溢出层级（按钮宽度可能变化）
+          context.recalculateOverflow()
+        }
         await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
-        await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
-        // 重新计算溢出层级（按钮宽度可能变化）
-        context.recalculateOverflow()
         Notify.showInfoIconSizeModified()
+      }
+      // 存储引用并设置初始禁用状态
+      mobileConfigInputs.push(input)
+      if (!(context.mobileGlobalButtonConfig.enabled ?? true)) {
+        input.disabled = true
+        input.style.opacity = '0.5'
+        input.style.cursor = 'not-allowed'
       }
       return input
     }
@@ -517,12 +579,22 @@ export function createMobileSettingLayout(
       input.onchange = async () => {
         const newValue = parseInt(input.value) || 32
         context.mobileGlobalButtonConfig.minWidth = newValue
-        context.mobileButtonConfigs.forEach(btn => btn.minWidth = newValue)
+        // 只有启用全局配置时才批量应用到按钮
+        if (context.mobileGlobalButtonConfig.enabled ?? true) {
+          context.mobileButtonConfigs.forEach(btn => btn.minWidth = newValue)
+          await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
+          // 重新计算溢出层级（按钮宽度变化）
+          context.recalculateOverflow()
+        }
         await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
-        await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
-        // 重新计算溢出层级（按钮宽度变化）
-        context.recalculateOverflow()
         Notify.showInfoButtonWidthModified()
+      }
+      // 存储引用并设置初始禁用状态
+      mobileConfigInputs.push(input)
+      if (!(context.mobileGlobalButtonConfig.enabled ?? true)) {
+        input.disabled = true
+        input.style.opacity = '0.5'
+        input.style.cursor = 'not-allowed'
       }
       return input
     }
@@ -541,12 +613,22 @@ export function createMobileSettingLayout(
       input.onchange = async () => {
         const newValue = parseInt(input.value) || 8
         context.mobileGlobalButtonConfig.marginRight = newValue
-        context.mobileButtonConfigs.forEach(btn => btn.marginRight = newValue)
+        // 只有启用全局配置时才批量应用到按钮
+        if (context.mobileGlobalButtonConfig.enabled ?? true) {
+          context.mobileButtonConfigs.forEach(btn => btn.marginRight = newValue)
+          await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
+          // 重新计算溢出层级（按钮宽度变化）
+          context.recalculateOverflow()
+        }
         await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
-        await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
-        // 重新计算溢出层级（按钮宽度变化）
-        context.recalculateOverflow()
         Notify.showInfoMarginRightModified()
+      }
+      // 存储引用并设置初始禁用状态
+      mobileConfigInputs.push(input)
+      if (!(context.mobileGlobalButtonConfig.enabled ?? true)) {
+        input.disabled = true
+        input.style.opacity = '0.5'
+        input.style.cursor = 'not-allowed'
       }
       return input
     }
@@ -564,12 +646,22 @@ export function createMobileSettingLayout(
       toggle.style.cssText = 'transform: scale(1.2);'
       toggle.onchange = async () => {
         context.mobileGlobalButtonConfig.showNotification = toggle.checked
-        context.mobileButtonConfigs.forEach(btn => btn.showNotification = toggle.checked)
+        // 只有启用全局配置时才批量应用到按钮
+        if (context.mobileGlobalButtonConfig.enabled ?? true) {
+          context.mobileButtonConfigs.forEach(btn => btn.showNotification = toggle.checked)
+          await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
+        }
         await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
-        await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
         // 刷新按钮以应用新配置
         context.updateMobileToolbar()
         Notify.showNotificationToggleStatus(toggle.checked)
+      }
+      // 存储引用并设置初始禁用状态
+      mobileConfigInputs.push(toggle)
+      if (!(context.mobileGlobalButtonConfig.enabled ?? true)) {
+        toggle.disabled = true
+        toggle.style.opacity = '0.5'
+        toggle.style.cursor = 'not-allowed'
       }
       return toggle
     }

@@ -137,13 +137,7 @@ export function showConfirmDialog(options: ConfirmDialogOptions): Promise<boolea
     dialog.appendChild(buttons)
     overlay.appendChild(dialog)
 
-    // 点击背景关闭（等同于取消）
-    overlay.onclick = (e) => {
-      if (e.target === overlay) {
-        document.body.removeChild(overlay)
-        resolve(false)
-      }
-    }
+    // 点击背景不关闭，强制用户必须选择按钮
 
     document.body.appendChild(overlay)
   })

@@ -3,13 +3,16 @@
  * 用于在编辑器工具栏添加按钮，显示数据库任务计划安排
  */
 
-import { 
-  IProtyle, 
-  fetchSyncPost, 
+import {
+  IProtyle,
+  fetchSyncPost,
   openTab,
   showMessage,
   getFrontend
 } from "siyuan";
+
+// 导出 openTab 供其他模块使用
+export { openTab };
 
 // 配置接口定义
 export interface StressThresholdConfig {
@@ -247,17 +250,22 @@ export function initStressThreshold(
     // 双击按钮执行其他操作（移动端跳转）
     btn.addEventListener('dblclick', async (e) => {
       e.stopPropagation();
-      
+
       if (config.mobileTargetBlockId) {
         const frontend = getFrontend();
         if (frontend === 'mobile' || frontend === 'browser-mobile') {
           try {
+            console.log('[数据库悬浮弹窗-双击按钮] 移动端 - openTab 函数:', openTab);
+            console.log('[数据库悬浮弹窗-双击按钮] 移动端 - openTab.toString():', openTab.toString().substring(0, 200));
+            console.log('[数据库悬浮弹窗-双击按钮] 移动端 - 目标ID:', config.mobileTargetBlockId);
+            console.log('[数据库悬浮弹窗-双击按钮] 移动端 - plugin.app:', plugin.app);
             await openTab({
               app: plugin.app,
               doc: {
                 id: config.mobileTargetBlockId
               }
             });
+            console.log('[数据库悬浮弹窗-双击按钮] 移动端 - openTab 调用完成');
           } catch (error) {
             console.warn('移动端跳转失败:', error);
           }
@@ -732,6 +740,10 @@ async function processData(data: any, keys: any[], config: StressThresholdConfig
  * 显示卡片模式弹窗
  */
 function showCardsPopup(processedData: any, config: StressThresholdConfig, plugin: any) {
+  console.log('[数据库悬浮弹窗] showCardsPopup 被调用');
+  console.log('[数据库悬浮弹窗] mobileTargetBlockId:', config.mobileTargetBlockId);
+  console.log('[数据库悬浮弹窗] isMobileDevice():', isMobileDevice());
+
   const isMobile = isMobileDevice();
   const rowCount = processedData.rows.length;
   const needsScroll = rowCount > config.popupConfig.scrollThreshold;
@@ -842,32 +854,55 @@ function showCardsPopup(processedData: any, config: StressThresholdConfig, plugi
             
             if (fieldName === config.primaryKeyColumn) {
               const maxLength = isMobile ? 35 : 45;
-              const displayText = valueText.length > maxLength ? 
+              const displayText = valueText.length > maxLength ?
                 valueText.substring(0, maxLength) + '...' : valueText;
               value.textContent = displayText;
               value.title = valueText;
-              
+
+              console.log('[数据库悬浮弹窗] 创建主键列可点击元素，文本:', displayText);
+
               value.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                
+
                 if (isMobileDevice()) {
+                  // 移动端：跳转到固定页面
                   if (config.mobileTargetBlockId) {
                     try {
+                      // 先显示一个明确的消息，确认新代码在运行
+                      showMessage('[新代码] 数据库弹窗准备跳转到: ' + config.mobileTargetBlockId, 3000, 'info');
+                      console.log('[数据库悬浮弹窗] 移动端 - openTab 函数:', openTab);
+                      console.log('[数据库悬浮弹窗] 移动端 - openTab.toString():', openTab.toString().substring(0, 200));
+                      console.log('[数据库悬浮弹窗] 移动端 - 目标ID:', config.mobileTargetBlockId);
                       await openTab({
-                        app: plugin.app,
                         doc: {
                           id: config.mobileTargetBlockId
                         }
                       });
+                      console.log('[数据库悬浮弹窗] 移动端 - openTab 调用完成');
                     } catch (error) {
                       console.warn('移动端跳转失败:', error);
                     }
+                  } else {
+                    // 如果没有配置 mobileTargetBlockId，尝试跳转到数据库块
+                    if (blockId) {
+                      try {
+                        await openTab({
+                          doc: {
+                            id: blockId
+                          }
+                        });
+                      } catch (error) {
+                        console.warn('移动端跳转到数据库块失败:', error);
+                      }
+                    } else {
+                      showMessage('请配置 mobileTargetBlockId', 2000, 'warning');
+                    }
                   }
                 } else {
+                  // 桌面端：跳转到数据库块
                   if (blockId) {
                     try {
                       await openTab({
-                        app: plugin.app,
                         doc: {
                           id: blockId
                         }
@@ -918,9 +953,9 @@ function showCardsPopup(processedData: any, config: StressThresholdConfig, plugi
   
   const note = document.createElement('div');
   if (isMobileDevice()) {
-    note.textContent = '双击任意位置关闭 | 点击任务可打开固定页面';
+    note.textContent = '双击任意位置关闭 | 点击主键列跳转（需配置 mobileTargetBlockId）';
   } else {
-    note.textContent = '双击任意位置关闭 | 点击紫色任务可跳转';
+    note.textContent = '双击任意位置关闭 | 点击紫色任务可跳转到对应块';
   }
   note.style.cssText = `
     margin-top: ${rowCount > 0 ? '14px' : '20px'};

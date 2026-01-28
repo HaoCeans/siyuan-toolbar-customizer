@@ -471,12 +471,13 @@ export function createDesktopButtonItem(
     subtypeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
     const currentSubtype = button.authorToolSubtype || 'open-doc'
     subtypeSelect.innerHTML = `
-      <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>① 打开指定ID文档</option>
+      <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>① 打开指定ID块</option>
       <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库悬浮弹窗</option>
       <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
+      <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>④ 叶归LifeLog适配</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log'
       // 刷新表单以显示/隐藏相关配置
       if ((subtypeSelect as any).refreshForm) {
         (subtypeSelect as any).refreshForm()
@@ -484,20 +485,21 @@ export function createDesktopButtonItem(
     }
     authorToolField.appendChild(subtypeSelect)
 
-    // 打开指定ID文档配置区
+    // 打开指定ID块配置区
     const docConfigDiv = document.createElement('div')
     docConfigDiv.id = 'open-doc-config'
     docConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
+    // 目标块ID
     const docIdLabel = document.createElement('label')
-    docIdLabel.textContent = '📄 目标文档ID'
+    docIdLabel.textContent = '📄 目标块ID'
     docIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     docConfigDiv.appendChild(docIdLabel)
 
     const docIdInput = document.createElement('input')
     docIdInput.type = 'text'
     docIdInput.className = 'b3-text-field'
-    docIdInput.placeholder = '如: 20251215234003-j3i7wjc'
+    docIdInput.placeholder = '如: 20251215234003-j3i7wjc 或 20251215234003-j3i7wjc-a1b2c3'
     docIdInput.value = button.targetDocId || ''
     docIdInput.style.cssText = 'font-size: 13px;'
     docIdInput.onchange = () => { button.targetDocId = docIdInput.value }
@@ -505,7 +507,7 @@ export function createDesktopButtonItem(
 
     const docIdHint = document.createElement('div')
     docIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    docIdHint.textContent = '💡 点击按钮后自动打开指定ID的文档'
+    docIdHint.textContent = '💡 支持文档ID（打开文档）或块ID（打开文档并定位到该块）'
     docConfigDiv.appendChild(docIdHint)
 
     authorToolField.appendChild(docConfigDiv)
@@ -558,6 +560,55 @@ export function createDesktopButtonItem(
     diaryConfigDiv.appendChild(waitTimeContainer)
 
     authorToolField.appendChild(diaryConfigDiv)
+
+    // 叶归LifeLog适配配置区
+    const lifeLogConfigDiv = document.createElement('div')
+    lifeLogConfigDiv.id = 'life-log-config'
+    lifeLogConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+    
+    // 笔记本ID输入
+    const notebookIdLabel = document.createElement('label')
+    notebookIdLabel.textContent = '📚 笔记本ID'
+    notebookIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+    lifeLogConfigDiv.appendChild(notebookIdLabel)
+    
+    const notebookIdInput = document.createElement('input')
+    notebookIdInput.type = 'text'
+    notebookIdInput.className = 'b3-text-field'
+    notebookIdInput.placeholder = '请输入笔记本ID，如：20250101000000-aaaaaa'
+    notebookIdInput.value = button.lifeLogNotebookId || ''
+    notebookIdInput.style.cssText = 'font-size: 13px;'
+    notebookIdInput.onchange = () => { button.lifeLogNotebookId = notebookIdInput.value }
+    lifeLogConfigDiv.appendChild(notebookIdInput)
+    
+    const notebookIdHint = document.createElement('div')
+    notebookIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+    notebookIdHint.textContent = '💡 指定内容将要追加到的笔记本ID，不能为空'
+    lifeLogConfigDiv.appendChild(notebookIdHint)
+    
+    // 分类选项输入
+    const categoriesLabel = document.createElement('label')
+    categoriesLabel.textContent = '📝 分类选项（每行一个）'
+    categoriesLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
+    lifeLogConfigDiv.appendChild(categoriesLabel)
+
+    const categoriesTextarea = document.createElement('textarea')
+    categoriesTextarea.className = 'b3-text-field'
+    categoriesTextarea.value = button.lifeLogCategories?.join('\n') || '学习\n工作\n生活'
+    categoriesTextarea.placeholder = '每行输入一个分类，例如：\n学习\n工作\n生活'
+    categoriesTextarea.rows = 4
+    categoriesTextarea.style.cssText = 'font-size: 13px; resize: vertical; min-height: 100px;'
+    categoriesTextarea.onchange = () => { 
+      button.lifeLogCategories = categoriesTextarea.value.split('\n').map(cat => cat.trim()).filter(cat => cat)
+    }
+    lifeLogConfigDiv.appendChild(categoriesTextarea)
+
+    const categoriesHint = document.createElement('div')
+    categoriesHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+    categoriesHint.textContent = '💡 每行输入一个分类选项，点击按钮后会弹出选择对话框'
+    lifeLogConfigDiv.appendChild(categoriesHint)
+
+    authorToolField.appendChild(lifeLogConfigDiv)
 
     // 数据库块ID
     const dbBlockIdLabel = document.createElement('label')
@@ -722,17 +773,25 @@ export function createDesktopButtonItem(
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'flex'
         diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
       } else if (subtype === 'diary-bottom') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'flex'
+        lifeLogConfigDiv.style.display = 'none'
+      } else if (subtype === 'life-log') {
+        docConfigDiv.style.display = 'none'
+        dbConfigDiv.style.display = 'none'
+        diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'flex'
       } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
       }
     }
-    subtypeSelect.refreshForm = updateVisibility
+    ;(subtypeSelect as any).refreshForm = updateVisibility
     updateVisibility()
 
     editForm.appendChild(authorToolField)
@@ -1049,30 +1108,32 @@ export function populateDesktopEditForm(
     subtypeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
     const currentSubtype = button.authorToolSubtype || 'open-doc'
     subtypeSelect.innerHTML = `
-      <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>① 打开指定ID文档</option>
+      <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>① 打开指定ID块</option>
       <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库悬浮弹窗</option>
       <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
+      <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>④ 叶归LifeLog适配</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log'
       ;(subtypeSelect as any).refreshForm?.()
     }
     authorToolField.appendChild(subtypeSelect)
 
-    // 打开指定ID文档配置区
+    // 打开指定ID块配置区
     const docConfigDiv = document.createElement('div')
     docConfigDiv.id = 'open-doc-config'
     docConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
+    // 目标块ID
     const docIdLabel = document.createElement('label')
-    docIdLabel.textContent = '📄 目标文档ID'
+    docIdLabel.textContent = '📄 目标块ID'
     docIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     docConfigDiv.appendChild(docIdLabel)
 
     const docIdInput = document.createElement('input')
     docIdInput.type = 'text'
     docIdInput.className = 'b3-text-field'
-    docIdInput.placeholder = '如: 20251215234003-j3i7wjc'
+    docIdInput.placeholder = '如: 20251215234003-j3i7wjc 或 20251215234003-j3i7wjc-a1b2c3'
     docIdInput.value = button.targetDocId || ''
     docIdInput.style.cssText = 'font-size: 13px;'
     docIdInput.onchange = () => { button.targetDocId = docIdInput.value }
@@ -1080,7 +1141,7 @@ export function populateDesktopEditForm(
 
     const docIdHint = document.createElement('div')
     docIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    docIdHint.textContent = '💡 点击按钮后自动打开指定ID的文档'
+    docIdHint.textContent = '💡 支持文档ID（打开文档）或块ID（打开文档并定位到该块）'
     docConfigDiv.appendChild(docIdHint)
 
     authorToolField.appendChild(docConfigDiv)
@@ -1317,6 +1378,55 @@ export function populateDesktopEditForm(
 
     authorToolField.appendChild(diaryConfigDiv)
 
+    // 叶归LifeLog适配配置区
+    const lifeLogConfigDiv = document.createElement('div')
+    lifeLogConfigDiv.id = 'life-log-config'
+    lifeLogConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+    
+    // 笔记本ID输入
+    const notebookIdLabel = document.createElement('label')
+    notebookIdLabel.textContent = '📚 笔记本ID'
+    notebookIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+    lifeLogConfigDiv.appendChild(notebookIdLabel)
+    
+    const notebookIdInput = document.createElement('input')
+    notebookIdInput.type = 'text'
+    notebookIdInput.className = 'b3-text-field'
+    notebookIdInput.placeholder = '请输入笔记本ID，如：20250101000000-aaaaaa'
+    notebookIdInput.value = button.lifeLogNotebookId || ''
+    notebookIdInput.style.cssText = 'font-size: 13px;'
+    notebookIdInput.onchange = () => { button.lifeLogNotebookId = notebookIdInput.value }
+    lifeLogConfigDiv.appendChild(notebookIdInput)
+    
+    const notebookIdHint = document.createElement('div')
+    notebookIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+    notebookIdHint.textContent = '💡 指定内容将要追加到的笔记本ID，不能为空'
+    lifeLogConfigDiv.appendChild(notebookIdHint)
+    
+    // 分类选项输入
+    const categoriesLabel = document.createElement('label')
+    categoriesLabel.textContent = '📝 分类选项（每行一个）'
+    categoriesLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
+    lifeLogConfigDiv.appendChild(categoriesLabel)
+
+    const categoriesTextarea = document.createElement('textarea')
+    categoriesTextarea.className = 'b3-text-field'
+    categoriesTextarea.value = button.lifeLogCategories?.join('\n') || '学习\n工作\n生活'
+    categoriesTextarea.placeholder = '每行输入一个分类，例如：\n学习\n工作\n生活'
+    categoriesTextarea.rows = 4
+    categoriesTextarea.style.cssText = 'font-size: 13px; resize: vertical; min-height: 100px;'
+    categoriesTextarea.onchange = () => { 
+      button.lifeLogCategories = categoriesTextarea.value.split('\n').map(cat => cat.trim()).filter(cat => cat)
+    }
+    lifeLogConfigDiv.appendChild(categoriesTextarea)
+
+    const categoriesHint = document.createElement('div')
+    categoriesHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+    categoriesHint.textContent = '💡 每行输入一个分类选项，点击按钮后会弹出选择对话框'
+    lifeLogConfigDiv.appendChild(categoriesHint)
+
+    authorToolField.appendChild(lifeLogConfigDiv)
+
     // 根据当前选择显示/隐藏配置区
     const updateVisibility = () => {
       const subtype = subtypeSelect.value
@@ -1324,17 +1434,25 @@ export function populateDesktopEditForm(
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'flex'
         diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
       } else if (subtype === 'diary-bottom') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'flex'
+        lifeLogConfigDiv.style.display = 'none'
+      } else if (subtype === 'life-log') {
+        docConfigDiv.style.display = 'none'
+        dbConfigDiv.style.display = 'none'
+        diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'flex'
       } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
       }
     }
-    subtypeSelect.refreshForm = updateVisibility
+    ;(subtypeSelect as any).refreshForm = updateVisibility
     updateVisibility()
 
     form.appendChild(authorToolField)

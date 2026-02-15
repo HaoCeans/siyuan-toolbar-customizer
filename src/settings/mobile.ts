@@ -1450,7 +1450,6 @@ export function createMobileSettingLayout(
           
         // 添加空值检查
         if (!idLabel || !idInput || !idHint) {
-          console.warn('一键记事设置元素未找到，跳过更新');
           return;
         }
           

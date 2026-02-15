@@ -517,7 +517,6 @@ export function createDesktopButtonItem(
       
       // 添加空值检查
       if (!idLabel || !idInput) {
-        console.warn('一键记事配置元素未找到，跳过更新');
         return;
       }
       
@@ -564,7 +563,6 @@ export function createDesktopButtonItem(
       
       // 添加空值检查
       if (!idHint) {
-        console.warn('一键记事提示元素未找到，跳过更新');
         return;
       }
       

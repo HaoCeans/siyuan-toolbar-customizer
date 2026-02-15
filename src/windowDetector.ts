@@ -40,12 +40,10 @@ async function showSmallWindowTip() {
     } else {
       notebookId = config.quickNoteNotebookId || '';
     }
-    console.log('使用临时配置:', { saveType, notebookId, documentId });
   } else {
     // 使用全局配置
     notebookId = pluginInstance?.mobileFeatureConfig?.quickNoteNotebookId || '';
     documentId = pluginInstance?.mobileFeatureConfig?.quickNoteDocumentId || '';
-    console.log('使用全局配置:', { notebookId, documentId });
   }
 
   // 显示思源原生编辑器弹窗，传递文档ID
@@ -54,18 +52,11 @@ async function showSmallWindowTip() {
 
 // 思源原生编辑器弹窗
 function showSiyuanEditorDialog(notebookId: string, documentId?: string) {
-  console.log('=== 使用自定义记事弹窗 ===');
-  console.log('笔记本ID:', notebookId);
-  console.log('文档ID:', documentId);
-  
   // 直接使用自定义的美观输入弹窗（用户偏好方案）
   showNoteInputDialog(notebookId, documentId);
 }
 
 function showNoteInputDialog(notebookId: string, documentId?: string) {
-  console.log('使用自定义的简单输入弹窗');
-  console.log('目标文档ID:', documentId);
-  
   // 创建美化版记事输入弹窗
   const dialog = document.createElement('div');
   dialog.id = 'quick-note-dialog';
@@ -221,13 +212,11 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
         
         // 如果指定了文档ID，优先使用appendBlock API
         if (documentId) {
-          console.log('使用文档ID追加内容:', documentId);
           success = await appendToSpecificDocument(documentId, content);
         }
         
         // 如果没有文档ID或追加失败，使用默认的日记API
         if (!documentId || !success) {
-          console.log('使用默认日记API');
           const response = await fetch('/api/block/appendDailyNoteBlock', {
             method: 'POST',
             headers: {
@@ -289,43 +278,33 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
 
 // 关闭记事弹窗的函数
 function closeNoteDialog() {
-  console.log('[弹窗关闭] 开始延迟关闭弹窗');
   const noteDialog = document.getElementById('quick-note-dialog');
   if (noteDialog) {
-    console.log('[弹窗关闭] 找到弹窗元素，开始清理');
     // 清理滚动条样式
     const scrollbarStyles = document.querySelectorAll('style');
     scrollbarStyles.forEach(style => {
       if (style.textContent && style.textContent.includes('quick-note-dialog')) {
-        console.log('[弹窗关闭] 清理滚动条样式');
         style.remove();
       }
     });
     noteDialog.remove();
-    console.log('[弹窗关闭] 弹窗已移除');
   } else {
-    console.log('[弹窗关闭] 未找到弹窗元素');
   }
 }
 
 // 立即关闭记事弹窗的函数（无延迟）
 function closeNoteDialogImmediately() {
-  console.log('[弹窗关闭] 开始立即关闭弹窗');
   const noteDialog = document.getElementById('quick-note-dialog');
   if (noteDialog) {
-    console.log('[弹窗关闭] 找到弹窗元素，开始清理');
     // 清理滚动条样式
     const scrollbarStyles = document.querySelectorAll('style');
     scrollbarStyles.forEach(style => {
       if (style.textContent && style.textContent.includes('quick-note-dialog')) {
-        console.log('[弹窗关闭] 清理滚动条样式');
         style.remove();
       }
     });
     noteDialog.remove();
-    console.log('[弹窗关闭] 弹窗已移除');
   } else {
-    console.log('[弹窗关闭] 未找到弹窗元素');
   }
 }
 function copyBottomToolbarButtons(container: HTMLElement) {
@@ -334,7 +313,6 @@ function copyBottomToolbarButtons(container: HTMLElement) {
     const buttonConfigs = (window as any).__mobileButtonConfigs || [];
     
     if (buttonConfigs.length === 0) {
-      console.log('未找到按钮配置');
       // 如果没有按钮配置，显示提示信息
       const noButtonsMsg = document.createElement('div');
       noButtonsMsg.textContent = '暂无按钮配置';
@@ -466,12 +444,9 @@ function copyBottomToolbarButtons(container: HTMLElement) {
         e.preventDefault();
         e.stopPropagation();
         
-        console.log(`[按钮点击] 开始执行按钮: ${buttonConfig.name} (类型: ${buttonConfig.type})`);
-        
         try {
           // 特殊处理：template类型按钮的行为
           if (buttonConfig.type === 'template') {
-            console.log('[template按钮] 开始处理模板插入');
             // 获取弹窗中的textarea输入框
             const noteDialog = document.getElementById('quick-note-dialog');
             const textarea = noteDialog?.querySelector('textarea');
@@ -508,8 +483,6 @@ function copyBottomToolbarButtons(container: HTMLElement) {
               // 聚焦到输入框
               input.focus();
               
-              console.log('[template按钮] 模板内容已插入到输入框');
-              
               // 显示插入成功提示
               const successMsg = document.createElement('div');
               successMsg.textContent = '模板已插入';
@@ -534,7 +507,6 @@ function copyBottomToolbarButtons(container: HTMLElement) {
               }, 2000);
             }
             
-            console.log('[template按钮] 不关闭弹窗，处理完成');
             // template类型按钮不关闭弹窗，直接返回
             return;
           }
@@ -542,36 +514,26 @@ function copyBottomToolbarButtons(container: HTMLElement) {
           // 其他类型按钮：使用工具栏管理器执行按钮功能
           const toolbarManager = (window as any).__toolbarManager;
           if (toolbarManager && typeof toolbarManager.executeButton === 'function') {
-            console.log(`[按钮执行] 使用工具栏管理器执行按钮功能`);
-            
             // 特殊处理builtin类型：需要短暂延迟后再关闭弹窗
             if (buttonConfig.type === 'builtin') {
-              console.log('[builtin按钮] 开始执行，将延迟100ms关闭弹窗');
               // 执行按钮功能
               await toolbarManager.executeButton(buttonConfig);
-              console.log('[builtin按钮] 功能执行完成，设置100ms延迟关闭');
               // builtin按钮需要短暂延迟确保功能执行完成
               setTimeout(() => {
-                console.log('[builtin按钮] 延迟结束，关闭弹窗');
                 closeNoteDialog();
               }, 100); // 100ms延迟
             } else if (buttonConfig.type === 'click-sequence') {
-              console.log('[click-sequence按钮] 开始执行，等待完成后再关闭');
               // 执行按钮功能并等待完成
               await toolbarManager.executeButton(buttonConfig);
-              console.log('[click-sequence按钮] 功能执行完成，立即关闭弹窗');
               // click-sequence执行完成后立即关闭弹窗
               closeNoteDialogImmediately();
             } else {
-              console.log('[其他按钮] 开始执行，立即关闭弹窗');
               // 其他类型按钮正常执行
               await toolbarManager.executeButton(buttonConfig);
-              console.log('[其他按钮] 功能执行完成，立即关闭弹窗');
               // 立即关闭窗口
               closeNoteDialogImmediately();
             }
           } else {
-            console.log('[按钮执行] 工具栏管理器不可用，尝试触发原始按钮');
             // 如果工具栏管理器不可用，尝试触发原始按钮
             if (originalBtn) {
               const clickEvent = new MouseEvent('click', {
@@ -580,9 +542,7 @@ function copyBottomToolbarButtons(container: HTMLElement) {
                 view: window
               });
               originalBtn.dispatchEvent(clickEvent);
-              console.log('[原始按钮] 已触发原始按钮点击事件');
             }
-            console.log('[原始按钮] 立即关闭弹窗');
             // 立即关闭窗口
             closeNoteDialogImmediately();
           }
@@ -611,7 +571,6 @@ function copyBottomToolbarButtons(container: HTMLElement) {
     }
 
     container.appendChild(buttonsContainer);
-    console.log(`成功创建了 ${buttonsContainer.children.length} 个按钮副本`);
 
   } catch (error) {
     console.error('复制底部工具栏按钮时出错:', error);
@@ -671,11 +630,6 @@ function handleVisibilityChange() {
     if (isAppInForeground()) {
       // 获取弹窗配置
       const popupConfig = pluginInstance.mobileFeatureConfig?.popupConfig || 'bothModes';
-      
-      // 调试信息
-      console.log('Quick note config:', popupConfig);
-      console.log('Plugin instance:', pluginInstance);
-      console.log('Mobile feature config:', pluginInstance.mobileFeatureConfig);
       
       // 如果配置为关闭弹窗，则不执行任何操作
       if (popupConfig === 'disabled') {
@@ -754,8 +708,6 @@ export function getAppForegroundStatus(): boolean {
 
 // 备选方案：直接使用 API 创建文档
 function useApiFallback(notebookId: string, siyuan: any) {
-  console.log('使用 API 备选方案创建文档...');
-  
   const notebookIdToUse = notebookId || (siyuan.notebooks?.[0]?.id) || '0';
   
   siyuan.fetchPost('/api/filetree/createDocWithMd', {
@@ -764,13 +716,11 @@ function useApiFallback(notebookId: string, siyuan: any) {
     markdown: ''
   }, (response: any) => {
     if (response.code === 0) {
-      console.log('✅ 成功创建文档:', response.data);
       // 在新窗口中打开文档
       siyuan.openWindow({
         doc: { id: response.data.id }
       });
     } else {
-      console.error('❌ 创建文档失败:', response.msg);
       // 最后的降级方案
       showNoteInputDialog(notebookId);
     }

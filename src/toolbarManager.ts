@@ -55,7 +55,7 @@ export interface ButtonConfig {
   targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
   mobileTargetDocId?: string; // 打开指定ID块：目标块ID（移动端），支持文档ID或块ID
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
-  authorToolSubtype?: 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary-bottom=日记底部, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择
+  authorToolSubtype?: 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select' | 'button-sequence'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary-bottom=日记底部, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
   viewName?: string;         // 视图名称
@@ -77,6 +77,8 @@ export interface ButtonConfig {
   quickNoteSaveType?: 'daily' | 'document'; // 一键记事：保存方式（新增）
   // 弹窗选择输入配置
   popupSelectTemplates?: { name: string; content: string }[]; // 弹窗选择：模板列表
+  // 连续点击自定义按钮配置
+  buttonSequenceSteps?: { buttonName: string; delayMs: number }[]; // 连续点击：按钮名称和间隔时间列表
   icon: string;              // 图标（思源图标或Emoji）
   iconSize: number;          // 图标大小（px）
   minWidth: number;          // 按钮最小宽度（px）
@@ -2046,6 +2048,87 @@ async function executeClickSequence(config: ButtonConfig) {
 }
 
 /**
+ * 执行连续点击自定义按钮序列
+ * 根据按钮名称查找自定义按钮并依次点击，点击后等待指定间隔时间
+ */
+async function executeButtonSequence(config: ButtonConfig) {
+  const steps = config.buttonSequenceSteps
+  
+  if (!steps || steps.length === 0) {
+    Notify.showErrorClickSequenceNotConfigured(config.name)
+    return
+  }
+
+  // 过滤掉空的步骤（按钮名称为空的）
+  const validSteps = steps.filter(step => step.buttonName && step.buttonName.trim())
+  
+  if (validSteps.length === 0) {
+    Notify.showErrorClickSequenceNotConfigured(config.name)
+    return
+  }
+
+  for (let i = 0; i < validSteps.length; i++) {
+    const step = validSteps[i]
+    const buttonName = step.buttonName.trim()
+    const delayMs = step.delayMs || 200
+
+    // 根据按钮名称查找自定义按钮
+    const button = findCustomButtonByName(buttonName)
+    
+    if (!button) {
+      // 找不到按钮，停止整个序列
+      Notify.showErrorClickSequenceStepFailed(i + 1, `按钮“${buttonName}”`)
+      return
+    }
+
+    // 点击按钮
+    try {
+      clickElement(button)
+    } catch (error) {
+      Notify.showErrorClickSequenceStepFailed(i + 1, `按钮“${buttonName}”`)
+      return
+    }
+
+    // 点击后等待指定间隔时间
+    await delay(delayMs)
+  }
+}
+
+/**
+ * 根据按钮名称查找自定义按钮
+ * 通过遍历所有带 data-custom-button 属性的按钮，匹配按钮名称
+ */
+function findCustomButtonByName(buttonName: string): HTMLElement | null {
+  // 查找所有自定义按钮
+  const customButtons = document.querySelectorAll('[data-custom-button]')
+  
+  for (const btn of customButtons) {
+    const button = btn as HTMLElement
+    // 获取按钮配置
+    const buttonId = button.dataset.customButton
+    
+    // 尝试从全局配置中查找按钮名称
+    const toolbarManager = (window as any).__toolbarManager
+    if (toolbarManager && buttonId) {
+      const configs = toolbarManager.getAllButtonConfigs?.()
+      if (configs) {
+        const config = configs.find((c: ButtonConfig) => c.id === buttonId)
+        if (config && config.name === buttonName) {
+          return button
+        }
+      }
+    }
+    
+    // 备用方案：通过按钮的 title 或文本内容匹配
+    if (button.title === buttonName || button.textContent?.trim() === buttonName) {
+      return button
+    }
+  }
+  
+  return null
+}
+
+/**
  * 等待元素出现
  * @param selector CSS选择器或简单标识符（支持智能匹配）
  * @param timeout 超时时间（毫秒）
@@ -2405,6 +2488,12 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
   // 弹窗框模板选择类型
   if (subtype === 'popup-select') {
     await executePopupSelect(config, savedSelection, lastActiveElement)
+    return
+  }
+
+  // 连续点击自定义按钮类型
+  if (subtype === 'button-sequence') {
+    await executeButtonSequence(config)
     return
   }
 

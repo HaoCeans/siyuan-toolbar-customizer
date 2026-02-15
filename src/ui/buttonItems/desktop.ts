@@ -657,9 +657,10 @@ export function createDesktopButtonItem(
       <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
       <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>④ 叶归LifeLog适配</option>
       <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑤ 弹窗框模板选择</option>
+      <option value="button-sequence" ${currentSubtype === 'button-sequence' ? 'selected' : ''}>⑥ 连续点击自定义按钮</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select' | 'button-sequence'
       // 刷新表单以显示/隐藏相关配置
       if ((subtypeSelect as any).refreshForm) {
         (subtypeSelect as any).refreshForm()
@@ -871,6 +872,111 @@ export function createDesktopButtonItem(
 
     authorToolField.appendChild(popupSelectConfigDiv)
 
+    // 连续点击自定义按钮配置区
+    const buttonSequenceConfigDiv = document.createElement('div')
+    buttonSequenceConfigDiv.id = 'button-sequence-config'
+    buttonSequenceConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+    const buttonSequenceTitle = document.createElement('label')
+    buttonSequenceTitle.textContent = '🔗 按钮序列'
+    buttonSequenceTitle.style.cssText = 'font-size: 13px; font-weight: 500;'
+    buttonSequenceConfigDiv.appendChild(buttonSequenceTitle)
+
+    const buttonSequenceHint = document.createElement('div')
+    buttonSequenceHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+    buttonSequenceHint.textContent = '💡 左边选择要点击的按钮，右边填点击后等待的间隔时间（毫秒）'
+    buttonSequenceConfigDiv.appendChild(buttonSequenceHint)
+
+    const buttonSequenceRowsContainer = document.createElement('div')
+    buttonSequenceRowsContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
+    buttonSequenceConfigDiv.appendChild(buttonSequenceRowsContainer)
+
+    // 初始化按钮序列数据
+    if (!button.buttonSequenceSteps || button.buttonSequenceSteps.length === 0) {
+      button.buttonSequenceSteps = [
+        { buttonName: '', delayMs: 200 },
+        { buttonName: '', delayMs: 200 },
+        { buttonName: '', delayMs: 200 }
+      ]
+    }
+
+    // 获取可选择的按钮列表（排除当前按钮自己和扩展工具栏按钮，按 sort 排序）
+    const getAvailableButtons = () => {
+      return context.buttonConfigs
+        .filter(btn => btn.id !== button.id && btn.id !== 'overflow-button-mobile')
+        .sort((a, b) => a.sort - b.sort)
+    }
+
+    const renderButtonSequenceRows = () => {
+      buttonSequenceRowsContainer.innerHTML = ''
+      const availableButtons = getAvailableButtons()
+      
+      button.buttonSequenceSteps!.forEach((step, idx) => {
+        const row = document.createElement('div')
+        row.style.cssText = 'display: flex; align-items: center; gap: 6px;'
+
+        // 改为下拉选择框
+        const nameSelect = document.createElement('select')
+        nameSelect.className = 'b3-select'
+        
+        // 使用 innerHTML 方式构建选项（与其他 select 保持一致）
+        console.log('[button-sequence] 构建选项列表, idx:', idx)
+        console.log('  availableButtons:', availableButtons.map(b => b.name))
+        const optionsHtml = availableButtons.map((btn, optIdx) => {
+          const iconDisplay = btn.icon.startsWith('icon') ? '⭐' : btn.icon
+          const selected = step.buttonName === btn.name ? 'selected' : ''
+          console.log(`  选项${optIdx}: value="${btn.name}", selected=${selected}, text="${iconDisplay} ${btn.name}"`)
+          return `<option value="${btn.name}" ${selected}>${iconDisplay} ${btn.name}</option>`
+        }).join('')
+        nameSelect.innerHTML = `<option value="">-- 请选择按钮 --</option>${optionsHtml}`
+        console.log('  最终options数量:', nameSelect.options.length)
+        
+        nameSelect.onchange = () => {
+          console.log('[button-sequence] 选择变化:')
+          console.log('  selectedIndex:', nameSelect.selectedIndex)
+          console.log('  value:', nameSelect.value)
+          console.log('  options数量:', nameSelect.options.length)
+          console.log('  当前选中的option:', nameSelect.options[nameSelect.selectedIndex]?.textContent)
+          button.buttonSequenceSteps![idx].buttonName = nameSelect.value
+        }
+
+        const delayInput = document.createElement('input')
+        delayInput.type = 'number'
+        delayInput.className = 'b3-text-field'
+        delayInput.placeholder = '间隔(ms)'
+        delayInput.value = String(step.delayMs || 200)
+        delayInput.style.cssText = 'font-size: 13px; flex: 1; min-width: 60px;'
+        delayInput.onchange = () => { button.buttonSequenceSteps![idx].delayMs = parseInt(delayInput.value) || 200 }
+
+        const deleteBtn = document.createElement('button')
+        deleteBtn.textContent = '✕'
+        deleteBtn.style.cssText = 'padding: 4px 8px; border: 1px solid var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 12px; flex-shrink: 0;'
+        deleteBtn.onclick = () => {
+          if (button.buttonSequenceSteps!.length > 1) {
+            button.buttonSequenceSteps!.splice(idx, 1)
+            renderButtonSequenceRows()
+          }
+        }
+
+        row.appendChild(nameSelect)
+        row.appendChild(delayInput)
+        row.appendChild(deleteBtn)
+        buttonSequenceRowsContainer.appendChild(row)
+      })
+    }
+    renderButtonSequenceRows()
+
+    const addSequenceRowBtn = document.createElement('button')
+    addSequenceRowBtn.textContent = '+ 添加步骤'
+    addSequenceRowBtn.style.cssText = 'padding: 6px 12px; border: 1px dashed var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 13px; align-self: flex-start;'
+    addSequenceRowBtn.onclick = () => {
+      button.buttonSequenceSteps!.push({ buttonName: '', delayMs: 200 })
+      renderButtonSequenceRows()
+    }
+    buttonSequenceConfigDiv.appendChild(addSequenceRowBtn)
+
+    authorToolField.appendChild(buttonSequenceConfigDiv)
+
     // 数据库块ID
     const dbBlockIdLabel = document.createElement('label')
     dbBlockIdLabel.textContent = '数据库块ID'
@@ -1035,29 +1141,43 @@ export function createDesktopButtonItem(
         dbConfigDiv.style.display = 'flex'
         diaryConfigDiv.style.display = 'none'
         lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
       } else if (subtype === 'diary-bottom') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'flex'
         lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
       } else if (subtype === 'life-log') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'
         lifeLogConfigDiv.style.display = 'flex'
         popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
       } else if (subtype === 'popup-select') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'flex'
+        buttonSequenceConfigDiv.style.display = 'none'
+      } else if (subtype === 'button-sequence') {
+        docConfigDiv.style.display = 'none'
+        dbConfigDiv.style.display = 'none'
+        diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'flex'
       } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
       }
     }
     ;(subtypeSelect as any).refreshForm = updateVisibility
@@ -1441,9 +1561,10 @@ export function populateDesktopEditForm(
       <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
       <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>④ 叶归LifeLog适配</option>
       <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑤ 弹窗框模板选择</option>
+      <option value="button-sequence" ${currentSubtype === 'button-sequence' ? 'selected' : ''}>⑥ 连续点击自定义按钮</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select' | 'button-sequence'
       ;(subtypeSelect as any).refreshForm?.()
     }
     authorToolField.appendChild(subtypeSelect)
@@ -1834,6 +1955,110 @@ export function populateDesktopEditForm(
 
     authorToolField.appendChild(popupSelectConfigDiv)
 
+    // 连续点击自定义按钮配置区
+    const buttonSequenceConfigDiv = document.createElement('div')
+    buttonSequenceConfigDiv.id = 'button-sequence-config-2'
+    buttonSequenceConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+    const buttonSequenceTitle2 = document.createElement('label')
+    buttonSequenceTitle2.textContent = '🔗 按钮序列'
+    buttonSequenceTitle2.style.cssText = 'font-size: 13px; font-weight: 500;'
+    buttonSequenceConfigDiv.appendChild(buttonSequenceTitle2)
+
+    const buttonSequenceHint2 = document.createElement('div')
+    buttonSequenceHint2.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+    buttonSequenceHint2.textContent = '💡 左边选择要点击的按钮，右边填点击后等待的间隔时间（毫秒）'
+    buttonSequenceConfigDiv.appendChild(buttonSequenceHint2)
+
+    const buttonSequenceRowsContainer2 = document.createElement('div')
+    buttonSequenceRowsContainer2.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
+    buttonSequenceConfigDiv.appendChild(buttonSequenceRowsContainer2)
+
+    if (!button.buttonSequenceSteps || button.buttonSequenceSteps.length === 0) {
+      button.buttonSequenceSteps = [
+        { buttonName: '', delayMs: 200 },
+        { buttonName: '', delayMs: 200 },
+        { buttonName: '', delayMs: 200 }
+      ]
+    }
+
+    // 获取可选择的按钮列表（排除当前按钮自己和扩展工具栏按钮，按 sort 排序）
+    const getAvailableButtons2 = () => {
+      return context.buttonConfigs
+        .filter(btn => btn.id !== button.id && btn.id !== 'overflow-button-mobile')
+        .sort((a, b) => a.sort - b.sort)
+    }
+
+    const renderButtonSequenceRows2 = () => {
+      buttonSequenceRowsContainer2.innerHTML = ''
+      const availableButtons = getAvailableButtons2()
+      
+      button.buttonSequenceSteps!.forEach((step, idx) => {
+        const row = document.createElement('div')
+        row.style.cssText = 'display: flex; align-items: center; gap: 6px;'
+
+        // 改为下拉选择框
+        const nameSelect = document.createElement('select')
+        nameSelect.className = 'b3-select'
+        
+        // 使用 innerHTML 方式构建选项（与其他 select 保持一致）
+        console.log('[button-sequence] 构建选项列表, idx:', idx)
+        console.log('  availableButtons:', availableButtons.map(b => b.name))
+        const optionsHtml = availableButtons.map((btn, optIdx) => {
+          const iconDisplay = btn.icon.startsWith('icon') ? '⭐' : btn.icon
+          const selected = step.buttonName === btn.name ? 'selected' : ''
+          console.log(`  选项${optIdx}: value="${btn.name}", selected=${selected}, text="${iconDisplay} ${btn.name}"`)
+          return `<option value="${btn.name}" ${selected}>${iconDisplay} ${btn.name}</option>`
+        }).join('')
+        nameSelect.innerHTML = `<option value="">-- 请选择按钮 --</option>${optionsHtml}`
+        console.log('  最终options数量:', nameSelect.options.length)
+        
+        nameSelect.onchange = () => {
+          console.log('[button-sequence] 选择变化:')
+          console.log('  selectedIndex:', nameSelect.selectedIndex)
+          console.log('  value:', nameSelect.value)
+          console.log('  options数量:', nameSelect.options.length)
+          console.log('  当前选中的option:', nameSelect.options[nameSelect.selectedIndex]?.textContent)
+          button.buttonSequenceSteps![idx].buttonName = nameSelect.value
+        }
+
+        const delayInput = document.createElement('input')
+        delayInput.type = 'number'
+        delayInput.className = 'b3-text-field'
+        delayInput.placeholder = '间隔(ms)'
+        delayInput.value = String(step.delayMs || 200)
+        delayInput.style.cssText = 'font-size: 13px; flex: 1; min-width: 60px;'
+        delayInput.onchange = () => { button.buttonSequenceSteps![idx].delayMs = parseInt(delayInput.value) || 200 }
+
+        const deleteBtn = document.createElement('button')
+        deleteBtn.textContent = '✕'
+        deleteBtn.style.cssText = 'padding: 4px 8px; border: 1px solid var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 12px; flex-shrink: 0;'
+        deleteBtn.onclick = () => {
+          if (button.buttonSequenceSteps!.length > 1) {
+            button.buttonSequenceSteps!.splice(idx, 1)
+            renderButtonSequenceRows2()
+          }
+        }
+
+        row.appendChild(nameSelect)
+        row.appendChild(delayInput)
+        row.appendChild(deleteBtn)
+        buttonSequenceRowsContainer2.appendChild(row)
+      })
+    }
+    renderButtonSequenceRows2()
+
+    const addSequenceRowBtn2 = document.createElement('button')
+    addSequenceRowBtn2.textContent = '+ 添加步骤'
+    addSequenceRowBtn2.style.cssText = 'padding: 6px 12px; border: 1px dashed var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 13px; align-self: flex-start;'
+    addSequenceRowBtn2.onclick = () => {
+      button.buttonSequenceSteps!.push({ buttonName: '', delayMs: 200 })
+      renderButtonSequenceRows2()
+    }
+    buttonSequenceConfigDiv.appendChild(addSequenceRowBtn2)
+
+    authorToolField.appendChild(buttonSequenceConfigDiv)
+
     // 根据当前选择显示/隐藏配置区
     const updateVisibility = () => {
       const subtype = subtypeSelect.value
@@ -1843,30 +2068,42 @@ export function populateDesktopEditForm(
         diaryConfigDiv.style.display = 'none'
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
       } else if (subtype === 'diary-bottom') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'flex'
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
       } else if (subtype === 'life-log') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'
         lifeLogConfigDiv.style.display = 'flex'
         popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
       } else if (subtype === 'popup-select') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'flex'
+        buttonSequenceConfigDiv.style.display = 'none'
+      } else if (subtype === 'button-sequence') {
+        docConfigDiv.style.display = 'none'
+        dbConfigDiv.style.display = 'none'
+        diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'flex'
       } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
       }
     }
     ;(subtypeSelect as any).refreshForm = updateVisibility

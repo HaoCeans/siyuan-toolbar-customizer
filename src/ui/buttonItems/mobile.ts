@@ -543,7 +543,10 @@ export function createMobileButtonItem(
       { value: 'quick-note', label: '⑤一键记事【简单】' }
     ]
     if (context.isAuthorToolActivated()) {
-      typeOptions.push({ value: 'author-tool', label: '⑥鲸鱼定制工具箱' })
+      typeOptions.push(
+        { value: 'author-tool', label: '⑥鲸鱼定制工具箱' },
+        { value: 'popup-select', label: '⑦弹窗框选择输入【简单】' }
+      )
     }
     const typeField = createSelectField('选择功能', button.type, typeOptions, (v) => {
       button.type = v as any
@@ -784,9 +787,10 @@ export function createMobileButtonItem(
         <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库悬浮弹窗</option>
         <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
         <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>④ 叶归LifeLog适配</option>
+        <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑤ 弹窗框选择输入</option>
       `
       subtypeSelect.onchange = () => {
-        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log'
+        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select'
         ;(subtypeSelect as any).refreshForm?.()
       }
       authorToolContainer.appendChild(subtypeSelect)

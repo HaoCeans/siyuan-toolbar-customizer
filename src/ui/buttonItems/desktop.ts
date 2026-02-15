@@ -238,7 +238,10 @@ export function createDesktopButtonItem(
     { value: 'quick-note', label: '⑤一键记事【简单】' }
   ]
   if (context.isAuthorToolActivated()) {
-    typeOptions.push({ value: 'author-tool', label: '⑥鲸鱼定制工具箱' })
+    typeOptions.push(
+      { value: 'author-tool', label: '⑥鲸鱼定制工具箱' },
+      { value: 'popup-select', label: '⑦弹窗框选择输入【简单】' }
+    )
   }
 
   editForm.appendChild(createDesktopSelectField('选择功能', button.type, typeOptions, (v) => {
@@ -654,9 +657,10 @@ export function createDesktopButtonItem(
       <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库悬浮弹窗</option>
       <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
       <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>④ 叶归LifeLog适配</option>
+      <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑤ 弹窗框选择输入</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select'
       // 刷新表单以显示/隐藏相关配置
       if ((subtypeSelect as any).refreshForm) {
         (subtypeSelect as any).refreshForm()
@@ -963,11 +967,19 @@ export function createDesktopButtonItem(
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'
         lifeLogConfigDiv.style.display = 'flex'
+        popupSelectConfigDiv.style.display = 'none'
+      } else if (subtype === 'popup-select') {
+        docConfigDiv.style.display = 'none'
+        dbConfigDiv.style.display = 'none'
+        diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'flex'
       } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'
         lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
       }
     }
     ;(subtypeSelect as any).refreshForm = updateVisibility
@@ -1068,7 +1080,10 @@ export function populateDesktopEditForm(
     { value: 'quick-note', label: '⑤一键记事【简单】' }
   ]
   if (context.isAuthorToolActivated()) {
-    typeOptions.push({ value: 'author-tool', label: '⑥鲸鱼定制工具箱' })
+    typeOptions.push(
+      { value: 'author-tool', label: '⑥鲸鱼定制工具箱' },
+      { value: 'popup-select', label: '⑦弹窗框选择输入【简单】' }
+    )
   }
   form.appendChild(createDesktopSelectField('选择功能', button.type, typeOptions, (v) => {
     button.type = v as any
@@ -1348,9 +1363,10 @@ export function populateDesktopEditForm(
       <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库悬浮弹窗</option>
       <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
       <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>④ 叶归LifeLog适配</option>
+      <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑤ 弹窗框选择输入</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select'
       ;(subtypeSelect as any).refreshForm?.()
     }
     authorToolField.appendChild(subtypeSelect)
@@ -1681,11 +1697,19 @@ export function populateDesktopEditForm(
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'
         lifeLogConfigDiv.style.display = 'flex'
+        popupSelectConfigDiv.style.display = 'none'
+      } else if (subtype === 'popup-select') {
+        docConfigDiv.style.display = 'none'
+        dbConfigDiv.style.display = 'none'
+        diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'flex'
       } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'
         lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
       }
     }
     ;(subtypeSelect as any).refreshForm = updateVisibility

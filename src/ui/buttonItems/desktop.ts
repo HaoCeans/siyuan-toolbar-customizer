@@ -239,8 +239,7 @@ export function createDesktopButtonItem(
   ]
   if (context.isAuthorToolActivated()) {
     typeOptions.push(
-      { value: 'author-tool', label: '⑥鲸鱼定制工具箱' },
-      { value: 'popup-select', label: '⑦弹窗框选择输入【简单】' }
+      { value: 'author-tool', label: '⑥鲸鱼定制工具箱' }
     )
   }
 
@@ -1081,8 +1080,7 @@ export function populateDesktopEditForm(
   ]
   if (context.isAuthorToolActivated()) {
     typeOptions.push(
-      { value: 'author-tool', label: '⑥鲸鱼定制工具箱' },
-      { value: 'popup-select', label: '⑦弹窗框选择输入【简单】' }
+      { value: 'author-tool', label: '⑥鲸鱼定制工具箱' }
     )
   }
   form.appendChild(createDesktopSelectField('选择功能', button.type, typeOptions, (v) => {

@@ -786,7 +786,7 @@ export function createMobileButtonItem(
         <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库悬浮弹窗</option>
         <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
         <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>④ 叶归LifeLog适配</option>
-        <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑤ 弹窗框选择输入</option>
+        <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑤ 弹窗框模板选择</option>
       `
       subtypeSelect.onchange = () => {
         button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select'
@@ -910,6 +910,84 @@ export function createMobileButtonItem(
 
       authorToolContainer.appendChild(lifeLogConfigDiv)
 
+      // 弹窗框模板选择配置区
+      const popupSelectConfigDiv = document.createElement('div')
+      popupSelectConfigDiv.id = 'popup-select-config-mobile'
+      popupSelectConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+      const popupSelectTitle = document.createElement('label')
+      popupSelectTitle.textContent = '📋 模板列表'
+      popupSelectTitle.style.cssText = 'font-size: 13px; font-weight: 500;'
+      popupSelectConfigDiv.appendChild(popupSelectTitle)
+
+      const popupSelectHint = document.createElement('div')
+      popupSelectHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+      popupSelectHint.textContent = '💡 左边填模板名称（显示在弹窗上），右边填插入的模板内容'
+      popupSelectConfigDiv.appendChild(popupSelectHint)
+
+      const popupSelectRowsContainer = document.createElement('div')
+      popupSelectRowsContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
+      popupSelectConfigDiv.appendChild(popupSelectRowsContainer)
+
+      if (!button.popupSelectTemplates || button.popupSelectTemplates.length === 0) {
+        button.popupSelectTemplates = [
+          { name: '', content: '' },
+          { name: '', content: '' },
+          { name: '', content: '' }
+        ]
+      }
+
+      const renderPopupSelectRows = () => {
+        popupSelectRowsContainer.innerHTML = ''
+        button.popupSelectTemplates!.forEach((tpl, idx) => {
+          const row = document.createElement('div')
+          row.style.cssText = 'display: flex; align-items: center; gap: 6px;'
+
+          const nameInput = document.createElement('input')
+          nameInput.type = 'text'
+          nameInput.className = 'b3-text-field'
+          nameInput.placeholder = '模板名称'
+          nameInput.value = tpl.name
+          nameInput.style.cssText = 'font-size: 13px; flex: 1; min-width: 0;'
+          nameInput.onchange = () => { button.popupSelectTemplates![idx].name = nameInput.value }
+
+          const contentInput = document.createElement('input')
+          contentInput.type = 'text'
+          contentInput.className = 'b3-text-field'
+          contentInput.placeholder = '模板内容'
+          contentInput.value = tpl.content
+          contentInput.style.cssText = 'font-size: 13px; flex: 2; min-width: 0;'
+          contentInput.onchange = () => { button.popupSelectTemplates![idx].content = contentInput.value }
+
+          const deleteBtn = document.createElement('button')
+          deleteBtn.textContent = '✕'
+          deleteBtn.style.cssText = 'padding: 4px 8px; border: 1px solid var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 12px; flex-shrink: 0;'
+          deleteBtn.onclick = () => {
+            if (button.popupSelectTemplates!.length > 1) {
+              button.popupSelectTemplates!.splice(idx, 1)
+              renderPopupSelectRows()
+            }
+          }
+
+          row.appendChild(nameInput)
+          row.appendChild(contentInput)
+          row.appendChild(deleteBtn)
+          popupSelectRowsContainer.appendChild(row)
+        })
+      }
+      renderPopupSelectRows()
+
+      const addRowBtn = document.createElement('button')
+      addRowBtn.textContent = '+ 添加模板'
+      addRowBtn.style.cssText = 'padding: 6px 12px; border: 1px dashed var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 13px; align-self: flex-start;'
+      addRowBtn.onclick = () => {
+        button.popupSelectTemplates!.push({ name: '', content: '' })
+        renderPopupSelectRows()
+      }
+      popupSelectConfigDiv.appendChild(addRowBtn)
+
+      authorToolContainer.appendChild(popupSelectConfigDiv)
+
       // 日记底部配置区（说明 + 等待时间配置）
       const diaryConfigDiv = document.createElement('div')
       diaryConfigDiv.id = 'diary-config-mobile'
@@ -963,21 +1041,31 @@ export function createMobileButtonItem(
           dbConfigDiv.style.display = 'flex'
           diaryConfigDiv.style.display = 'none'
           lifeLogConfigDiv.style.display = 'none'
+          popupSelectConfigDiv.style.display = 'none'
         } else if (subtype === 'diary-bottom') {
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
           diaryConfigDiv.style.display = 'flex'
           lifeLogConfigDiv.style.display = 'none'
+          popupSelectConfigDiv.style.display = 'none'
         } else if (subtype === 'life-log') {
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
           diaryConfigDiv.style.display = 'none'
           lifeLogConfigDiv.style.display = 'flex'
+          popupSelectConfigDiv.style.display = 'none'
+        } else if (subtype === 'popup-select') {
+          docConfigDiv.style.display = 'none'
+          dbConfigDiv.style.display = 'none'
+          diaryConfigDiv.style.display = 'none'
+          lifeLogConfigDiv.style.display = 'none'
+          popupSelectConfigDiv.style.display = 'flex'
         } else {
           docConfigDiv.style.display = 'flex'
           dbConfigDiv.style.display = 'none'
           diaryConfigDiv.style.display = 'none'
           lifeLogConfigDiv.style.display = 'none'
+          popupSelectConfigDiv.style.display = 'none'
         }
       }
       ;(subtypeSelect as any).refreshForm = updateVisibility

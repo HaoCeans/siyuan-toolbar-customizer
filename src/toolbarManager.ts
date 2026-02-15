@@ -55,7 +55,7 @@ export interface ButtonConfig {
   targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
   mobileTargetDocId?: string; // 打开指定ID块：目标块ID（移动端），支持文档ID或块ID
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
-  authorToolSubtype?: 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary-bottom=日记底部, life-log=叶归LifeLog适配, popup-select=弹窗框选择输入
+  authorToolSubtype?: 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary-bottom=日记底部, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
   viewName?: string;         // 视图名称
@@ -1405,11 +1405,17 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
       return
     }
 
-    // 主工具栏按钮点击后立即移除焦点和背景色（避免"阴影"一直显示）
+    // 主工具栏按钮点击后立即移除焦点和背景色（避免“阴影”一直显示）
     button.blur()
     button.style.setProperty('background-color', 'transparent', 'important')
     button.style.setProperty('background', 'transparent', 'important')
-
+    
+    // 弹窗框模板选择特殊处理：立即恢复焦点，保持输入法不关闭
+    const isPopupSelect = config.type === 'author-tool' && config.authorToolSubtype === 'popup-select'
+    if (isPopupSelect && lastActiveElement && isInputOrEditable(lastActiveElement)) {
+      lastActiveElement.focus()
+    }
+    
     // 如果扩展工具栏已打开，先关闭它（其他按钮点击会关闭扩展工具栏）
     const existingLayers = document.querySelectorAll('.overflow-toolbar-layer')
     if (existingLayers.length > 0) {
@@ -1755,6 +1761,12 @@ function showOverflowToolbar(config: ButtonConfig) {
         // 关闭扩展工具栏
         document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove())
 
+        // 弹窗框模板选择特殊处理：在执行功能前先恢复焦点，保持输入法不关闭
+        const isPopupSelect = btn.type === 'author-tool' && btn.authorToolSubtype === 'popup-select'
+        if (isPopupSelect && lastActiveElement && isInputOrEditable(lastActiveElement)) {
+          lastActiveElement.focus()
+        }
+
         // 将保存的选区传递给处理函数（使用 await 保持 async 链条）
         await handleButtonClick(btn, savedSelection, lastActiveElement)
 
@@ -1818,7 +1830,7 @@ async function handleButtonClick(config: ButtonConfig, savedSelection: Range | n
     executeShortcut(config, savedSelection, lastActiveElement)
   } else if (config.type === 'author-tool') {
     // 执行鲸鱼定制工具箱
-    await executeAuthorTool(config)
+    await executeAuthorTool(config, savedSelection, lastActiveElement)
   } else if (config.type === 'quick-note') {
     // 执行一键记事功能
     await executeQuickNote(config)
@@ -1947,7 +1959,7 @@ function insertTemplate(config: ButtonConfig, savedSelection: Range | null = nul
  * - {{week}} - 星期几（中文）
  * - {{timestamp}} - Unix时间戳（毫秒）
  */
-function processTemplateVariables(template: string): string {
+export function processTemplateVariables(template: string): string {
   const now = new Date()
   
   // 格式化函数
@@ -2387,8 +2399,14 @@ async function executeDiaryBottom(config: ButtonConfig) {
 /**
  * 执行鲸鱼定制工具箱
  */
-async function executeAuthorTool(config: ButtonConfig) {
+async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
   const subtype = config.authorToolSubtype || 'open-doc'
+
+  // 弹窗框模板选择类型
+  if (subtype === 'popup-select') {
+    await executePopupSelect(config, savedSelection, lastActiveElement)
+    return
+  }
 
   // 日记底部类型
   if (subtype === 'diary-bottom') {
@@ -4871,12 +4889,17 @@ async function executePopupSelect(config: ButtonConfig, savedSelection: Range | 
 /**
  * 显示弹窗选择对话框
  */
-async function showPopupSelectDialog(templates: { name: string; content: string }[]): Promise<{ name: string; content: string } | null> {
+export async function showPopupSelectDialog(templates: { name: string; content: string }[]): Promise<{ name: string; content: string } | null> {
   return new Promise((resolve) => {
     // 保存当前焦点元素
     const activeElement = document.activeElement as HTMLElement;
     
-    // 创建遮罩
+    // 阻止焦点转移的通用处理器
+    const preventFocusLoss = (e: Event) => {
+      e.preventDefault();
+    };
+    
+    // 创建遮罩（居中显示，不挤占输入法区域）
     const overlay = document.createElement('div')
     overlay.style.cssText = `
       position: fixed;
@@ -4889,100 +4912,233 @@ async function showPopupSelectDialog(templates: { name: string; content: string 
       justify-content: center;
       align-items: center;
       z-index: 2147483647;
+      padding: 20px;
     `
     
     overlay.tabIndex = -1;
+    overlay.addEventListener('mousedown', preventFocusLoss);
+    overlay.addEventListener('touchstart', preventFocusLoss);
 
     // 创建对话框容器
     const dialog = document.createElement('div')
+    dialog.tabIndex = -1;
     dialog.style.cssText = `
       background: var(--b3-theme-background);
-      border-radius: 8px;
+      border-radius: 12px;
       padding: 20px;
-      min-width: 320px;
+      width: 320px;
       max-width: 90vw;
-      max-height: 70vh;
-      overflow-y: auto;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      max-height: 60vh;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
       display: flex;
       flex-direction: column;
-      gap: 12px;
     `
+    // 阻止 dialog 上的事件冒泡到 overlay 导致误关闭，但同样阻止焦点转移
+    dialog.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
 
     // 添加标题
     const title = document.createElement('div')
     title.textContent = '请选择模板'
     title.style.cssText = `
-      font-size: 16px;
+      font-size: 17px;
       font-weight: 600;
-      margin-bottom: 12px;
+      padding-bottom: 16px;
       color: var(--b3-theme-on-background);
       text-align: center;
+      border-bottom: 1px solid var(--b3-border-color);
+      flex-shrink: 0;
     `
     dialog.appendChild(title)
 
-    // 为每个模板创建按钮
-    templates.forEach(template => {
-      const button = document.createElement('button')
-      button.textContent = template.name
-      button.style.cssText = `
-        padding: 12px 16px;
-        border: 1px solid var(--b3-border-color);
-        border-radius: 4px;
-        background: var(--b3-theme-surface);
-        color: var(--b3-theme-on-surface);
-        font-size: 14px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-        text-align: left;
-      `
-      button.onmouseenter = () => {
-        button.style.backgroundColor = 'var(--b3-theme-primary-lightest)'
-      }
-      button.onmouseleave = () => {
-        button.style.backgroundColor = 'var(--b3-theme-surface)'
-      }
-      button.onclick = () => {
-        document.body.removeChild(overlay)
-        setTimeout(() => {
-          if (activeElement && document.contains(activeElement)) {
-            try {
-              activeElement.focus({ preventScroll: true });
-            } catch (e) {}
-          }
-          resolve(template)
-        }, 100)
-      }
-      dialog.appendChild(button)
-    })
-
-    // 添加取消按钮
-    const cancelButton = document.createElement('button')
-    cancelButton.textContent = '取消'
-    cancelButton.style.cssText = `
-      padding: 12px 16px;
-      border: 1px solid var(--b3-border-color);
-      border-radius: 4px;
-      background: var(--b3-theme-surface);
-      color: var(--b3-theme-on-surface);
-      font-size: 14px;
-      cursor: pointer;
-      margin-top: 12px;
+    // 创建按钮容器（可滚动）
+    const buttonContainer = document.createElement('div')
+    buttonContainer.style.cssText = `
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 16px 4px 8px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--b3-scroll-color) transparent;
     `
-    cancelButton.onclick = () => {
-      document.body.removeChild(overlay)
+    // Webkit 滚动条样式
+    const styleId = 'popup-select-scrollbar-style'
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style')
+      style.id = styleId
+      style.textContent = `
+        .popup-select-scroll::-webkit-scrollbar {
+          width: 6px;
+        }
+        .popup-select-scroll::-webkit-scrollbar-track {
+          background: transparent;
+          border-radius: 3px;
+        }
+        .popup-select-scroll::-webkit-scrollbar-thumb {
+          background: var(--b3-scroll-color);
+          border-radius: 3px;
+        }
+        .popup-select-scroll::-webkit-scrollbar-thumb:hover {
+          background: var(--b3-theme-on-surface-light);
+        }
+      `
+      document.head.appendChild(style)
+    }
+    buttonContainer.className = 'popup-select-scroll'
+
+    // 关闭弹窗并恢复焦点的通用函数
+    const closeAndResolve = (result: { name: string; content: string } | null) => {
+      if (overlay.parentNode) {
+        document.body.removeChild(overlay)
+      }
       setTimeout(() => {
         if (activeElement && document.contains(activeElement)) {
           try {
             activeElement.focus({ preventScroll: true });
           } catch (e) {}
         }
-        resolve(null)
+        resolve(result)
       }, 100)
     }
+
+    // 为每个模板创建按钮
+    templates.forEach(template => {
+      const button = document.createElement('button')
+      button.tabIndex = -1;
+      button.textContent = template.name
+      button.style.cssText = `
+        padding: 14px 16px;
+        border: 1px solid var(--b3-border-color);
+        border-radius: 8px;
+        background: var(--b3-theme-surface);
+        color: var(--b3-theme-on-surface);
+        font-size: 15px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: left;
+        flex-shrink: 0;
+      `
+      button.onmouseenter = () => {
+        button.style.backgroundColor = 'var(--b3-theme-primary-lightest)'
+        button.style.borderColor = 'var(--b3-theme-primary-light)'
+      }
+      button.onmouseleave = () => {
+        button.style.backgroundColor = 'var(--b3-theme-surface)'
+        button.style.borderColor = 'var(--b3-border-color)'
+      }
+      // 阻止 mousedown 导致的焦点转移（保持输入法状态）
+      button.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+      // 桌面端使用 click 事件
+      button.onclick = (e) => {
+        e.preventDefault();
+        closeAndResolve(template)
+      }
+      // 移动端滑动检测：记录起始位置
+      let touchStartY = 0;
+      let touchStartX = 0;
+      button.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+        if (e.touches.length > 0) {
+          touchStartY = e.touches[0].clientY;
+          touchStartX = e.touches[0].clientX;
+        }
+      }, { passive: true });
+      // 移动端：touchend 检测是否为滑动
+      button.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // 检测滑动距离，超过 10px 认为是滑动，不触发点击
+        if (e.changedTouches.length > 0) {
+          const touchEndY = e.changedTouches[0].clientY;
+          const touchEndX = e.changedTouches[0].clientX;
+          const deltaY = Math.abs(touchEndY - touchStartY);
+          const deltaX = Math.abs(touchEndX - touchStartX);
+          if (deltaY > 10 || deltaX > 10) {
+            return; // 是滑动，不触发点击
+          }
+        }
+        closeAndResolve(template);
+      });
+      buttonContainer.appendChild(button)
+    })
+    
+    dialog.appendChild(buttonContainer)
+
+    // 添加取消按钮（底部固定）
+    const cancelButton = document.createElement('button')
+    cancelButton.tabIndex = -1;
+    cancelButton.textContent = '取消'
+    cancelButton.style.cssText = `
+      padding: 12px 16px;
+      border: none;
+      border-radius: 8px;
+      background: var(--b3-theme-surface);
+      color: var(--b3-theme-on-surface-light);
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 12px;
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+    `
+    cancelButton.onmouseenter = () => {
+      cancelButton.style.backgroundColor = 'var(--b3-theme-error-lighter)'
+      cancelButton.style.color = 'var(--b3-theme-error)'
+    }
+    cancelButton.onmouseleave = () => {
+      cancelButton.style.backgroundColor = 'var(--b3-theme-surface)'
+      cancelButton.style.color = 'var(--b3-theme-on-surface-light)'
+    }
+    // 阻止 mousedown 导致的焦点转移（保持输入法状态）
+    cancelButton.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    // 桌面端使用 click 事件
+    cancelButton.onclick = (e) => {
+      e.preventDefault();
+      closeAndResolve(null)
+    }
+    // 移动端滑动检测：记录起始位置
+    let cancelTouchStartY = 0;
+    let cancelTouchStartX = 0;
+    cancelButton.addEventListener('touchstart', (e) => {
+      e.stopPropagation();
+      if (e.touches.length > 0) {
+        cancelTouchStartY = e.touches[0].clientY;
+        cancelTouchStartX = e.touches[0].clientX;
+      }
+    }, { passive: true });
+    // 移动端：touchend 检测是否为滑动
+    cancelButton.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // 检测滑动距离，超过 10px 认为是滑动，不触发点击
+      if (e.changedTouches.length > 0) {
+        const touchEndY = e.changedTouches[0].clientY;
+        const touchEndX = e.changedTouches[0].clientX;
+        const deltaY = Math.abs(touchEndY - cancelTouchStartY);
+        const deltaX = Math.abs(touchEndX - cancelTouchStartX);
+        if (deltaY > 10 || deltaX > 10) {
+          return; // 是滑动，不触发点击
+        }
+      }
+      closeAndResolve(null);
+    });
     dialog.appendChild(cancelButton)
 
     overlay.appendChild(dialog)
     document.body.appendChild(overlay)
+    
+    // 关键：弹窗显示后立即恢复焦点，保持输入法不关闭
+    if (activeElement && document.contains(activeElement)) {
+      try {
+        activeElement.focus({ preventScroll: true });
+      } catch (e) {}
+    }
   })
 }

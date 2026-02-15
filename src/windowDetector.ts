@@ -1,4 +1,4 @@
-import { isMobileDevice, pluginInstance, setPluginInstance } from './toolbarManager';
+import { isMobileDevice, pluginInstance, setPluginInstance, showPopupSelectDialog, processTemplateVariables } from './toolbarManager';
 import { appendBlock } from './api';
 
 // 存储当前的事件监听器，以便可以移除
@@ -382,6 +382,9 @@ function copyBottomToolbarButtons(container: HTMLElement) {
       // 创建按钮副本
       const clonedBtn = document.createElement('button');
       
+      // 防止按钮获取焦点，保持输入法不关闭
+      clonedBtn.tabIndex = -1;
+      
       // 设置按钮基本样式
       clonedBtn.style.cssText = `
         min-width: 36px;
@@ -443,6 +446,22 @@ function copyBottomToolbarButtons(container: HTMLElement) {
         clonedBtn.style.backgroundColor = 'white';
         clonedBtn.style.transform = 'translateY(0)';
         clonedBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+      });
+      
+      // 阻止 mousedown 导致的焦点转移（保持输入法状态）
+      clonedBtn.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+      });
+      
+      // 移动端：不能对 touchstart 调用 preventDefault（会阻止 click）
+      // 改用 touchend 作为备用触发方式
+      let touchHandled = false;
+      clonedBtn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        if (touchHandled) return;
+        touchHandled = true;
+        setTimeout(() => { touchHandled = false; }, 100);
+        clonedBtn.click(); // 触发 click 事件
       });
       
       // 添加点击事件
@@ -514,6 +533,37 @@ function copyBottomToolbarButtons(container: HTMLElement) {
             }
             
             // template类型按钮不关闭弹窗，直接返回
+            return;
+          }
+          
+          // 特殊处理：author-tool + popup-select 类型按钮
+          if (buttonConfig.type === 'author-tool' && buttonConfig.authorToolSubtype === 'popup-select') {
+            const templates = buttonConfig.popupSelectTemplates || [];
+            if (templates.length === 0) {
+              return;
+            }
+            
+            const selectedTemplate = await showPopupSelectDialog(templates);
+            
+            if (selectedTemplate) {
+              const noteDialog = document.getElementById('quick-note-dialog');
+              const textarea = noteDialog?.querySelector('textarea');
+              
+              if (textarea) {
+                const processedContent = processTemplateVariables(selectedTemplate.content);
+                const input = textarea as HTMLTextAreaElement;
+                const startPos = input.selectionStart || input.value.length;
+                const endPos = input.selectionEnd || input.value.length;
+                
+                input.value = input.value.substring(0, startPos) + processedContent + input.value.substring(endPos);
+                
+                const newCursorPos = startPos + processedContent.length;
+                input.setSelectionRange(newCursorPos, newCursorPos);
+                input.focus();
+              }
+            }
+            
+            // 不关闭弹窗，直接返回
             return;
           }
           

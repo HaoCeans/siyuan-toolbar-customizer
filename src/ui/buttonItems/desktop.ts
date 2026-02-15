@@ -656,7 +656,7 @@ export function createDesktopButtonItem(
       <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库悬浮弹窗</option>
       <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
       <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>④ 叶归LifeLog适配</option>
-      <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑤ 弹窗框选择输入</option>
+      <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑤ 弹窗框模板选择</option>
     `
     subtypeSelect.onchange = () => {
       button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select'
@@ -791,6 +791,85 @@ export function createDesktopButtonItem(
     lifeLogConfigDiv.appendChild(categoriesHint)
 
     authorToolField.appendChild(lifeLogConfigDiv)
+
+    // 弹窗框模板选择配置区
+    const popupSelectConfigDiv = document.createElement('div')
+    popupSelectConfigDiv.id = 'popup-select-config'
+    popupSelectConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+    const popupSelectTitle = document.createElement('label')
+    popupSelectTitle.textContent = '📋 模板列表'
+    popupSelectTitle.style.cssText = 'font-size: 13px; font-weight: 500;'
+    popupSelectConfigDiv.appendChild(popupSelectTitle)
+
+    const popupSelectHint = document.createElement('div')
+    popupSelectHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+    popupSelectHint.textContent = '💡 左边填模板名称（显示在弹窗上），右边填插入的模板内容'
+    popupSelectConfigDiv.appendChild(popupSelectHint)
+
+    const popupSelectRowsContainer = document.createElement('div')
+    popupSelectRowsContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
+    popupSelectConfigDiv.appendChild(popupSelectRowsContainer)
+
+    // 初始化模板数据
+    if (!button.popupSelectTemplates || button.popupSelectTemplates.length === 0) {
+      button.popupSelectTemplates = [
+        { name: '', content: '' },
+        { name: '', content: '' },
+        { name: '', content: '' }
+      ]
+    }
+
+    const renderPopupSelectRows = () => {
+      popupSelectRowsContainer.innerHTML = ''
+      button.popupSelectTemplates!.forEach((tpl, idx) => {
+        const row = document.createElement('div')
+        row.style.cssText = 'display: flex; align-items: center; gap: 6px;'
+
+        const nameInput = document.createElement('input')
+        nameInput.type = 'text'
+        nameInput.className = 'b3-text-field'
+        nameInput.placeholder = '模板名称'
+        nameInput.value = tpl.name
+        nameInput.style.cssText = 'font-size: 13px; flex: 1; min-width: 0;'
+        nameInput.onchange = () => { button.popupSelectTemplates![idx].name = nameInput.value }
+
+        const contentInput = document.createElement('input')
+        contentInput.type = 'text'
+        contentInput.className = 'b3-text-field'
+        contentInput.placeholder = '模板内容'
+        contentInput.value = tpl.content
+        contentInput.style.cssText = 'font-size: 13px; flex: 2; min-width: 0;'
+        contentInput.onchange = () => { button.popupSelectTemplates![idx].content = contentInput.value }
+
+        const deleteBtn = document.createElement('button')
+        deleteBtn.textContent = '✕'
+        deleteBtn.style.cssText = 'padding: 4px 8px; border: 1px solid var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 12px; flex-shrink: 0;'
+        deleteBtn.onclick = () => {
+          if (button.popupSelectTemplates!.length > 1) {
+            button.popupSelectTemplates!.splice(idx, 1)
+            renderPopupSelectRows()
+          }
+        }
+
+        row.appendChild(nameInput)
+        row.appendChild(contentInput)
+        row.appendChild(deleteBtn)
+        popupSelectRowsContainer.appendChild(row)
+      })
+    }
+    renderPopupSelectRows()
+
+    const addRowBtn = document.createElement('button')
+    addRowBtn.textContent = '+ 添加模板'
+    addRowBtn.style.cssText = 'padding: 6px 12px; border: 1px dashed var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 13px; align-self: flex-start;'
+    addRowBtn.onclick = () => {
+      button.popupSelectTemplates!.push({ name: '', content: '' })
+      renderPopupSelectRows()
+    }
+    popupSelectConfigDiv.appendChild(addRowBtn)
+
+    authorToolField.appendChild(popupSelectConfigDiv)
 
     // 数据库块ID
     const dbBlockIdLabel = document.createElement('label')
@@ -1361,7 +1440,7 @@ export function populateDesktopEditForm(
       <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库悬浮弹窗</option>
       <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
       <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>④ 叶归LifeLog适配</option>
-      <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑤ 弹窗框选择输入</option>
+      <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑤ 弹窗框模板选择</option>
     `
     subtypeSelect.onchange = () => {
       button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select'
@@ -1677,6 +1756,84 @@ export function populateDesktopEditForm(
 
     authorToolField.appendChild(lifeLogConfigDiv)
 
+    // 弹窗框模板选择配置区
+    const popupSelectConfigDiv = document.createElement('div')
+    popupSelectConfigDiv.id = 'popup-select-config-2'
+    popupSelectConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+    const popupSelectTitle2 = document.createElement('label')
+    popupSelectTitle2.textContent = '📋 模板列表'
+    popupSelectTitle2.style.cssText = 'font-size: 13px; font-weight: 500;'
+    popupSelectConfigDiv.appendChild(popupSelectTitle2)
+
+    const popupSelectHint2 = document.createElement('div')
+    popupSelectHint2.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+    popupSelectHint2.textContent = '💡 左边填模板名称（显示在弹窗上），右边填插入的模板内容'
+    popupSelectConfigDiv.appendChild(popupSelectHint2)
+
+    const popupSelectRowsContainer2 = document.createElement('div')
+    popupSelectRowsContainer2.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
+    popupSelectConfigDiv.appendChild(popupSelectRowsContainer2)
+
+    if (!button.popupSelectTemplates || button.popupSelectTemplates.length === 0) {
+      button.popupSelectTemplates = [
+        { name: '', content: '' },
+        { name: '', content: '' },
+        { name: '', content: '' }
+      ]
+    }
+
+    const renderPopupSelectRows2 = () => {
+      popupSelectRowsContainer2.innerHTML = ''
+      button.popupSelectTemplates!.forEach((tpl, idx) => {
+        const row = document.createElement('div')
+        row.style.cssText = 'display: flex; align-items: center; gap: 6px;'
+
+        const nameInput = document.createElement('input')
+        nameInput.type = 'text'
+        nameInput.className = 'b3-text-field'
+        nameInput.placeholder = '模板名称'
+        nameInput.value = tpl.name
+        nameInput.style.cssText = 'font-size: 13px; flex: 1; min-width: 0;'
+        nameInput.onchange = () => { button.popupSelectTemplates![idx].name = nameInput.value }
+
+        const contentInput = document.createElement('input')
+        contentInput.type = 'text'
+        contentInput.className = 'b3-text-field'
+        contentInput.placeholder = '模板内容'
+        contentInput.value = tpl.content
+        contentInput.style.cssText = 'font-size: 13px; flex: 2; min-width: 0;'
+        contentInput.onchange = () => { button.popupSelectTemplates![idx].content = contentInput.value }
+
+        const deleteBtn = document.createElement('button')
+        deleteBtn.textContent = '✕'
+        deleteBtn.style.cssText = 'padding: 4px 8px; border: 1px solid var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 12px; flex-shrink: 0;'
+        deleteBtn.onclick = () => {
+          if (button.popupSelectTemplates!.length > 1) {
+            button.popupSelectTemplates!.splice(idx, 1)
+            renderPopupSelectRows2()
+          }
+        }
+
+        row.appendChild(nameInput)
+        row.appendChild(contentInput)
+        row.appendChild(deleteBtn)
+        popupSelectRowsContainer2.appendChild(row)
+      })
+    }
+    renderPopupSelectRows2()
+
+    const addRowBtn2 = document.createElement('button')
+    addRowBtn2.textContent = '+ 添加模板'
+    addRowBtn2.style.cssText = 'padding: 6px 12px; border: 1px dashed var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 13px; align-self: flex-start;'
+    addRowBtn2.onclick = () => {
+      button.popupSelectTemplates!.push({ name: '', content: '' })
+      renderPopupSelectRows2()
+    }
+    popupSelectConfigDiv.appendChild(addRowBtn2)
+
+    authorToolField.appendChild(popupSelectConfigDiv)
+
     // 根据当前选择显示/隐藏配置区
     const updateVisibility = () => {
       const subtype = subtypeSelect.value
@@ -1685,11 +1842,13 @@ export function populateDesktopEditForm(
         dbConfigDiv.style.display = 'flex'
         diaryConfigDiv.style.display = 'none'
         lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
       } else if (subtype === 'diary-bottom') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'flex'
         lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
       } else if (subtype === 'life-log') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'

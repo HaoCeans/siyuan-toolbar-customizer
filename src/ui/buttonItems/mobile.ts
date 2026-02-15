@@ -365,9 +365,10 @@ export function createMobileButtonItem(
   infoDiv.style.cssText = 'flex: 1; min-width: 0;'
   const typeLabels: Record<string, string> = {
     'builtin': '①思源内置功能【简单】',
-    'template': '①手写模板插入【简单】',
-    'shortcut': '②电脑端快捷键【简单】',
-    'click-sequence': '③自动化模拟点击【难】',
+    'template': '②手写模板插入【简单】',
+    'shortcut': '③电脑端快捷键【简单】',
+    'click-sequence': '④自动化模拟点击【难】',
+    'quick-note': '⑤一键记事【简单】',
     'author-tool': '⑥鲸鱼定制工具箱'
   }
   const typeLabel = typeLabels[button.type] || button.type
@@ -538,7 +539,8 @@ export function createMobileButtonItem(
       { value: 'builtin', label: '①思源内置功能【简单】' },
       { value: 'template', label: '②手写模板插入【简单】' },
       { value: 'shortcut', label: '③电脑端快捷键【简单】' },
-      { value: 'click-sequence', label: '④自动化模拟点击【难】' }
+      { value: 'click-sequence', label: '④自动化模拟点击【难】' },
+      { value: 'quick-note', label: '⑤一键记事【简单】' }
     ]
     if (context.isAuthorToolActivated()) {
       typeOptions.push({ value: 'author-tool', label: '⑥鲸鱼定制工具箱' })
@@ -692,7 +694,7 @@ export function createMobileButtonItem(
       // 绑定"查看常用ID（部分）"链接点击事件
       const link = hint.querySelector('#view-common-ids-link')
       if (link) {
-        link.onclick = (e) => {
+        (link as HTMLElement).onclick = (e) => {
           e.preventDefault()
           setTimeout(() => {
             const settingItems = Array.from(document.querySelectorAll('.b3-label'))
@@ -778,26 +780,27 @@ export function createMobileButtonItem(
       subtypeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
       const currentSubtype = button.authorToolSubtype || 'open-doc'
       subtypeSelect.innerHTML = `
-        <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>① 打开指定ID文档</option>
+        <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>① 打开指定ID块</option>
         <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库悬浮弹窗</option>
         <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
+        <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>④ 叶归LifeLog适配</option>
       `
       subtypeSelect.onchange = () => {
-        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom'
+        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log'
         ;(subtypeSelect as any).refreshForm?.()
       }
       authorToolContainer.appendChild(subtypeSelect)
 
-      // 打开指定ID文档配置区
+      // 打开指定ID块配置区
       const docConfigDiv = document.createElement('div')
       docConfigDiv.id = 'open-doc-config-mobile'
 
-      docConfigDiv.appendChild(createInputField('📄 目标文档ID', button.targetDocId || '', '如: 20251215234003-j3i7wjc', (v) => { button.targetDocId = v }))
+      docConfigDiv.appendChild(createInputField('📱 目标块ID', button.mobileTargetDocId || '', '如: 20251215234003-j3i7wjc 或 20251215234003-j3i7wjc-a1b2c3', (v) => { button.mobileTargetDocId = v }))
 
       // 添加提示
       const docHint = document.createElement('div')
       docHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: 4px;'
-      docHint.textContent = '💡 点击按钮后自动打开指定ID的文档'
+      docHint.textContent = '💡 支持文档ID（打开文档）或块ID（打开文档并定位到该块）'
       docConfigDiv.appendChild(docHint)
 
       authorToolContainer.appendChild(docConfigDiv)
@@ -855,6 +858,55 @@ export function createMobileButtonItem(
 
       authorToolContainer.appendChild(dbConfigDiv)
 
+      // 叶归LifeLog适配配置区
+      const lifeLogConfigDiv = document.createElement('div')
+      lifeLogConfigDiv.id = 'life-log-config-mobile'
+      lifeLogConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+      
+      // 笔记本ID输入
+      const notebookIdLabel = document.createElement('label')
+      notebookIdLabel.textContent = '📚 笔记本ID'
+      notebookIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      lifeLogConfigDiv.appendChild(notebookIdLabel)
+      
+      const notebookIdInput = document.createElement('input')
+      notebookIdInput.type = 'text'
+      notebookIdInput.className = 'b3-text-field'
+      notebookIdInput.placeholder = '请输入笔记本ID，如：20250101000000-aaaaaa'
+      notebookIdInput.value = button.lifeLogNotebookId || ''
+      notebookIdInput.style.cssText = 'font-size: 13px;'
+      notebookIdInput.onchange = () => { button.lifeLogNotebookId = notebookIdInput.value }
+      lifeLogConfigDiv.appendChild(notebookIdInput)
+      
+      const notebookIdHint = document.createElement('div')
+      notebookIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+      notebookIdHint.textContent = '💡 指定内容将要追加到的笔记本ID，不能为空'
+      lifeLogConfigDiv.appendChild(notebookIdHint)
+      
+      // 分类选项输入
+      const categoriesLabel = document.createElement('label')
+      categoriesLabel.textContent = '📝 分类选项（每行一个）'
+      categoriesLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
+      lifeLogConfigDiv.appendChild(categoriesLabel)
+
+      const categoriesTextarea = document.createElement('textarea')
+      categoriesTextarea.className = 'b3-text-field'
+      categoriesTextarea.value = button.lifeLogCategories?.join('\n') || '学习\n工作\n生活'
+      categoriesTextarea.placeholder = '每行输入一个分类，例如：\n学习\n工作\n生活'
+      categoriesTextarea.rows = 4
+      categoriesTextarea.style.cssText = 'font-size: 13px; resize: vertical; min-height: 100px;'
+      categoriesTextarea.onchange = () => { 
+        button.lifeLogCategories = categoriesTextarea.value.split('\n').map(cat => cat.trim()).filter(cat => cat)
+      }
+      lifeLogConfigDiv.appendChild(categoriesTextarea)
+
+      const categoriesHint = document.createElement('div')
+      categoriesHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+      categoriesHint.textContent = '💡 每行输入一个分类选项，点击按钮后会弹出选择对话框'
+      lifeLogConfigDiv.appendChild(categoriesHint)
+
+      authorToolContainer.appendChild(lifeLogConfigDiv)
+
       // 日记底部配置区（说明 + 等待时间配置）
       const diaryConfigDiv = document.createElement('div')
       diaryConfigDiv.id = 'diary-config-mobile'
@@ -907,20 +959,207 @@ export function createMobileButtonItem(
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'flex'
           diaryConfigDiv.style.display = 'none'
+          lifeLogConfigDiv.style.display = 'none'
         } else if (subtype === 'diary-bottom') {
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
           diaryConfigDiv.style.display = 'flex'
+          lifeLogConfigDiv.style.display = 'none'
+        } else if (subtype === 'life-log') {
+          docConfigDiv.style.display = 'none'
+          dbConfigDiv.style.display = 'none'
+          diaryConfigDiv.style.display = 'none'
+          lifeLogConfigDiv.style.display = 'flex'
         } else {
           docConfigDiv.style.display = 'flex'
           dbConfigDiv.style.display = 'none'
           diaryConfigDiv.style.display = 'none'
+          lifeLogConfigDiv.style.display = 'none'
         }
       }
-      subtypeSelect.refreshForm = updateVisibility
+      ;(subtypeSelect as any).refreshForm = updateVisibility
       updateVisibility()
 
       typeFieldsContainer.appendChild(authorToolContainer)
+    } else if (button.type === 'quick-note') {
+      // 一键记事配置（单选模式）
+      const quickNoteContainer = document.createElement('div');
+      quickNoteContainer.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 12px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.08)); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px;';
+
+      const header = document.createElement('div');
+      header.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+      header.innerHTML = '<span style="font-size: 16px;">📝</span><span style="font-weight: 600; color: #3b82f6;">一键记事配置</span>';
+      quickNoteContainer.appendChild(header);
+
+      const desc = document.createElement('div');
+      desc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light);';
+      desc.textContent = '选择保存方式并配置目标ID，点击按钮后直接进入记事编辑界面。';
+      quickNoteContainer.appendChild(desc);
+
+      // 保存方式选择
+      const saveTypeLabel = document.createElement('label');
+      saveTypeLabel.textContent = '💾 保存方式选择';
+      saveTypeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;';
+      quickNoteContainer.appendChild(saveTypeLabel);
+
+      // 单选按钮组
+      const radioContainer = document.createElement('div');
+      radioContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px; margin-top: 4px;';
+
+      const options = [
+        { value: 'daily', label: '📘 保存到笔记本日记', description: '内容保存到指定笔记本的当日日记' },
+        { value: 'document', label: '📄 追加到指定文档', description: '内容直接追加到指定文档底部' }
+      ];
+
+      // 获取当前配置
+      const currentSaveType = button.quickNoteSaveType || 'daily';
+
+      options.forEach(option => {
+        const optionDiv = document.createElement('div');
+        optionDiv.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--b3-border-color); border-radius: 6px; cursor: pointer;';
+
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'quickNoteSaveType';
+        radio.value = option.value;
+        radio.checked = currentSaveType === option.value;
+        radio.style.cssText = 'transform: scale(1.2);';
+
+        const labelDiv = document.createElement('div');
+        labelDiv.style.cssText = 'flex: 1;';
+
+        const label = document.createElement('div');
+        label.textContent = option.label;
+        label.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);';
+
+        const desc = document.createElement('div');
+        desc.textContent = option.description;
+        desc.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: 2px;';
+
+        // 点击事件处理
+        optionDiv.onclick = () => {
+          // 清除其他选中状态
+          const allRadios = radioContainer.querySelectorAll('input[type="radio"]');
+          allRadios.forEach(r => (r as HTMLInputElement).checked = false);
+          
+          // 清除所有选项的选中样式 - 使用更准确的选择器
+          const allOptionDivs = radioContainer.children;
+          for (let i = 0; i < allOptionDivs.length; i++) {
+            const div = allOptionDivs[i] as HTMLElement;
+            if (div !== optionDiv) { // 排除当前点击的选项
+              div.style.borderColor = 'var(--b3-border-color)';
+              div.style.backgroundColor = 'transparent';
+            }
+          }
+          
+          // 选中当前项
+          radio.checked = true;
+          button.quickNoteSaveType = option.value as 'daily' | 'document';
+          
+          // 设置当前选项的选中样式
+          optionDiv.style.borderColor = 'var(--b3-theme-primary)';
+          optionDiv.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+          
+          // 更新ID输入框提示
+          updateIdInputPlaceholder();
+        };
+
+        // 默认选中样式
+        if (radio.checked) {
+          optionDiv.style.borderColor = 'var(--b3-theme-primary)';
+          optionDiv.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+        }
+
+        labelDiv.appendChild(label);
+        labelDiv.appendChild(desc);
+        optionDiv.appendChild(radio);
+        optionDiv.appendChild(labelDiv);
+        radioContainer.appendChild(optionDiv);
+      });
+
+      quickNoteContainer.appendChild(radioContainer);
+
+      // 统一的ID输入框
+      const idLabel = document.createElement('label');
+      idLabel.id = 'quick-note-id-label';
+      idLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 12px;';
+      quickNoteContainer.appendChild(idLabel);
+
+      const idInput = document.createElement('input');
+      idInput.type = 'text';
+      idInput.className = 'b3-text-field';
+      idInput.id = 'quick-note-id-input';
+      idInput.style.cssText = 'font-size: 13px;';
+
+      // 根据选择类型更新输入框
+      function updateIdInputPlaceholder() {
+        const saveType = button.quickNoteSaveType || 'daily';
+        const idLabel = quickNoteContainer.querySelector('#quick-note-id-label') as HTMLLabelElement;
+        const idInput = quickNoteContainer.querySelector('#quick-note-id-input') as HTMLInputElement;
+        
+        // 添加空值检查
+        if (!idLabel || !idInput) {
+          console.warn('一键记事配置元素未找到，跳过更新');
+          return;
+        }
+        
+        if (saveType === 'document') {
+          idLabel.textContent = '📄 目标文档ID';
+          idInput.placeholder = '请输入文档ID，如：20250101000000-aaaaaa';
+          idInput.value = button.quickNoteDocumentId || '';
+        } else {
+          idLabel.textContent = '📘 目标笔记本ID';
+          idInput.placeholder = '请输入笔记本ID，如：20250101000000-aaaaaa';
+          idInput.value = button.quickNoteNotebookId || '';
+        }
+      }
+
+      // 初始化显示
+      updateIdInputPlaceholder();
+
+      idInput.onchange = () => {
+        const saveType = button.quickNoteSaveType || 'daily';
+        const value = idInput.value.trim();
+        
+        if (saveType === 'document') {
+          button.quickNoteDocumentId = value;
+          // 清空笔记本ID避免混淆
+          button.quickNoteNotebookId = '';
+        } else {
+          button.quickNoteNotebookId = value;
+          // 清空文档ID避免混淆
+          button.quickNoteDocumentId = '';
+        }
+      };
+
+      quickNoteContainer.appendChild(idInput);
+
+      const idHint = document.createElement('div');
+      idHint.id = 'quick-note-id-hint';
+      idHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: 4px;';
+      quickNoteContainer.appendChild(idHint);
+
+      // 更新提示文字
+      function updateIdHint() {
+        const saveType = button.quickNoteSaveType || 'daily';
+        const idHint = quickNoteContainer.querySelector('#quick-note-id-hint') as HTMLDivElement;
+        
+        // 添加空值检查
+        if (!idHint) {
+          console.warn('一键记事提示元素未找到，跳过更新');
+          return;
+        }
+        
+        if (saveType === 'document') {
+          idHint.textContent = '💡 内容将直接追加到该文档底部';
+        } else {
+          idHint.textContent = '💡 内容将保存到该笔记本的当日日记中';
+        }
+      }
+
+      updateIdHint();
+
+      typeFieldsContainer.appendChild(quickNoteContainer);
     }
   }
 

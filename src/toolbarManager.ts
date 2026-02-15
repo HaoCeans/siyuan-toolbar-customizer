@@ -3,9 +3,20 @@
  * 负责移动端工具栏调整和自定义按钮功能
  */
 
-import { Dialog, fetchSyncPost, getFrontend, showMessage } from "siyuan";
+import { Dialog, fetchSyncPost, getFrontend, showMessage, openTab as siyuanOpenTab } from "siyuan";
 // 通知模块
 import * as Notify from "./notification";
+import { openTab as stressThresholdOpenTab } from "siyuan";
+
+// ===== 插件实例（用于需要 app 参数的 API 调用） =====
+export let pluginInstance: any = null;
+
+/**
+ * 设置插件实例（在插件初始化时调用）
+ */
+export function setPluginInstance(plugin: any): void {
+  pluginInstance = plugin;
+}
 
 // ===== 配置接口 =====
 export interface MobileToolbarConfig {
@@ -36,14 +47,15 @@ export interface MobileToolbarConfig {
 export interface ButtonConfig {
   id: string;                 // 唯一标识
   name: string;              // 按钮名称
-  type: 'builtin' | 'template' | 'click-sequence' | 'shortcut' | 'author-tool'; // 功能类型
+  type: 'builtin' | 'template' | 'click-sequence' | 'shortcut' | 'author-tool' | 'quick-note'; // 功能类型
   builtinId?: string;        // 思源功能ID（如：menuSearch）
   template?: string;         // 模板内容
   clickSequence?: string[];  // 模拟点击选择器序列
   shortcutKey?: string;      // 快捷键组合
-  targetDocId?: string;      // 打开指定ID文档：目标文档ID
+  targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
+  mobileTargetDocId?: string; // 打开指定ID块：目标块ID（移动端），支持文档ID或块ID
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
-  authorToolSubtype?: 'open-doc' | 'database' | 'diary-bottom'; // 作者工具子类型：open-doc=打开指定ID文档, database=数据库悬浮弹窗, diary-bottom=日记底部
+  authorToolSubtype?: 'open-doc' | 'database' | 'diary-bottom' | 'life-log'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary-bottom=日记底部, life-log=叶归LifeLog适配
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
   viewName?: string;         // 视图名称
@@ -55,6 +67,14 @@ export interface ButtonConfig {
   showColumns?: string[];    // 要显示的列名数组
   timeRangeColumnName?: string; // 时间段列的名称
   diaryWaitTime?: number;     // 日记底部功能：移动端等待时间（毫秒，默认 1000）
+  lifeLogCategories?: string[]; // 叶归LifeLog适配：分类选项列表
+  lifeLogNotebookId?: string; // 叶归LifeLog适配：目标笔记本ID
+  cardContainerHeight?: string; // 卡片模式容器高度
+  cardScrollMaxHeight?: string; // 卡片模式滚动容器最大高度
+  // 一键记事配置
+  quickNoteNotebookId?: string; // 一键记事：目标笔记本ID
+  quickNoteDocumentId?: string; // 一键记事：目标文档ID
+  quickNoteSaveType?: 'daily' | 'document'; // 一键记事：保存方式（新增）
   icon: string;              // 图标（思源图标或Emoji）
   iconSize: number;          // 图标大小（px）
   minWidth: number;          // 按钮最小宽度（px）
@@ -69,18 +89,33 @@ export interface ButtonConfig {
 
 // 全局按钮配置（用于批量设置所有按钮的默认值）
 export interface GlobalButtonConfig {
+  enabled: boolean           // 是否启用全局配置批量应用（默认true，保持向后兼容）
   iconSize: number;          // 图标大小（px）
   minWidth: number;          // 按钮最小宽度（px）
   marginRight: number;       // 右侧边距（px）
   showNotification: boolean; // 是否显示右上角提示
 }
 
-export const DEFAULT_GLOBAL_BUTTON_CONFIG: GlobalButtonConfig = {
-  iconSize: 20,
-  minWidth: 20,
-  marginRight: 15,
+// 桌面端全局按钮默认值
+export const DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG: GlobalButtonConfig = {
+  enabled: true,
+  iconSize: 18,
+  minWidth: 32,
+  marginRight: 8,
   showNotification: true
 }
+
+// 手机端全局按钮默认值
+export const DEFAULT_MOBILE_GLOBAL_BUTTON_CONFIG: GlobalButtonConfig = {
+  enabled: true,
+  iconSize: 23,
+  minWidth: 23,
+  marginRight: 10,
+  showNotification: true
+}
+
+// 兼容性：保留旧的导出名称（默认为桌面端）
+export const DEFAULT_GLOBAL_BUTTON_CONFIG = DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG
 
 // ===== 默认配置 =====
 export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
@@ -151,7 +186,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
     id: 'plugin-settings-desktop',
     name: '插件设置',
     type: 'click-sequence',
-    clickSequence: ['barPlugins', 'text:工具栏定制器'],
+    clickSequence: ['barPlugins', 'text:思源手机端增强'],
     icon: '⚙️',
     iconSize: 18,
     minWidth: 32,
@@ -209,9 +244,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'builtin',
     builtinId: 'overflow',
     icon: '⋯',
-    iconSize: 20,
-    minWidth: 20,
-    marginRight: 15,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 0,
     platform: 'mobile',
     showNotification: true,
@@ -223,9 +258,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'builtin',
     builtinId: 'more',
     icon: '✨',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 1,
     platform: 'mobile',
     showNotification: true
@@ -236,9 +271,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'builtin',
     builtinId: 'doc',
     icon: '🧩',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 2,
     platform: 'mobile',
     showNotification: true
@@ -249,9 +284,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'builtin',
     builtinId: 'readonly',
     icon: '🔒',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 3,
     platform: 'mobile',
     showNotification: true
@@ -260,11 +295,11 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     id: 'plugin-settings-mobile',
     name: '插件设置',
     type: 'click-sequence',
-    clickSequence: ['toolbarMore', 'menuPlugin', 'text:工具栏定制器'],
+    clickSequence: ['toolbarMore', 'menuPlugin', 'text:思源手机端增强'],
     icon: '⚙️',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 4,
     platform: 'mobile',
     showNotification: true
@@ -275,9 +310,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'shortcut',
     shortcutKey: 'Alt+5',
     icon: '🗓️',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 5,
     platform: 'mobile',
     showNotification: true
@@ -288,9 +323,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'template',
     template: '{{hour}}时{{minute}}分',
     icon: '⏰',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 6,
     platform: 'mobile',
     showNotification: true
@@ -301,9 +336,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     type: 'builtin',
     builtinId: 'menuSearch',
     icon: '🔎',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
     sort: 7,
     platform: 'mobile',
     showNotification: true
@@ -317,13 +352,25 @@ let mutationObserver: MutationObserver | null = null
 let pageObserver: MutationObserver | null = null  // 用于检测页面变化的观察器
 let mobileToolbarClickHandler: ((e: Event) => void) | null = null  // 专门用于移动端工具栏的点击处理
 let customButtonClickHandler: ((e: Event) => void) | null = null  // 专门用于自定义按钮的点击处理
-let activeTimers: Set<number> = new Set()  // 跟踪所有活动的定时器
+let activeTimers: Set<ReturnType<typeof setTimeout>> = new Set()  // 跟踪所有活动的定时器
 let focusEventHandlers: Array<{ element: HTMLElement; focusHandler: () => void; blurHandler: () => void }> = []  // 跟踪焦点事件监听器以便清理
+
+// 导出工具栏管理器对象
+export const toolbarManager = {
+  executeButton: async (config: ButtonConfig) => {
+    await handleButtonClick(config);
+  }
+};
+
+// 在初始化时设置全局变量
+export function setGlobalToolbarManager() {
+  (window as any).__toolbarManager = toolbarManager;
+}
 
 /**
  * 安全的 setTimeout，返回的定时器会被跟踪以便清理
  */
-function safeSetTimeout(callback: () => void, delay: number): number {
+function safeSetTimeout(callback: () => void, delay: number): ReturnType<typeof setTimeout> {
   const timerId = setTimeout(() => {
     activeTimers.delete(timerId)
     callback()
@@ -363,6 +410,8 @@ export function getBottomToolbarWidth(): number {
   return rect.width
 }
 
+
+
 /**
  * 获取底部工具栏内可用宽度（排除内边距和固定元素）
  * @returns 可用宽度（px）
@@ -390,7 +439,7 @@ export function getToolbarAvailableWidth(): number {
  * @param button 按钮配置
  * @returns 占用宽度（px）
  */
-function getButtonWidth(button: ButtonConfig): number {
+export function getButtonWidth(button: ButtonConfig): number {
   // 主工具栏按钮的宽度计算（与 createButtonElement 的样式保持一致）
   // CSS: min-width + padding(0 8px = 16px) + margin-right
   const paddingX = 16 // padding: 0 8px (左右各 8px)
@@ -490,7 +539,11 @@ export function calculateButtonOverflow(buttons: ButtonConfig[], overflowToolbar
  */
 export function isMobileDevice(): boolean {
   const frontend = getFrontend()
-  return frontend === 'mobile' || frontend === 'browser-mobile'
+  // 区分移动端和浏览器移动端模式
+  const isNativeMobile = frontend === 'mobile'  // 原生移动端APP
+  const isBrowserMobile = frontend === 'browser-mobile'  // 浏览器移动端模式
+  const isMobile = isNativeMobile || isBrowserMobile
+  return isMobile
 }
 
 /**
@@ -809,7 +862,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
     applyToolbarBackgroundColor(config)
 
     // 防抖变量
-    let observerTimer: number | null = null
+    let observerTimer: ReturnType<typeof setTimeout> | null = null
 
     // 添加页面变化检测函数
     function updateToolbarVisibility() {
@@ -1008,7 +1061,9 @@ export function initCustomButtons(configs: ButtonConfig[]) {
     focusStyle.textContent = `
       /* 移除主工具栏自定义按钮的 focus 状态样式（包括阴影） */
       .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus,
-      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus {
+      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus,
+      .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus-visible,
+      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus-visible {
         background-color: transparent !important;
         background: transparent !important;
         box-shadow: none !important;
@@ -1023,9 +1078,21 @@ export function initCustomButtons(configs: ButtonConfig[]) {
       /* 移除主工具栏自定义按钮的 active 状态阴影（点击时） */
       .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):active,
       .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):active {
+        background-color: transparent !important;
+        background: transparent !important;
         box-shadow: none !important;
         -webkit-box-shadow: none !important;
+        outline: none !important;
+        border: none !important;
+        transform: none !important;
+        filter: none !important;
       }
+      /* 保留主工具栏自定义按钮的 hover 状态背景（桌面端） */
+      .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):hover,
+      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):hover {
+        /* 允许 JavaScript 控制悬停效果 */
+      }
+            
     `
     document.head.appendChild(focusStyle)
   }
@@ -1255,20 +1322,16 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
 
   // 添加 hover 效果（与思源原生按钮一致）
   button.addEventListener('mouseenter', () => {
-    button.style.backgroundColor = 'var(--b3-list-hover) !important'
-    button.style.color = 'var(--b3-theme-on-background) !important'
+    button.classList.add('custom-button-hover')
   })
   button.addEventListener('mouseleave', () => {
-    button.style.backgroundColor = 'transparent !important'
-    button.style.color = 'var(--b3-theme-on-surface) !important'
+    button.classList.remove('custom-button-hover')
   })
   button.addEventListener('touchstart', () => {
-    button.style.backgroundColor = 'var(--b3-list-hover) !important'
-    button.style.color = 'var(--b3-theme-on-background) !important'
+    button.classList.add('custom-button-hover')
   }, { passive: true })
   button.addEventListener('touchend', () => {
-    button.style.backgroundColor = 'transparent !important'
-    button.style.color = 'var(--b3-theme-on-surface) !important'
+    button.classList.remove('custom-button-hover')
   })
 
   // 保存选区的变量（用于快捷键按钮）
@@ -1325,7 +1388,7 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
   }
 
   // 绑定点击事件
-  button.addEventListener('click', (e) => {
+  button.addEventListener('click', async (e) => {
     e.stopPropagation()
 
     // 扩展工具栏按钮特殊处理（toggle 扩展工具栏）
@@ -1357,8 +1420,8 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
       }
     }
 
-    // 将保存的选区和按钮元素传递给处理函数（不传 button，因为已经 blur 了）
-    handleButtonClick(config, savedSelection, lastActiveElement, null)
+    // 将保存的选区和按钮元素传递给处理函数（使用 await 保持 async 链条）
+    await handleButtonClick(config, savedSelection, lastActiveElement, null)
 
     // builtin 类型的按钮不恢复焦点，让输入法自然关闭
     // 其他类型恢复焦点
@@ -1640,20 +1703,16 @@ function showOverflowToolbar(config: ButtonConfig) {
 
       // 添加 hover 效果（与思源原生按钮一致）
       layerBtn.addEventListener('mouseenter', () => {
-        layerBtn.style.backgroundColor = 'var(--b3-list-hover) !important'
-        layerBtn.style.color = 'var(--b3-theme-on-background) !important'
+        layerBtn.classList.add('custom-button-hover')
       })
       layerBtn.addEventListener('mouseleave', () => {
-        layerBtn.style.backgroundColor = 'transparent !important'
-        layerBtn.style.color = 'var(--b3-theme-on-surface) !important'
+        layerBtn.classList.remove('custom-button-hover')
       })
       layerBtn.addEventListener('touchstart', () => {
-        layerBtn.style.backgroundColor = 'var(--b3-list-hover) !important'
-        layerBtn.style.color = 'var(--b3-theme-on-background) !important'
+        layerBtn.classList.add('custom-button-hover')
       }, { passive: true })
       layerBtn.addEventListener('touchend', () => {
-        layerBtn.style.backgroundColor = 'transparent !important'
-        layerBtn.style.color = 'var(--b3-theme-on-surface) !important'
+        layerBtn.classList.remove('custom-button-hover')
       })
 
       // 保存选区的变量（每个按钮独立保存）
@@ -1687,15 +1746,15 @@ function showOverflowToolbar(config: ButtonConfig) {
       })
 
       // 点击按钮执行功能
-      layerBtn.addEventListener('click', (e) => {
+      layerBtn.addEventListener('click', async (e) => {
         e.stopPropagation()
         e.preventDefault()  // 阻止默认行为，包括按钮获得焦点
 
         // 关闭扩展工具栏
         document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove())
 
-        // 将保存的选区传递给处理函数
-        handleButtonClick(btn, savedSelection, lastActiveElement)
+        // 将保存的选区传递给处理函数（使用 await 保持 async 链条）
+        await handleButtonClick(btn, savedSelection, lastActiveElement)
 
         // builtin 类型的按钮不恢复焦点，让输入法自然关闭
         // 其他类型恢复焦点，保持输入法打开
@@ -1737,7 +1796,7 @@ function showOverflowToolbar(config: ButtonConfig) {
   }, 100)
 }
 
-function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null, clickedButton: HTMLElement | null = null) {
+async function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null, clickedButton: HTMLElement | null = null) {
   // 如果开启了右上角提示，显示消息
   const notificationEnabled = config.showNotification !== false
   Notify.showButtonExecNotification(config.name, notificationEnabled)
@@ -1757,7 +1816,10 @@ function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = 
     executeShortcut(config, savedSelection, lastActiveElement)
   } else if (config.type === 'author-tool') {
     // 执行鲸鱼定制工具箱
-    executeAuthorTool(config)
+    await executeAuthorTool(config)
+  } else if (config.type === 'quick-note') {
+    // 执行一键记事功能
+    await executeQuickNote(config)
   }
 
   // 功能执行完成后，延迟移除按钮焦点（1000ms）
@@ -2320,7 +2382,7 @@ async function executeDiaryBottom(config: ButtonConfig) {
 /**
  * 执行鲸鱼定制工具箱
  */
-function executeAuthorTool(config: ButtonConfig) {
+async function executeAuthorTool(config: ButtonConfig) {
   const subtype = config.authorToolSubtype || 'open-doc'
 
   // 日记底部类型
@@ -2335,14 +2397,189 @@ function executeAuthorTool(config: ButtonConfig) {
     return
   }
 
-  // 打开指定ID文档类型（默认）
-  if (config.targetDocId) {
-    // 使用思源 API 打开块
-    fetch('/api/block/openBlockDoc', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: config.targetDocId })
-    }).catch(() => {})
+  // 叶归LifeLog适配类型
+  if (subtype === 'life-log') {
+    try {
+      const categories = config.lifeLogCategories || ['学习', '工作', '生活']
+      
+      // 创建选择对话框
+      const selectedCategory = await showCategorySelectionDialog(categories)
+      
+      if (selectedCategory) {
+        // 弹出输入框，让用户输入具体内容
+        const inputContent = await showTextInputDialog('请输入内容', '例如：写插件')
+        
+        if (inputContent !== null) {
+          // 获取当前时间
+          const now = new Date()
+          const hours = String(now.getHours()).padStart(2, '0')
+          const minutes = String(now.getMinutes()).padStart(2, '0')
+          
+          // 生成内容格式：19:50 工作：输入内容\n
+          const content = `${hours}:${minutes} ${selectedCategory}：${inputContent}\n`
+          
+          // 获取笔记本ID
+          const notebookId = config.lifeLogNotebookId
+          
+          if (!notebookId) {
+            // 如果没有配置笔记本ID，给出提示
+            Notify.showErrorCommandCannotExecute('请先配置笔记本ID');
+            return;
+          }
+          
+          try {
+            // 尝试使用appendDailyNoteBlock API将内容追加到指定笔记本的每日笔记
+            const response = await fetchSyncPost('/api/block/appendDailyNoteBlock', {
+              data: content,
+              dataType: 'markdown',
+              notebook: notebookId
+            });
+            
+            if (response.code === 0) {
+              if (config.showNotification) {
+                Notify.showInfoCopySuccess() // 使用现有的成功通知
+              }
+            } else {
+              console.warn('[叶归LifeLog适配] 追加到每日笔记失败:', response.msg)
+              // 如果API调用失败，尝试使用替代方案
+              await appendToDailyNoteAlternative(notebookId, content, config.showNotification);
+            }
+          } catch (apiError) {
+            console.warn('[叶归LifeLog适配] appendDailyNoteBlock API调用失败，尝试替代方案:', apiError)
+            // 如果API调用失败，尝试使用替代方案
+            await appendToDailyNoteAlternative(notebookId, content, config.showNotification);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[叶归LifeLog适配] 执行失败:', error)
+      Notify.showErrorCommandCannotExecute('叶归LifeLog适配')
+    }
+    return
+  }
+
+  // 打开指定ID块类型（默认）
+  const frontend = getFrontend()
+  const isMobile = frontend === 'mobile' || frontend === 'browser-mobile'
+
+
+
+  if (isMobile) {
+    // 移动端处理
+    const targetId = config.mobileTargetDocId
+
+
+    if (targetId) {
+      try {
+        // 模仿数据库悬浮弹窗的手机端实现方式
+        const response = await fetchSyncPost('/api/block/getBlockInfo', { id: targetId });
+        if (response.code === 0 && response.data) {
+          const rootId = response.data.rootID;
+
+          // 尝试找到文档元素并点击打开
+          const findDocElement = (id: string) => {
+            const selectors = [
+              `[data-node-id="${id}"]`,
+              `[data-url-id="${id}"]`,
+              `.b3-list-item[data-url-id="${id}"]`,
+              `[data-type="doc"][data-id="${id}"]`,
+              `li[data-id="${id}"]`
+            ];
+            for (const selector of selectors) {
+              const el = document.querySelector(selector);
+              if (el) return el;
+            }
+            return null;
+          };
+
+          let retries = 0;
+          const tryOpenDoc = () => {
+            const fileTreeDoc = findDocElement(rootId);
+            if (fileTreeDoc) {
+              (fileTreeDoc as HTMLElement).click();
+              setTimeout(() => {
+                const block = document.querySelector(`[data-node-id="${targetId}"]`);
+                if (block) {
+                  block.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  block.dispatchEvent(new MouseEvent('click', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                  }));
+                } else {
+                  // 如果直接定位失败，回退到使用openTab
+                  stressThresholdOpenTab({
+                    app: pluginInstance.app,
+                    doc: {
+                      id: targetId
+                    }
+                  }).catch(err => {
+                    console.warn('[打开指定ID块] 移动端 - openTab方式也失败:', err);
+                  });
+                }
+              }, 500);
+            } else if (retries < 5) {
+              retries++;
+              setTimeout(tryOpenDoc, 200);
+            } else {
+              // 如果多次尝试后仍未找到文档元素，回退到使用openTab
+              stressThresholdOpenTab({
+                app: pluginInstance.app,
+                doc: {
+                  id: targetId
+                }
+              }).catch(err => {
+                console.warn('[打开指定ID块] 移动端 - openTab方式也失败:', err);
+              });
+            }
+          };
+
+          tryOpenDoc();
+        } else {
+          // 获取块信息失败时，回退到使用openTab
+          await stressThresholdOpenTab({
+            app: pluginInstance.app,
+            doc: {
+              id: targetId
+            }
+          });
+        }
+        
+
+      } catch (error) {
+        console.warn('[打开指定ID块] 移动端打开块失败:', error)
+        // 出错时也尝试使用openTab作为备用方式
+        try {
+          await stressThresholdOpenTab({
+            app: pluginInstance.app,
+            doc: {
+              id: targetId
+            }
+          });
+        } catch (fallbackError) {
+          console.warn('[打开指定ID块] 移动端备用方式也失败:', fallbackError);
+          Notify.showErrorCommandCannotExecute(`打开块: ${targetId}`);
+        }
+      }
+    } else {
+      Notify.showErrorCommandCannotExecute('未配置目标块ID')
+    }
+  } else {
+    // 桌面端处理
+    const targetId = config.targetDocId
+    if (targetId) {
+      try {
+        await siyuanOpenTab({
+          app: pluginInstance.app,
+          doc: { id: targetId }
+        })
+      } catch (error) {
+        console.warn('[打开指定ID块] 桌面端打开块失败:', error)
+        Notify.showErrorCommandCannotExecute(`打开块: ${targetId}`)
+      }
+    } else {
+      Notify.showErrorCommandCannotExecute('未配置目标块ID')
+    }
   }
 }
 
@@ -2377,6 +2614,562 @@ function minutesToHHMM(minutes: number): string {
   const hours = Math.floor(minutes / 60) % 24
   const mins = minutes % 60
   return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`
+}
+
+/**
+ * 显示分类选择对话框
+ */
+async function showCategorySelectionDialog(categories: string[]): Promise<string | null> {
+  return new Promise((resolve) => {
+    // 保存当前焦点元素
+    const activeElement = document.activeElement as HTMLElement;
+    
+    // 创建遮罩
+    const overlay = document.createElement('div')
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2147483647;
+    `
+    
+    // 防止遮罩捕获焦点
+    overlay.tabIndex = -1;
+
+    // 创建对话框容器
+    const dialog = document.createElement('div')
+    dialog.style.cssText = `
+      background: var(--b3-theme-background);
+      border-radius: 8px;
+      padding: 20px;
+      min-width: 200px;
+      max-width: 80vw;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    `
+
+    // 添加标题
+    const title = document.createElement('div')
+    title.textContent = '请选择分类'
+    title.style.cssText = `
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--b3-theme-on-background);
+      text-align: center;
+    `
+    dialog.appendChild(title)
+
+    // 为每个分类创建按钮
+    categories.forEach(category => {
+      const button = document.createElement('button')
+      button.textContent = category
+      button.style.cssText = `
+        padding: 12px 16px;
+        border: 1px solid var(--b3-border-color);
+        border-radius: 4px;
+        background: var(--b3-theme-surface);
+        color: var(--b3-theme-on-surface);
+        font-size: 14px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      `
+      button.onclick = () => {
+        // 先移除对话框，稍后插入内容以避免输入法冲突
+        document.body.removeChild(overlay)
+        // 添加短暂延迟以确保对话框完全移除后再插入内容
+        setTimeout(() => {
+          // 恢复焦点到原始元素
+          if (activeElement && document.contains(activeElement)) {
+            try {
+              activeElement.focus({ preventScroll: true });
+            } catch (e) {
+              // 如果无法聚焦原始元素，忽略错误
+            }
+          }
+          resolve(category)
+        }, 100)
+      }
+      dialog.appendChild(button)
+    })
+
+    // 添加取消按钮
+    const cancelButton = document.createElement('button')
+    cancelButton.textContent = '取消'
+    cancelButton.style.cssText = `
+      padding: 12px 16px;
+      border: 1px solid var(--b3-border-color);
+      border-radius: 4px;
+      background: var(--b3-theme-surface);
+      color: var(--b3-theme-on-surface);
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 12px;
+    `
+    cancelButton.onclick = () => {
+      document.body.removeChild(overlay)
+      setTimeout(() => {
+        // 恢复焦点到原始元素
+        if (activeElement && document.contains(activeElement)) {
+          try {
+            activeElement.focus({ preventScroll: true });
+          } catch (e) {
+            // 如果无法聚焦原始元素，忽略错误
+          }
+        }
+        resolve(null)
+      }, 100)
+    }
+    dialog.appendChild(cancelButton)
+
+    // 添加键盘事件监听（仅电脑端）
+    // 注意：必须在按钮创建之后添加事件监听器
+    const frontend = getFrontend();
+    const isDesktop = frontend === 'desktop';
+    
+    console.log('[分类调试] 当前前端类型:', frontend);
+    console.log('[分类调试] 是否为桌面端:', isDesktop);
+    
+    if (isDesktop) {
+      console.log('[分类调试] 为桌面端添加键盘事件监听器');
+      // 为取消按钮添加键盘事件
+      const handleKeyDown = (e: KeyboardEvent) => {
+        console.log('[分类调试] 键盘事件触发:', e.key);
+        if (e.key === 'Escape') {
+          console.log('[分类调试] 检测到Escape键，触发取消');
+          e.preventDefault();
+          cancelButton.click();
+        }
+      };
+      
+      overlay.addEventListener('keydown', handleKeyDown);
+      
+      // 确保overlay可以接收键盘事件
+      overlay.tabIndex = -1;
+    } else {
+      console.log('[分类调试] 非桌面端，不添加键盘事件监听器');
+    }
+
+    overlay.appendChild(dialog)
+    document.body.appendChild(overlay)
+    
+    // 尝试保持焦点在原始元素上（如果它还存在）
+    setTimeout(() => {
+      if (activeElement && document.contains(activeElement)) {
+        try {
+          activeElement.focus({ preventScroll: true });
+        } catch (e) {
+          // 如果无法聚焦原始元素，忽略错误
+        }
+      }
+    }, 0);
+
+    // 点击遮罩关闭
+    overlay.onclick = (e) => {
+      if (e.target === overlay) {
+        document.body.removeChild(overlay)
+        setTimeout(() => {
+          // 恢复焦点到原始元素
+          if (activeElement && document.contains(activeElement)) {
+            try {
+              activeElement.focus({ preventScroll: true });
+            } catch (e) {
+              // 如果无法聚焦原始元素，忽略错误
+            }
+          }
+          resolve(null)
+        }, 100)
+      }
+    }
+  })
+}
+
+async function showTextInputDialog(prompt: string, placeholder?: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    // 保存当前焦点元素
+    const activeElement = document.activeElement as HTMLElement;
+    
+    // 创建遮罩
+    const overlay = document.createElement('div')
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 2147483647;
+    `;
+    
+    // 防止遮罩捕获焦点
+    overlay.tabIndex = -1;
+
+    // 创建对话框容器
+    const dialog = document.createElement('div')
+    dialog.style.cssText = `
+      background: var(--b3-theme-background);
+      border-radius: 8px;
+      padding: 20px;
+      min-width: 280px;
+      max-width: 80vw;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    `;
+
+    // 添加标题
+    const title = document.createElement('div')
+    title.textContent = prompt;
+    title.style.cssText = `
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--b3-theme-on-background);
+      text-align: center;
+    `;
+    dialog.appendChild(title);
+
+    // 添加输入框
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = placeholder || '';
+    input.style.cssText = `
+      padding: 10px 12px;
+      border: 1px solid var(--b3-border-color);
+      border-radius: 4px;
+      background: var(--b3-theme-surface);
+      color: var(--b3-theme-on-surface);
+      font-size: 14px;
+    `;
+    
+    // 确保输入框获得焦点
+    setTimeout(() => {
+      if (document.contains(input)) {
+        input.focus();
+      }
+    }, 0);
+    
+    dialog.appendChild(input);
+
+    // 按钮容器
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    `;
+
+    // 取消按钮
+    const cancelButton = document.createElement('button');
+    cancelButton.textContent = '取消';
+    cancelButton.style.cssText = `
+      flex: 1;
+      padding: 10px 16px;
+      border: 1px solid var(--b3-border-color);
+      border-radius: 4px;
+      background: var(--b3-theme-surface);
+      color: var(--b3-theme-on-surface);
+      font-size: 14px;
+      cursor: pointer;
+    `;
+    cancelButton.onclick = () => {
+      document.body.removeChild(overlay);
+      setTimeout(() => {
+        // 恢复焦点到原始元素
+        if (activeElement && document.contains(activeElement)) {
+          try {
+            activeElement.focus({ preventScroll: true });
+          } catch (e) {
+            // 如果无法聚焦原始元素，忽略错误
+          }
+        }
+        resolve(null);
+      }, 100);
+    };
+    buttonContainer.appendChild(cancelButton);
+
+    // 确认按钮
+    const confirmButton = document.createElement('button');
+    confirmButton.textContent = '确认';
+    confirmButton.style.cssText = `
+      flex: 1;
+      padding: 10px 16px;
+      border: 1px solid var(--b3-border-color);
+      border-radius: 4px;
+      background: var(--b3-theme-primary);
+      color: var(--b3-theme-on-primary);
+      font-size: 14px;
+      cursor: pointer;
+    `;
+    confirmButton.onclick = () => {
+      document.body.removeChild(overlay);
+      setTimeout(() => {
+        // 恢复焦点到原始元素
+        if (activeElement && document.contains(activeElement)) {
+          try {
+            activeElement.focus({ preventScroll: true });
+          } catch (e) {
+            // 如果无法聚焦原始元素，忽略错误
+          }
+        }
+        resolve(input.value.trim() || null);
+      }, 100);
+    };
+    buttonContainer.appendChild(confirmButton);
+
+    dialog.appendChild(buttonContainer);
+
+    // 添加键盘事件监听（仅电脑端）
+    // 注意：必须在按钮创建之后添加事件监听器
+    const frontend = getFrontend();
+    const isDesktop = frontend === 'desktop';
+    
+    console.log('[调试] 当前前端类型:', frontend);
+    console.log('[调试] 是否为桌面端:', isDesktop);
+    
+    if (isDesktop) {
+      console.log('[调试] 为桌面端添加键盘事件监听器');
+      input.addEventListener('keydown', (e) => {
+        console.log('[调试] 键盘事件触发:', e.key);
+        if (e.key === 'Enter') {
+          console.log('[调试] 检测到Enter键，触发确认');
+          e.preventDefault();
+          // 触发确认按钮点击
+          console.log('[调试] 确认按钮是否存在:', !!confirmButton);
+          confirmButton.click();
+        } else if (e.key === 'Escape') {
+          console.log('[调试] 检测到Escape键，触发取消');
+          e.preventDefault();
+          // 触发取消按钮点击
+          console.log('[调试] 取消按钮是否存在:', !!cancelButton);
+          cancelButton.click();
+        }
+      });
+    } else {
+      console.log('[调试] 非桌面端，不添加键盘事件监听器');
+    }
+
+    // 点击遮罩关闭
+    overlay.onclick = (e) => {
+      if (e.target === overlay) {
+        document.body.removeChild(overlay);
+        setTimeout(() => {
+          // 恢复焦点到原始元素
+          if (activeElement && document.contains(activeElement)) {
+            try {
+              activeElement.focus({ preventScroll: true });
+            } catch (e) {
+              // 如果无法聚焦原始元素，忽略错误
+            }
+          }
+          resolve(null);
+        }, 100);
+      }
+    };
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+    
+    // 尝试保持焦点在输入框上
+    setTimeout(() => {
+      if (activeElement && document.contains(activeElement)) {
+        try {
+          activeElement.focus({ preventScroll: true });
+        } catch (e) {
+          // 如果无法聚焦原始元素，忽略错误
+        }
+      }
+    }, 0);
+  });
+}
+
+/**
+ * 将内容追加到每日笔记的替代方案（当appendDailyNoteBlock API不可用时）
+ */
+async function appendToDailyNoteAlternative(notebookId: string, content: string, showNotification?: boolean) {
+  try {
+    // 首先获取每日笔记的ID
+    const dailyNoteResponse = await fetchSyncPost('/api/filetree/getDailyNote', {
+      notebook: notebookId
+    });
+    
+    if (dailyNoteResponse.code === 0 && dailyNoteResponse.data.box) {
+      const docId = dailyNoteResponse.data.id;
+      
+      // 使用appendBlock API将内容追加到每日笔记
+      const appendResponse = await fetchSyncPost('/api/block/appendBlock', {
+        dataType: 'markdown',
+        data: content,
+        parentID: docId
+      });
+      
+      if (appendResponse.code === 0) {
+        if (showNotification) {
+          Notify.showInfoCopySuccess();
+        }
+      } else {
+        console.warn('[叶归LifeLog适配] 替代方案追加失败:', appendResponse.msg);
+        // 如果追加失败，回退到插入到当前编辑器
+        await insertContentToEditor(content);
+      }
+    } else {
+      // 如果获取每日笔记失败，创建一个新的每日笔记
+      const today = new Date();
+      const year = today.getFullYear();
+      const month = String(today.getMonth() + 1).padStart(2, '0');
+      const day = String(today.getDate()).padStart(2, '0');
+      
+      const title = `${year}年${month}月${day}日`;
+      
+      const createResponse = await fetchSyncPost('/api/filetree/createDailyNote', {
+        notebook: notebookId,
+        title: title
+      });
+      
+      if (createResponse.code === 0 && createResponse.data) {
+        // 创建成功后，再追加内容
+        const appendResponse = await fetchSyncPost('/api/block/appendBlock', {
+          dataType: 'markdown',
+          data: content,
+          parentID: createResponse.data
+        });
+        
+        if (appendResponse.code === 0) {
+          if (showNotification) {
+            Notify.showInfoCopySuccess();
+          }
+        } else {
+          console.warn('[叶归LifeLog适配] 创建后追加失败:', appendResponse.msg);
+          // 如果追加失败，回退到插入到当前编辑器
+          await insertContentToEditor(content);
+        }
+      } else {
+        console.warn('[叶归LifeLog适配] 创建每日笔记失败:', createResponse.msg);
+        // 如果创建失败，回退到插入到当前编辑器
+        await insertContentToEditor(content);
+      }
+    }
+  } catch (error) {
+    console.warn('[叶归LifeLog适配] 替代方案执行失败:', error);
+    // 如果所有方法都失败，回退到插入到当前编辑器
+    await insertContentToEditor(content);
+  }
+}
+
+/**
+ * 将内容插入到编辑器
+ */
+async function insertContentToEditor(content: string): Promise<void> {
+  // 查找当前活动的编辑器
+  const activeProtyle = document.querySelector('.protyle:not(.fn__hidden)') as HTMLElement
+  
+  if (!activeProtyle) {
+    // 如果没有找到活动编辑器，尝试查找任何编辑器
+    const protyles = document.querySelectorAll('.protyle')
+    if (protyles.length > 0) {
+      // 使用最后一个编辑器
+      for (let i = protyles.length - 1; i >= 0; i--) {
+        const protyle = protyles[i] as HTMLElement
+        if (!protyle.classList.contains('fn__hidden')) {
+          await insertToSpecificProtyle(protyle, content)
+          return
+        }
+      }
+      // 如果都没有显示的，就用第一个
+      await insertToSpecificProtyle(protyles[0] as HTMLElement, content)
+      return
+    }
+  } else {
+    await insertToSpecificProtyle(activeProtyle, content)
+    return
+  }
+
+  // 如果仍然找不到编辑器，尝试通过思源API插入
+  console.warn('未找到编辑器，无法插入内容')
+}
+
+/**
+ * 模拟文本输入
+ */
+function simulateTextInput(text: string, targetElement: HTMLElement): void {
+  // 创建一个临时输入框
+  const tempInput = document.createElement('textarea')
+  tempInput.value = text
+  tempInput.style.cssText = 'position: fixed; top: 0; left: 0; opacity: 0;'
+  document.body.appendChild(tempInput)
+  tempInput.focus()
+  tempInput.select()
+  
+  // 复制内容
+  document.execCommand('copy')
+  
+  // 焦点回到目标元素
+  targetElement.focus()
+  
+  // 触发粘贴事件
+  const pasteEvent = new ClipboardEvent('paste', {
+    clipboardData: new DataTransfer(),
+    bubbles: true,
+    cancelable: true
+  })
+  targetElement.dispatchEvent(pasteEvent)
+  
+  // 清理临时元素
+  document.body.removeChild(tempInput)
+}
+
+/**
+ * 向特定编辑器插入内容
+ */
+async function insertToSpecificProtyle(protyle: HTMLElement, content: string): Promise<void> {
+  // 尝试获取编辑器实例
+  const contentElement = protyle.querySelector('.protyle-content')
+  if (contentElement) {
+    // 如果编辑器可见，尝试插入内容
+    try {
+      // 在移动端避免强制获取焦点以防止输入法弹跳
+      const frontend = getFrontend();
+      const isMobile = frontend === 'mobile' || frontend === 'browser-mobile';
+      
+      if (!isMobile) {
+        // 桌面端可以安全地获取焦点
+        (contentElement as HTMLElement).focus();
+      }
+      
+      // 使用document.execCommand插入内容
+      document.execCommand('insertText', false, content)
+    } catch (e) {
+      console.warn('使用execCommand插入失败:', e)
+      // 备用方法：直接在DOM中插入
+      try {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          range.deleteContents();
+          range.insertNode(document.createTextNode(content));
+          range.collapse(false);
+        } else {
+          // 如果没有选择区域，直接追加到内容末尾
+          contentElement.textContent += content;
+        }
+      } catch (domError) {
+        console.warn('DOM插入方法也失败:', domError);
+      }
+    }
+  }
 }
 
 /**
@@ -2808,7 +3601,7 @@ function showDatabasePopup(
           const tryOpenDoc = () => {
             const fileTreeDoc = findDocElement(rootId)
             if (fileTreeDoc) {
-              fileTreeDoc.click()
+              (fileTreeDoc as HTMLElement).click()
               setTimeout(() => {
                 const block = document.querySelector(`[data-node-id="${blockId}"]`)
                 if (block) {
@@ -3677,5 +4470,356 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
   } catch (error) {
     console.error('执行快捷键失败:', error)
     Notify.showErrorShortcutFailed(config.shortcutKey, error)
+  }
+}
+
+// ===== 窗口检测器 =====
+
+// 存储当前的事件监听器，以便可以移除
+let currentResizeListener: (() => void) | null = null;
+let dimensionCheckInterval: number | null = null;  // 使用 setInterval 进行高度检测
+let initialHeight: number | null = null;  // 记录初始高度
+let lastHeight: number = window.innerHeight;
+
+// 尺寸显示器相关
+let dimensionDisplayElement: HTMLElement | null = null;
+
+// 小窗模式状态跟踪
+// 注：由于需求变更，现在每次检测到小窗模式都会提示，不再使用状态跟踪
+// let isInSmallWindowState: boolean = false;  // 跟踪是否已经在小窗模式状态
+
+// 前后台切换监听相关
+let visibilityChangeListener: (() => void) | null = null;
+
+/**
+ * 检查应用是否在前台
+ * 使用 Page Visibility API 检测应用是否可见
+ */
+function isAppInForeground(): boolean {
+  return !document.hidden;  // 如果 document.hidden 为 false，说明在前台
+}
+
+/**
+ * 显示窗口尺寸
+ * 实时显示当前窗口的尺寸
+ */
+function showWindowDimensions() {
+  // 检查是否已经存在尺寸显示器，如果没有则创建
+  if (!dimensionDisplayElement) {
+    dimensionDisplayElement = document.createElement('div')
+    dimensionDisplayElement.id = 'window-dimension-display'
+    dimensionDisplayElement.style.cssText = `
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      z-index: 99999;
+      background: rgba(0, 0, 0, 0.7);
+      color: #00ff00;
+      padding: 10px 15px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: monospace;
+      font-weight: bold;
+      pointer-events: none;
+      opacity: 0.9;
+      backdrop-filter: blur(4px);
+      border: 1px solid rgba(0, 255, 0, 0.3);
+    `
+    
+    // 添加到页面
+    document.body.appendChild(dimensionDisplayElement)
+  }
+  
+  // 更新尺寸显示
+  dimensionDisplayElement.textContent = `🖥️ ${window.innerWidth} × ${window.innerHeight}`
+}
+
+/**
+ * 显示小窗模式提示
+ * 当检测到高度减少50px或以上时显示全屏居中提示
+ */
+function showSmallWindowTip() {
+  // 创建全屏居中提示弹窗
+  const tipDialog = document.createElement('div');
+  tipDialog.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 100000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  `;
+
+  const tipContent = document.createElement('div');
+  tipContent.style.cssText = `
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    text-align: center;
+    max-width: 80%;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  `;
+
+  const tipIcon = document.createElement('div');
+  tipIcon.innerHTML = '📱';
+  tipIcon.style.cssText = 'font-size: 48px; margin-bottom: 16px;';
+
+  const tipTitle = document.createElement('div');
+  tipTitle.textContent = '小窗模式检测';
+  tipTitle.style.cssText = 'font-size: 20px; font-weight: bold; margin-bottom: 12px; color: #333;';
+
+  const tipText = document.createElement('div');
+  tipText.textContent = '当前已进入小窗模式，部分功能可能受限。';
+  tipText.style.cssText = 'font-size: 16px; color: #666; margin-bottom: 20px;';
+
+  const closeBtn = document.createElement('button');
+  closeBtn.textContent = '知道了';
+  closeBtn.style.cssText = `
+    padding: 12px 24px;
+    font-size: 16px;
+    background: #4285f4;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  `;
+  closeBtn.onclick = () => {
+    try {
+      // 使用更安全的方式移除元素
+      if (tipDialog && tipDialog.parentNode) {
+        tipDialog.parentNode.removeChild(tipDialog);
+      } else {
+        // 如果父节点不存在，直接从body移除（如果存在）
+        if (document.contains(tipDialog)) {
+          document.body.removeChild(tipDialog);
+        }
+      }
+    } catch (e) {
+      // 如果移除失败，使用最通用的方法
+      if (tipDialog && tipDialog.parentNode) {
+        tipDialog.parentNode.removeChild(tipDialog);
+      } else {
+        // 最后的保险措施：隐藏元素
+        tipDialog.style.display = 'none';
+      }
+    }
+  };
+
+  tipContent.appendChild(tipIcon);
+  tipContent.appendChild(tipTitle);
+  tipContent.appendChild(tipText);
+  tipContent.appendChild(closeBtn);
+  tipDialog.appendChild(tipContent);
+  document.body.appendChild(tipDialog);
+}
+
+/**
+ * 处理前后台切换
+ * 当应用从前台回到后台时，检查是否处于小窗模式
+ */
+function handleVisibilityChange() {
+  // 只在移动端处理
+  if (isMobileDevice()) {
+    // 当应用回到前台时，检查当前是否处于小窗模式
+    if (isAppInForeground()) {
+      const currentHeight = window.innerHeight;
+      
+      // 检查初始高度是否已记录
+      if (initialHeight !== null) {
+        const heightReduction = initialHeight - currentHeight;
+        
+        // 检查是否处于小窗模式（高度减少>=100px）
+        if (heightReduction >= 100) {
+          // 如果当前处于小窗模式，显示提示
+          showSmallWindowTip();
+        }
+      }
+    }
+  }
+}
+
+/**
+ * 获取应用前后台状态
+ * 返回应用当前是在前台还是后台
+ */
+export function getAppVisibilityStatus(): { isVisible: boolean, status: string } {
+  const isVisible = isAppInForeground();
+  return {
+    isVisible,
+    status: isVisible ? '前台' : '后台'
+  };
+}
+
+/**
+ * 检查窗口高度是否发生变化
+ * 专门针对小窗模式下的高度变化进行检测
+ */
+function checkHeightChange() {
+  const currentHeight = window.innerHeight;
+  
+  // 记录初始高度（全屏模式下的高度）
+  if (initialHeight === null) {
+    initialHeight = currentHeight;
+  }
+  
+  // 检查是否高度减少了100px或以上（意味着进入小窗模式）
+  const heightReduction = initialHeight - currentHeight;
+  if (heightReduction >= 100) {
+    // 如果高度减少>=100px，显示小窗模式提示
+    showSmallWindowTip();
+  }
+  
+  // 更新尺寸显示器
+  showWindowDimensions();
+  
+  // 更新最后记录的高度
+  lastHeight = currentHeight;
+}
+
+/**
+ * 初始化窗口检测器
+ * 监听窗口高度变化，当减少100px或以上时显示提示，同时显示尺寸显示器
+ */
+export function initWindowDimensionDisplay(): void {
+  // 重置状态
+  initialHeight = null;
+  lastHeight = window.innerHeight;
+  
+  // 显示初始尺寸
+  showWindowDimensions();
+  
+  // 如果已有监听器，先清除
+  if (currentResizeListener) {
+    window.removeEventListener('resize', currentResizeListener)
+    currentResizeListener = null
+  }
+
+  // 监听窗口大小变化
+  let resizeTimer: number | null = null
+  
+  currentResizeListener = () => {
+    if (resizeTimer) {
+      window.clearTimeout(resizeTimer)
+    }
+    resizeTimer = window.setTimeout(() => {
+      // 检查高度变化
+      checkHeightChange();
+    }, 100)  // 防抖处理，100ms延迟
+  }
+  
+  window.addEventListener('resize', currentResizeListener)
+  
+  // 清除可能存在的可见性变化监听器
+  if (visibilityChangeListener) {
+    document.removeEventListener('visibilitychange', visibilityChangeListener);
+    visibilityChangeListener = null;
+  }
+  
+  // 添加可见性变化监听器（用于检测前后台切换）
+  visibilityChangeListener = handleVisibilityChange;
+  document.addEventListener('visibilitychange', visibilityChangeListener);
+  
+  // 对于移动端，使用 setInterval 专门检测高度变化（小窗模式的关键指标）
+  if (isMobileDevice()) {
+    // 清除可能存在的旧定时器
+    if (dimensionCheckInterval) {
+      clearInterval(dimensionCheckInterval)
+    }
+    
+    // 开始每100毫秒检测一次高度变化
+    dimensionCheckInterval = window.setInterval(checkHeightChange, 100);
+  }
+}
+
+/**
+ * 清除窗口检测器
+ * 移除事件监听器和尺寸显示器
+ */
+export function clearWindowDimensionDisplay(): void {
+  if (currentResizeListener) {
+    window.removeEventListener('resize', currentResizeListener)
+    currentResizeListener = null
+  }
+  
+  // 清除可见性变化监听器
+  if (visibilityChangeListener) {
+    document.removeEventListener('visibilitychange', visibilityChangeListener);
+    visibilityChangeListener = null;
+  }
+  
+  // 清除移动端的高度检查定时器
+  if (dimensionCheckInterval) {
+    clearInterval(dimensionCheckInterval)
+    dimensionCheckInterval = null
+  }
+  
+  // 清除尺寸显示器元素
+  if (dimensionDisplayElement) {
+    dimensionDisplayElement.remove()
+    dimensionDisplayElement = null
+  }
+  
+}
+
+// 导入 windowDetector 中的函数
+import { showSmallWindowTip as showSmallWindowTipFromDetector } from './windowDetector';
+
+// 一键记事执行函数
+async function executeQuickNote(config: ButtonConfig) {
+  try {
+    // 获取配置参数（优先使用按钮自身的配置）
+    let notebookId = '';
+    let documentId = '';
+    let saveType = 'daily'; // 默认保存到日记
+    
+    // 优先使用按钮自身的配置
+    if (config.quickNoteSaveType) {
+      saveType = config.quickNoteSaveType;
+      if (saveType === 'document') {
+        documentId = config.quickNoteDocumentId || '';
+      } else {
+        notebookId = config.quickNoteNotebookId || '';
+      }
+    } else {
+      // 如果按钮没有配置，回退到全局配置
+      if (pluginInstance?.mobileFeatureConfig?.quickNoteSaveType) {
+        saveType = pluginInstance.mobileFeatureConfig.quickNoteSaveType;
+        if (saveType === 'document') {
+          documentId = pluginInstance.mobileFeatureConfig.quickNoteDocumentId || '';
+        } else {
+          notebookId = pluginInstance.mobileFeatureConfig.quickNoteNotebookId || '';
+        }
+      } else {
+        // 兼容旧的配置方式
+        notebookId = config.quickNoteNotebookId || '';
+        documentId = config.quickNoteDocumentId || '';
+      }
+    }
+    
+    console.log('一键记事配置:');
+    console.log('- 保存方式:', saveType);
+    console.log('- 笔记本ID:', notebookId);
+    console.log('- 文档ID:', documentId);
+    
+    // 直接调用现有的记事检测功能
+    // 临时设置插件实例的配置
+    const tempPlugin = {
+      mobileFeatureConfig: {
+        quickNoteNotebookId: notebookId,
+        quickNoteDocumentId: documentId,
+        quickNoteSaveType: saveType
+      }
+    };
+    (window as any).__pluginInstance = tempPlugin;
+    showSmallWindowTipFromDetector();
+    
+  } catch (error) {
+    console.error('一键记事执行失败:', error);
+    const message = `按钮 "${config.name}" 的一键记事功能执行失败`;
+    showMessage(message, 3000, 'error');
   }
 }

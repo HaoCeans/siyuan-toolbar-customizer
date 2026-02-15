@@ -111,6 +111,18 @@ export function injectTabSwitcher(): void {
       border-radius: 4px;
     `
 
+    // 版本检查标签
+    const versionTab = document.createElement('button')
+    versionTab.className = 'b3-button'
+    versionTab.dataset.tab = 'version'
+    versionTab.textContent = '🔍 版本检查'
+    versionTab.style.cssText = `
+      flex: 1;
+      padding: 8px 16px;
+      font-size: 13px;
+      border-radius: 4px;
+    `
+
     const previewConfig = {
       width: '100%',                 // 宽度：'100%' / '300px' / '20rem' 等
       fontSize: '17px',
@@ -161,22 +173,35 @@ export function injectTabSwitcher(): void {
     previewHint.textContent = '💡点击打开浏览器，可预览手机端效果，本处仅支持插入按钮。更多配置，请同步至手机端设置！'
 
     // 切换函数
-    const switchTab = (type: 'desktop' | 'mobile') => {
+    const switchTab = (type: 'desktop' | 'mobile' | 'version') => {
       // 更新按钮样式
       if (type === 'desktop') {
         desktopTab.classList.add('b3-button--primary')
         desktopTab.classList.remove('b3-button--outline')
         mobileTab.classList.remove('b3-button--primary')
         mobileTab.classList.add('b3-button--outline')
+        versionTab.classList.remove('b3-button--primary')
+        versionTab.classList.add('b3-button--outline')
         previewLink.style.display = 'none'
         previewHint.style.display = 'none'
-      } else {
+      } else if (type === 'mobile') {
         mobileTab.classList.add('b3-button--primary')
         mobileTab.classList.remove('b3-button--outline')
         desktopTab.classList.remove('b3-button--primary')
         desktopTab.classList.add('b3-button--outline')
+        versionTab.classList.remove('b3-button--primary')
+        versionTab.classList.add('b3-button--outline')
         previewLink.style.display = 'block'
         previewHint.style.display = 'block'
+      } else { // type === 'version'
+        versionTab.classList.add('b3-button--primary')
+        versionTab.classList.remove('b3-button--outline')
+        desktopTab.classList.remove('b3-button--primary')
+        desktopTab.classList.add('b3-button--outline')
+        mobileTab.classList.remove('b3-button--primary')
+        mobileTab.classList.add('b3-button--outline')
+        previewLink.style.display = 'none'
+        previewHint.style.display = 'none'
       }
 
       // 显示/隐藏对应的配置项
@@ -197,9 +222,11 @@ export function injectTabSwitcher(): void {
 
     desktopTab.onclick = () => switchTab('desktop')
     mobileTab.onclick = () => switchTab('mobile')
+    versionTab.onclick = () => switchTab('version')
 
     tabsContainer.appendChild(desktopTab)
     tabsContainer.appendChild(mobileTab)
+    tabsContainer.appendChild(versionTab)
 
     // 预览链接容器（插入到标签栏后面，会在第一个配置项前面显示）
     const previewContainer = document.createElement('div')

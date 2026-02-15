@@ -29,10 +29,18 @@ import {
   MobileToolbarConfig,
   ButtonConfig,
   GlobalButtonConfig,
-  DEFAULT_GLOBAL_BUTTON_CONFIG,
+  DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG,
+  DEFAULT_MOBILE_GLOBAL_BUTTON_CONFIG,
   isMobileDevice,
-  calculateButtonOverflow
+  calculateButtonOverflow,
+  setPluginInstance,
+  setGlobalToolbarManager
 } from './toolbarManager'
+
+import {
+  initSmallWindowDetector,
+  clearSmallWindowDetector
+} from './windowDetector'
 
 // 导入 UI 组件
 import { showConfirmDialog as showConfirmDialogModal } from './ui/dialog'
@@ -95,8 +103,8 @@ export default class ToolbarCustomizer extends Plugin {
   private currentEditingButton: ButtonConfig | null = null
 
   // 全局按钮配置（批量设置所有按钮的默认值）
-  private desktopGlobalButtonConfig: GlobalButtonConfig = { ...DEFAULT_GLOBAL_BUTTON_CONFIG }
-  private mobileGlobalButtonConfig: GlobalButtonConfig = { ...DEFAULT_GLOBAL_BUTTON_CONFIG }
+  private desktopGlobalButtonConfig: GlobalButtonConfig = { ...DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG }
+  private mobileGlobalButtonConfig: GlobalButtonConfig = { ...DEFAULT_MOBILE_GLOBAL_BUTTON_CONFIG }
 
   // 全局事件处理器引用（用于清理）
   private touchStartHandler: any = null
@@ -139,12 +147,15 @@ export default class ToolbarCustomizer extends Plugin {
     hideReadonlyButton: true,   // 锁定编辑按钮隐藏
     hideDocMenuButton: true,    // 文档菜单按钮隐藏
     hideMoreButton: true,       // 更多按钮隐藏
+    disableCustomButtons: false,// 禁用所有自定义按钮
     disableMobileSwipe: true,   // 手机端禁止左右滑动弹出
     disableFileTree: true,      // 禁止右滑弹出文档树
     disableSettingMenu: true,   // 禁止左滑弹出设置菜单
     showAllNotifications: true, // 一键开启所有按钮右上角提示
     authorActivated: false,     // 鲸鱼定制工具箱是否已激活
-    authorCode: ''              // 鲸鱼定制工具箱激活码
+    authorCode: '',             // 鲸鱼定制工具箱激活码
+    popupConfig: 'bothModes' as const, // 弹窗配置：'disabled'|'smallWindowOnly'|'bothModes'
+    quickNoteNotebookId: ''     // 自启动一键记事默认笔记本ID
   }
 
   // 检查作者功能是否已激活
@@ -159,6 +170,12 @@ export default class ToolbarCustomizer extends Plugin {
   }
 
   async onload() {
+    // 设置插件实例（供 toolbarManager 和 windowDetector 中需要访问配置的 API 调用使用）
+    setPluginInstance(this);
+    
+    // 设置全局工具栏管理器
+    setGlobalToolbarManager();
+
     // ===== 环境检测 =====
     const frontEnd = getFrontend();
     this.platform = frontEnd
@@ -265,8 +282,8 @@ export default class ToolbarCustomizer extends Plugin {
       }
 
       // 同步全局按钮配置的 showNotification 到所有电脑端按钮
-      // 确保全局配置和单个按钮配置保持一致
-      if (this.desktopGlobalButtonConfig.showNotification !== undefined) {
+      // 只有启用全局配置时才同步，否则保留各按钮的独立配置
+      if ((this.desktopGlobalButtonConfig.enabled ?? true) && this.desktopGlobalButtonConfig.showNotification !== undefined) {
         this.desktopButtonConfigs.forEach(btn => {
           btn.showNotification = this.desktopGlobalButtonConfig.showNotification
         })
@@ -282,8 +299,8 @@ export default class ToolbarCustomizer extends Plugin {
       }
 
       // 同步全局按钮配置的 showNotification 到所有手机端按钮
-      // 确保全局配置和单个按钮配置保持一致
-      if (this.mobileGlobalButtonConfig.showNotification !== undefined) {
+      // 只有启用全局配置时才同步，否则保留各按钮的独立配置
+      if ((this.mobileGlobalButtonConfig.enabled ?? true) && this.mobileGlobalButtonConfig.showNotification !== undefined) {
         this.mobileButtonConfigs.forEach(btn => {
           btn.showNotification = this.mobileGlobalButtonConfig.showNotification
         })
@@ -324,8 +341,39 @@ export default class ToolbarCustomizer extends Plugin {
       // ===== 首次安装提示 =====
       // 检查是否显示过首次安装提示
       const hasShownWelcome = await this.loadData('hasShownWelcome')
-      if (!hasShownWelcome) {
-        // 延迟显示欢迎提示，确保界面完全加载
+      const v3MigrationAsked = await this.loadData('v3MigrationAsked')
+
+      // v3.0.0 大版本迁移：检测老用户并询问是否覆盖配置
+      if (hasShownWelcome && !v3MigrationAsked) {
+        // 这是老用户，且未询问过迁移
+        setTimeout(async () => {
+          const shouldReset = await this.showConfirmDialogModal({
+            title: '🎉 检测到《工具栏定制器》插件大版本更新 (v3.0.0)',
+            message: '本版本正式更名为《思源手机端增强》，进行了重大重构，推荐使用新的默认配置。\n\n是否覆盖旧配置？\n\n• 选择"覆盖配置"：使用新的默认按钮和设置\n• 选择"保留配置"：继续使用现有配置',
+            hint: '⚠️ 提示：若保留配置，可能会出现部分问题。\n欢迎进群反馈 QQ：1018010924',
+            confirmText: '覆盖配置',
+            cancelText: '保留配置'
+          })
+
+          if (shouldReset) {
+            // 用户选择覆盖配置：删除所有配置数据
+            await this.resetAllConfigs()
+            showMessage('已重置为新的默认配置，正在重载...', 3000, 'info')
+            // 保存迁移标记
+            await this.saveData('v3MigrationAsked', true)
+            // 重载界面
+            setTimeout(() => {
+              fetchSyncPost('/api/system/reloadUI', {})
+            }, 1000)
+          } else {
+            // 用户选择保留配置
+            showMessage('已保留现有配置', 2000, 'info')
+            // 保存迁移标记
+            await this.saveData('v3MigrationAsked', true)
+          }
+        }, 1000)
+      } else if (!hasShownWelcome) {
+        // 新用户，显示欢迎提示
         setTimeout(() => {
           if (this.isMobile) {
             showMessage('欢迎使用本插件！🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦搜索', 0, 'info')
@@ -372,6 +420,13 @@ export default class ToolbarCustomizer extends Plugin {
     // 根据当前平台选择对应的按钮配置
     const buttonsToInit = this.isMobile ? this.mobileButtonConfigs : this.desktopButtonConfigs
     initCustomButtons(buttonsToInit)
+    
+    // ===== 初始化小窗模式检测器 =====
+    // 在手机端检测小窗模式和前后台切换
+    if (this.isMobile) {
+      // 初始化小窗模式检测器
+      initSmallWindowDetector()
+    }
   }
 
   onunload() {
@@ -384,6 +439,11 @@ export default class ToolbarCustomizer extends Plugin {
 
     // 移除动态样式
     this.removeFeatureStyles()
+
+    // 清理小窗模式检测器资源
+    if (typeof clearSmallWindowDetector === 'function') {
+      clearSmallWindowDetector()
+    }
 
     // 清理全局 touch 事件监听器
     if (this.touchStartHandler) {
@@ -496,6 +556,7 @@ export default class ToolbarCustomizer extends Plugin {
         desktopFeatureConfig: this.desktopFeatureConfig,
         mobileFeatureConfig: this.mobileFeatureConfig,
         mobileConfig: this.mobileConfig,
+        version: this.version,
         isAuthorToolActivated: () => this.isAuthorToolActivated(),
         showConfirmDialog: (msg) => this.showConfirmDialog(msg),
         showIconPicker: (current, onSelect) => this.showIconPicker(current, onSelect),
@@ -509,7 +570,7 @@ export default class ToolbarCustomizer extends Plugin {
       createDesktopSettingLayout(setting, context)
     }
 
-    setting.open('工具栏定制器')
+    setting.open('思源手机端增强')
 
     // 电脑端：对话框打开后注入标签栏
     if (!this.isMobile) {
@@ -544,6 +605,11 @@ export default class ToolbarCustomizer extends Plugin {
         initMobileToolbarAdjuster(this.mobileConfig)
         const buttonsToInit = this.mobileButtonConfigs
         initCustomButtons(buttonsToInit)
+        
+        // 手机端功能初始化
+        if (this.isMobile) {
+          initSmallWindowDetector()
+        }
       },
       recalculateOverflow: () => {
         // 获取扩展工具栏按钮的层数配置
@@ -583,6 +649,25 @@ export default class ToolbarCustomizer extends Plugin {
   // 自定义确认对话框（已迁移到 ui/dialog.ts，兼容鸿蒙系统）
   private showConfirmDialog(message: string): Promise<boolean> {
     return showConfirmDialogModal({ message, confirmText: '删除', cancelText: '取消' })
+  }
+
+  // 带标题的确认对话框（用于 v3.0.0 迁移询问）
+  private showConfirmDialogModal(options: { title?: string; message: string; confirmText?: string; cancelText?: string }): Promise<boolean> {
+    return showConfirmDialogModal(options)
+  }
+
+  // 重置所有配置（用于 v3.0.0 迁移）
+  private async resetAllConfigs() {
+    // 删除所有配置数据
+    await this.removeData('desktopButtonConfigs')
+    await this.removeData('mobileButtonConfigs')
+    await this.removeData('desktopGlobalButtonConfig')
+    await this.removeData('mobileGlobalButtonConfig')
+    await this.removeData('desktopFeatureConfig')
+    await this.removeData('mobileFeatureConfig')
+    await this.removeData('mobileToolbarConfig')
+    await this.removeData('featureConfig')  // 旧版配置
+    // 注意：不删除 hasShownWelcome 和 v3MigrationAsked
   }
 
   // 图标选择器（已迁移到 ui/iconPicker.ts）
@@ -681,8 +766,17 @@ export default class ToolbarCustomizer extends Plugin {
       styleContent += `
         /* 隐藏所有自定义按钮 */
         .protyle-breadcrumb__bar button[data-custom-button],
-        .protyle-breadcrumb button[data-custom-button] {
+        .protyle-breadcrumb button[data-custom-button],
+        .protyle-breadcrumb__bar [data-custom-button],
+        .protyle-breadcrumb [data-custom-button],
+        button[data-custom-button] {
           display: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          width: 0 !important;
+          height: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
         }
       `
     }

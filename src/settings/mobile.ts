@@ -1,6 +1,6 @@
 /**
  * 手机端设置模块
- * 处理手机端工具栏定制器的设置界面
+ * 处理手机端思源手机端增强的设置界面
  */
 
 import type { Setting } from 'siyuan'
@@ -50,6 +50,9 @@ export interface MobileFeatureConfig {
   disableMobileSwipe?: boolean
   authorCode?: string
   authorActivated?: boolean
+  popupConfig?: 'disabled' | 'smallWindowOnly' | 'bothModes'
+  quickNoteNotebookId?: string
+  quickNoteDocumentId?: string  // 新增：一键记事目标文档ID
 }
 
 /**
@@ -343,13 +346,14 @@ export function createMobileSettingLayout(
         titleEl.style.cssText = `
           padding: 16px 16px 8px 16px;
           margin: 8px -16px 0 -16px;
-          font-size: 15px;
-          font-weight: 600;
+          font-size: 16px;
+          font-weight: 700;
           color: var(--b3-theme-on-background);
           background: var(--b3-theme-surface);
           display: flex;
           align-items: center;
           gap: 8px;
+          border-bottom: 2px solid var(--b3-border-color);
         `
         titleEl.innerHTML = `<span style="font-size: 18px;">${icon}</span>${title}`
         return titleEl
@@ -438,12 +442,12 @@ export function createMobileSettingLayout(
           type: 'builtin',
           builtinId: 'menuSearch',
           icon: '♥️',
-          iconSize: 18,
-          minWidth: 32,
-          marginRight: 8,
+          iconSize: context.mobileGlobalButtonConfig.iconSize,
+          minWidth: context.mobileGlobalButtonConfig.minWidth,
+          marginRight: context.mobileGlobalButtonConfig.marginRight,
           sort: context.buttonConfigs.length + 1,
           platform: 'both',
-          showNotification: true,
+          showNotification: context.mobileGlobalButtonConfig.showNotification,
           overflowLevel: 0 // 初始为可见，稍后重新计算
         }
         context.buttonConfigs.push(newButton)
@@ -480,6 +484,58 @@ export function createMobileSettingLayout(
   // === 手机端全局按钮配置 ===
   createGroupTitle('📱', '全局按钮配置')
 
+  // 存储所有配置项的 input 元素，用于统一控制禁用状态
+  const mobileConfigInputs: HTMLInputElement[] = []
+
+  // 更新配置项禁用状态的函数
+  const updateMobileConfigItemsDisabled = (disabled: boolean) => {
+    mobileConfigInputs.forEach(input => {
+      input.disabled = disabled
+      if (disabled) {
+        input.style.opacity = '0.5'
+        input.style.cursor = 'not-allowed'
+      } else {
+        input.style.opacity = ''
+        input.style.cursor = ''
+      }
+    })
+  }
+
+  // 全局配置启用开关（放在最前面）
+  setting.addItem({
+    title: '🔘 启用全局按钮配置',
+    description: '💡 关闭后，修改全局配置不会影响已有按钮，仅作为新建按钮的默认值',
+    createActionElement: () => {
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'b3-switch'
+      toggle.checked = context.mobileGlobalButtonConfig.enabled ?? true
+      toggle.style.cssText = 'transform: scale(1.2);'
+      toggle.onchange = async () => {
+        context.mobileGlobalButtonConfig.enabled = toggle.checked
+        // 打开开关时，立即应用全局配置到所有按钮
+        if (toggle.checked) {
+          context.mobileButtonConfigs.forEach(btn => {
+            btn.iconSize = context.mobileGlobalButtonConfig.iconSize
+            btn.minWidth = context.mobileGlobalButtonConfig.minWidth
+            btn.marginRight = context.mobileGlobalButtonConfig.marginRight
+            btn.showNotification = context.mobileGlobalButtonConfig.showNotification
+          })
+          await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
+          // 重新计算溢出层级（按钮宽度可能变化）
+          context.recalculateOverflow()
+          // 刷新按钮以应用新配置
+          context.updateMobileToolbar()
+        }
+        await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
+        Notify.showGlobalConfigEnabledStatus(toggle.checked)
+        // 更新配置项的禁用状态
+        updateMobileConfigItemsDisabled(!toggle.checked)
+      }
+      return toggle
+    }
+  })
+
   // 图标大小
   setting.addItem({
     title: '🆖 图标大小 (px)',
@@ -493,12 +549,22 @@ export function createMobileSettingLayout(
       input.onchange = async () => {
         const newValue = parseInt(input.value) || 16
         context.mobileGlobalButtonConfig.iconSize = newValue
-        context.mobileButtonConfigs.forEach(btn => btn.iconSize = newValue)
+        // 只有启用全局配置时才批量应用到按钮
+        if (context.mobileGlobalButtonConfig.enabled ?? true) {
+          context.mobileButtonConfigs.forEach(btn => btn.iconSize = newValue)
+          await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
+          // 重新计算溢出层级（按钮宽度可能变化）
+          context.recalculateOverflow()
+        }
         await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
-        await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
-        // 重新计算溢出层级（按钮宽度可能变化）
-        context.recalculateOverflow()
         Notify.showInfoIconSizeModified()
+      }
+      // 存储引用并设置初始禁用状态
+      mobileConfigInputs.push(input)
+      if (!(context.mobileGlobalButtonConfig.enabled ?? true)) {
+        input.disabled = true
+        input.style.opacity = '0.5'
+        input.style.cursor = 'not-allowed'
       }
       return input
     }
@@ -517,12 +583,22 @@ export function createMobileSettingLayout(
       input.onchange = async () => {
         const newValue = parseInt(input.value) || 32
         context.mobileGlobalButtonConfig.minWidth = newValue
-        context.mobileButtonConfigs.forEach(btn => btn.minWidth = newValue)
+        // 只有启用全局配置时才批量应用到按钮
+        if (context.mobileGlobalButtonConfig.enabled ?? true) {
+          context.mobileButtonConfigs.forEach(btn => btn.minWidth = newValue)
+          await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
+          // 重新计算溢出层级（按钮宽度变化）
+          context.recalculateOverflow()
+        }
         await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
-        await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
-        // 重新计算溢出层级（按钮宽度变化）
-        context.recalculateOverflow()
         Notify.showInfoButtonWidthModified()
+      }
+      // 存储引用并设置初始禁用状态
+      mobileConfigInputs.push(input)
+      if (!(context.mobileGlobalButtonConfig.enabled ?? true)) {
+        input.disabled = true
+        input.style.opacity = '0.5'
+        input.style.cursor = 'not-allowed'
       }
       return input
     }
@@ -541,12 +617,22 @@ export function createMobileSettingLayout(
       input.onchange = async () => {
         const newValue = parseInt(input.value) || 8
         context.mobileGlobalButtonConfig.marginRight = newValue
-        context.mobileButtonConfigs.forEach(btn => btn.marginRight = newValue)
+        // 只有启用全局配置时才批量应用到按钮
+        if (context.mobileGlobalButtonConfig.enabled ?? true) {
+          context.mobileButtonConfigs.forEach(btn => btn.marginRight = newValue)
+          await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
+          // 重新计算溢出层级（按钮宽度变化）
+          context.recalculateOverflow()
+        }
         await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
-        await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
-        // 重新计算溢出层级（按钮宽度变化）
-        context.recalculateOverflow()
         Notify.showInfoMarginRightModified()
+      }
+      // 存储引用并设置初始禁用状态
+      mobileConfigInputs.push(input)
+      if (!(context.mobileGlobalButtonConfig.enabled ?? true)) {
+        input.disabled = true
+        input.style.opacity = '0.5'
+        input.style.cursor = 'not-allowed'
       }
       return input
     }
@@ -564,12 +650,22 @@ export function createMobileSettingLayout(
       toggle.style.cssText = 'transform: scale(1.2);'
       toggle.onchange = async () => {
         context.mobileGlobalButtonConfig.showNotification = toggle.checked
-        context.mobileButtonConfigs.forEach(btn => btn.showNotification = toggle.checked)
+        // 只有启用全局配置时才批量应用到按钮
+        if (context.mobileGlobalButtonConfig.enabled ?? true) {
+          context.mobileButtonConfigs.forEach(btn => btn.showNotification = toggle.checked)
+          await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
+        }
         await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
-        await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
         // 刷新按钮以应用新配置
         context.updateMobileToolbar()
         Notify.showNotificationToggleStatus(toggle.checked)
+      }
+      // 存储引用并设置初始禁用状态
+      mobileConfigInputs.push(toggle)
+      if (!(context.mobileGlobalButtonConfig.enabled ?? true)) {
+        toggle.disabled = true
+        toggle.style.opacity = '0.5'
+        toggle.style.cursor = 'not-allowed'
       }
       return toggle
     }
@@ -997,7 +1093,7 @@ export function createMobileSettingLayout(
         context.mobileConfig.heightThreshold = parseInt(input.value) || 70
         await context.saveData('mobileConfig', context.mobileConfig)
         // 需要重新初始化工具栏检测器以应用新阈值
-        initMobileToolbarAdjuster(context.mobileConfig)
+        context.updateMobileToolbar()
       }
       return input
     }
@@ -1166,7 +1262,7 @@ export function createMobileSettingLayout(
   // 鲸鱼定制工具箱激活码输入
   setting.addItem({
     title: '🔐 鲸鱼定制工具箱激活',
-    description: '💡输入激活码解锁「⑥鲸鱼定制工具箱」功能类型',
+    description: '💡输入激活码解锁「⑥鲸鱼定制工具箱」功能类型。激活码获取：请进QQ群1018010924咨询群主！',
     createActionElement: () => {
       const container = document.createElement('div')
       container.style.cssText = 'display: flex; flex-direction: column; gap: 10px; width: 100%;'
@@ -1227,6 +1323,259 @@ export function createMobileSettingLayout(
     }
   })
 
+
+  
+  // === 自启动一键记事 ===
+  createGroupTitle('📝', '自启动一键记事')
+
+  // 一键记事保存配置（整合保存方式和ID配置）
+  setting.addItem({
+    title: '💾 一键记事保存配置',
+    description: '选择保存方式并配置对应的目标ID，实时联动更新',
+    createActionElement: () => {
+      const container = document.createElement('div');
+      container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 12px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.08)); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px;';
+  
+      const config = context.mobileFeatureConfig as any;
+      const currentSaveType = config.quickNoteSaveType || 'daily';
+  
+      // 保存方式选择
+      const saveTypeLabel = document.createElement('label');
+      saveTypeLabel.textContent = '选择保存方式：';
+      saveTypeLabel.style.cssText = 'font-size: 13px; font-weight: 500;';
+      container.appendChild(saveTypeLabel);
+  
+      // 单选按钮组
+      const radioContainer = document.createElement('div');
+      radioContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px; margin-top: 4px;';
+  
+      const options = [
+        { value: 'daily', label: '📘 保存到笔记本日记', description: '内容保存到指定笔记本的当日日记' },
+        { value: 'document', label: '📄 追加到指定文档', description: '内容直接追加到指定文档底部' }
+      ];
+  
+      options.forEach(option => {
+        const optionDiv = document.createElement('div');
+        optionDiv.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--b3-border-color); border-radius: 6px; cursor: pointer;';
+  
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'quickNoteSaveTypeSetting';
+        radio.value = option.value;
+        radio.checked = currentSaveType === option.value;
+        radio.style.cssText = 'transform: scale(1.2);';
+  
+        const labelDiv = document.createElement('div');
+        labelDiv.style.cssText = 'flex: 1;';
+  
+        const label = document.createElement('div');
+        label.textContent = option.label;
+        label.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);';
+  
+        const desc = document.createElement('div');
+        desc.textContent = option.description;
+        desc.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: 2px;';
+  
+        // 点击事件处理
+        optionDiv.onclick = async () => {
+          // 清除其他选中状态
+          const allRadios = radioContainer.querySelectorAll('input[type="radio"]');
+          allRadios.forEach(r => (r as HTMLInputElement).checked = false);
+          
+          // 清除所有选项的选中样式 - 使用更准确的选择器
+          const allOptionDivs = radioContainer.children;
+          for (let i = 0; i < allOptionDivs.length; i++) {
+            const div = allOptionDivs[i] as HTMLElement;
+            if (div !== optionDiv) { // 排除当前点击的选项
+              div.style.borderColor = 'var(--b3-border-color)';
+              div.style.backgroundColor = 'transparent';
+            }
+          }
+            
+          // 选中当前项
+          radio.checked = true;
+          config.quickNoteSaveType = option.value as 'daily' | 'document';
+          
+          // 设置当前选项的选中样式
+          optionDiv.style.borderColor = 'var(--b3-theme-primary)';
+          optionDiv.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+            
+          // 更新ID输入框
+          updateIdInput();
+            
+          // 保存配置
+          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+        };
+  
+        // 默认选中样式
+        if (radio.checked) {
+          optionDiv.style.borderColor = 'var(--b3-theme-primary)';
+          optionDiv.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+        }
+  
+        labelDiv.appendChild(label);
+        labelDiv.appendChild(desc);
+        optionDiv.appendChild(radio);
+        optionDiv.appendChild(labelDiv);
+        radioContainer.appendChild(optionDiv);
+      });
+  
+      container.appendChild(radioContainer);
+  
+      // ID配置区域
+      const idConfigContainer = document.createElement('div');
+      idConfigContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px; margin-top: 12px;';
+  
+      const idLabel = document.createElement('label');
+      idLabel.id = 'quick-note-setting-id-label';
+      idLabel.style.cssText = 'font-size: 13px; font-weight: 500;';
+      idConfigContainer.appendChild(idLabel);
+  
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'b3-text-field';
+      input.id = 'quick-note-setting-id-input';
+      input.style.cssText = 'font-size: 14px; padding: 8px; width: 100%;';
+  
+      const hint = document.createElement('div');
+      hint.id = 'quick-note-setting-id-hint';
+      hint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light);';
+  
+      // 根据选择类型更新ID输入框
+      function updateIdInput() {
+        const saveType = config.quickNoteSaveType || 'daily';
+        const idLabel = container.querySelector('#quick-note-setting-id-label') as HTMLLabelElement;
+        const idInput = container.querySelector('#quick-note-setting-id-input') as HTMLInputElement;
+        const idHint = container.querySelector('#quick-note-setting-id-hint') as HTMLDivElement;
+          
+        // 添加空值检查
+        if (!idLabel || !idInput || !idHint) {
+          console.warn('一键记事设置元素未找到，跳过更新');
+          return;
+        }
+          
+        if (saveType === 'document') {
+          idLabel.textContent = '📄 目标文档ID';
+          idInput.placeholder = '请输入文档ID，如：20250101000000-aaaaaa';
+          idInput.value = config.quickNoteDocumentId || '';
+          idHint.textContent = '💡 内容将直接追加到该文档底部';
+        } else {
+          idLabel.textContent = '📘 目标笔记本ID';
+          idInput.placeholder = '请输入笔记本ID，如：20250101000000-aaaaaa';
+          idInput.value = config.quickNoteNotebookId || '';
+          idHint.textContent = '💡 内容将保存到该笔记本的当日日记中';
+        }
+      }
+  
+      // 初始化显示
+      updateIdInput();
+  
+      input.onchange = async () => {
+        const saveType = config.quickNoteSaveType || 'daily';
+        const value = input.value.trim();
+          
+        if (saveType === 'document') {
+          config.quickNoteDocumentId = value;
+          // 清空笔记本ID避免混淆
+          config.quickNoteNotebookId = '';
+        } else {
+          config.quickNoteNotebookId = value;
+          // 清空文档ID避免混淆
+          config.quickNoteDocumentId = '';
+        }
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+      };
+  
+      idConfigContainer.appendChild(input);
+      idConfigContainer.appendChild(hint);
+      container.appendChild(idConfigContainer);
+  
+      return container;
+    }
+  });
+
+  setting.addItem({
+    title: '自启动一键记事',
+    description: '💡设置自动触发记事功能的条件和默认存储位置',
+    createActionElement: () => {
+      const container = document.createElement('div')
+      container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; width: 100%;'
+  
+      // 获取当前配置值，设置默认值
+      const config = context.mobileFeatureConfig as any
+      const currentPopupConfig = config.popupConfig || 'bothModes'
+  
+      // 创建选项按钮
+      const options = [
+        { value: 'disabled', label: '①关闭自启动', description: '完全关闭自启动记事功能' },
+        { value: 'smallWindowOnly', label: '②只在小窗模式下启用自启动', description: '仅当检测到小窗模式时自动触发记事' },
+        { value: 'bothModes', label: '③小窗和全屏模式都启用自启动', description: '无论全屏还是小窗模式都自动触发记事' }
+      ]
+  
+      options.forEach(option => {
+        const optionContainer = document.createElement('div')
+        optionContainer.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--b3-border-color); border-radius: 8px; cursor: pointer; transition: all 0.2s ease;'
+  
+        const radio = document.createElement('input')
+        radio.type = 'radio'
+        radio.name = 'popupConfig'
+        radio.value = option.value
+        radio.checked = currentPopupConfig === option.value
+        radio.style.cssText = 'transform: scale(1.3);'
+  
+        const labelContainer = document.createElement('div')
+        labelContainer.style.cssText = 'flex: 1;'
+  
+        const label = document.createElement('div')
+        label.textContent = option.label
+        label.style.cssText = 'font-weight: 500; color: var(--b3-theme-on-background); margin-bottom: 4px;'
+  
+        const desc = document.createElement('div')
+        desc.textContent = option.description
+        desc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface-light);'
+  
+        labelContainer.appendChild(label)
+        labelContainer.appendChild(desc)
+  
+        optionContainer.appendChild(radio)
+        optionContainer.appendChild(labelContainer)
+  
+        // 添加选中状态样式
+        if (radio.checked) {
+          optionContainer.style.cssText += ' background: var(--b3-theme-primary-lightest); border-color: var(--b3-theme-primary);'
+        }
+  
+        // 点击事件处理
+        optionContainer.onclick = async () => {
+          // 更新所有选项的选中状态
+          container.querySelectorAll('input[type="radio"]').forEach(r => {
+            const radioInput = r as HTMLInputElement;
+            const container = r.closest('div[style*="cursor: pointer"]') as HTMLElement
+            if (r === radio) {
+              radioInput.checked = true
+              if (container) {
+                container.style.cssText = container.style.cssText.replace(/background: [^;]+; border-color: [^;]+;/, '') + ' background: var(--b3-theme-primary-lightest); border-color: var(--b3-theme-primary);'
+              }
+            } else {
+              radioInput.checked = false
+              if (container) {
+                container.style.cssText = container.style.cssText.replace(/background: [^;]+; border-color: [^;]+;/, '')
+              }
+            }
+          })
+  
+          // 保存配置
+          config.popupConfig = option.value
+          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+        }
+  
+        container.appendChild(optionContainer)
+      })
+  
+      return container
+    }
+  })
+  
   // === 使用帮助 ===
   createGroupTitle('💡', '使用帮助')
 

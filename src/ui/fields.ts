@@ -397,7 +397,7 @@ export function createTextareaField(
     color: var(--b3-theme-on-background);
     font-size: 14px;
     resize: vertical;
-    min-height: 60px;
+    min-height: 20px;
     box-sizing: border-box;
     width: 100%;
   `

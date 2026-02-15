@@ -103,6 +103,7 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    max-height: 70vh;  /* 限制整体最大高度，按钮多时压缩输入框 */
   `;
 
   // 上半部分：记事输入区域
@@ -113,16 +114,21 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
     flex-direction: column;
     overflow: hidden;
     margin-bottom: 16px;
+    min-height: 32px;  /* 至少保留一行输入空间 */
   `;
 
   const textarea = document.createElement('textarea');
   textarea.placeholder = documentId ? '请输入要追加到文档的内容...' : '请输入您的记事内容...';
+  
+  // 获取字体大小配置
+  const fontSize = pluginInstance?.mobileFeatureConfig?.quickNoteFontSize || 16;
+  
   textarea.style.cssText = `
     flex: 1;
     padding: 16px;
     border: 2px solid #e0e0e0;
     border-radius: 8px;
-    font-size: 16px;
+    font-size: ${fontSize}px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     resize: none;
     overflow-y: auto;
@@ -161,17 +167,19 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
   const toolbarSection = document.createElement('div');
   toolbarSection.style.cssText = `
     border-top: 1px solid #e0e0e0;
-    padding-top: 16px;
-    min-height: 60px;
+    padding-top: 8px;
+    min-height: 40px;
+    max-height: 50vh;  /* 按钮区域最大高度，超出可滚动 */
+    overflow-y: auto;
   `;
 
   const toolbarTitle = document.createElement('div');
   toolbarTitle.textContent = '🔧 工具栏按钮';
   toolbarTitle.style.cssText = `
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
     color: #666;
-    margin-bottom: 12px;
+    margin-bottom: 8px;
     text-align: center;
   `;
   toolbarSection.appendChild(toolbarTitle);
@@ -326,17 +334,15 @@ function copyBottomToolbarButtons(container: HTMLElement) {
       return;
     }
 
-    // 创建按钮容器，支持多行显示和滚动
+    // 创建按钮容器
     const buttonsContainer = document.createElement('div');
     buttonsContainer.style.cssText = `
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 6px;
       justify-content: center;
-      align-items: center;
-      padding: 10px;
-      max-height: 300px;  /* 增加高度以容纳更多按钮 */
-      overflow-y: auto;
+      align-content: flex-start;
+      padding: 6px 8px;
     `;
 
     // 为滚动条添加样式
@@ -350,11 +356,11 @@ function copyBottomToolbarButtons(container: HTMLElement) {
         border-radius: 3px;
       }
       #quick-note-dialog .buttons-container::-webkit-scrollbar-thumb {
-        background: #c1c1c1;
+        background: #888;
         border-radius: 3px;
       }
       #quick-note-dialog .buttons-container::-webkit-scrollbar-thumb:hover {
-        background: #a8a8a8;
+        background: #555;
       }
     `;
     document.head.appendChild(scrollbarStyle);
@@ -378,9 +384,9 @@ function copyBottomToolbarButtons(container: HTMLElement) {
       
       // 设置按钮基本样式
       clonedBtn.style.cssText = `
-        min-width: 40px;
-        height: 36px;
-        padding: 8px 12px;
+        min-width: 36px;
+        height: 32px;
+        padding: 4px 8px;
         margin: 2px;
         border: 1px solid #e0e0e0;
         border-radius: 6px;
@@ -658,6 +664,9 @@ function handleVisibilityChange() {
           showSmallWindowTip();
         }
       }
+    } else {
+      // 应用切换到后台时，自动关闭一键记事弹窗
+      closeNoteDialogImmediately();
     }
   }
 }

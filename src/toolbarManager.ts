@@ -613,7 +613,7 @@ function shouldShowInMainToolbar(button: ButtonConfig): boolean {
 /**
  * 应用工具栏背景颜色（顶部和底部工具栏通用）
  */
-function applyToolbarBackgroundColor(config: MobileToolbarConfig) {
+export function applyToolbarBackgroundColor(config: MobileToolbarConfig) {
   const backgroundColorStyleId = 'mobile-toolbar-background-color-style'
   let backgroundColorStyle = document.getElementById(backgroundColorStyleId) as HTMLStyleElement
 
@@ -628,15 +628,15 @@ function applyToolbarBackgroundColor(config: MobileToolbarConfig) {
     // 使用主题颜色时，只调整透明度，使用CSS变量
     backgroundColorStyle.textContent = `
       /* 顶部工具栏 - 使用主题颜色 */
-      body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]),
-      body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) {
+      body.siyuan-toolbar-top-mode .protyle-breadcrumb,
+      body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar {
         background-color: var(--b3-theme-surface) !important;
         opacity: ${config.toolbarOpacity} !important;
       }
 
       /* 底部工具栏 - 使用主题颜色 */
-      .protyle-breadcrumb__bar[data-input-method],
-      .protyle-breadcrumb[data-input-method] {
+      .protyle-breadcrumb__bar,
+      .protyle-breadcrumb {
         background-color: var(--b3-theme-surface) !important;
         opacity: ${config.toolbarOpacity} !important;
       }
@@ -647,15 +647,15 @@ function applyToolbarBackgroundColor(config: MobileToolbarConfig) {
       /* 明亮模式 */
       html:not([data-theme-mode="dark"]) {
         /* 顶部工具栏 - 自定义颜色 */
-        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]),
-        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) {
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb,
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar {
           background-color: ${config.toolbarBackgroundColor} !important;
           opacity: ${config.toolbarOpacity} !important;
         }
 
         /* 底部工具栏 - 自定义颜色 */
-        .protyle-breadcrumb__bar[data-input-method],
-        .protyle-breadcrumb[data-input-method] {
+        .protyle-breadcrumb__bar,
+        .protyle-breadcrumb {
           background-color: ${config.toolbarBackgroundColor} !important;
           opacity: ${config.toolbarOpacity} !important;
         }
@@ -664,15 +664,15 @@ function applyToolbarBackgroundColor(config: MobileToolbarConfig) {
       /* 黑暗模式 */
       html[data-theme-mode="dark"] {
         /* 顶部工具栏 - 自定义颜色（黑暗模式） */
-        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]),
-        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) {
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb,
+        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar {
           background-color: ${config.toolbarBackgroundColorDark} !important;
           opacity: ${config.toolbarOpacity} !important;
         }
 
         /* 底部工具栏 - 自定义颜色（黑暗模式） */
-        .protyle-breadcrumb__bar[data-input-method],
-        .protyle-breadcrumb[data-input-method] {
+        .protyle-breadcrumb__bar,
+        .protyle-breadcrumb {
           background-color: ${config.toolbarBackgroundColorDark} !important;
           opacity: ${config.toolbarOpacity} !important;
         }

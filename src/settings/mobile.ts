@@ -1574,6 +1574,49 @@ export function createMobileSettingLayout(
       return container
     }
   })
+
+  // === 弹窗输入框字体大小 ===
+  setting.addItem({
+    title: '📝 弹窗输入框字体大小',
+    description: '调节一键记事弹窗中输入框的字体大小',
+    createActionElement: () => {
+      const container = document.createElement('div');
+      container.style.cssText = 'display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 0;';
+
+      const config = context.mobileFeatureConfig as any;
+      const currentFontSize = config.quickNoteFontSize || 18;
+
+      // 字体大小滑块
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = '12';
+      slider.max = '30';
+      slider.value = String(currentFontSize);
+      slider.style.cssText = 'flex: 1; cursor: pointer;';
+
+      // 数值显示
+      const valueDisplay = document.createElement('span');
+      valueDisplay.textContent = `${currentFontSize}px`;
+      valueDisplay.style.cssText = 'min-width: 45px; text-align: right; font-size: 14px; font-weight: 500;';
+
+      slider.oninput = () => {
+        const value = parseInt(slider.value);
+        valueDisplay.textContent = `${value}px`;
+        config.quickNoteFontSize = value;
+      };
+
+      slider.onchange = async () => {
+        const value = parseInt(slider.value);
+        config.quickNoteFontSize = value;
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+      };
+
+      container.appendChild(slider);
+      container.appendChild(valueDisplay);
+
+      return container;
+    }
+  })
   
   // === 使用帮助 ===
   createGroupTitle('💡', '使用帮助')

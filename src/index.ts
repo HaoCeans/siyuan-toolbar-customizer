@@ -34,7 +34,8 @@ import {
   isMobileDevice,
   calculateButtonOverflow,
   setPluginInstance,
-  setGlobalToolbarManager
+  setGlobalToolbarManager,
+  applyToolbarBackgroundColor
 } from './toolbarManager'
 
 import {
@@ -155,7 +156,8 @@ export default class ToolbarCustomizer extends Plugin {
     authorActivated: false,     // 鲸鱼定制工具箱是否已激活
     authorCode: '',             // 鲸鱼定制工具箱激活码
     popupConfig: 'bothModes' as const, // 弹窗配置：'disabled'|'smallWindowOnly'|'bothModes'
-    quickNoteNotebookId: ''     // 自启动一键记事默认笔记本ID
+    quickNoteNotebookId: '',     // 自启动一键记事默认笔记本ID
+    quickNoteFontSize: 18        // 弹窗输入框字体大小（px）
   }
 
   // 检查作者功能是否已激活
@@ -915,8 +917,8 @@ export default class ToolbarCustomizer extends Plugin {
   private applyMobileToolbarStyle() {
     if (!this.isMobile) return
 
-    // 注意：背景颜色由 toolbarManager 中的 applyToolbarBackgroundColor 处理
-    // 这里只处理需要动态更新的样式（如工具栏高度）
+    // 应用背景颜色（包括透明度）
+    applyToolbarBackgroundColor(this.mobileConfig)
 
     // 使用不同的 style ID 来避免冲突
     const styleId = 'mobile-toolbar-dynamic-style'

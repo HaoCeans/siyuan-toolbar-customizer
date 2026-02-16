@@ -721,7 +721,7 @@ export function createDesktopButtonItem(
     dbConfigDiv.id = 'db-config'
     dbConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 10px; background: rgba(255, 255, 255, 0.5); border-radius: 6px;'
 
-    // 日记底部配置区（说明 + 等待时间配置）
+    // 日记底部配置区（说明 + 笔记本ID + 等待时间配置）
     const diaryConfigDiv = document.createElement('div')
     diaryConfigDiv.id = 'diary-config'
     diaryConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 15px; background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(59, 130, 246, 0.1)); border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3);'
@@ -733,8 +733,35 @@ export function createDesktopButtonItem(
 
     const diaryDesc = document.createElement('div')
     diaryDesc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.6;'
-    diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 打开日记<br>2. 自动滚动到文档底部'
+    diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 或 API 打开日记<br>2. 自动滚动到文档底部<br>💡 配置笔记本ID后将直接使用API，无需弹窗选择'
     diaryConfigDiv.appendChild(diaryDesc)
+
+    // 笔记本ID配置
+    const diaryNotebookIdContainer = document.createElement('div')
+    diaryNotebookIdContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px; margin-top: 8px;'
+
+    const diaryNotebookIdLabel = document.createElement('label')
+    diaryNotebookIdLabel.textContent = '📚 笔记本ID（可选）'
+    diaryNotebookIdLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); font-weight: 500;'
+    diaryNotebookIdContainer.appendChild(diaryNotebookIdLabel)
+
+    const diaryNotebookIdInput = document.createElement('input')
+    diaryNotebookIdInput.type = 'text'
+    diaryNotebookIdInput.className = 'b3-text-field'
+    diaryNotebookIdInput.value = button.diaryNotebookId || ''
+    diaryNotebookIdInput.placeholder = '留空则使用 Alt+5 快捷键，如：20250101000000-aaaaaa'
+    diaryNotebookIdInput.style.cssText = 'font-size: 13px;'
+    diaryNotebookIdInput.addEventListener('input', () => {
+      button.diaryNotebookId = diaryNotebookIdInput.value
+    })
+    diaryNotebookIdContainer.appendChild(diaryNotebookIdInput)
+
+    const diaryNotebookIdHint = document.createElement('div')
+    diaryNotebookIdHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
+    diaryNotebookIdHint.textContent = '💡 填写后将直接调用API创建日记，不会弹出选择框'
+    diaryNotebookIdContainer.appendChild(diaryNotebookIdHint)
+
+    diaryConfigDiv.appendChild(diaryNotebookIdContainer)
 
     // 等待时间配置（移动端）
     const waitTimeContainer = document.createElement('div')
@@ -1871,7 +1898,7 @@ export function populateDesktopEditForm(
 
     authorToolField.appendChild(dbConfigDiv)
 
-    // 日记底部配置区（说明 + 等待时间配置）
+    // 日记底部配置区（说明 + 笔记本ID + 等待时间配置）
     const diaryConfigDiv = document.createElement('div')
     diaryConfigDiv.id = 'diary-config'
     diaryConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 15px; background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(59, 130, 246, 0.1)); border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3);'
@@ -1883,8 +1910,35 @@ export function populateDesktopEditForm(
 
     const diaryDesc = document.createElement('div')
     diaryDesc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.6;'
-    diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 打开日记<br>2. 自动滚动到文档底部'
+    diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 或 API 打开日记<br>2. 自动滚动到文档底部<br>💡 配置笔记本ID后将直接使用API，无需弹窗选择'
     diaryConfigDiv.appendChild(diaryDesc)
+
+    // 笔记本ID配置
+    const diaryNotebookIdContainer2 = document.createElement('div')
+    diaryNotebookIdContainer2.style.cssText = 'display: flex; flex-direction: column; gap: 6px; margin-top: 8px;'
+
+    const diaryNotebookIdLabel2 = document.createElement('label')
+    diaryNotebookIdLabel2.textContent = '📚 笔记本ID（可选）'
+    diaryNotebookIdLabel2.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); font-weight: 500;'
+    diaryNotebookIdContainer2.appendChild(diaryNotebookIdLabel2)
+
+    const diaryNotebookIdInput2 = document.createElement('input')
+    diaryNotebookIdInput2.type = 'text'
+    diaryNotebookIdInput2.className = 'b3-text-field'
+    diaryNotebookIdInput2.value = button.diaryNotebookId || ''
+    diaryNotebookIdInput2.placeholder = '留空则使用 Alt+5 快捷键，如：20250101000000-aaaaaa'
+    diaryNotebookIdInput2.style.cssText = 'font-size: 13px;'
+    diaryNotebookIdInput2.addEventListener('input', () => {
+      button.diaryNotebookId = diaryNotebookIdInput2.value
+    })
+    diaryNotebookIdContainer2.appendChild(diaryNotebookIdInput2)
+
+    const diaryNotebookIdHint2 = document.createElement('div')
+    diaryNotebookIdHint2.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
+    diaryNotebookIdHint2.textContent = '💡 填写后将直接调用API创建日记，不会弹出选择框'
+    diaryNotebookIdContainer2.appendChild(diaryNotebookIdHint2)
+
+    diaryConfigDiv.appendChild(diaryNotebookIdContainer2)
 
     // 等待时间配置（移动端）
     const waitTimeContainer = document.createElement('div')

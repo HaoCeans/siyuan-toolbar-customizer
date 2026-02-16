@@ -3,10 +3,9 @@
  * 负责移动端工具栏调整和自定义按钮功能
  */
 
-import { Dialog, fetchSyncPost, getFrontend, showMessage, openTab as siyuanOpenTab } from "siyuan";
+import { Dialog, fetchSyncPost, getFrontend, showMessage, openTab as siyuanOpenTab, openMobileFileById } from "siyuan";
 // 通知模块
 import * as Notify from "./notification";
-import { openTab as stressThresholdOpenTab } from "siyuan";
 
 // ===== 插件实例（用于需要 app 参数的 API 调用） =====
 export let pluginInstance: any = null;
@@ -68,6 +67,7 @@ export interface ButtonConfig {
   showColumns?: string[];    // 要显示的列名数组
   timeRangeColumnName?: string; // 时间段列的名称
   diaryWaitTime?: number;     // 日记底部功能：移动端等待时间（毫秒，默认 1000）
+  diaryNotebookId?: string;   // 日记底部功能：指定笔记本ID（留空则使用Alt+5快捷键）
   lifeLogCategories?: string[]; // 叶归LifeLog适配：分类选项列表
   lifeLogNotebookId?: string; // 叶归LifeLog适配：目标笔记本ID
   cardContainerHeight?: string; // 卡片模式容器高度
@@ -2124,78 +2124,68 @@ function executeScrollDoc(config: ButtonConfig) {
 }
 
 /**
+ * 根据按钮名称查找按钮配置
+ * 通过遍历所有按钮配置，匹配按钮名称
+ */
+function findButtonConfigByName(buttonName: string): ButtonConfig | null {
+  const toolbarManager = (window as any).__toolbarManager
+  if (!toolbarManager) return null
+
+  const configs = toolbarManager.getAllButtonConfigs?.()
+  if (!configs || configs.length === 0) return null
+
+  return configs.find((c: ButtonConfig) => c.name === buttonName) || null
+}
+
+/**
  * 执行连续点击自定义按钮序列
- * 根据按钮名称查找自定义按钮并依次点击，点击后等待指定间隔时间
+ * 根据按钮名称查找按钮配置并直接执行功能，无需弹出扩展工具栏
  */
 async function executeButtonSequence(config: ButtonConfig) {
   const steps = config.buttonSequenceSteps
-  console.log('[连续点击] 开始执行，配置:', config.name, '步骤:', steps)
-  
+
   if (!steps || steps.length === 0) {
-    console.log('[连续点击] 错误：没有配置步骤')
     Notify.showErrorClickSequenceNotConfigured(config.name)
     return
   }
 
   // 过滤掉空的步骤（按钮名称为空的）
   const validSteps = steps.filter(step => step.buttonName && step.buttonName.trim())
-  console.log('[连续点击] 有效步骤:', validSteps.length, '个')
-  
+
   if (validSteps.length === 0) {
-    console.log('[连续点击] 错误：没有有效步骤')
     Notify.showErrorClickSequenceNotConfigured(config.name)
     return
   }
+
+  // 保存当前选区和焦点元素
+  const savedSelection = saveSelection()
+  const lastActiveElement = document.activeElement as HTMLElement | null
 
   for (let i = 0; i < validSteps.length; i++) {
     const step = validSteps[i]
     const buttonName = step.buttonName.trim()
     const delayMs = step.delayMs || 200
-    console.log(`[连续点击] 步骤 ${i + 1}: 按钮名称="${buttonName}", 延迟=${delayMs}ms`)
 
-    // 根据按钮名称查找自定义按钮
-    let button = findCustomButtonByName(buttonName)
-    console.log(`[连续点击] 步骤 ${i + 1}: 查找按钮结果=`, button ? '找到' : '未找到')
-    
-    // 如果没找到，检查按钮是否在扩展工具栏中
-    if (!button) {
-      console.log(`[连续点击] 步骤 ${i + 1}: 按钮可能在扩展工具栏中，尝试打开扩展工具栏`)
-      const overflowButton = findOverflowButton()
-      if (overflowButton) {
-        console.log(`[连续点击] 步骤 ${i + 1}: 找到扩展工具栏按钮，正在打开`)
-        // 模拟点击扩展工具栏按钮
-        clickElement(overflowButton)
-        // 等待扩展工具栏动画完成
-        await delay(300)
-        // 再次查找按钮
-        button = findCustomButtonByName(buttonName)
-        console.log(`[连续点击] 步骤 ${i + 1}: 打开扩展工具栏后查找结果=`, button ? '找到' : '未找到')
-      }
-    }
-    
-    if (!button) {
-      // 找不到按钮，停止整个序列
-      console.log(`[连续点击] 步骤 ${i + 1}: 错误 - 找不到按钮`)
+    // 根据按钮名称查找按钮配置
+    const buttonConfig = findButtonConfigByName(buttonName)
+
+    if (!buttonConfig) {
+      // 找不到按钮配置，停止整个序列
       Notify.showErrorClickSequenceStepFailed(i + 1, `按钮"${buttonName}"`)
       return
     }
 
-    // 点击按钮
+    // 直接执行按钮功能（不通过 DOM 点击，无需弹出扩展工具栏）
     try {
-      console.log(`[连续点击] 步骤 ${i + 1}: 正在点击按钮`)
-      clickElement(button)
-      console.log(`[连续点击] 步骤 ${i + 1}: 点击成功`)
+      await handleButtonClick(buttonConfig, savedSelection, lastActiveElement)
     } catch (error) {
-      console.log(`[连续点击] 步骤 ${i + 1}: 点击失败`, error)
       Notify.showErrorClickSequenceStepFailed(i + 1, `按钮"${buttonName}"`)
       return
     }
 
-    // 点击后等待指定间隔时间
-    console.log(`[连续点击] 步骤 ${i + 1}: 等待 ${delayMs}ms`)
+    // 执行后等待指定间隔时间
     await delay(delayMs)
   }
-  console.log('[连续点击] 所有步骤执行完成')
 }
 
 // 查找扩展工具栏按钮
@@ -2515,8 +2505,8 @@ function clickElement(element: HTMLElement): void {
 /**
  * 执行日记底部功能
  * 打开日记后跳转到文档底部
- * 电脑端：直接触发 Alt+5 并滚动
- * 手机端：触发 Alt+5，自动确认对话框，然后滚动
+ * 如果配置了 notebookId，直接调用API创建/打开日记
+ * 否则使用 Alt+5 快捷键模拟（电脑端和手机端）
  */
 async function executeDiaryBottom(config: ButtonConfig) {
   try {
@@ -2526,14 +2516,6 @@ async function executeDiaryBottom(config: ButtonConfig) {
     const isMobile = /mobile|android|iphone|ipad/i.test(navigator.userAgent) ||
                      windowObj.siyuan?.config?.fronted === 'mobile' ||
                      document.body.classList.contains('mobile')
-
-    // 从思源 keymap 中获取 dailyNote 的快捷键
-    let hotkeyToTrigger = '⌥5' // 默认 Alt+5
-
-    if (windowObj.siyuan?.config?.keymap?.general?.dailyNote) {
-      const keymapItem = windowObj.siyuan.config.keymap.general.dailyNote
-      hotkeyToTrigger = keymapItem.custom || keymapItem.default
-    }
 
     // ==================== 滚动到底部函数（电脑端和手机端共用） ====================
     let scrollAttempts = 0
@@ -2575,6 +2557,67 @@ async function executeDiaryBottom(config: ButtonConfig) {
           Notify.showInfoDiaryOpened()
         }
       }
+    }
+
+    // ==================== 如果配置了笔记本ID，使用API直接创建/打开日记 ====================
+    if (config.diaryNotebookId && config.diaryNotebookId.trim()) {
+      try {
+        console.log('[日记底部] 开始调用API创建日记，笔记本ID:', config.diaryNotebookId.trim())
+
+        // 调用思源API创建日记
+        const response = await fetchSyncPost('/api/filetree/createDailyNote', {
+          notebook: config.diaryNotebookId.trim()
+        })
+
+        console.log('[日记底部] API响应:', response)
+
+        if (response.code === 0 && response.data?.id) {
+          const docId = response.data.id
+          console.log('[日记底部] 日记创建成功，文档ID:', docId)
+
+          // 打开创建的日记文档（createDailyNote不会自动跳转，需要手动打开）
+          console.log('[日记底部] 开始打开文档，平台:', isMobile ? '移动端' : '桌面端')
+          try {
+            if (isMobile) {
+              // 移动端使用 openMobileFileById
+              await openMobileFileById(pluginInstance.app, docId)
+              console.log('[日记底部] 移动端文档打开成功')
+            } else {
+              // 桌面端使用 openTab
+              await siyuanOpenTab({
+                app: pluginInstance.app,
+                doc: {
+                  id: docId
+                }
+              })
+              console.log('[日记底部] 桌面端文档打开成功')
+            }
+          } catch (openError) {
+            console.warn('[日记底部] 打开文档失败:', openError)
+          }
+
+          // 等待文档加载后滚动到底部
+          const waitTime = isMobile ? (config.diaryWaitTime || 1000) : 800
+          console.log('[日记底部] 等待', waitTime, 'ms后滚动到底部')
+          safeSetTimeout(startScrolling, waitTime)
+          return
+        } else {
+          console.warn('[日记底部] API调用失败:', response.msg)
+          // API失败，回退到快捷键方式
+        }
+      } catch (apiError) {
+        console.warn('[日记底部] API调用异常:', apiError)
+        // API异常，回退到快捷键方式
+      }
+    }
+
+    // ==================== 未配置笔记本ID或API失败，使用快捷键方式 ====================
+    // 从思源 keymap 中获取 dailyNote 的快捷键
+    let hotkeyToTrigger = '⌥5' // 默认 Alt+5
+
+    if (windowObj.siyuan?.config?.keymap?.general?.dailyNote) {
+      const keymapItem = windowObj.siyuan.config.keymap.general.dailyNote
+      hotkeyToTrigger = keymapItem.custom || keymapItem.default
     }
 
     // ==================== 电脑端流程 ====================
@@ -2743,124 +2786,66 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
   const frontend = getFrontend()
   const isMobile = frontend === 'mobile' || frontend === 'browser-mobile'
 
+  // 根据平台获取对应的目标ID配置
+  const targetId = isMobile ? config.mobileTargetDocId : config.targetDocId
 
+  if (!targetId) {
+    Notify.showErrorCommandCannotExecute('未配置目标块ID')
+    return
+  }
 
-  if (isMobile) {
-    // 移动端处理
-    const targetId = config.mobileTargetDocId
+  console.log('[打开指定ID块] 开始打开，平台:', isMobile ? '移动端' : '桌面端', '目标ID:', targetId)
 
+  try {
+    // 先获取块信息，提取文档ID（rootID）
+    console.log('[打开指定ID块] 获取块信息...')
+    const blockInfo = await fetchSyncPost('/api/block/getBlockInfo', { id: targetId })
 
-    if (targetId) {
-      try {
-        // 模仿数据库悬浮弹窗的手机端实现方式
-        const response = await fetchSyncPost('/api/block/getBlockInfo', { id: targetId });
-        if (response.code === 0 && response.data) {
-          const rootId = response.data.rootID;
-
-          // 尝试找到文档元素并点击打开
-          const findDocElement = (id: string) => {
-            const selectors = [
-              `[data-node-id="${id}"]`,
-              `[data-url-id="${id}"]`,
-              `.b3-list-item[data-url-id="${id}"]`,
-              `[data-type="doc"][data-id="${id}"]`,
-              `li[data-id="${id}"]`
-            ];
-            for (const selector of selectors) {
-              const el = document.querySelector(selector);
-              if (el) return el;
-            }
-            return null;
-          };
-
-          let retries = 0;
-          const tryOpenDoc = () => {
-            const fileTreeDoc = findDocElement(rootId);
-            if (fileTreeDoc) {
-              (fileTreeDoc as HTMLElement).click();
-              setTimeout(() => {
-                const block = document.querySelector(`[data-node-id="${targetId}"]`);
-                if (block) {
-                  block.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  block.dispatchEvent(new MouseEvent('click', {
-                    view: window,
-                    bubbles: true,
-                    cancelable: true
-                  }));
-                } else {
-                  // 如果直接定位失败，回退到使用openTab
-                  stressThresholdOpenTab({
-                    app: pluginInstance.app,
-                    doc: {
-                      id: targetId
-                    }
-                  }).catch(err => {
-                    console.warn('[打开指定ID块] 移动端 - openTab方式也失败:', err);
-                  });
-                }
-              }, 500);
-            } else if (retries < 5) {
-              retries++;
-              setTimeout(tryOpenDoc, 200);
-            } else {
-              // 如果多次尝试后仍未找到文档元素，回退到使用openTab
-              stressThresholdOpenTab({
-                app: pluginInstance.app,
-                doc: {
-                  id: targetId
-                }
-              }).catch(err => {
-                console.warn('[打开指定ID块] 移动端 - openTab方式也失败:', err);
-              });
-            }
-          };
-
-          tryOpenDoc();
-        } else {
-          // 获取块信息失败时，回退到使用openTab
-          await stressThresholdOpenTab({
-            app: pluginInstance.app,
-            doc: {
-              id: targetId
-            }
-          });
-        }
-        
-
-      } catch (error) {
-        console.warn('[打开指定ID块] 移动端打开块失败:', error)
-        // 出错时也尝试使用openTab作为备用方式
-        try {
-          await stressThresholdOpenTab({
-            app: pluginInstance.app,
-            doc: {
-              id: targetId
-            }
-          });
-        } catch (fallbackError) {
-          console.warn('[打开指定ID块] 移动端备用方式也失败:', fallbackError);
-          Notify.showErrorCommandCannotExecute(`打开块: ${targetId}`);
-        }
-      }
-    } else {
-      Notify.showErrorCommandCannotExecute('未配置目标块ID')
+    if (blockInfo.code !== 0 || !blockInfo.data) {
+      console.warn('[打开指定ID块] 获取块信息失败:', blockInfo.msg)
+      Notify.showErrorCommandCannotExecute(`获取块信息: ${targetId}`)
+      return
     }
-  } else {
-    // 桌面端处理
-    const targetId = config.targetDocId
-    if (targetId) {
-      try {
-        await siyuanOpenTab({
-          app: pluginInstance.app,
-          doc: { id: targetId }
-        })
-      } catch (error) {
-        console.warn('[打开指定ID块] 桌面端打开块失败:', error)
-        Notify.showErrorCommandCannotExecute(`打开块: ${targetId}`)
-      }
+
+    const docId = blockInfo.data.rootID
+    console.log('[打开指定ID块] 文档ID:', docId, '块ID:', targetId)
+
+    if (isMobile) {
+      // 移动端使用 openMobileFileById 打开文档
+      console.log('[打开指定ID块] 移动端使用 openMobileFileById 打开文档')
+      await openMobileFileById(pluginInstance.app, docId)
+      console.log('[打开指定ID块] 移动端文档打开成功')
     } else {
-      Notify.showErrorCommandCannotExecute('未配置目标块ID')
+      // 桌面端使用 openTab 打开文档（使用文档ID而非块ID，避免只显示块内容）
+      console.log('[打开指定ID块] 桌面端使用 openTab 打开文档')
+      await siyuanOpenTab({
+        app: pluginInstance.app,
+        doc: { id: docId },  // 使用文档ID打开整个文档
+        keepCursor: true     // 保持光标位置，不自动跳转到新标签页
+      })
+      console.log('[打开指定ID块] 桌面端文档打开成功')
     }
+
+    // 等待文档加载后滚动到目标块
+    console.log('[打开指定ID块] 等待文档加载后滚动到目标块...')
+    setTimeout(() => {
+      const blockElement = document.querySelector(`[data-node-id="${targetId}"]`)
+      if (blockElement) {
+        console.log('[打开指定ID块] 找到目标块，滚动到视图')
+        blockElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        // 高亮显示目标块
+        ;(blockElement as HTMLElement).style.backgroundColor = 'var(--b3-theme-primary-lightest)'
+        setTimeout(() => {
+          ;(blockElement as HTMLElement).style.backgroundColor = ''
+        }, 2000)
+      } else {
+        console.warn('[打开指定ID块] 未找到目标块元素:', targetId)
+      }
+    }, 500)
+
+  } catch (error) {
+    console.warn('[打开指定ID块] 打开失败:', error)
+    Notify.showErrorCommandCannotExecute(`打开块: ${targetId}`)
   }
 }
 

@@ -436,16 +436,17 @@ export function createMobileSettingLayout(
       }
 
       addBtn.onclick = () => {
+        const newButtonIndex = context.buttonConfigs.length + 1
         const newButton: ButtonConfig = {
           id: `button_${Date.now()}`,
-          name: '新按钮',
+          name: `新按钮${newButtonIndex}`,
           type: 'builtin',
           builtinId: 'menuSearch',
           icon: '♥️',
           iconSize: context.mobileGlobalButtonConfig.iconSize,
           minWidth: context.mobileGlobalButtonConfig.minWidth,
           marginRight: context.mobileGlobalButtonConfig.marginRight,
-          sort: context.buttonConfigs.length + 1,
+          sort: newButtonIndex,
           platform: 'both',
           showNotification: context.mobileGlobalButtonConfig.showNotification,
           overflowLevel: 0 // 初始为可见，稍后重新计算

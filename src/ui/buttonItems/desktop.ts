@@ -343,9 +343,29 @@ export function createDesktopButtonItem(
       </div>
     `
 
+    // 笔记本ID配置（可选）
+    const notebookIdLabel = document.createElement('label')
+    notebookIdLabel.textContent = '📚 追加到每日笔记（可选）'
+    notebookIdLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 12px;'
+    
+    const notebookIdInput = document.createElement('input')
+    notebookIdInput.type = 'text'
+    notebookIdInput.className = 'b3-text-field'
+    notebookIdInput.placeholder = '笔记本ID，留空则在当前编辑器光标位置插入'
+    notebookIdInput.value = button.templateNotebookId || ''
+    notebookIdInput.style.cssText = 'font-size: 13px;'
+    notebookIdInput.onchange = () => { button.templateNotebookId = notebookIdInput.value }
+    
+    const notebookIdHint = document.createElement('div')
+    notebookIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+    notebookIdHint.textContent = '💡 填写笔记本ID后，点击按钮将直接追加到该笔记本的每日笔记；留空则需先选择编辑器'
+
     templateField.appendChild(label)
     templateField.appendChild(textarea)
     templateField.appendChild(hint)
+    templateField.appendChild(notebookIdLabel)
+    templateField.appendChild(notebookIdInput)
+    templateField.appendChild(notebookIdHint)
     editForm.appendChild(templateField)
   }
 
@@ -652,15 +672,16 @@ export function createDesktopButtonItem(
     subtypeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
     const currentSubtype = button.authorToolSubtype || 'open-doc'
     subtypeSelect.innerHTML = `
-      <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>① 打开指定ID块</option>
-      <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库悬浮弹窗</option>
-      <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
-      <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>④ 叶归LifeLog适配</option>
-      <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑤ 弹窗框模板选择</option>
-      <option value="button-sequence" ${currentSubtype === 'button-sequence' ? 'selected' : ''}>⑥ 连续点击自定义按钮</option>
+      <option value="button-sequence" ${currentSubtype === 'button-sequence' ? 'selected' : ''}>① 连续点击自定义按钮</option>
+      <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>② 打开指定ID块</option>
+      <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>③ 数据库悬浮弹窗</option>
+      <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>④ 日记底部</option>
+      <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>⑤ 叶归LifeLog适配</option>
+      <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
+      <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select' | 'button-sequence'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc'
       // 刷新表单以显示/隐藏相关配置
       if ((subtypeSelect as any).refreshForm) {
         (subtypeSelect as any).refreshForm()
@@ -919,25 +940,31 @@ export function createDesktopButtonItem(
         const nameSelect = document.createElement('select')
         nameSelect.className = 'b3-select'
         
-        // 使用 innerHTML 方式构建选项（与其他 select 保持一致）
-        console.log('[button-sequence] 构建选项列表, idx:', idx)
-        console.log('  availableButtons:', availableButtons.map(b => b.name))
-        const optionsHtml = availableButtons.map((btn, optIdx) => {
+        // 使用 DOM 方式构建选项（避免 HTML 转义问题）
+        const defaultOption = document.createElement('option')
+        defaultOption.value = ''
+        defaultOption.textContent = '-- 请选择按钮 --'
+        nameSelect.appendChild(defaultOption)
+        
+        availableButtons.forEach((btn) => {
+          const option = document.createElement('option')
+          option.value = btn.id  // 使用按钮ID作为value，避免名称重复问题
           const iconDisplay = btn.icon.startsWith('icon') ? '⭐' : btn.icon
-          const selected = step.buttonName === btn.name ? 'selected' : ''
-          console.log(`  选项${optIdx}: value="${btn.name}", selected=${selected}, text="${iconDisplay} ${btn.name}"`)
-          return `<option value="${btn.name}" ${selected}>${iconDisplay} ${btn.name}</option>`
-        }).join('')
-        nameSelect.innerHTML = `<option value="">-- 请选择按钮 --</option>${optionsHtml}`
-        console.log('  最终options数量:', nameSelect.options.length)
+          option.textContent = `${iconDisplay} ${btn.name}`
+          // 通过ID匹配当前选中的按钮
+          const currentBtn = availableButtons.find(b => b.name === step.buttonName)
+          if (currentBtn && currentBtn.id === btn.id) {
+            option.selected = true
+          }
+          nameSelect.appendChild(option)
+        })
         
         nameSelect.onchange = () => {
-          console.log('[button-sequence] 选择变化:')
-          console.log('  selectedIndex:', nameSelect.selectedIndex)
-          console.log('  value:', nameSelect.value)
-          console.log('  options数量:', nameSelect.options.length)
-          console.log('  当前选中的option:', nameSelect.options[nameSelect.selectedIndex]?.textContent)
-          button.buttonSequenceSteps![idx].buttonName = nameSelect.value
+          // 根据选中的ID找到对应的按钮名称
+          const selectedBtn = availableButtons.find(b => b.id === nameSelect.value)
+          if (selectedBtn) {
+            button.buttonSequenceSteps![idx].buttonName = selectedBtn.name
+          }
         }
 
         const delayInput = document.createElement('input')
@@ -976,6 +1003,51 @@ export function createDesktopButtonItem(
     buttonSequenceConfigDiv.appendChild(addSequenceRowBtn)
 
     authorToolField.appendChild(buttonSequenceConfigDiv)
+
+    // 滚动文档配置区
+    const scrollDocConfigDiv = document.createElement('div')
+    scrollDocConfigDiv.id = 'scroll-doc-config'
+    scrollDocConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+    const scrollDocTitle = document.createElement('label')
+    scrollDocTitle.textContent = '📜 滚动方向'
+    scrollDocTitle.style.cssText = 'font-size: 13px; font-weight: 500;'
+    scrollDocConfigDiv.appendChild(scrollDocTitle)
+
+    // 单选按钮组
+    const radioContainer = document.createElement('div')
+    radioContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
+
+    const currentDirection = button.scrollDirection || 'top'
+
+    // 滚动到顶部选项
+    const topRadioWrapper = document.createElement('label')
+    topRadioWrapper.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;'
+    const topRadio = document.createElement('input')
+    topRadio.type = 'radio'
+    topRadio.name = `scroll-direction-${button.id}`
+    topRadio.value = 'top'
+    topRadio.checked = currentDirection === 'top'
+    topRadio.onchange = () => { button.scrollDirection = 'top' }
+    topRadioWrapper.appendChild(topRadio)
+    topRadioWrapper.appendChild(document.createTextNode('滚动文档顶部'))
+    radioContainer.appendChild(topRadioWrapper)
+
+    // 滚动到底部选项
+    const bottomRadioWrapper = document.createElement('label')
+    bottomRadioWrapper.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;'
+    const bottomRadio = document.createElement('input')
+    bottomRadio.type = 'radio'
+    bottomRadio.name = `scroll-direction-${button.id}`
+    bottomRadio.value = 'bottom'
+    bottomRadio.checked = currentDirection === 'bottom'
+    bottomRadio.onchange = () => { button.scrollDirection = 'bottom' }
+    bottomRadioWrapper.appendChild(bottomRadio)
+    bottomRadioWrapper.appendChild(document.createTextNode('滚动文档底部'))
+    radioContainer.appendChild(bottomRadioWrapper)
+
+    scrollDocConfigDiv.appendChild(radioContainer)
+    authorToolField.appendChild(scrollDocConfigDiv)
 
     // 数据库块ID
     const dbBlockIdLabel = document.createElement('label')
@@ -1143,6 +1215,7 @@ export function createDesktopButtonItem(
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
       } else if (subtype === 'diary-bottom') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -1150,6 +1223,7 @@ export function createDesktopButtonItem(
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
       } else if (subtype === 'life-log') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -1157,6 +1231,7 @@ export function createDesktopButtonItem(
         lifeLogConfigDiv.style.display = 'flex'
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
       } else if (subtype === 'popup-select') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -1164,6 +1239,7 @@ export function createDesktopButtonItem(
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'flex'
         buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
       } else if (subtype === 'button-sequence') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -1171,6 +1247,15 @@ export function createDesktopButtonItem(
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'flex'
+        scrollDocConfigDiv.style.display = 'none'
+      } else if (subtype === 'scroll-doc') {
+        docConfigDiv.style.display = 'none'
+        dbConfigDiv.style.display = 'none'
+        diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'flex'
       } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'
@@ -1178,6 +1263,7 @@ export function createDesktopButtonItem(
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
       }
     }
     ;(subtypeSelect as any).refreshForm = updateVisibility
@@ -1556,15 +1642,16 @@ export function populateDesktopEditForm(
     subtypeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
     const currentSubtype = button.authorToolSubtype || 'open-doc'
     subtypeSelect.innerHTML = `
-      <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>① 打开指定ID块</option>
-      <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>② 数据库悬浮弹窗</option>
-      <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>③ 日记底部</option>
-      <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>④ 叶归LifeLog适配</option>
-      <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑤ 弹窗框模板选择</option>
-      <option value="button-sequence" ${currentSubtype === 'button-sequence' ? 'selected' : ''}>⑥ 连续点击自定义按钮</option>
+      <option value="button-sequence" ${currentSubtype === 'button-sequence' ? 'selected' : ''}>① 连续点击自定义按钮</option>
+      <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>② 打开指定ID块</option>
+      <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>③ 数据库悬浮弹窗</option>
+      <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>④ 日记底部</option>
+      <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>⑤ 叶归LifeLog适配</option>
+      <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
+      <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select' | 'button-sequence'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc'
       ;(subtypeSelect as any).refreshForm?.()
     }
     authorToolField.appendChild(subtypeSelect)
@@ -2001,25 +2088,31 @@ export function populateDesktopEditForm(
         const nameSelect = document.createElement('select')
         nameSelect.className = 'b3-select'
         
-        // 使用 innerHTML 方式构建选项（与其他 select 保持一致）
-        console.log('[button-sequence] 构建选项列表, idx:', idx)
-        console.log('  availableButtons:', availableButtons.map(b => b.name))
-        const optionsHtml = availableButtons.map((btn, optIdx) => {
+        // 使用 DOM 方式构建选项（避免 HTML 转义问题）
+        const defaultOption = document.createElement('option')
+        defaultOption.value = ''
+        defaultOption.textContent = '-- 请选择按钮 --'
+        nameSelect.appendChild(defaultOption)
+        
+        availableButtons.forEach((btn) => {
+          const option = document.createElement('option')
+          option.value = btn.id  // 使用按钮ID作为value，避免名称重复问题
           const iconDisplay = btn.icon.startsWith('icon') ? '⭐' : btn.icon
-          const selected = step.buttonName === btn.name ? 'selected' : ''
-          console.log(`  选项${optIdx}: value="${btn.name}", selected=${selected}, text="${iconDisplay} ${btn.name}"`)
-          return `<option value="${btn.name}" ${selected}>${iconDisplay} ${btn.name}</option>`
-        }).join('')
-        nameSelect.innerHTML = `<option value="">-- 请选择按钮 --</option>${optionsHtml}`
-        console.log('  最终options数量:', nameSelect.options.length)
+          option.textContent = `${iconDisplay} ${btn.name}`
+          // 通过ID匹配当前选中的按钮
+          const currentBtn = availableButtons.find(b => b.name === step.buttonName)
+          if (currentBtn && currentBtn.id === btn.id) {
+            option.selected = true
+          }
+          nameSelect.appendChild(option)
+        })
         
         nameSelect.onchange = () => {
-          console.log('[button-sequence] 选择变化:')
-          console.log('  selectedIndex:', nameSelect.selectedIndex)
-          console.log('  value:', nameSelect.value)
-          console.log('  options数量:', nameSelect.options.length)
-          console.log('  当前选中的option:', nameSelect.options[nameSelect.selectedIndex]?.textContent)
-          button.buttonSequenceSteps![idx].buttonName = nameSelect.value
+          // 根据选中的ID找到对应的按钮名称
+          const selectedBtn = availableButtons.find(b => b.id === nameSelect.value)
+          if (selectedBtn) {
+            button.buttonSequenceSteps![idx].buttonName = selectedBtn.name
+          }
         }
 
         const delayInput = document.createElement('input')
@@ -2059,6 +2152,51 @@ export function populateDesktopEditForm(
 
     authorToolField.appendChild(buttonSequenceConfigDiv)
 
+    // 滚动文档配置区
+    const scrollDocConfigDiv = document.createElement('div')
+    scrollDocConfigDiv.id = 'scroll-doc-config-2'
+    scrollDocConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+    const scrollDocTitle2 = document.createElement('label')
+    scrollDocTitle2.textContent = '📜 滚动方向'
+    scrollDocTitle2.style.cssText = 'font-size: 13px; font-weight: 500;'
+    scrollDocConfigDiv.appendChild(scrollDocTitle2)
+
+    // 单选按钮组
+    const radioContainer2 = document.createElement('div')
+    radioContainer2.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
+
+    const currentDirection2 = button.scrollDirection || 'top'
+
+    // 滚动到顶部选项
+    const topRadioWrapper2 = document.createElement('label')
+    topRadioWrapper2.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;'
+    const topRadio2 = document.createElement('input')
+    topRadio2.type = 'radio'
+    topRadio2.name = `scroll-direction-2-${button.id}`
+    topRadio2.value = 'top'
+    topRadio2.checked = currentDirection2 === 'top'
+    topRadio2.onchange = () => { button.scrollDirection = 'top' }
+    topRadioWrapper2.appendChild(topRadio2)
+    topRadioWrapper2.appendChild(document.createTextNode('滚动文档顶部'))
+    radioContainer2.appendChild(topRadioWrapper2)
+
+    // 滚动到底部选项
+    const bottomRadioWrapper2 = document.createElement('label')
+    bottomRadioWrapper2.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px;'
+    const bottomRadio2 = document.createElement('input')
+    bottomRadio2.type = 'radio'
+    bottomRadio2.name = `scroll-direction-2-${button.id}`
+    bottomRadio2.value = 'bottom'
+    bottomRadio2.checked = currentDirection2 === 'bottom'
+    bottomRadio2.onchange = () => { button.scrollDirection = 'bottom' }
+    bottomRadioWrapper2.appendChild(bottomRadio2)
+    bottomRadioWrapper2.appendChild(document.createTextNode('滚动文档底部'))
+    radioContainer2.appendChild(bottomRadioWrapper2)
+
+    scrollDocConfigDiv.appendChild(radioContainer2)
+    authorToolField.appendChild(scrollDocConfigDiv)
+
     // 根据当前选择显示/隐藏配置区
     const updateVisibility = () => {
       const subtype = subtypeSelect.value
@@ -2069,6 +2207,7 @@ export function populateDesktopEditForm(
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
       } else if (subtype === 'diary-bottom') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -2076,6 +2215,7 @@ export function populateDesktopEditForm(
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
       } else if (subtype === 'life-log') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -2083,6 +2223,7 @@ export function populateDesktopEditForm(
         lifeLogConfigDiv.style.display = 'flex'
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
       } else if (subtype === 'popup-select') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -2090,6 +2231,7 @@ export function populateDesktopEditForm(
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'flex'
         buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
       } else if (subtype === 'button-sequence') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -2097,6 +2239,15 @@ export function populateDesktopEditForm(
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'flex'
+        scrollDocConfigDiv.style.display = 'none'
+      } else if (subtype === 'scroll-doc') {
+        docConfigDiv.style.display = 'none'
+        dbConfigDiv.style.display = 'none'
+        diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'flex'
       } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'
@@ -2104,6 +2255,7 @@ export function populateDesktopEditForm(
         lifeLogConfigDiv.style.display = 'none'
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
       }
     }
     ;(subtypeSelect as any).refreshForm = updateVisibility

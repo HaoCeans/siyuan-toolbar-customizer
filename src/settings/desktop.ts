@@ -740,16 +740,17 @@ export function createDesktopSettingLayout(
       addBtn.style.cssText = 'width: 100%; margin-bottom: 12px; padding: 10px; border-radius: 6px; font-size: 14px;'
       addBtn.textContent = '+ 添加新按钮'
       addBtn.onclick = () => {
+        const newButtonIndex = context.desktopButtonConfigs.length + 1
         const newButton: ButtonConfig = {
           id: `button_${Date.now()}`,
-          name: '新按钮',
+          name: `新按钮${newButtonIndex}`,
           type: 'builtin',
           builtinId: 'menuSearch',
           icon: '♥️',
           iconSize: context.desktopGlobalButtonConfig.iconSize,
           minWidth: context.desktopGlobalButtonConfig.minWidth,
           marginRight: context.desktopGlobalButtonConfig.marginRight,
-          sort: context.desktopButtonConfigs.length + 1,
+          sort: newButtonIndex,
           platform: 'both',
           showNotification: context.desktopGlobalButtonConfig.showNotification,
           enabled: true
@@ -1215,16 +1216,17 @@ export function createDesktopSettingLayout(
       addBtn.style.cssText = 'width: 100%; margin-bottom: 12px; padding: 10px; border-radius: 6px; font-size: 14px;'
       addBtn.textContent = '+ 添加新按钮'
       addBtn.onclick = () => {
+        const newButtonIndex = context.mobileButtonConfigs.length + 1
         const newButton: ButtonConfig = {
           id: `button_${Date.now()}`,
-          name: '新按钮',
+          name: `新按钮${newButtonIndex}`,
           type: 'builtin',
           builtinId: 'menuSearch',
           icon: '♥️',
           iconSize: 18,
           minWidth: 32,
           marginRight: 8,
-          sort: context.mobileButtonConfigs.length + 1,
+          sort: newButtonIndex,
           platform: 'both',
           showNotification: true,
           enabled: true

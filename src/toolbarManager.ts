@@ -50,12 +50,13 @@ export interface ButtonConfig {
   type: 'builtin' | 'template' | 'click-sequence' | 'shortcut' | 'author-tool' | 'quick-note' | 'popup-select'; // 功能类型
   builtinId?: string;        // 思源功能ID（如：menuSearch）
   template?: string;         // 模板内容
+    templateNotebookId?: string; // 模板追加到每日笔记的笔记本ID（可选，为空则在当前编辑器插入）
   clickSequence?: string[];  // 模拟点击选择器序列
   shortcutKey?: string;      // 快捷键组合
   targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
   mobileTargetDocId?: string; // 打开指定ID块：目标块ID（移动端），支持文档ID或块ID
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
-  authorToolSubtype?: 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select' | 'button-sequence'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary-bottom=日记底部, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮
+  authorToolSubtype?: 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary-bottom=日记底部, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮, scroll-doc=滚动文档顶部或底部
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
   viewName?: string;         // 视图名称
@@ -79,6 +80,7 @@ export interface ButtonConfig {
   popupSelectTemplates?: { name: string; content: string }[]; // 弹窗选择：模板列表
   // 连续点击自定义按钮配置
   buttonSequenceSteps?: { buttonName: string; delayMs: number }[]; // 连续点击：按钮名称和间隔时间列表
+    scrollDirection?: 'top' | 'bottom'; // 滚动文档：滚动方向（top=顶部, bottom=底部）
   icon: string;              // 图标（思源图标或Emoji）
   iconSize: number;          // 图标大小（px）
   minWidth: number;          // 按钮最小宽度（px）
@@ -368,7 +370,17 @@ export const toolbarManager = {
 
 // 在初始化时设置全局变量
 export function setGlobalToolbarManager() {
-  (window as any).__toolbarManager = toolbarManager;
+  (window as any).__toolbarManager = {
+    executeButton: toolbarManager.executeButton,
+    // 添加获取所有按钮配置的方法
+    getAllButtonConfigs: () => {
+      if (pluginInstance) {
+        // 返回当前平台的按钮配置
+        return pluginInstance.buttonConfigs || []
+      }
+      return []
+    }
+  };
 }
 
 /**
@@ -1661,6 +1673,7 @@ function showOverflowToolbar(config: ButtonConfig) {
       layerBtn.className = 'fn__flex-center ariaLabel'
       layerBtn.style.cssText = getButtonBaseStyle(btn)
       layerBtn.title = btn.name
+      layerBtn.dataset.customButton = btn.id  // 添加 data-custom-button 属性，使按钮可被查找
 
       // 清空按钮内容
       layerBtn.innerHTML = ''
@@ -1917,6 +1930,39 @@ function insertTemplate(config: ButtonConfig, savedSelection: Range | null = nul
     return
   }
 
+  // 处理模板变量
+  const processedTemplate = processTemplateVariables(config.template)
+  
+  // 如果配置了笔记本ID，使用 appendDailyNoteBlock API 追加到每日笔记
+  if (config.templateNotebookId && config.templateNotebookId.trim()) {
+    const notebookId = config.templateNotebookId.trim()
+    // 异步执行追加操作
+    ;(async () => {
+      try {
+        const response = await fetchSyncPost('/api/block/appendDailyNoteBlock', {
+          data: processedTemplate,
+          dataType: 'markdown',
+          notebook: notebookId
+        })
+        
+        if (response.code === 0) {
+          if (config.showNotification) {
+            Notify.showInfoCopySuccess()
+          }
+        } else {
+          console.warn('[模板插入] 追加到每日笔记失败:', response.msg)
+          // 尝试替代方案
+          await appendToDailyNoteAlternative(notebookId, processedTemplate, config.showNotification)
+        }
+      } catch (error) {
+        console.warn('[模板插入] appendDailyNoteBlock API调用失败，尝试替代方案:', error)
+        await appendToDailyNoteAlternative(notebookId, processedTemplate, config.showNotification)
+      }
+    })()
+    return
+  }
+
+  // 原有逻辑：在当前编辑器光标位置插入
   // 优先使用保存的焦点元素，否则使用当前焦点元素
   const targetElement = lastActiveElement || document.activeElement
   const activeEditor = targetElement?.closest('.protyle')
@@ -1924,9 +1970,6 @@ function insertTemplate(config: ButtonConfig, savedSelection: Range | null = nul
     Notify.showInfoEditorNotFocused()
     return
   }
-  
-  // 处理模板变量
-  const processedTemplate = processTemplateVariables(config.template)
   
   // 插入模板内容
   const contentEditable = activeEditor.querySelector('[contenteditable="true"]')
@@ -2048,21 +2091,58 @@ async function executeClickSequence(config: ButtonConfig) {
 }
 
 /**
+ * 执行滚动文档到顶部或底部
+ * 获取当前活动的编辑器并滚动到指定位置
+ */
+function executeScrollDoc(config: ButtonConfig) {
+  const direction = config.scrollDirection || 'top'
+  
+  // 获取当前活动的编辑器
+  const activeEditor = document.querySelector('.protyle:not(.fn__none) .protyle-content')
+  if (!activeEditor) {
+    // 尝试获取任意可见的编辑器
+    const anyEditor = document.querySelector('.protyle .protyle-content')
+    if (!anyEditor) {
+      Notify.showInfoEditorNotFocused()
+      return
+    }
+    // 滚动
+    if (direction === 'top') {
+      anyEditor.scrollTop = 0
+    } else {
+      anyEditor.scrollTop = anyEditor.scrollHeight
+    }
+    return
+  }
+  
+  // 滚动到顶部或底部
+  if (direction === 'top') {
+    activeEditor.scrollTop = 0
+  } else {
+    activeEditor.scrollTop = activeEditor.scrollHeight
+  }
+}
+
+/**
  * 执行连续点击自定义按钮序列
  * 根据按钮名称查找自定义按钮并依次点击，点击后等待指定间隔时间
  */
 async function executeButtonSequence(config: ButtonConfig) {
   const steps = config.buttonSequenceSteps
+  console.log('[连续点击] 开始执行，配置:', config.name, '步骤:', steps)
   
   if (!steps || steps.length === 0) {
+    console.log('[连续点击] 错误：没有配置步骤')
     Notify.showErrorClickSequenceNotConfigured(config.name)
     return
   }
 
   // 过滤掉空的步骤（按钮名称为空的）
   const validSteps = steps.filter(step => step.buttonName && step.buttonName.trim())
+  console.log('[连续点击] 有效步骤:', validSteps.length, '个')
   
   if (validSteps.length === 0) {
+    console.log('[连续点击] 错误：没有有效步骤')
     Notify.showErrorClickSequenceNotConfigured(config.name)
     return
   }
@@ -2071,27 +2151,56 @@ async function executeButtonSequence(config: ButtonConfig) {
     const step = validSteps[i]
     const buttonName = step.buttonName.trim()
     const delayMs = step.delayMs || 200
+    console.log(`[连续点击] 步骤 ${i + 1}: 按钮名称="${buttonName}", 延迟=${delayMs}ms`)
 
     // 根据按钮名称查找自定义按钮
-    const button = findCustomButtonByName(buttonName)
+    let button = findCustomButtonByName(buttonName)
+    console.log(`[连续点击] 步骤 ${i + 1}: 查找按钮结果=`, button ? '找到' : '未找到')
+    
+    // 如果没找到，检查按钮是否在扩展工具栏中
+    if (!button) {
+      console.log(`[连续点击] 步骤 ${i + 1}: 按钮可能在扩展工具栏中，尝试打开扩展工具栏`)
+      const overflowButton = findOverflowButton()
+      if (overflowButton) {
+        console.log(`[连续点击] 步骤 ${i + 1}: 找到扩展工具栏按钮，正在打开`)
+        // 模拟点击扩展工具栏按钮
+        clickElement(overflowButton)
+        // 等待扩展工具栏动画完成
+        await delay(300)
+        // 再次查找按钮
+        button = findCustomButtonByName(buttonName)
+        console.log(`[连续点击] 步骤 ${i + 1}: 打开扩展工具栏后查找结果=`, button ? '找到' : '未找到')
+      }
+    }
     
     if (!button) {
       // 找不到按钮，停止整个序列
-      Notify.showErrorClickSequenceStepFailed(i + 1, `按钮“${buttonName}”`)
+      console.log(`[连续点击] 步骤 ${i + 1}: 错误 - 找不到按钮`)
+      Notify.showErrorClickSequenceStepFailed(i + 1, `按钮"${buttonName}"`)
       return
     }
 
     // 点击按钮
     try {
+      console.log(`[连续点击] 步骤 ${i + 1}: 正在点击按钮`)
       clickElement(button)
+      console.log(`[连续点击] 步骤 ${i + 1}: 点击成功`)
     } catch (error) {
-      Notify.showErrorClickSequenceStepFailed(i + 1, `按钮“${buttonName}”`)
+      console.log(`[连续点击] 步骤 ${i + 1}: 点击失败`, error)
+      Notify.showErrorClickSequenceStepFailed(i + 1, `按钮"${buttonName}"`)
       return
     }
 
     // 点击后等待指定间隔时间
+    console.log(`[连续点击] 步骤 ${i + 1}: 等待 ${delayMs}ms`)
     await delay(delayMs)
   }
+  console.log('[连续点击] 所有步骤执行完成')
+}
+
+// 查找扩展工具栏按钮
+function findOverflowButton(): HTMLElement | null {
+  return document.querySelector('[data-custom-button="overflow-button-mobile"]') as HTMLElement
 }
 
 /**
@@ -2099,32 +2208,86 @@ async function executeButtonSequence(config: ButtonConfig) {
  * 通过遍历所有带 data-custom-button 属性的按钮，匹配按钮名称
  */
 function findCustomButtonByName(buttonName: string): HTMLElement | null {
-  // 查找所有自定义按钮
+  console.log('[查找按钮] ========== 开始查找按钮:', buttonName, '==========')
+  
+  // 先从全局配置中查找按钮ID（通过名称找ID）
+  const toolbarManager = (window as any).__toolbarManager
+  let targetButtonId: string | null = null
+  
+  console.log('[查找按钮] toolbarManager 存在:', !!toolbarManager)
+  
+  if (toolbarManager) {
+    const configs = toolbarManager.getAllButtonConfigs?.()
+    console.log('[查找按钮] 获取配置函数存在:', !!toolbarManager.getAllButtonConfigs)
+    console.log('[查找按钮] 配置数组:', configs)
+    console.log('[查找按钮] 配置数量:', configs?.length || 0)
+    
+    if (configs && configs.length > 0) {
+      // 打印所有配置名称
+      console.log('[查找按钮] 所有配置名称:')
+      configs.forEach((c: ButtonConfig, i: number) => {
+        console.log(`  [${i}] name="${c.name}", id="${c.id}", type="${c.type}"`)
+      })
+      
+      const config = configs.find((c: ButtonConfig) => c.name === buttonName)
+      console.log('[查找按钮] 查找结果:', config ? `找到 name="${config.name}"` : '未找到')
+      if (config) {
+        targetButtonId = config.id
+        console.log('[查找按钮] 通过名称找到配置, targetButtonId:', targetButtonId)
+      }
+    }
+  }
+  
+  // 如果没找到配置，尝试备用方案（通过title匹配）
+  if (!targetButtonId) {
+    console.log('[查找按钮] ⚠️ 未找到配置，将尝试通过 title 匹配')
+  }
+  
+  // 查找所有自定义按钮（包括主工具栏和扩展工具栏）
   const customButtons = document.querySelectorAll('[data-custom-button]')
+  console.log('[查找按钮] 页面上自定义按钮总数（含扩展工具栏）:', customButtons.length)
   
   for (const btn of customButtons) {
     const button = btn as HTMLElement
-    // 获取按钮配置
     const buttonId = button.dataset.customButton
+    console.log('[查找按钮] 检查按钮 -> ID:', buttonId, '| title:', button.title, '| targetButtonId:', targetButtonId)
     
-    // 尝试从全局配置中查找按钮名称
-    const toolbarManager = (window as any).__toolbarManager
-    if (toolbarManager && buttonId) {
-      const configs = toolbarManager.getAllButtonConfigs?.()
-      if (configs) {
-        const config = configs.find((c: ButtonConfig) => c.id === buttonId)
-        if (config && config.name === buttonName) {
-          return button
-        }
-      }
+    // 优先通过ID匹配
+    if (targetButtonId && buttonId === targetButtonId) {
+      console.log('[查找按钮] ✅ 通过ID匹配成功!')
+      return button
     }
     
-    // 备用方案：通过按钮的 title 或文本内容匹配
-    if (button.title === buttonName || button.textContent?.trim() === buttonName) {
+    // 备用方案：通过按钮的 title 匹配
+    if (button.title === buttonName) {
+      console.log('[查找按钮] ✅ 通过 title 匹配成功!')
       return button
     }
   }
   
+  // 如果还没找到，检查按钮是否在扩展工具栏中（扩展工具栏可能使用不同的属性）
+  console.log('[查找按钮] 检查扩展工具栏中的按钮...')
+  const overflowToolbarButtons = document.querySelectorAll('.overflow-toolbar-layer [data-custom-button]')
+  console.log('[查找按钮] 扩展工具栏中的按钮数:', overflowToolbarButtons.length)
+  
+  for (const btn of overflowToolbarButtons) {
+    const button = btn as HTMLElement
+    const buttonId = button.dataset.customButton
+    console.log('[查找按钮] 检查扩展工具栏按钮 -> ID:', buttonId, '| title:', button.title)
+    
+    if (targetButtonId && buttonId === targetButtonId) {
+      console.log('[查找按钮] ✅ 在扩展工具栏中通过ID匹配成功!')
+      return button
+    }
+    
+    if (button.title === buttonName) {
+      console.log('[查找按钮] ✅ 在扩展工具栏中通过 title 匹配成功!')
+      return button
+    }
+  }
+  
+  console.log('[查找按钮] ❌ 未找到按钮:', buttonName)
+  console.log('[查找按钮] ========== 查找结束 ==========')
   return null
 }
 
@@ -2494,6 +2657,12 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
   // 连续点击自定义按钮类型
   if (subtype === 'button-sequence') {
     await executeButtonSequence(config)
+    return
+  }
+
+  // 滚动文档顶部或底部类型
+  if (subtype === 'scroll-doc') {
+    executeScrollDoc(config)
     return
   }
 

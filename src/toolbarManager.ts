@@ -239,10 +239,23 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
     sort: 7,
     platform: 'desktop',
     showNotification: true
+  },
+  {
+    id: 'recent-docs-desktop',
+    name: '最近文档',
+    type: 'shortcut',
+    shortcutKey: 'Ctrl+E',
+    icon: '📸',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 8,
+    platform: 'desktop',
+    showNotification: true
   }
 ]
 
-// 移动端默认按钮（8个，包含扩展工具栏按钮）
+// 移动端默认按钮（9个，包含扩展工具栏按钮）
 export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
   {
     id: 'overflow-button-mobile',
@@ -346,6 +359,19 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     minWidth: 23,
     marginRight: 10,
     sort: 7,
+    platform: 'mobile',
+    showNotification: true
+  },
+  {
+    id: 'recent-docs-mobile',
+    name: '最近文档',
+    type: 'builtin',
+    builtinId: 'menuRecent',
+    icon: '📸',
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
+    sort: 8,
     platform: 'mobile',
     showNotification: true
   }
@@ -1272,7 +1298,6 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
   // 保留必要的功能性类，移除 block__icon（避免思源样式干扰）
   button.className = 'fn__flex-center ariaLabel'
   button.setAttribute('aria-label', config.name)
-  button.title = config.name
 
   // 扩展工具栏按钮：设置 tabindex="-1" 阻止通过 Tab 键获得焦点
   if (config.id === 'overflow-button-mobile') {
@@ -1672,7 +1697,7 @@ function showOverflowToolbar(config: ButtonConfig) {
       // 使用与主工具栏相同的样式函数，确保完全一致
       layerBtn.className = 'fn__flex-center ariaLabel'
       layerBtn.style.cssText = getButtonBaseStyle(btn)
-      layerBtn.title = btn.name
+      layerBtn.setAttribute('aria-label', btn.name)
       layerBtn.dataset.customButton = btn.id  // 添加 data-custom-button 属性，使按钮可被查找
 
       // 清空按钮内容
@@ -2096,9 +2121,9 @@ async function executeClickSequence(config: ButtonConfig) {
  */
 function executeScrollDoc(config: ButtonConfig) {
   const direction = config.scrollDirection || 'top'
-  
-  // 获取当前活动的编辑器
-  const activeEditor = document.querySelector('.protyle:not(.fn__none) .protyle-content')
+
+  // 获取当前活动的编辑器（兼容电脑端 fn__hidden 和手机端 fn__none）
+  const activeEditor = document.querySelector('.protyle:not(.fn__none):not(.fn__hidden) .protyle-content')
   if (!activeEditor) {
     // 尝试获取任意可见的编辑器
     const anyEditor = document.querySelector('.protyle .protyle-content')
@@ -2108,18 +2133,18 @@ function executeScrollDoc(config: ButtonConfig) {
     }
     // 滚动
     if (direction === 'top') {
-      anyEditor.scrollTop = 0
+      ;(anyEditor as HTMLElement).scrollTop = 0
     } else {
-      anyEditor.scrollTop = anyEditor.scrollHeight
+      ;(anyEditor as HTMLElement).scrollTop = (anyEditor as HTMLElement).scrollHeight
     }
     return
   }
-  
+
   // 滚动到顶部或底部
   if (direction === 'top') {
-    activeEditor.scrollTop = 0
+    ;(activeEditor as HTMLElement).scrollTop = 0
   } else {
-    activeEditor.scrollTop = activeEditor.scrollHeight
+    ;(activeEditor as HTMLElement).scrollTop = (activeEditor as HTMLElement).scrollHeight
   }
 }
 
@@ -2198,86 +2223,55 @@ function findOverflowButton(): HTMLElement | null {
  * 通过遍历所有带 data-custom-button 属性的按钮，匹配按钮名称
  */
 function findCustomButtonByName(buttonName: string): HTMLElement | null {
-  console.log('[查找按钮] ========== 开始查找按钮:', buttonName, '==========')
-  
   // 先从全局配置中查找按钮ID（通过名称找ID）
   const toolbarManager = (window as any).__toolbarManager
   let targetButtonId: string | null = null
-  
-  console.log('[查找按钮] toolbarManager 存在:', !!toolbarManager)
-  
+
   if (toolbarManager) {
     const configs = toolbarManager.getAllButtonConfigs?.()
-    console.log('[查找按钮] 获取配置函数存在:', !!toolbarManager.getAllButtonConfigs)
-    console.log('[查找按钮] 配置数组:', configs)
-    console.log('[查找按钮] 配置数量:', configs?.length || 0)
-    
+
     if (configs && configs.length > 0) {
-      // 打印所有配置名称
-      console.log('[查找按钮] 所有配置名称:')
-      configs.forEach((c: ButtonConfig, i: number) => {
-        console.log(`  [${i}] name="${c.name}", id="${c.id}", type="${c.type}"`)
-      })
-      
       const config = configs.find((c: ButtonConfig) => c.name === buttonName)
-      console.log('[查找按钮] 查找结果:', config ? `找到 name="${config.name}"` : '未找到')
       if (config) {
         targetButtonId = config.id
-        console.log('[查找按钮] 通过名称找到配置, targetButtonId:', targetButtonId)
       }
     }
   }
-  
-  // 如果没找到配置，尝试备用方案（通过title匹配）
-  if (!targetButtonId) {
-    console.log('[查找按钮] ⚠️ 未找到配置，将尝试通过 title 匹配')
-  }
-  
+
   // 查找所有自定义按钮（包括主工具栏和扩展工具栏）
   const customButtons = document.querySelectorAll('[data-custom-button]')
-  console.log('[查找按钮] 页面上自定义按钮总数（含扩展工具栏）:', customButtons.length)
-  
+
   for (const btn of customButtons) {
     const button = btn as HTMLElement
     const buttonId = button.dataset.customButton
-    console.log('[查找按钮] 检查按钮 -> ID:', buttonId, '| title:', button.title, '| targetButtonId:', targetButtonId)
-    
+
     // 优先通过ID匹配
     if (targetButtonId && buttonId === targetButtonId) {
-      console.log('[查找按钮] ✅ 通过ID匹配成功!')
       return button
     }
-    
+
     // 备用方案：通过按钮的 title 匹配
     if (button.title === buttonName) {
-      console.log('[查找按钮] ✅ 通过 title 匹配成功!')
       return button
     }
   }
-  
+
   // 如果还没找到，检查按钮是否在扩展工具栏中（扩展工具栏可能使用不同的属性）
-  console.log('[查找按钮] 检查扩展工具栏中的按钮...')
   const overflowToolbarButtons = document.querySelectorAll('.overflow-toolbar-layer [data-custom-button]')
-  console.log('[查找按钮] 扩展工具栏中的按钮数:', overflowToolbarButtons.length)
-  
+
   for (const btn of overflowToolbarButtons) {
     const button = btn as HTMLElement
     const buttonId = button.dataset.customButton
-    console.log('[查找按钮] 检查扩展工具栏按钮 -> ID:', buttonId, '| title:', button.title)
-    
+
     if (targetButtonId && buttonId === targetButtonId) {
-      console.log('[查找按钮] ✅ 在扩展工具栏中通过ID匹配成功!')
       return button
     }
-    
+
     if (button.title === buttonName) {
-      console.log('[查找按钮] ✅ 在扩展工具栏中通过 title 匹配成功!')
       return button
     }
   }
-  
-  console.log('[查找按钮] ❌ 未找到按钮:', buttonName)
-  console.log('[查找按钮] ========== 查找结束 ==========')
+
   return null
 }
 
@@ -2562,26 +2556,19 @@ async function executeDiaryBottom(config: ButtonConfig) {
     // ==================== 如果配置了笔记本ID，使用API直接创建/打开日记 ====================
     if (config.diaryNotebookId && config.diaryNotebookId.trim()) {
       try {
-        console.log('[日记底部] 开始调用API创建日记，笔记本ID:', config.diaryNotebookId.trim())
-
         // 调用思源API创建日记
         const response = await fetchSyncPost('/api/filetree/createDailyNote', {
           notebook: config.diaryNotebookId.trim()
         })
 
-        console.log('[日记底部] API响应:', response)
-
         if (response.code === 0 && response.data?.id) {
           const docId = response.data.id
-          console.log('[日记底部] 日记创建成功，文档ID:', docId)
 
           // 打开创建的日记文档（createDailyNote不会自动跳转，需要手动打开）
-          console.log('[日记底部] 开始打开文档，平台:', isMobile ? '移动端' : '桌面端')
           try {
             if (isMobile) {
               // 移动端使用 openMobileFileById
               await openMobileFileById(pluginInstance.app, docId)
-              console.log('[日记底部] 移动端文档打开成功')
             } else {
               // 桌面端使用 openTab
               await siyuanOpenTab({
@@ -2590,7 +2577,6 @@ async function executeDiaryBottom(config: ButtonConfig) {
                   id: docId
                 }
               })
-              console.log('[日记底部] 桌面端文档打开成功')
             }
           } catch (openError) {
             console.warn('[日记底部] 打开文档失败:', openError)
@@ -2598,7 +2584,6 @@ async function executeDiaryBottom(config: ButtonConfig) {
 
           // 等待文档加载后滚动到底部
           const waitTime = isMobile ? (config.diaryWaitTime || 1000) : 800
-          console.log('[日记底部] 等待', waitTime, 'ms后滚动到底部')
           safeSetTimeout(startScrolling, waitTime)
           return
         } else {
@@ -2689,7 +2674,7 @@ async function executeDiaryBottom(config: ButtonConfig) {
  * 执行鲸鱼定制工具箱
  */
 async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
-  const subtype = config.authorToolSubtype || 'open-doc'
+  const subtype = config.authorToolSubtype || 'button-sequence'
 
   // 弹窗框模板选择类型
   if (subtype === 'popup-select') {
@@ -2726,8 +2711,8 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
     try {
       const categories = config.lifeLogCategories || ['学习', '工作', '生活']
       
-      // 创建选择对话框
-      const selectedCategory = await showCategorySelectionDialog(categories)
+      // 创建选择对话框（不恢复焦点，因为接下来还要弹出输入框）
+      const selectedCategory = await showCategorySelectionDialog(categories, { restoreFocus: false })
       
       if (selectedCategory) {
         // 弹出输入框，让用户输入具体内容
@@ -2794,52 +2779,39 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
     return
   }
 
-  console.log('[打开指定ID块] 开始打开，平台:', isMobile ? '移动端' : '桌面端', '目标ID:', targetId)
-
   try {
     // 先获取块信息，提取文档ID（rootID）
-    console.log('[打开指定ID块] 获取块信息...')
     const blockInfo = await fetchSyncPost('/api/block/getBlockInfo', { id: targetId })
 
     if (blockInfo.code !== 0 || !blockInfo.data) {
-      console.warn('[打开指定ID块] 获取块信息失败:', blockInfo.msg)
       Notify.showErrorCommandCannotExecute(`获取块信息: ${targetId}`)
       return
     }
 
     const docId = blockInfo.data.rootID
-    console.log('[打开指定ID块] 文档ID:', docId, '块ID:', targetId)
 
     if (isMobile) {
       // 移动端使用 openMobileFileById 打开文档
-      console.log('[打开指定ID块] 移动端使用 openMobileFileById 打开文档')
       await openMobileFileById(pluginInstance.app, docId)
-      console.log('[打开指定ID块] 移动端文档打开成功')
     } else {
       // 桌面端使用 openTab 打开文档（使用文档ID而非块ID，避免只显示块内容）
-      console.log('[打开指定ID块] 桌面端使用 openTab 打开文档')
       await siyuanOpenTab({
         app: pluginInstance.app,
         doc: { id: docId },  // 使用文档ID打开整个文档
         keepCursor: true     // 保持光标位置，不自动跳转到新标签页
       })
-      console.log('[打开指定ID块] 桌面端文档打开成功')
     }
 
     // 等待文档加载后滚动到目标块
-    console.log('[打开指定ID块] 等待文档加载后滚动到目标块...')
     setTimeout(() => {
       const blockElement = document.querySelector(`[data-node-id="${targetId}"]`)
       if (blockElement) {
-        console.log('[打开指定ID块] 找到目标块，滚动到视图')
         blockElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
         // 高亮显示目标块
         ;(blockElement as HTMLElement).style.backgroundColor = 'var(--b3-theme-primary-lightest)'
         setTimeout(() => {
           ;(blockElement as HTMLElement).style.backgroundColor = ''
         }, 2000)
-      } else {
-        console.warn('[打开指定ID块] 未找到目标块元素:', targetId)
       }
     }, 500)
 
@@ -2885,7 +2857,8 @@ function minutesToHHMM(minutes: number): string {
 /**
  * 显示分类选择对话框
  */
-async function showCategorySelectionDialog(categories: string[]): Promise<string | null> {
+async function showCategorySelectionDialog(categories: string[], options?: { restoreFocus?: boolean }): Promise<string | null> {
+  const { restoreFocus = true } = options || {};
   return new Promise((resolve) => {
     // 保存当前焦点元素
     const activeElement = document.activeElement as HTMLElement;
@@ -2955,8 +2928,8 @@ async function showCategorySelectionDialog(categories: string[]): Promise<string
         document.body.removeChild(overlay)
         // 添加短暂延迟以确保对话框完全移除后再插入内容
         setTimeout(() => {
-          // 恢复焦点到原始元素
-          if (activeElement && document.contains(activeElement)) {
+          // 恢复焦点到原始元素（仅在需要时）
+          if (restoreFocus && activeElement && document.contains(activeElement)) {
             try {
               activeElement.focus({ preventScroll: true });
             } catch (e) {
@@ -2985,8 +2958,8 @@ async function showCategorySelectionDialog(categories: string[]): Promise<string
     cancelButton.onclick = () => {
       document.body.removeChild(overlay)
       setTimeout(() => {
-        // 恢复焦点到原始元素
-        if (activeElement && document.contains(activeElement)) {
+        // 恢复焦点到原始元素（仅在需要时）
+        if (restoreFocus && activeElement && document.contains(activeElement)) {
           try {
             activeElement.focus({ preventScroll: true });
           } catch (e) {
@@ -3002,28 +2975,20 @@ async function showCategorySelectionDialog(categories: string[]): Promise<string
     // 注意：必须在按钮创建之后添加事件监听器
     const frontend = getFrontend();
     const isDesktop = frontend === 'desktop';
-    
-    console.log('[分类调试] 当前前端类型:', frontend);
-    console.log('[分类调试] 是否为桌面端:', isDesktop);
-    
+
     if (isDesktop) {
-      console.log('[分类调试] 为桌面端添加键盘事件监听器');
       // 为取消按钮添加键盘事件
       const handleKeyDown = (e: KeyboardEvent) => {
-        console.log('[分类调试] 键盘事件触发:', e.key);
         if (e.key === 'Escape') {
-          console.log('[分类调试] 检测到Escape键，触发取消');
           e.preventDefault();
           cancelButton.click();
         }
       };
-      
+
       overlay.addEventListener('keydown', handleKeyDown);
-      
+
       // 确保overlay可以接收键盘事件
       overlay.tabIndex = -1;
-    } else {
-      console.log('[分类调试] 非桌面端，不添加键盘事件监听器');
     }
 
     overlay.appendChild(dialog)
@@ -3202,30 +3167,19 @@ async function showTextInputDialog(prompt: string, placeholder?: string): Promis
     // 注意：必须在按钮创建之后添加事件监听器
     const frontend = getFrontend();
     const isDesktop = frontend === 'desktop';
-    
-    console.log('[调试] 当前前端类型:', frontend);
-    console.log('[调试] 是否为桌面端:', isDesktop);
-    
+
     if (isDesktop) {
-      console.log('[调试] 为桌面端添加键盘事件监听器');
       input.addEventListener('keydown', (e) => {
-        console.log('[调试] 键盘事件触发:', e.key);
         if (e.key === 'Enter') {
-          console.log('[调试] 检测到Enter键，触发确认');
           e.preventDefault();
           // 触发确认按钮点击
-          console.log('[调试] 确认按钮是否存在:', !!confirmButton);
           confirmButton.click();
         } else if (e.key === 'Escape') {
-          console.log('[调试] 检测到Escape键，触发取消');
           e.preventDefault();
           // 触发取消按钮点击
-          console.log('[调试] 取消按钮是否存在:', !!cancelButton);
           cancelButton.click();
         }
       });
-    } else {
-      console.log('[调试] 非桌面端，不添加键盘事件监听器');
     }
 
     // 点击遮罩关闭
@@ -3842,58 +3796,57 @@ function showDatabasePopup(
 
     const isMobile = isMobileDevice()
 
-    if (isMobile) {
-      // 手机端：模拟点击文件树
-      fetchSyncPost('/api/block/getBlockInfo', { id: blockId }).then((response) => {
-        if (response.code === 0 && response.data) {
-          const rootId = response.data.rootID
+    // 先获取块信息，然后用正确的方式打开
+    fetchSyncPost('/api/block/getBlockInfo', { id: blockId }).then((response) => {
+      if (response.code === 0 && response.data) {
+        const docId = response.data.rootID
 
-          const findDocElement = (id: string) => {
-            const selectors = [
-              `[data-node-id="${id}"]`,
-              `[data-url-id="${id}"]`,
-              `.b3-list-item[data-url-id="${id}"]`,
-              `[data-type="doc"][data-id="${id}"]`,
-              `li[data-id="${id}"]`
-            ]
-            for (const selector of selectors) {
-              const el = document.querySelector(selector)
-              if (el) return el
-            }
-            return null
+        if (isMobile) {
+          // 移动端：使用 openMobileFileById 打开文档
+          try {
+            openMobileFileById(pluginInstance.app, docId)
+            // 等待文档加载后滚动到目标块
+            setTimeout(() => {
+              const blockElement = document.querySelector(`[data-node-id="${blockId}"]`)
+              if (blockElement) {
+                blockElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                // 高亮显示
+                ;(blockElement as HTMLElement).style.backgroundColor = 'var(--b3-theme-primary-lightest)'
+                setTimeout(() => {
+                  ;(blockElement as HTMLElement).style.backgroundColor = ''
+                }, 2000)
+              }
+            }, 500)
+          } catch (err) {
+            console.warn('[数据库弹窗] 移动端打开失败:', err)
           }
-
-          let retries = 0
-          const tryOpenDoc = () => {
-            const fileTreeDoc = findDocElement(rootId)
-            if (fileTreeDoc) {
-              (fileTreeDoc as HTMLElement).click()
-              setTimeout(() => {
-                const block = document.querySelector(`[data-node-id="${blockId}"]`)
-                if (block) {
-                  block.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                  block.dispatchEvent(new MouseEvent('click', {
-                    view: window,
-                    bubbles: true,
-                    cancelable: true
-                  }))
-                }
-              }, 500)
-            } else if (retries < 5) {
-              retries++
-              setTimeout(tryOpenDoc, 200)
-            }
-          }
-
-          tryOpenDoc()
+        } else {
+          // 桌面端：使用 openTab 打开文档
+          siyuanOpenTab({
+            app: pluginInstance.app,
+            doc: { id: docId },
+            keepCursor: true
+          }).then(() => {
+            // 等待文档加载后滚动到目标块
+            setTimeout(() => {
+              const blockElement = document.querySelector(`[data-node-id="${blockId}"]`)
+              if (blockElement) {
+                blockElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                // 高亮显示
+                ;(blockElement as HTMLElement).style.backgroundColor = 'var(--b3-theme-primary-lightest)'
+                setTimeout(() => {
+                  ;(blockElement as HTMLElement).style.backgroundColor = ''
+                }, 2000)
+              }
+            }, 500)
+          }).catch((err) => {
+            console.warn('[数据库弹窗] 桌面端打开失败:', err)
+          })
         }
-      }).catch((err) => {
-        console.log('手机端打开失败:', err)
-      })
-    } else {
-      // 电脑端：直接使用 siyuan:// 超链接
-      window.location.href = 'siyuan://blocks/' + blockId
-    }
+      }
+    }).catch((err) => {
+      console.warn('[数据库弹窗] 获取块信息失败:', err)
+    })
   })
 }
 
@@ -4311,8 +4264,6 @@ async function copyToClipboard(text: string): Promise<boolean> {
 function executeSiyuanCommand(command: string, protyle?: any) {
   const windowObj = window as any
 
-  console.log('执行命令:', command, 'protyle:', protyle ? '有' : '无')
-
   // ========== 新方法：直接触发思源的快捷键处理系统 ==========
   // 思源监听键盘事件来处理快捷键，我们模拟真实的键盘事件
 
@@ -4342,8 +4293,6 @@ function executeSiyuanCommand(command: string, protyle?: any) {
   }
 
   if (hotkeyToTrigger) {
-    console.log('尝试触发快捷键事件:', hotkeyToTrigger)
-
     // 解析快捷键并创建键盘事件
     const keyEvent = parseHotkeyToKeyEvent(hotkeyToTrigger)
 
@@ -4360,36 +4309,26 @@ function executeSiyuanCommand(command: string, protyle?: any) {
       document.body.dispatchEvent(eventDown)
       document.body.dispatchEvent(eventUp)
 
-      console.log('已触发键盘事件:', keyEvent)
-
       // 快捷键触发成功，直接返回
       return
     }
   }
 
   // ========== 备用方法：点击按钮 ==========
-  console.log('尝试备用方法：点击按钮')
-
   const generalCommandHandlers: Record<string, () => void> = {
     'dailyNote': () => {
-      console.log('尝试通过多种方式打开日记')
-
       const siyuan = (window as any).siyuan
 
       // 方法1: 尝试使用 window.siyuan 中的函数
       if (siyuan) {
-        console.log('siyuan 对象的键:', Object.keys(siyuan))
-
         // 尝试查找可能的日记相关函数
         for (const key in siyuan) {
           if (typeof siyuan[key] === 'function' && key.toLowerCase().includes('daily')) {
-            console.log('找到日记相关函数:', key)
             try {
               siyuan[key]()
-              console.log('调用成功')
               return
             } catch (e) {
-              console.log('调用失败:', e)
+              // 调用失败，继续尝试
             }
           }
         }
@@ -4397,43 +4336,31 @@ function executeSiyuanCommand(command: string, protyle?: any) {
 
       // 方法2: 尝试通过 fetchSyncPost 调用思源 API
       try {
-        console.log('尝试通过思源 API 打开日记')
-
         if (typeof (window as any).fetchSyncPost === 'function') {
-          console.log('fetchSyncPost 存在，尝试调用')
-
           ;(window as any).fetchSyncPost('/api/notebook/lsNotebooks', {}).then((result: any) => {
-            console.log('笔记本列表:', result)
             if (result.code === 0 && result.data) {
-              const dailyNotebook = result.data.notebooks?.find((nb: any) =>
+              result.data.notebooks?.find((nb: any) =>
                 nb.name?.includes('日记') || nb.name?.includes('Daily')
               )
-              if (dailyNotebook) {
-                console.log('找到日记笔记本:', dailyNotebook)
-              }
             }
           })
         }
       } catch (e) {
-        console.log('API 调用失败:', e)
+        // API 调用失败
       }
 
       // 方法3: 查找并触发菜单容器
       const menuContainers = document.querySelectorAll('.b3-menu, [role="menu"]')
-      console.log('找到', menuContainers.length, '个菜单容器')
 
       menuContainers.forEach(menu => {
         const items = menu.querySelectorAll('.b3-menu__item, [role="menuitem"]')
         items.forEach(item => {
           const text = item.textContent?.trim()
           if (text?.includes('日记')) {
-            console.log('找到日记菜单项:', text)
             ;(item as HTMLElement).click()
           }
         })
       })
-
-      console.log('所有方法尝试完毕，仍未找到打开日记的方法')
     },
     'search': () => {
       const searchBtn = document.querySelector('[data-type="search"]') as HTMLElement
@@ -4517,7 +4444,6 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
   try {
     // 转换为思源的快捷键格式
     const siyuanHotkey = convertToSiyuanHotkey(config.shortcutKey)
-    console.log('执行快捷键:', config.shortcutKey, '-> 转换为:', siyuanHotkey)
 
     // 获取思源的快捷键配置
     const windowObj = window as any
@@ -4561,7 +4487,6 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
     }
 
     if (command) {
-      console.log('找到命令:', command)
 
       // 获取 keymap 和该命令对应的快捷键，以及判断是否为编辑器命令
       let hotkeyToTrigger = ''
@@ -4707,7 +4632,6 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
           const eventDown = new KeyboardEvent('keydown', keyEvent)
           window.dispatchEvent(eventDown)
 
-          console.log('已触发键盘事件:', hotkeyToTrigger, '目标: 全局')
           return
         }
       }
@@ -4715,14 +4639,11 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
       Notify.showErrorCommandCannotExecute(command)
     } else {
       // 未在 keymap 中找到命令，直接触发用户输入的快捷键
-      console.log('未在 keymap 中找到，直接触发快捷键:', siyuanHotkey)
-
       const keyEvent = parseHotkeyToKeyEvent(siyuanHotkey)
       if (keyEvent) {
         try {
           const eventDown = new KeyboardEvent('keydown', keyEvent)
           window.dispatchEvent(eventDown)
-          console.log('已触发键盘事件:', siyuanHotkey)
         } catch (e) {
           // 思源内部处理此快捷键时出错（可能不是有效快捷键）
           console.warn('思源处理此快捷键时出错:', e)
@@ -5065,12 +4986,7 @@ async function executeQuickNote(config: ButtonConfig) {
         documentId = config.quickNoteDocumentId || '';
       }
     }
-    
-    console.log('一键记事配置:');
-    console.log('- 保存方式:', saveType);
-    console.log('- 笔记本ID:', notebookId);
-    console.log('- 文档ID:', documentId);
-    
+
     // 直接调用现有的记事检测功能
     // 临时设置插件实例的配置
     const tempPlugin = {

@@ -43,6 +43,11 @@ import {
   clearSmallWindowDetector
 } from './windowDetector'
 
+// 导入 StressThreshold 清理函数
+import {
+  cleanupStressThreshold
+} from './stressThreshold'
+
 // 导入 UI 组件
 import { showConfirmDialog as showConfirmDialogModal } from './ui/dialog'
 import { showButtonSelector, type ButtonInfo } from './ui/buttonSelector'
@@ -378,9 +383,9 @@ export default class ToolbarCustomizer extends Plugin {
         // 新用户，显示欢迎提示
         setTimeout(() => {
           if (this.isMobile) {
-            showMessage('欢迎使用本插件！🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦搜索', 0, 'info')
+            showMessage('欢迎使用本插件！🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦搜索\n⑧最近文档', 0, 'info')
           } else {
-            showMessage('欢迎使用本插件🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦伺服浏览器', 0, 'info')
+            showMessage('欢迎使用本插件🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦伺服浏览器\n⑧最近文档', 0, 'info')
           }
           // 只设置标记，不立即写入，等待用户保存设置时一并写入
           this._pendingWelcomeSave = true
@@ -447,6 +452,9 @@ export default class ToolbarCustomizer extends Plugin {
       clearSmallWindowDetector()
     }
 
+    // 清理 StressThreshold 事件监听器
+    cleanupStressThreshold(this)
+
     // 清理全局 touch 事件监听器
     if (this.touchStartHandler) {
       document.removeEventListener('touchstart', this.touchStartHandler, true)
@@ -505,7 +513,6 @@ export default class ToolbarCustomizer extends Plugin {
 
           // 重新计算所有按钮的溢出层级
           const overflowLayers = overflowBtn.layers || 1
-          console.log('[保存设置] 准备调用溢出检测，层数:', overflowLayers)
           const updatedButtons = calculateButtonOverflow(this.mobileButtonConfigs, overflowLayers)
           // 更新按钮的溢出层级
           updatedButtons.forEach(btn => {
@@ -654,7 +661,7 @@ export default class ToolbarCustomizer extends Plugin {
   }
 
   // 带标题的确认对话框（用于 v3.0.0 迁移询问）
-  private showConfirmDialogModal(options: { title?: string; message: string; confirmText?: string; cancelText?: string }): Promise<boolean> {
+  private showConfirmDialogModal(options: { title?: string; message: string; hint?: string; confirmText?: string; cancelText?: string }): Promise<boolean> {
     return showConfirmDialogModal(options)
   }
 

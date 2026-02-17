@@ -186,6 +186,9 @@ export const DEFAULT_CONFIG: StressThresholdConfig = {
   mobileTargetBlockId: '20251109153938-zrdgcag',
 };
 
+// 保存事件监听器引用以便清理
+let stressThresholdEventHandler: ((event: CustomEvent) => void) | null = null;
+
 /**
  * 初始化 StressThreshold 功能
  */
@@ -194,20 +197,23 @@ export function initStressThreshold(
   config: StressThresholdConfig,
   onConfigChange: (newConfig: StressThresholdConfig) => Promise<void>
 ) {
-  // 监听编辑器加载事件
-  plugin.eventBus.on('loaded-protyle-static', (event: CustomEvent) => {
+  // 清理已存在的监听器，防止重复注册
+  cleanupStressThreshold(plugin);
+
+  // 定义事件处理函数
+  stressThresholdEventHandler = (event: CustomEvent) => {
     const protyle = event.detail?.protyle as IProtyle;
     if (!protyle) return;
-    
+
     // 防止重复注入
     if (protyle.element?.querySelector('[data-type="StressThreshold"]')) {
       return;
     }
-    
+
     // 找到工具栏按钮区
     const anchor = protyle.element?.querySelector('.protyle-breadcrumb [data-type="exit-focus"]');
     if (!anchor) return;
-    
+
     // 插入按钮
     anchor.insertAdjacentHTML(
       'afterend',
@@ -215,25 +221,25 @@ export function initStressThreshold(
         class="block__icon fn__flex-center"
         style="font-size:18px; user-select:none;">✅</button>`
     );
-    
+
     const btn = protyle.element?.querySelector('[data-type="StressThreshold"]') as HTMLElement;
     if (!btn) return;
-    
+
     // 设置按钮点击事件
-    btn.addEventListener('click', async (e) => {
+    const clickHandler = async (e: Event) => {
       e.stopPropagation();
-      
+
       // 防抖处理
       if ((btn as any).dataset.loading === 'true') return;
       (btn as any).dataset.loading = 'true';
-      
+
       // 添加加载动画
       const originalText = btn.textContent;
       btn.textContent = '⌛';
-      
+
       try {
         await loadAndShowData(plugin, config);
-      } catch (error) {
+      } catch (error: any) {
         console.error('按钮点击处理失败:', error);
         showMessage(`加载数据失败: ${error.message}`, 3000, 'error');
       } finally {
@@ -242,12 +248,12 @@ export function initStressThreshold(
           (btn as any).dataset.loading = 'false';
         }, 500);
       }
-    });
-    
+    };
+
     // 双击按钮执行其他操作（移动端跳转）
-    btn.addEventListener('dblclick', async (e) => {
+    const dblclickHandler = async (e: Event) => {
       e.stopPropagation();
-      
+
       if (config.mobileTargetBlockId) {
         const frontend = getFrontend();
         if (frontend === 'mobile' || frontend === 'browser-mobile') {
@@ -263,7 +269,46 @@ export function initStressThreshold(
           }
         }
       }
-    });
+    };
+
+    // 添加事件监听
+    btn.addEventListener('click', clickHandler);
+    btn.addEventListener('dblclick', dblclickHandler);
+
+    // 在按钮上保存处理器引用，便于后续清理
+    (btn as any)._stressThresholdClickHandler = clickHandler;
+    (btn as any)._stressThresholdDblclickHandler = dblclickHandler;
+  };
+
+  // 监听编辑器加载事件
+  plugin.eventBus.on('loaded-protyle-static', stressThresholdEventHandler);
+}
+
+/**
+ * 清理 StressThreshold 功能的所有事件监听器
+ */
+export function cleanupStressThreshold(plugin: any) {
+  // 移除 eventBus 监听器
+  if (stressThresholdEventHandler && plugin?.eventBus) {
+    plugin.eventBus.off('loaded-protyle-static', stressThresholdEventHandler);
+    stressThresholdEventHandler = null;
+  }
+
+  // 清理所有已添加按钮的事件监听器
+  document.querySelectorAll('[data-type="StressThreshold"]').forEach(btn => {
+    const button = btn as HTMLElement;
+    const clickHandler = (button as any)._stressThresholdClickHandler;
+    const dblclickHandler = (button as any)._stressThresholdDblclickHandler;
+
+    if (clickHandler) {
+      button.removeEventListener('click', clickHandler);
+    }
+    if (dblclickHandler) {
+      button.removeEventListener('dblclick', dblclickHandler);
+    }
+
+    // 移除按钮元素
+    button.remove();
   });
 }
 
@@ -561,16 +606,14 @@ async function findViewIdByName(avId: string, viewName: string): Promise<string 
       return matchingView.id;
     }
     
-    const fuzzyMatch = attributeView.views.find((view: any) => 
+    const fuzzyMatch = attributeView.views.find((view: any) =>
       view.name.includes(viewName) || viewName.includes(view.name)
     );
     if (fuzzyMatch) {
-      console.log(`使用模糊匹配的视图: ${fuzzyMatch.name}`);
       return fuzzyMatch.id;
     }
-    
+
     if (attributeView.views.length > 0) {
-      console.log(`未找到视图"${viewName}"，使用第一个视图: ${attributeView.views[0].name}`);
       return attributeView.views[0].id;
     }
     

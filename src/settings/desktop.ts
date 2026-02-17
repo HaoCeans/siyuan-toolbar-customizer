@@ -939,7 +939,7 @@ export function createDesktopSettingLayout(
     // 说明文字
     const hint = document.createElement('div')
     hint.style.cssText = 'font-size: 16px; color: var(--b3-theme-on-surface-light); margin-top: 8px; padding: 8px; background: var(--b3-theme-background); border-radius: 4px;'
-    hint.innerHTML = '💡 修改后会批量应用到所有按钮,单个按钮的独立配置优先级更高（仅限桌面端🖥️）'
+    hint.innerHTML = '💡 修改后会批量应用到所有按钮,单个按钮的独立配置优先级更高（仅限桌面端🖥️）<br><br><span style="font-size: 18px; font-weight: bold; color: var(--b3-theme-primary);">💡 建议：图标大小与按钮宽度设置相同，效果会更好</span>'
     container.appendChild(hint)
 
     return container

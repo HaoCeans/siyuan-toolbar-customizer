@@ -459,7 +459,6 @@ export function createMobileSettingLayout(
 
         // 如果启用了扩展工具栏，重新计算溢出层级
         if (overflowLayers > 0) {
-          console.log('[添加按钮] 准备调用溢出检测，层数:', overflowLayers)
           const updated = calculateButtonOverflow(context.buttonConfigs, overflowLayers)
           // 更新所有按钮的溢出层级
           updated.forEach(btn => {
@@ -540,7 +539,7 @@ export function createMobileSettingLayout(
   // 图标大小
   setting.addItem({
     title: '🆖 图标大小 (px)',
-    description: '所有按钮的图标大小',
+    description: '所有按钮的图标大小，建议与【按钮宽度】设置相同',
     createActionElement: () => {
       const input = document.createElement('input')
       input.className = 'b3-text-field fn__flex-center fn__size200'
@@ -574,7 +573,7 @@ export function createMobileSettingLayout(
   // 按钮宽度
   setting.addItem({
     title: '📏 按钮宽度 (px)',
-    description: '所有按钮的最小宽度',
+    description: '所有按钮的最小宽度，建议与【图标大小】设置相同，效果更好',
     createActionElement: () => {
       const input = document.createElement('input')
       input.className = 'b3-text-field fn__flex-center fn__size200'
@@ -1139,193 +1138,6 @@ export function createMobileSettingLayout(
   })
 
 
-  // === 小功能选择 ===
-  createGroupTitle('⚙️', '小功能选择')
-
-  // 检查扩展工具栏按钮是否启用
-  const isOverflowButtonEnabled = () => {
-    const overflowBtn = context.mobileButtonConfigs.find(btn => btn.id === 'overflow-button-mobile')
-    return overflowBtn?.enabled !== false
-  }
-
-
-  setting.addItem({
-    title: '面包屑图标隐藏',
-    description: '💡开启后隐藏面包屑左侧的图标',
-    createActionElement: () => {
-      const toggle = document.createElement('input')
-      toggle.type = 'checkbox'
-      toggle.className = 'b3-switch'
-      const overflowEnabled = isOverflowButtonEnabled()
-      toggle.checked = overflowEnabled ? true : context.mobileFeatureConfig.hideBreadcrumbIcon
-      toggle.style.cssText = 'transform: scale(1.2);'
-      if (overflowEnabled) {
-        toggle.disabled = true
-        toggle.style.opacity = '0.5'
-      }
-      toggle.onchange = async () => {
-        context.mobileFeatureConfig.hideBreadcrumbIcon = toggle.checked
-        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
-        context.applyFeatures()
-      }
-      return toggle
-    }
-  })
-
-  setting.addItem({
-    title: '锁定编辑按钮隐藏',
-    description: '💡隐藏工具栏的锁定编辑按钮',
-    createActionElement: () => {
-      const toggle = document.createElement('input')
-      toggle.type = 'checkbox'
-      toggle.className = 'b3-switch'
-      const overflowEnabled = isOverflowButtonEnabled()
-      toggle.checked = overflowEnabled ? true : context.mobileFeatureConfig.hideReadonlyButton
-      toggle.style.cssText = 'transform: scale(1.2);'
-      if (overflowEnabled) {
-        toggle.disabled = true
-        toggle.style.opacity = '0.5'
-      }
-      toggle.onchange = async () => {
-        context.mobileFeatureConfig.hideReadonlyButton = toggle.checked
-        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
-        context.applyFeatures()
-      }
-      return toggle
-    }
-  })
-
-  setting.addItem({
-    title: '文档菜单按钮隐藏',
-    description: '💡隐藏工具栏的文档菜单按钮',
-    createActionElement: () => {
-      const toggle = document.createElement('input')
-      toggle.type = 'checkbox'
-      toggle.className = 'b3-switch'
-      const overflowEnabled = isOverflowButtonEnabled()
-      toggle.checked = overflowEnabled ? true : context.mobileFeatureConfig.hideDocMenuButton
-      toggle.style.cssText = 'transform: scale(1.2);'
-      if (overflowEnabled) {
-        toggle.disabled = true
-        toggle.style.opacity = '0.5'
-      }
-      toggle.onchange = async () => {
-        context.mobileFeatureConfig.hideDocMenuButton = toggle.checked
-        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
-        context.applyFeatures()
-      }
-      return toggle
-    }
-  })
-
-  setting.addItem({
-    title: '更多按钮隐藏',
-    description: '💡隐藏工具栏的更多按钮',
-    createActionElement: () => {
-      const toggle = document.createElement('input')
-      toggle.type = 'checkbox'
-      toggle.className = 'b3-switch'
-      const overflowEnabled = isOverflowButtonEnabled()
-      toggle.checked = overflowEnabled ? true : context.mobileFeatureConfig.hideMoreButton
-      toggle.style.cssText = 'transform: scale(1.2);'
-      if (overflowEnabled) {
-        toggle.disabled = true
-        toggle.style.opacity = '0.5'
-      }
-      toggle.onchange = async () => {
-        context.mobileFeatureConfig.hideMoreButton = toggle.checked
-        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
-        context.applyFeatures()
-      }
-      return toggle
-    }
-  })
-
-  // 手机端禁止左右滑动弹出
-  setting.addItem({
-    title: '禁止左右滑动弹出',
-    description: '💡开启后禁止左右滑动弹出文档树和设置菜单',
-    createActionElement: () => {
-      const toggle = document.createElement('input')
-      toggle.type = 'checkbox'
-      toggle.className = 'b3-switch'
-      toggle.checked = context.mobileFeatureConfig.disableMobileSwipe ?? false
-      toggle.style.cssText = 'transform: scale(1.2);'
-      toggle.onchange = async () => {
-        context.mobileFeatureConfig.disableMobileSwipe = toggle.checked
-        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
-        context.applyFeatures()
-      }
-      return toggle
-    }
-  })
-
-  // 鲸鱼定制工具箱激活码输入
-  setting.addItem({
-    title: '🔐 鲸鱼定制工具箱激活',
-    description: '💡输入激活码解锁「⑥鲸鱼定制工具箱」功能类型。激活码获取：请进QQ群1018010924咨询群主！',
-    createActionElement: () => {
-      const container = document.createElement('div')
-      container.style.cssText = 'display: flex; flex-direction: column; gap: 10px; width: 100%;'
-
-      // 激活状态显示
-      const statusEl = document.createElement('div')
-      statusEl.style.cssText = 'font-size: 13px; padding: 4px 10px; border-radius: 4px; display: inline-block; width: fit-content;'
-      if (context.isAuthorToolActivated()) {
-        statusEl.style.cssText += ' background: rgba(34, 197, 94, 0.2); color: #22c55e;'
-        statusEl.textContent = '✓ 已激活'
-      } else {
-        statusEl.style.cssText += ' background: rgba(255, 77, 77, 0.2); color: #ff4d4d;'
-        statusEl.textContent = '✗ 未激活'
-      }
-      container.appendChild(statusEl)
-
-      // 输入框和按钮容器
-      const inputRow = document.createElement('div')
-      inputRow.style.cssText = 'display: flex; gap: 8px; align-items: center;'
-
-      const input = document.createElement('input')
-      input.type = 'text'
-      input.className = 'b3-text-field'
-      input.placeholder = '请输入激活码'
-      input.value = context.mobileFeatureConfig.authorCode ?? ''
-      input.style.cssText = 'flex: 1;'
-
-      const btn = document.createElement('button')
-      btn.className = 'b3-button b3-button--text'
-      btn.textContent = '验证激活'
-      btn.onclick = async () => {
-        const code = input.value.trim()
-        if (code === '88888888') {
-          // 同时激活两端
-          context.mobileFeatureConfig.authorActivated = true
-          context.mobileFeatureConfig.authorCode = code
-          context.desktopFeatureConfig.authorActivated = true
-          context.desktopFeatureConfig.authorCode = code
-          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
-          await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
-          statusEl.style.cssText = 'font-size: 13px; padding: 4px 10px; border-radius: 4px; display: inline-block; width: fit-content; background: rgba(34, 197, 94, 0.2); color: #22c55e;'
-          statusEl.textContent = '✓ 已激活'
-          Notify.showInfoAuthorToolActivated()
-          // 延迟后重新加载设置页面
-          setTimeout(() => {
-            window.location.reload()
-          }, 1500)
-        } else {
-          Notify.showErrorActivationCodeInvalid()
-        }
-      }
-
-      inputRow.appendChild(input)
-      inputRow.appendChild(btn)
-      container.appendChild(inputRow)
-
-      return container
-    }
-  })
-
-
-  
   // === 自启动一键记事 ===
   createGroupTitle('📝', '自启动一键记事')
 
@@ -1618,7 +1430,194 @@ export function createMobileSettingLayout(
       return container;
     }
   })
-  
+
+
+  // === 小功能选择 ===
+  createGroupTitle('⚙️', '小功能选择')
+
+  // 检查扩展工具栏按钮是否启用
+  const isOverflowButtonEnabled = () => {
+    const overflowBtn = context.mobileButtonConfigs.find(btn => btn.id === 'overflow-button-mobile')
+    return overflowBtn?.enabled !== false
+  }
+
+
+  setting.addItem({
+    title: '面包屑图标隐藏',
+    description: '💡开启后隐藏面包屑左侧的图标',
+    createActionElement: () => {
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'b3-switch'
+      const overflowEnabled = isOverflowButtonEnabled()
+      toggle.checked = overflowEnabled ? true : context.mobileFeatureConfig.hideBreadcrumbIcon
+      toggle.style.cssText = 'transform: scale(1.2);'
+      if (overflowEnabled) {
+        toggle.disabled = true
+        toggle.style.opacity = '0.5'
+      }
+      toggle.onchange = async () => {
+        context.mobileFeatureConfig.hideBreadcrumbIcon = toggle.checked
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+        context.applyFeatures()
+      }
+      return toggle
+    }
+  })
+
+  setting.addItem({
+    title: '锁定编辑按钮隐藏',
+    description: '💡隐藏工具栏的锁定编辑按钮',
+    createActionElement: () => {
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'b3-switch'
+      const overflowEnabled = isOverflowButtonEnabled()
+      toggle.checked = overflowEnabled ? true : context.mobileFeatureConfig.hideReadonlyButton
+      toggle.style.cssText = 'transform: scale(1.2);'
+      if (overflowEnabled) {
+        toggle.disabled = true
+        toggle.style.opacity = '0.5'
+      }
+      toggle.onchange = async () => {
+        context.mobileFeatureConfig.hideReadonlyButton = toggle.checked
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+        context.applyFeatures()
+      }
+      return toggle
+    }
+  })
+
+  setting.addItem({
+    title: '文档菜单按钮隐藏',
+    description: '💡隐藏工具栏的文档菜单按钮',
+    createActionElement: () => {
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'b3-switch'
+      const overflowEnabled = isOverflowButtonEnabled()
+      toggle.checked = overflowEnabled ? true : context.mobileFeatureConfig.hideDocMenuButton
+      toggle.style.cssText = 'transform: scale(1.2);'
+      if (overflowEnabled) {
+        toggle.disabled = true
+        toggle.style.opacity = '0.5'
+      }
+      toggle.onchange = async () => {
+        context.mobileFeatureConfig.hideDocMenuButton = toggle.checked
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+        context.applyFeatures()
+      }
+      return toggle
+    }
+  })
+
+  setting.addItem({
+    title: '更多按钮隐藏',
+    description: '💡隐藏工具栏的更多按钮',
+    createActionElement: () => {
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'b3-switch'
+      const overflowEnabled = isOverflowButtonEnabled()
+      toggle.checked = overflowEnabled ? true : context.mobileFeatureConfig.hideMoreButton
+      toggle.style.cssText = 'transform: scale(1.2);'
+      if (overflowEnabled) {
+        toggle.disabled = true
+        toggle.style.opacity = '0.5'
+      }
+      toggle.onchange = async () => {
+        context.mobileFeatureConfig.hideMoreButton = toggle.checked
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+        context.applyFeatures()
+      }
+      return toggle
+    }
+  })
+
+  // 手机端禁止左右滑动弹出
+  setting.addItem({
+    title: '禁止左右滑动弹出',
+    description: '💡开启后禁止左右滑动弹出文档树和设置菜单',
+    createActionElement: () => {
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'b3-switch'
+      toggle.checked = context.mobileFeatureConfig.disableMobileSwipe ?? false
+      toggle.style.cssText = 'transform: scale(1.2);'
+      toggle.onchange = async () => {
+        context.mobileFeatureConfig.disableMobileSwipe = toggle.checked
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+        context.applyFeatures()
+      }
+      return toggle
+    }
+  })
+
+  // 鲸鱼定制工具箱激活码输入
+  setting.addItem({
+    title: '🔐 鲸鱼定制工具箱激活',
+    description: '💡输入激活码解锁「⑥鲸鱼定制工具箱」功能类型。激活码获取：请进QQ群1018010924咨询群主！',
+    createActionElement: () => {
+      const container = document.createElement('div')
+      container.style.cssText = 'display: flex; flex-direction: column; gap: 10px; width: 100%;'
+
+      // 激活状态显示
+      const statusEl = document.createElement('div')
+      statusEl.style.cssText = 'font-size: 13px; padding: 4px 10px; border-radius: 4px; display: inline-block; width: fit-content;'
+      if (context.isAuthorToolActivated()) {
+        statusEl.style.cssText += ' background: rgba(34, 197, 94, 0.2); color: #22c55e;'
+        statusEl.textContent = '✓ 已激活'
+      } else {
+        statusEl.style.cssText += ' background: rgba(255, 77, 77, 0.2); color: #ff4d4d;'
+        statusEl.textContent = '✗ 未激活'
+      }
+      container.appendChild(statusEl)
+
+      // 输入框和按钮容器
+      const inputRow = document.createElement('div')
+      inputRow.style.cssText = 'display: flex; gap: 8px; align-items: center;'
+
+      const input = document.createElement('input')
+      input.type = 'text'
+      input.className = 'b3-text-field'
+      input.placeholder = '请输入激活码'
+      input.value = context.mobileFeatureConfig.authorCode ?? ''
+      input.style.cssText = 'flex: 1;'
+
+      const btn = document.createElement('button')
+      btn.className = 'b3-button b3-button--text'
+      btn.textContent = '验证激活'
+      btn.onclick = async () => {
+        const code = input.value.trim()
+        if (code === '88888888') {
+          // 同时激活两端
+          context.mobileFeatureConfig.authorActivated = true
+          context.mobileFeatureConfig.authorCode = code
+          context.desktopFeatureConfig.authorActivated = true
+          context.desktopFeatureConfig.authorCode = code
+          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+          await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+          statusEl.style.cssText = 'font-size: 13px; padding: 4px 10px; border-radius: 4px; display: inline-block; width: fit-content; background: rgba(34, 197, 94, 0.2); color: #22c55e;'
+          statusEl.textContent = '✓ 已激活'
+          Notify.showInfoAuthorToolActivated()
+          // 延迟后重新加载设置页面
+          setTimeout(() => {
+            window.location.reload()
+          }, 1500)
+        } else {
+          Notify.showErrorActivationCodeInvalid()
+        }
+      }
+
+      inputRow.appendChild(input)
+      inputRow.appendChild(btn)
+      container.appendChild(inputRow)
+
+      return container
+    }
+  })
+
+
   // === 使用帮助 ===
   createGroupTitle('💡', '使用帮助')
 

@@ -1521,6 +1521,49 @@ export function createMobileSettingLayout(
     }
   })
 
+  // 弹窗按钮高度设置
+  setting.addItem({
+    title: '🔘 弹窗按钮高度',
+    description: '调整一键记事弹窗内按钮的高度（像素）',
+    createActionElement: () => {
+      const container = document.createElement('div');
+      container.style.cssText = 'display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 0;';
+
+      const config = context.mobileFeatureConfig as any;
+      const currentHeight = config.quickNoteButtonHeight || 32;
+
+      // 高度滑块
+      const slider = document.createElement('input');
+      slider.type = 'range';
+      slider.min = '24';
+      slider.max = '66';
+      slider.value = String(currentHeight);
+      slider.style.cssText = 'flex: 1; cursor: pointer;';
+
+      // 数值显示
+      const valueDisplay = document.createElement('span');
+      valueDisplay.textContent = `${currentHeight}px`;
+      valueDisplay.style.cssText = 'min-width: 45px; text-align: right; font-size: 14px; font-weight: 500;';
+
+      slider.oninput = () => {
+        const value = parseInt(slider.value);
+        valueDisplay.textContent = `${value}px`;
+        config.quickNoteButtonHeight = value;
+      };
+
+      slider.onchange = async () => {
+        const value = parseInt(slider.value);
+        config.quickNoteButtonHeight = value;
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+      };
+
+      container.appendChild(slider);
+      container.appendChild(valueDisplay);
+
+      return container;
+    }
+  })
+
 
   // === 小功能选择 ===
   createGroupTitle('⚙️', '小功能选择')

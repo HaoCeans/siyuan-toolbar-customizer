@@ -4917,8 +4917,8 @@ export function initWindowDimensionDisplay(): void {
       clearInterval(dimensionCheckInterval)
     }
     
-    // 开始每100毫秒检测一次高度变化
-    dimensionCheckInterval = window.setInterval(checkHeightChange, 100);
+    // 开始每300毫秒检测一次高度变化
+    dimensionCheckInterval = window.setInterval(checkHeightChange, 300);
   }
 }
 

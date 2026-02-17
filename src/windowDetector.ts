@@ -60,6 +60,8 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
   // 创建美化版记事输入弹窗
   const dialog = document.createElement('div');
   dialog.id = 'quick-note-dialog';
+  // 防止遮罩层获取焦点
+  dialog.tabIndex = -1;
   dialog.style.cssText = `
     position: fixed;
     top: 0;
@@ -74,6 +76,8 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
   `;
 
   const content = document.createElement('div');
+  // 防止内容容器获取焦点
+  content.tabIndex = -1;
   content.style.cssText = `
     background: white;
     border-radius: 12px;
@@ -215,6 +219,12 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
   const saveBtn = document.createElement('button');
   saveBtn.textContent = documentId ? '追加到文档' : '保存记事';
   saveBtn.className = 'b3-button b3-button--primary';
+  // 防止按钮获取焦点，保持输入法不关闭
+  saveBtn.tabIndex = -1;
+  // 阻止 mousedown 导致的焦点转移
+  saveBtn.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+  });
   saveBtn.onclick = async () => {
     const content = textarea.value.trim();
     if (content) {
@@ -265,6 +275,12 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
   const cancelBtn = document.createElement('button');
   cancelBtn.textContent = '取消';
   cancelBtn.className = 'b3-button b3-button--outline';
+  // 防止按钮获取焦点，保持输入法不关闭
+  cancelBtn.tabIndex = -1;
+  // 阻止 mousedown 导致的焦点转移
+  cancelBtn.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+  });
   cancelBtn.onclick = () => {
     dialog.remove();
   };
@@ -279,10 +295,30 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
 
   document.body.appendChild(dialog);
 
-  // 自动聚焦到输入框
-  setTimeout(() => {
+  // 自动聚焦到输入框 - 使用 requestAnimationFrame 确保布局完成后再聚焦
+  const focusTextarea = () => {
     textarea.focus();
-  }, 100);
+    // 移动端额外尝试，确保输入法弹出
+    if (isMobileDevice()) {
+      textarea.click();
+      // 再次尝试聚焦，处理某些浏览器延迟问题
+      setTimeout(() => {
+        if (document.activeElement !== textarea) {
+          textarea.focus();
+          textarea.click();
+        }
+      }, 300);
+    }
+  };
+  
+  // 等待 DOM 渲染完成
+  if (document.readyState === 'complete') {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(focusTextarea);
+    });
+  } else {
+    setTimeout(focusTextarea, 150);
+  }
 }
 
 // 关闭记事弹窗的函数
@@ -325,10 +361,13 @@ function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null):
   // 防止按钮获取焦点，保持输入法不关闭
   clonedBtn.tabIndex = -1;
   
+  // 获取配置的按钮高度
+  const buttonHeight = pluginInstance?.mobileFeatureConfig?.quickNoteButtonHeight || 32;
+  
   // 设置按钮基本样式
   clonedBtn.style.cssText = `
     min-width: 36px;
-    height: 32px;
+    height: ${buttonHeight}px;
     padding: 4px 8px;
     margin: 2px;
     border: 1px solid #e0e0e0;

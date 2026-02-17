@@ -162,7 +162,8 @@ export default class ToolbarCustomizer extends Plugin {
     authorCode: '',             // 鲸鱼定制工具箱激活码
     popupConfig: 'bothModes' as const, // 弹窗配置：'disabled'|'smallWindowOnly'|'bothModes'
     quickNoteNotebookId: '',     // 自启动一键记事默认笔记本ID
-    quickNoteFontSize: 18        // 弹窗输入框字体大小（px）
+    quickNoteFontSize: 18,       // 弹窗输入框字体大小（px）
+    quickNoteSortMethod: 'bottomToolbar' as const // 弹窗按钮排序方法：'topToolbar'|'bottomToolbar'
   }
 
   // 检查作者功能是否已激活

@@ -1388,6 +1388,96 @@ export function createMobileSettingLayout(
     }
   })
 
+  // === 弹窗按钮排序方法 ===
+  setting.addItem({
+    title: '🔘 弹窗按钮排序方法',
+    description: '选择一键记事弹窗中工具栏按钮的排列方式',
+    createActionElement: () => {
+      const container = document.createElement('div')
+      container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; width: 100%;'
+
+      // 获取当前配置值，设置默认值
+      const config = context.mobileFeatureConfig as any
+      const currentSortMethod = config.quickNoteSortMethod || 'bottomToolbar'
+
+      // 创建选项按钮
+      const options = [
+        { 
+          value: 'topToolbar', 
+          label: '①顶部工具栏排序', 
+          description: '从右往左排列，不满行时居中。适合习惯顶部工具栏的用户' 
+        },
+        { 
+          value: 'bottomToolbar', 
+          label: '②底部工具栏排序', 
+          description: '从左往右排列，不满行时靠左。适合习惯底部工具栏的用户' 
+        }
+      ]
+
+      options.forEach(option => {
+        const optionContainer = document.createElement('div')
+        optionContainer.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--b3-border-color); border-radius: 8px; cursor: pointer; transition: all 0.2s ease;'
+
+        const radio = document.createElement('input')
+        radio.type = 'radio'
+        radio.name = 'quickNoteSortMethod'
+        radio.value = option.value
+        radio.checked = currentSortMethod === option.value
+        radio.style.cssText = 'transform: scale(1.3);'
+
+        const labelContainer = document.createElement('div')
+        labelContainer.style.cssText = 'flex: 1;'
+
+        const label = document.createElement('div')
+        label.textContent = option.label
+        label.style.cssText = 'font-weight: 500; color: var(--b3-theme-on-background); margin-bottom: 4px;'
+
+        const desc = document.createElement('div')
+        desc.textContent = option.description
+        desc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface-light);'
+
+        labelContainer.appendChild(label)
+        labelContainer.appendChild(desc)
+
+        optionContainer.appendChild(radio)
+        optionContainer.appendChild(labelContainer)
+
+        // 添加选中状态样式
+        if (radio.checked) {
+          optionContainer.style.cssText += ' background: var(--b3-theme-primary-lightest); border-color: var(--b3-theme-primary);'
+        }
+
+        // 点击事件处理
+        optionContainer.onclick = async () => {
+          // 更新所有选项的选中状态
+          container.querySelectorAll('input[type="radio"]').forEach(r => {
+            const radioInput = r as HTMLInputElement;
+            const container = r.closest('div[style*="cursor: pointer"]') as HTMLElement
+            if (r === radio) {
+              radioInput.checked = true
+              if (container) {
+                container.style.cssText = container.style.cssText.replace(/background: [^;]+; border-color: [^;]+;/, '') + ' background: var(--b3-theme-primary-lightest); border-color: var(--b3-theme-primary);'
+              }
+            } else {
+              radioInput.checked = false
+              if (container) {
+                container.style.cssText = container.style.cssText.replace(/background: [^;]+; border-color: [^;]+;/, '')
+              }
+            }
+          })
+
+          // 保存配置
+          config.quickNoteSortMethod = option.value
+          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+        }
+
+        container.appendChild(optionContainer)
+      })
+
+      return container
+    }
+  })
+
   // === 弹窗输入框字体大小 ===
   setting.addItem({
     title: '📝 弹窗输入框字体大小',

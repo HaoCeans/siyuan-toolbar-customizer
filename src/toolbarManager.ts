@@ -4988,9 +4988,11 @@ async function executeQuickNote(config: ButtonConfig) {
     }
 
     // 直接调用现有的记事检测功能
-    // 临时设置插件实例的配置
+    // 临时设置插件实例的配置（保留原有配置，只覆盖需要的字段）
+    const existingConfig = (window as any).__pluginInstance?.mobileFeatureConfig || {};
     const tempPlugin = {
       mobileFeatureConfig: {
+        ...existingConfig,
         quickNoteNotebookId: notebookId,
         quickNoteDocumentId: documentId,
         quickNoteSaveType: saveType

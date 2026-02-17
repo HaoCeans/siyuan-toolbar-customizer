@@ -1,4 +1,4 @@
-import { isMobileDevice, pluginInstance, setPluginInstance, showPopupSelectDialog, processTemplateVariables } from './toolbarManager';
+import { isMobileDevice, pluginInstance, setPluginInstance, showPopupSelectDialog, processTemplateVariables, getToolbarAvailableWidth, getButtonWidth } from './toolbarManager';
 import { appendBlock } from './api';
 
 // 存储当前的事件监听器，以便可以移除
@@ -141,25 +141,29 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
     scrollbar-color: #888 #f1f1f1;
   `;
   
-  // 为Webkit浏览器添加滚动条样式
-  const scrollbarStyle = document.createElement('style');
-  scrollbarStyle.textContent = `
-    #quick-note-dialog textarea::-webkit-scrollbar {
-      width: 8px;
-    }
-    #quick-note-dialog textarea::-webkit-scrollbar-track {
-      background: #f1f1f1;
-      border-radius: 4px;
-    }
-    #quick-note-dialog textarea::-webkit-scrollbar-thumb {
-      background: #888;
-      border-radius: 4px;
-    }
-    #quick-note-dialog textarea::-webkit-scrollbar-thumb:hover {
-      background: #555;
-    }
-  `;
-  document.head.appendChild(scrollbarStyle);
+  // 为Webkit浏览器添加滚动条样式（避免重复注入）
+  const textareaStyleId = 'quick-note-textarea-scrollbar-style';
+  if (!document.getElementById(textareaStyleId)) {
+    const scrollbarStyle = document.createElement('style');
+    scrollbarStyle.id = textareaStyleId;
+    scrollbarStyle.textContent = `
+      #quick-note-dialog textarea::-webkit-scrollbar {
+        width: 8px;
+      }
+      #quick-note-dialog textarea::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+      }
+      #quick-note-dialog textarea::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+      }
+      #quick-note-dialog textarea::-webkit-scrollbar-thumb:hover {
+        background: #555;
+      }
+    `;
+    document.head.appendChild(scrollbarStyle);
+  }
 
   noteSection.appendChild(textarea);
 
@@ -171,6 +175,7 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
     min-height: 40px;
     max-height: 50vh;  /* 按钮区域最大高度，超出可滚动 */
     overflow-y: auto;
+    overflow-x: hidden;
   `;
 
   const toolbarTitle = document.createElement('div');
@@ -187,11 +192,9 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
   // 创建工具栏按钮容器
   const toolbarContainer = document.createElement('div');
   toolbarContainer.style.cssText = `
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    justify-content: center;
-    align-items: center;
+    display: block;
+    margin: 0 -16px;
+    padding: 0 8px;
   `;
   toolbarSection.appendChild(toolbarContainer);
 
@@ -244,18 +247,16 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
         if (success) {
           showSuccessMessage(documentId ? '✅ 内容已追加到文档' : '✅ 记事已保存');
           // 清理滚动条样式
-          const scrollbarStyles = document.querySelectorAll('style');
-          scrollbarStyles.forEach(style => {
-            if (style.textContent && style.textContent.includes('quick-note-dialog')) {
-              style.remove();
-            }
+          const styleIds = ['quick-note-textarea-scrollbar-style', 'quick-note-buttons-scrollbar-style'];
+          styleIds.forEach(id => {
+            const style = document.getElementById(id);
+            if (style) style.remove();
           });
           dialog.remove();
         } else {
           alert('保存失败，请重试');
         }
       } catch (error) {
-        console.error('记事保存失败:', error);
         alert('记事保存失败，请重试');
       }
     }
@@ -289,14 +290,12 @@ function closeNoteDialog() {
   const noteDialog = document.getElementById('quick-note-dialog');
   if (noteDialog) {
     // 清理滚动条样式
-    const scrollbarStyles = document.querySelectorAll('style');
-    scrollbarStyles.forEach(style => {
-      if (style.textContent && style.textContent.includes('quick-note-dialog')) {
-        style.remove();
-      }
+    const styleIds = ['quick-note-textarea-scrollbar-style', 'quick-note-buttons-scrollbar-style'];
+    styleIds.forEach(id => {
+      const style = document.getElementById(id);
+      if (style) style.remove();
     });
     noteDialog.remove();
-  } else {
   }
 }
 
@@ -315,6 +314,338 @@ function closeNoteDialogImmediately() {
   } else {
   }
 }
+/**
+ * 创建按钮元素
+ * 根据按钮配置创建克隆按钮
+ */
+function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null): HTMLElement {
+  // 创建按钮副本
+  const clonedBtn = document.createElement('button');
+  
+  // 防止按钮获取焦点，保持输入法不关闭
+  clonedBtn.tabIndex = -1;
+  
+  // 设置按钮基本样式
+  clonedBtn.style.cssText = `
+    min-width: 36px;
+    height: 32px;
+    padding: 4px 8px;
+    margin: 2px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    background: white;
+    color: #333;
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  `;
+  
+  clonedBtn.title = buttonConfig.name || '';
+  clonedBtn.dataset.buttonId = buttonConfig.id;
+  
+  // 设置按钮内容（图标）
+  if (buttonConfig.icon) {
+    if (buttonConfig.icon.startsWith('icon')) {
+      // 思源内置图标
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('width', `${buttonConfig.iconSize || 16}`);
+      svg.setAttribute('height', `${buttonConfig.iconSize || 16}`);
+      svg.style.cssText = 'flex-shrink: 0; display: block;';
+      
+      const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+      use.setAttribute('href', `#${buttonConfig.icon}`);
+      svg.appendChild(use);
+      
+      clonedBtn.appendChild(svg);
+    } else if (buttonConfig.icon.startsWith('lucide:')) {
+      // Lucide 图标 - 简化处理，显示图标名
+      const iconName = buttonConfig.icon.substring(7);
+      clonedBtn.textContent = iconName;
+      clonedBtn.style.fontSize = `${buttonConfig.iconSize || 16}px`;
+    } else {
+      // Emoji 或其他文本图标
+      clonedBtn.textContent = buttonConfig.icon;
+      clonedBtn.style.fontSize = `${buttonConfig.iconSize || 16}px`;
+    }
+  } else {
+    clonedBtn.textContent = buttonConfig.name || '按钮';
+  }
+  
+  // 添加hover效果
+  clonedBtn.addEventListener('mouseenter', () => {
+    clonedBtn.style.backgroundColor = '#f5f5f5';
+    clonedBtn.style.transform = 'translateY(-1px)';
+    clonedBtn.style.boxShadow = '0 2px 6px rgba(0,0,0,0.15)';
+  });
+  
+  clonedBtn.addEventListener('mouseleave', () => {
+    clonedBtn.style.backgroundColor = 'white';
+    clonedBtn.style.transform = 'translateY(0)';
+    clonedBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+  });
+  
+  // 阻止 mousedown 导致的焦点转移（保持输入法状态）
+  clonedBtn.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+  });
+  
+  // 移动端：不能对 touchstart 调用 preventDefault（会阻止 click）
+  // 改用 touchend 作为备用触发方式
+  let touchHandled = false;
+  clonedBtn.addEventListener('touchend', (e) => {
+    e.preventDefault();
+    if (touchHandled) return;
+    touchHandled = true;
+    setTimeout(() => { touchHandled = false; }, 100);
+    clonedBtn.click(); // 触发 click 事件
+  });
+  
+  return clonedBtn;
+}
+
+/**
+ * 渲染按钮列表
+ * 根据排序方法渲染按钮
+ */
+function renderButtons(
+  container: HTMLElement,
+  buttonConfigs: any[],
+  sortMethod: string
+): void {
+  // 创建按钮容器
+  const buttonsContainer = document.createElement('div');
+  buttonsContainer.className = 'buttons-container';
+  
+  // 先过滤掉扩展工具栏按钮和未启用的按钮
+  const filteredConfigs = buttonConfigs.filter(btn => btn.id !== 'overflow-button-mobile' && btn.enabled !== false);
+  
+  // 根据排序方法设置样式和排序
+  let sortedConfigs: any[];
+  
+  if (sortMethod === 'topToolbar') {
+    // 顶部工具栏排序：每行从右往左，sort小的在右，sort大的在左，居中
+    // 使用 row-reverse + 升序 + center
+    buttonsContainer.style.cssText = `
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      flex-direction: row-reverse;
+      justify-content: center;
+      align-content: flex-start;
+      padding: 6px 0;
+      width: 100%;
+    `;
+    // 升序排列：sort小的在前，配合row-reverse会显示在右边
+    sortedConfigs = [...filteredConfigs].sort((a, b) => a.sort - b.sort);
+  } else {
+    // 底部工具栏排序：最新按钮在左上，居中显示
+    // 效果：按行填充，从左到右，不满行居中
+    
+    // 降序排列：sort大的在前（新按钮优先）
+    sortedConfigs = [...filteredConfigs].sort((a, b) => b.sort - a.sort);
+    
+    buttonsContainer.style.cssText = `
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      flex-direction: row;
+      justify-content: center;
+      align-content: flex-start;
+      padding: 6px 0;
+      width: 100%;
+    `;
+  }
+  
+  // 渲染按钮（使用排序后的配置）
+  sortedConfigs.forEach((buttonConfig) => {
+    // 查找对应的DOM按钮元素
+    const originalBtn = document.querySelector(`[data-custom-button="${buttonConfig.id}"]`) as HTMLElement;
+    
+    // 创建按钮副本
+    const clonedBtn = createClonedButton(buttonConfig, originalBtn);
+    
+    // 添加点击事件
+    clonedBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      await handleButtonClick(buttonConfig, originalBtn);
+    });
+    
+    buttonsContainer.appendChild(clonedBtn);
+  });
+  
+  // 如果没有创建任何按钮，显示提示
+  if (buttonsContainer.children.length === 0) {
+    const noButtonsMsg = document.createElement('div');
+    noButtonsMsg.textContent = '暂无可用按钮';
+    noButtonsMsg.style.cssText = `
+      font-size: 12px;
+      color: #999;
+      text-align: center;
+      padding: 20px;
+    `;
+    container.appendChild(noButtonsMsg);
+    return;
+  }
+
+  container.appendChild(buttonsContainer);
+}
+
+/**
+ * 处理按钮点击事件
+ * 统一处理各种类型按钮的点击逻辑
+ */
+async function handleButtonClick(
+  buttonConfig: any,
+  originalBtn: HTMLElement | null
+): Promise<void> {
+  try {
+    // 特殊处理：template类型按钮的行为
+    if (buttonConfig.type === 'template') {
+      // 获取弹窗中的textarea输入框
+      const noteDialog = document.getElementById('quick-note-dialog');
+      const textarea = noteDialog?.querySelector('textarea');
+      
+      if (textarea && buttonConfig.template) {
+        // 处理模板变量
+        let templateContent = buttonConfig.template;
+        const now = new Date();
+        
+        // 替换模板变量
+        templateContent = templateContent
+          .replace(/{{date}}/g, now.toISOString().split('T')[0])
+          .replace(/{{time}}/g, now.toTimeString().split(' ')[0])
+          .replace(/{{datetime}}/g, `${now.toISOString().split('T')[0]} ${now.toTimeString().split(' ')[0]}`)
+          .replace(/{{year}}/g, now.getFullYear().toString())
+          .replace(/{{month}}/g, String(now.getMonth() + 1).padStart(2, '0'))
+          .replace(/{{day}}/g, String(now.getDate()).padStart(2, '0'))
+          .replace(/{{hour}}/g, String(now.getHours()).padStart(2, '0'))
+          .replace(/{{minute}}/g, String(now.getMinutes()).padStart(2, '0'))
+          .replace(/{{second}}/g, String(now.getSeconds()).padStart(2, '0'))
+          .replace(/{{week}}/g, ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][now.getDay()]);
+        
+        // 插入到输入框光标位置
+        const input = textarea as HTMLTextAreaElement;
+        const startPos = input.selectionStart || input.value.length;
+        const endPos = input.selectionEnd || input.value.length;
+        
+        input.value = input.value.substring(0, startPos) + templateContent + input.value.substring(endPos);
+        
+        // 设置新的光标位置
+        const newCursorPos = startPos + templateContent.length;
+        input.setSelectionRange(newCursorPos, newCursorPos);
+        
+        // 聚焦到输入框
+        input.focus();
+        
+        // 显示插入成功提示
+        const successMsg = document.createElement('div');
+        successMsg.textContent = '模板已插入';
+        successMsg.style.cssText = `
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          background: #4CAF50;
+          color: white;
+          padding: 12px 20px;
+          border-radius: 6px;
+          z-index: 100001;
+          font-size: 14px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        `;
+        document.body.appendChild(successMsg);
+        
+        setTimeout(() => {
+          if (successMsg.parentNode) {
+            successMsg.parentNode.removeChild(successMsg);
+          }
+        }, 2000);
+      }
+      
+      // template类型按钮不关闭弹窗，直接返回
+      return;
+    }
+    
+    // 特殊处理：author-tool + popup-select 类型按钮
+    if (buttonConfig.type === 'author-tool' && buttonConfig.authorToolSubtype === 'popup-select') {
+      const templates = buttonConfig.popupSelectTemplates || [];
+      if (templates.length === 0) {
+        return;
+      }
+      
+      const selectedTemplate = await showPopupSelectDialog(templates);
+      
+      if (selectedTemplate) {
+        const noteDialog = document.getElementById('quick-note-dialog');
+        const textarea = noteDialog?.querySelector('textarea');
+        
+        if (textarea) {
+          const processedContent = processTemplateVariables(selectedTemplate.content);
+          const input = textarea as HTMLTextAreaElement;
+          const startPos = input.selectionStart || input.value.length;
+          const endPos = input.selectionEnd || input.value.length;
+          
+          input.value = input.value.substring(0, startPos) + processedContent + input.value.substring(endPos);
+          
+          const newCursorPos = startPos + processedContent.length;
+          input.setSelectionRange(newCursorPos, newCursorPos);
+          input.focus();
+        }
+      }
+      
+      // 不关闭弹窗，直接返回
+      return;
+    }
+    
+    // 其他类型按钮：使用工具栏管理器执行按钮功能
+    const toolbarManager = (window as any).__toolbarManager;
+    if (toolbarManager && typeof toolbarManager.executeButton === 'function') {
+      // 特殊处理builtin类型：需要短暂延迟后再关闭弹窗
+      if (buttonConfig.type === 'builtin') {
+        // 执行按钮功能
+        await toolbarManager.executeButton(buttonConfig);
+        // builtin按钮需要短暂延迟确保功能执行完成
+        setTimeout(() => {
+          closeNoteDialog();
+        }, 100); // 100ms延迟
+      } else if (buttonConfig.type === 'click-sequence') {
+        // 执行按钮功能并等待完成
+        await toolbarManager.executeButton(buttonConfig);
+        // click-sequence执行完成后立即关闭弹窗
+        closeNoteDialogImmediately();
+      } else {
+        // 其他类型按钮正常执行
+        await toolbarManager.executeButton(buttonConfig);
+        // 立即关闭窗口
+        closeNoteDialogImmediately();
+      }
+    } else {
+      // 如果工具栏管理器不可用，尝试触发原始按钮
+      if (originalBtn) {
+        const clickEvent = new MouseEvent('click', {
+          bubbles: true,
+          cancelable: true,
+          view: window
+        });
+        originalBtn.dispatchEvent(clickEvent);
+      }
+      // 立即关闭窗口
+      closeNoteDialogImmediately();
+    }
+    
+  } catch (error) {
+    alert('按钮执行失败，请重试');
+  }
+}
+
+/**
+ * 主函数：获取并复制底部工具栏按钮
+ * 根据配置选择不同的排序方法
+ */
 function copyBottomToolbarButtons(container: HTMLElement) {
   try {
     // 获取所有按钮配置
@@ -334,302 +665,37 @@ function copyBottomToolbarButtons(container: HTMLElement) {
       return;
     }
 
-    // 创建按钮容器
-    const buttonsContainer = document.createElement('div');
-    buttonsContainer.style.cssText = `
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      justify-content: center;
-      align-content: flex-start;
-      padding: 6px 8px;
-    `;
+    // 获取排序方法配置（使用从 toolbarManager 导入的 pluginInstance）
+    const sortMethod = pluginInstance?.mobileFeatureConfig?.quickNoteSortMethod || 'bottomToolbar';
 
-    // 为滚动条添加样式
-    const scrollbarStyle = document.createElement('style');
-    scrollbarStyle.textContent = `
-      #quick-note-dialog .buttons-container::-webkit-scrollbar {
-        width: 6px;
-      }
-      #quick-note-dialog .buttons-container::-webkit-scrollbar-track {
-        background: #f1f1f1;
-        border-radius: 3px;
-      }
-      #quick-note-dialog .buttons-container::-webkit-scrollbar-thumb {
-        background: #888;
-        border-radius: 3px;
-      }
-      #quick-note-dialog .buttons-container::-webkit-scrollbar-thumb:hover {
-        background: #555;
-      }
-    `;
-    document.head.appendChild(scrollbarStyle);
-
-    buttonsContainer.className = 'buttons-container';
-
-    // 按照配置中的排序顺序处理所有按钮（包括扩展工具栏中的按钮）
-    const sortedConfigs = [...buttonConfigs].sort((a, b) => a.sort - b.sort);
-    
-    sortedConfigs.forEach((buttonConfig) => {
-      // 跳过扩展工具栏按钮本身
-      if (buttonConfig.id === 'overflow-button-mobile') {
-        return;
-      }
-
-      // 查找对应的DOM按钮元素（可能不存在，比如在扩展工具栏中）
-      const originalBtn = document.querySelector(`[data-custom-button="${buttonConfig.id}"]`) as HTMLElement;
-      
-      // 创建按钮副本
-      const clonedBtn = document.createElement('button');
-      
-      // 防止按钮获取焦点，保持输入法不关闭
-      clonedBtn.tabIndex = -1;
-      
-      // 设置按钮基本样式
-      clonedBtn.style.cssText = `
-        min-width: 36px;
-        height: 32px;
-        padding: 4px 8px;
-        margin: 2px;
-        border: 1px solid #e0e0e0;
-        border-radius: 6px;
-        background: white;
-        color: #333;
-        font-size: 14px;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s ease;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      `;
-      
-      clonedBtn.title = buttonConfig.name || '';
-      clonedBtn.dataset.buttonId = buttonConfig.id;
-      
-      // 设置按钮内容（图标）
-      if (buttonConfig.icon) {
-        if (buttonConfig.icon.startsWith('icon')) {
-          // 思源内置图标
-          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-          svg.setAttribute('width', `${buttonConfig.iconSize || 16}`);
-          svg.setAttribute('height', `${buttonConfig.iconSize || 16}`);
-          svg.style.cssText = 'flex-shrink: 0; display: block;';
-          
-          const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
-          use.setAttribute('href', `#${buttonConfig.icon}`);
-          svg.appendChild(use);
-          
-          clonedBtn.appendChild(svg);
-        } else if (buttonConfig.icon.startsWith('lucide:')) {
-          // Lucide 图标 - 简化处理，显示图标名
-          const iconName = buttonConfig.icon.substring(7);
-          clonedBtn.textContent = iconName;
-          clonedBtn.style.fontSize = `${buttonConfig.iconSize || 16}px`;
-        } else {
-          // Emoji 或其他文本图标
-          clonedBtn.textContent = buttonConfig.icon;
-          clonedBtn.style.fontSize = `${buttonConfig.iconSize || 16}px`;
+    // 为滚动条添加样式（避免重复注入）
+    const styleId = 'quick-note-buttons-scrollbar-style';
+    if (!document.getElementById(styleId)) {
+      const scrollbarStyle = document.createElement('style');
+      scrollbarStyle.id = styleId;
+      scrollbarStyle.textContent = `
+        #quick-note-dialog .buttons-container::-webkit-scrollbar {
+          width: 6px;
         }
-      } else {
-        clonedBtn.textContent = buttonConfig.name || '按钮';
-      }
-      
-      // 添加hover效果
-      clonedBtn.addEventListener('mouseenter', () => {
-        clonedBtn.style.backgroundColor = '#f5f5f5';
-        clonedBtn.style.transform = 'translateY(-1px)';
-        clonedBtn.style.boxShadow = '0 2px 6px rgba(0,0,0,0.15)';
-      });
-      
-      clonedBtn.addEventListener('mouseleave', () => {
-        clonedBtn.style.backgroundColor = 'white';
-        clonedBtn.style.transform = 'translateY(0)';
-        clonedBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-      });
-      
-      // 阻止 mousedown 导致的焦点转移（保持输入法状态）
-      clonedBtn.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-      });
-      
-      // 移动端：不能对 touchstart 调用 preventDefault（会阻止 click）
-      // 改用 touchend 作为备用触发方式
-      let touchHandled = false;
-      clonedBtn.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        if (touchHandled) return;
-        touchHandled = true;
-        setTimeout(() => { touchHandled = false; }, 100);
-        clonedBtn.click(); // 触发 click 事件
-      });
-      
-      // 添加点击事件
-      clonedBtn.addEventListener('click', async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        try {
-          // 特殊处理：template类型按钮的行为
-          if (buttonConfig.type === 'template') {
-            // 获取弹窗中的textarea输入框
-            const noteDialog = document.getElementById('quick-note-dialog');
-            const textarea = noteDialog?.querySelector('textarea');
-            
-            if (textarea && buttonConfig.template) {
-              // 处理模板变量
-              let templateContent = buttonConfig.template;
-              const now = new Date();
-              
-              // 替换模板变量
-              templateContent = templateContent
-                .replace(/{{date}}/g, now.toISOString().split('T')[0])
-                .replace(/{{time}}/g, now.toTimeString().split(' ')[0])
-                .replace(/{{datetime}}/g, `${now.toISOString().split('T')[0]} ${now.toTimeString().split(' ')[0]}`)
-                .replace(/{{year}}/g, now.getFullYear().toString())
-                .replace(/{{month}}/g, String(now.getMonth() + 1).padStart(2, '0'))
-                .replace(/{{day}}/g, String(now.getDate()).padStart(2, '0'))
-                .replace(/{{hour}}/g, String(now.getHours()).padStart(2, '0'))
-                .replace(/{{minute}}/g, String(now.getMinutes()).padStart(2, '0'))
-                .replace(/{{second}}/g, String(now.getSeconds()).padStart(2, '0'))
-                .replace(/{{week}}/g, ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][now.getDay()]);
-              
-              // 插入到输入框光标位置
-              const input = textarea as HTMLTextAreaElement;
-              const startPos = input.selectionStart || input.value.length;
-              const endPos = input.selectionEnd || input.value.length;
-              
-              input.value = input.value.substring(0, startPos) + templateContent + input.value.substring(endPos);
-              
-              // 设置新的光标位置
-              const newCursorPos = startPos + templateContent.length;
-              input.setSelectionRange(newCursorPos, newCursorPos);
-              
-              // 聚焦到输入框
-              input.focus();
-              
-              // 显示插入成功提示
-              const successMsg = document.createElement('div');
-              successMsg.textContent = '模板已插入';
-              successMsg.style.cssText = `
-                position: fixed;
-                top: 20px;
-                right: 20px;
-                background: #4CAF50;
-                color: white;
-                padding: 12px 20px;
-                border-radius: 6px;
-                z-index: 100001;
-                font-size: 14px;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-              `;
-              document.body.appendChild(successMsg);
-              
-              setTimeout(() => {
-                if (successMsg.parentNode) {
-                  successMsg.parentNode.removeChild(successMsg);
-                }
-              }, 2000);
-            }
-            
-            // template类型按钮不关闭弹窗，直接返回
-            return;
-          }
-          
-          // 特殊处理：author-tool + popup-select 类型按钮
-          if (buttonConfig.type === 'author-tool' && buttonConfig.authorToolSubtype === 'popup-select') {
-            const templates = buttonConfig.popupSelectTemplates || [];
-            if (templates.length === 0) {
-              return;
-            }
-            
-            const selectedTemplate = await showPopupSelectDialog(templates);
-            
-            if (selectedTemplate) {
-              const noteDialog = document.getElementById('quick-note-dialog');
-              const textarea = noteDialog?.querySelector('textarea');
-              
-              if (textarea) {
-                const processedContent = processTemplateVariables(selectedTemplate.content);
-                const input = textarea as HTMLTextAreaElement;
-                const startPos = input.selectionStart || input.value.length;
-                const endPos = input.selectionEnd || input.value.length;
-                
-                input.value = input.value.substring(0, startPos) + processedContent + input.value.substring(endPos);
-                
-                const newCursorPos = startPos + processedContent.length;
-                input.setSelectionRange(newCursorPos, newCursorPos);
-                input.focus();
-              }
-            }
-            
-            // 不关闭弹窗，直接返回
-            return;
-          }
-          
-          // 其他类型按钮：使用工具栏管理器执行按钮功能
-          const toolbarManager = (window as any).__toolbarManager;
-          if (toolbarManager && typeof toolbarManager.executeButton === 'function') {
-            // 特殊处理builtin类型：需要短暂延迟后再关闭弹窗
-            if (buttonConfig.type === 'builtin') {
-              // 执行按钮功能
-              await toolbarManager.executeButton(buttonConfig);
-              // builtin按钮需要短暂延迟确保功能执行完成
-              setTimeout(() => {
-                closeNoteDialog();
-              }, 100); // 100ms延迟
-            } else if (buttonConfig.type === 'click-sequence') {
-              // 执行按钮功能并等待完成
-              await toolbarManager.executeButton(buttonConfig);
-              // click-sequence执行完成后立即关闭弹窗
-              closeNoteDialogImmediately();
-            } else {
-              // 其他类型按钮正常执行
-              await toolbarManager.executeButton(buttonConfig);
-              // 立即关闭窗口
-              closeNoteDialogImmediately();
-            }
-          } else {
-            // 如果工具栏管理器不可用，尝试触发原始按钮
-            if (originalBtn) {
-              const clickEvent = new MouseEvent('click', {
-                bubbles: true,
-                cancelable: true,
-                view: window
-              });
-              originalBtn.dispatchEvent(clickEvent);
-            }
-            // 立即关闭窗口
-            closeNoteDialogImmediately();
-          }
-          
-        } catch (error) {
-          console.error('[按钮执行] 按钮执行失败:', error);
-          alert('按钮执行失败，请重试');
+        #quick-note-dialog .buttons-container::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 3px;
         }
-      });
-      
-      buttonsContainer.appendChild(clonedBtn);
-    });
-    
-    // 如果没有创建任何按钮，显示提示
-    if (buttonsContainer.children.length === 0) {
-      const noButtonsMsg = document.createElement('div');
-      noButtonsMsg.textContent = '暂无可用按钮';
-      noButtonsMsg.style.cssText = `
-        font-size: 12px;
-        color: #999;
-        text-align: center;
-        padding: 20px;
+        #quick-note-dialog .buttons-container::-webkit-scrollbar-thumb {
+          background: #888;
+          border-radius: 3px;
+        }
+        #quick-note-dialog .buttons-container::-webkit-scrollbar-thumb:hover {
+          background: #555;
+        }
       `;
-      container.appendChild(noButtonsMsg);
-      return;
+      document.head.appendChild(scrollbarStyle);
     }
 
-    container.appendChild(buttonsContainer);
+    // 根据排序方法调用渲染函数
+    renderButtons(container, buttonConfigs, sortMethod);
 
   } catch (error) {
-    console.error('复制底部工具栏按钮时出错:', error);
     const errorMsg = document.createElement('div');
     errorMsg.textContent = '按钮加载失败';
     errorMsg.style.cssText = `
@@ -648,7 +714,6 @@ async function appendToSpecificDocument(documentId: string, content: string): Pr
     const result = await appendBlock('markdown', content + '\n', documentId);
     return result && result.length > 0;
   } catch (error) {
-    console.error('追加到文档失败:', error);
     return false;
   }
 }

@@ -1141,6 +1141,29 @@ export function createMobileSettingLayout(
   // === 自启动一键记事 ===
   createGroupTitle('📝', '自启动一键记事')
 
+  // 使用说明
+  setting.addItem({
+    title: '💡 使用说明',
+    description: '请先阅读步骤①和②再使用',
+    createActionElement: () => {
+      const container = document.createElement('div');
+      container.style.cssText = 'display: flex; flex-direction: column; gap: 8px; padding: 12px; background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(59, 130, 246, 0.08)); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 6px;';
+
+      const step1 = document.createElement('div');
+      step1.textContent = '①请先配置ID，再选择触发方式；';
+      step1.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); font-weight: 500;';
+
+      const step2 = document.createElement('div');
+      step2.textContent = '②打开软件切后台，再切到前台，即可自动弹出一键记事。';
+      step2.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); font-weight: 500;';
+
+      container.appendChild(step1);
+      container.appendChild(step2);
+
+      return container;
+    }
+  });
+
   // 一键记事保存配置（整合保存方式和ID配置）
   setting.addItem({
     title: '💾 一键记事保存配置',
@@ -1238,49 +1261,51 @@ export function createMobileSettingLayout(
       // ID配置区域
       const idConfigContainer = document.createElement('div');
       idConfigContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px; margin-top: 12px;';
-  
+
       const idLabel = document.createElement('label');
       idLabel.id = 'quick-note-setting-id-label';
       idLabel.style.cssText = 'font-size: 13px; font-weight: 500;';
       idConfigContainer.appendChild(idLabel);
-  
+
       const input = document.createElement('input');
       input.type = 'text';
       input.className = 'b3-text-field';
       input.id = 'quick-note-setting-id-input';
       input.style.cssText = 'font-size: 14px; padding: 8px; width: 100%;';
-  
+
       const hint = document.createElement('div');
       hint.id = 'quick-note-setting-id-hint';
       hint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light);';
-  
+
       // 根据选择类型更新ID输入框
       function updateIdInput() {
         const saveType = config.quickNoteSaveType || 'daily';
-        const idLabel = container.querySelector('#quick-note-setting-id-label') as HTMLLabelElement;
-        const idInput = container.querySelector('#quick-note-setting-id-input') as HTMLInputElement;
-        const idHint = container.querySelector('#quick-note-setting-id-hint') as HTMLDivElement;
-          
+        const labelEl = idConfigContainer.querySelector('#quick-note-setting-id-label') as HTMLLabelElement;
+        const inputEl = idConfigContainer.querySelector('#quick-note-setting-id-input') as HTMLInputElement;
+        const hintEl = idConfigContainer.querySelector('#quick-note-setting-id-hint') as HTMLDivElement;
+
         // 添加空值检查
-        if (!idLabel || !idInput || !idHint) {
+        if (!labelEl || !inputEl || !hintEl) {
           return;
         }
-          
+
         if (saveType === 'document') {
-          idLabel.textContent = '📄 目标文档ID';
-          idInput.placeholder = '请输入文档ID，如：20250101000000-aaaaaa';
-          idInput.value = config.quickNoteDocumentId || '';
-          idHint.textContent = '💡 内容将直接追加到该文档底部';
+          labelEl.textContent = '📄 目标文档ID';
+          inputEl.placeholder = '请输入文档ID，如：20250101000000-aaaaaa';
+          inputEl.value = config.quickNoteDocumentId || '';
+          hintEl.textContent = '💡 内容将直接追加到该文档底部';
         } else {
-          idLabel.textContent = '📘 目标笔记本ID';
-          idInput.placeholder = '请输入笔记本ID，如：20250101000000-aaaaaa';
-          idInput.value = config.quickNoteNotebookId || '';
-          idHint.textContent = '💡 内容将保存到该笔记本的当日日记中';
+          labelEl.textContent = '📘 目标笔记本ID';
+          inputEl.placeholder = '请粘贴DailyNote所在笔记本ID';
+          inputEl.value = config.quickNoteNotebookId || '';
+          hintEl.textContent = '💡 内容将保存到该笔记本的当日日记中';
         }
       }
-  
-      // 初始化显示
-      updateIdInput();
+
+      // 初始化显示 - 使用setTimeout确保DOM已渲染
+      setTimeout(() => {
+        updateIdInput();
+      }, 0);
   
       input.onchange = async () => {
         const saveType = config.quickNoteSaveType || 'daily';

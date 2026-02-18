@@ -29,34 +29,43 @@ async function showSmallWindowTip() {
   // 优先使用临时配置（按钮触发时设置的），否则使用全局配置
   let notebookId = '';
   let documentId = '';
-  
+  let saveType: 'daily' | 'document' = 'daily';
+  let isFromButton = false; // 标记是否来自按钮触发
+
   // 检查是否有临时配置
   const tempPlugin = (window as any).__pluginInstance;
   if (tempPlugin?.mobileFeatureConfig) {
     const config = tempPlugin.mobileFeatureConfig;
-    const saveType = config.quickNoteSaveType || 'daily';
+    saveType = config.quickNoteSaveType || 'daily';
     if (saveType === 'document') {
       documentId = config.quickNoteDocumentId || '';
     } else {
       notebookId = config.quickNoteNotebookId || '';
     }
+    isFromButton = true; // 有临时配置，说明是按钮触发
   } else {
     // 使用全局配置
-    notebookId = pluginInstance?.mobileFeatureConfig?.quickNoteNotebookId || '';
-    documentId = pluginInstance?.mobileFeatureConfig?.quickNoteDocumentId || '';
+    const config = pluginInstance?.mobileFeatureConfig;
+    saveType = config?.quickNoteSaveType || 'daily';
+    // 根据保存类型只读取对应的ID
+    if (saveType === 'document') {
+      documentId = config?.quickNoteDocumentId || '';
+    } else {
+      notebookId = config?.quickNoteNotebookId || '';
+    }
   }
 
-  // 显示思源原生编辑器弹窗，传递文档ID
-  showSiyuanEditorDialog(notebookId, documentId);
+  // 显示思源原生编辑器弹窗，传递文档ID、保存类型和触发来源
+  showSiyuanEditorDialog(notebookId, documentId, saveType, isFromButton);
 }
 
 // 思源原生编辑器弹窗
-function showSiyuanEditorDialog(notebookId: string, documentId?: string) {
+function showSiyuanEditorDialog(notebookId: string, documentId?: string, saveType: 'daily' | 'document' = 'daily', isFromButton: boolean = false) {
   // 直接使用自定义的美观输入弹窗（用户偏好方案）
-  showNoteInputDialog(notebookId, documentId);
+  showNoteInputDialog(notebookId, documentId, saveType, isFromButton);
 }
 
-function showNoteInputDialog(notebookId: string, documentId?: string) {
+function showNoteInputDialog(notebookId: string, documentId?: string, saveType: 'daily' | 'document' = 'daily', isFromButton: boolean = false) {
   // 创建美化版记事输入弹窗
   const dialog = document.createElement('div');
   dialog.id = 'quick-note-dialog';
@@ -228,16 +237,27 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
   saveBtn.onclick = async () => {
     const content = textarea.value.trim();
     if (content) {
+      // 校验ID是否已配置（根据保存类型和触发来源给出精确提示）
+      if (saveType === 'document' && !documentId) {
+        const tipPrefix = isFromButton ? '【按钮】' : '【自启动一键记事】';
+        alert(`⚠️ 请先在${tipPrefix}设置中，配置文档ID`);
+        return;
+      }
+      if (saveType === 'daily' && !notebookId) {
+        const tipPrefix = isFromButton ? '【按钮】' : '【自启动一键记事】';
+        alert(`⚠️ 请先在${tipPrefix}设置中，配置笔记本ID`);
+        return;
+      }
+
       try {
         let success = false;
-        
-        // 如果指定了文档ID，优先使用appendBlock API
-        if (documentId) {
+
+        // 根据保存类型选择对应的API
+        if (saveType === 'document' && documentId) {
+          // 文档模式：使用appendBlock API追加到指定文档
           success = await appendToSpecificDocument(documentId, content);
-        }
-        
-        // 如果没有文档ID或追加失败，使用默认的日记API
-        if (!documentId || !success) {
+        } else {
+          // 日记模式：使用日记API
           const response = await fetch('/api/block/appendDailyNoteBlock', {
             method: 'POST',
             headers: {
@@ -249,13 +269,13 @@ function showNoteInputDialog(notebookId: string, documentId?: string) {
               notebook: notebookId || undefined
             })
           });
-          
+
           const result = await response.json();
           success = result.code === 0;
         }
-        
+
         if (success) {
-          showSuccessMessage(documentId ? '✅ 内容已追加到文档' : '✅ 记事已保存');
+          showSuccessMessage(saveType === 'document' ? '✅ 内容已追加到文档' : '✅ 记事已保存');
           // 清理滚动条样式
           const styleIds = ['quick-note-textarea-scrollbar-style', 'quick-note-buttons-scrollbar-style'];
           styleIds.forEach(id => {

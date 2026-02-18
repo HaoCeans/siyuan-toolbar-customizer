@@ -1415,27 +1415,29 @@ export function createMobileButtonItem(
       // 根据选择类型更新输入框
       function updateIdInputPlaceholder() {
         const saveType = button.quickNoteSaveType || 'daily';
-        const idLabel = quickNoteContainer.querySelector('#quick-note-id-label') as HTMLLabelElement;
-        const idInput = quickNoteContainer.querySelector('#quick-note-id-input') as HTMLInputElement;
-        
+        const labelEl = quickNoteContainer.querySelector('#quick-note-id-label') as HTMLLabelElement;
+        const inputEl = quickNoteContainer.querySelector('#quick-note-id-input') as HTMLInputElement;
+
         // 添加空值检查
-        if (!idLabel || !idInput) {
+        if (!labelEl || !inputEl) {
           return;
         }
-        
+
         if (saveType === 'document') {
-          idLabel.textContent = '📄 目标文档ID';
-          idInput.placeholder = '请输入文档ID，如：20250101000000-aaaaaa';
-          idInput.value = button.quickNoteDocumentId || '';
+          labelEl.textContent = '📄 目标文档ID';
+          inputEl.placeholder = '请输入文档ID，如：20250101000000-aaaaaa';
+          inputEl.value = button.quickNoteDocumentId || '';
         } else {
-          idLabel.textContent = '📘 目标笔记本ID';
-          idInput.placeholder = '请输入笔记本ID，如：20250101000000-aaaaaa';
-          idInput.value = button.quickNoteNotebookId || '';
+          labelEl.textContent = '📘 目标笔记本ID';
+          inputEl.placeholder = '请粘贴DailyNote所在笔记本ID';
+          inputEl.value = button.quickNoteNotebookId || '';
         }
       }
 
-      // 初始化显示
-      updateIdInputPlaceholder();
+      // 初始化显示 - 使用setTimeout确保DOM已渲染
+      setTimeout(() => {
+        updateIdInputPlaceholder();
+      }, 0);
 
       idInput.onchange = () => {
         const saveType = button.quickNoteSaveType || 'daily';

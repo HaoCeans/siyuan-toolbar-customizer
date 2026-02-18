@@ -534,27 +534,29 @@ export function createDesktopButtonItem(
     // 根据选择类型更新输入框
     function updateIdInputPlaceholder() {
       const saveType = button.quickNoteSaveType || 'daily';
-      const idLabel = quickNoteField.querySelector('#quick-note-id-label-desktop') as HTMLLabelElement;
-      const idInput = quickNoteField.querySelector('#quick-note-id-input-desktop') as HTMLInputElement;
-      
+      const labelEl = quickNoteField.querySelector('#quick-note-id-label-desktop') as HTMLLabelElement;
+      const inputEl = quickNoteField.querySelector('#quick-note-id-input-desktop') as HTMLInputElement;
+
       // 添加空值检查
-      if (!idLabel || !idInput) {
+      if (!labelEl || !inputEl) {
         return;
       }
-      
+
       if (saveType === 'document') {
-        idLabel.textContent = '📄 目标文档ID';
-        idInput.placeholder = '请输入文档ID，如：20250101000000-aaaaaa';
-        idInput.value = button.quickNoteDocumentId || '';
+        labelEl.textContent = '📄 目标文档ID';
+        inputEl.placeholder = '请输入文档ID，如：20250101000000-aaaaaa';
+        inputEl.value = button.quickNoteDocumentId || '';
       } else {
-        idLabel.textContent = '📘 目标笔记本ID';
-        idInput.placeholder = '请输入笔记本ID，如：20250101000000-aaaaaa';
-        idInput.value = button.quickNoteNotebookId || '';
+        labelEl.textContent = '📘 目标笔记本ID';
+        inputEl.placeholder = '请粘贴DailyNote所在笔记本ID';
+        inputEl.value = button.quickNoteNotebookId || '';
       }
     }
 
-    // 初始化显示
-    updateIdInputPlaceholder();
+    // 初始化显示 - 使用setTimeout确保DOM已渲染
+    setTimeout(() => {
+      updateIdInputPlaceholder();
+    }, 0);
 
     idInput.onchange = () => {
       const saveType = button.quickNoteSaveType || 'daily';
@@ -1235,7 +1237,15 @@ export function createDesktopButtonItem(
     // 根据当前选择显示/隐藏配置区
     const updateVisibility = () => {
       const subtype = subtypeSelect.value
-      if (subtype === 'database') {
+      if (subtype === 'open-doc') {
+        docConfigDiv.style.display = 'flex'
+        dbConfigDiv.style.display = 'none'
+        diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
+      } else if (subtype === 'database') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'flex'
         diaryConfigDiv.style.display = 'none'
@@ -1485,9 +1495,29 @@ export function populateDesktopEditForm(
       </div>
     `
 
+    // 笔记本ID配置（可选）
+    const notebookIdLabel = document.createElement('label')
+    notebookIdLabel.textContent = '📚 追加到每日笔记（可选）'
+    notebookIdLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 12px;'
+
+    const notebookIdInput = document.createElement('input')
+    notebookIdInput.type = 'text'
+    notebookIdInput.className = 'b3-text-field'
+    notebookIdInput.placeholder = '笔记本ID，留空则在当前编辑器光标位置插入'
+    notebookIdInput.value = button.templateNotebookId || ''
+    notebookIdInput.style.cssText = 'font-size: 13px;'
+    notebookIdInput.onchange = () => { button.templateNotebookId = notebookIdInput.value }
+
+    const notebookIdHint = document.createElement('div')
+    notebookIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
+    notebookIdHint.textContent = '💡 填写笔记本ID后，点击按钮将直接追加到该笔记本的每日笔记；留空则需先选择编辑器'
+
     templateField.appendChild(label)
     templateField.appendChild(textarea)
     templateField.appendChild(hint)
+    templateField.appendChild(notebookIdLabel)
+    templateField.appendChild(notebookIdInput)
+    templateField.appendChild(notebookIdHint)
     form.appendChild(templateField)
   } else if (button.type === 'click-sequence') {
     // 点击序列配置
@@ -2254,7 +2284,15 @@ export function populateDesktopEditForm(
     // 根据当前选择显示/隐藏配置区
     const updateVisibility = () => {
       const subtype = subtypeSelect.value
-      if (subtype === 'database') {
+      if (subtype === 'open-doc') {
+        docConfigDiv.style.display = 'flex'
+        dbConfigDiv.style.display = 'none'
+        diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
+      } else if (subtype === 'database') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'flex'
         diaryConfigDiv.style.display = 'none'

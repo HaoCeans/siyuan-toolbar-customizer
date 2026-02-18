@@ -2116,35 +2116,137 @@ async function executeClickSequence(config: ButtonConfig) {
 }
 
 /**
+ * 获取当前活动的 protyle 实例
+ * 通过 window.siyuan 的各种属性查找
+ */
+function getCurrentProtyle(): any {
+  const windowObj = window as any
+
+  // 方式1：通过 window.siyuan.blocks 查找
+  if (windowObj.siyuan?.blocks?.length > 0) {
+    const activeBlock = windowObj.siyuan.blocks.find((b: any) =>
+      b.protyle && !b.protyle.element?.classList.contains('fn__hidden')
+    )
+    if (activeBlock?.protyle) {
+      return activeBlock.protyle
+    }
+  }
+
+  // 方式2：通过 window.siyuan.layout 查找
+  if (windowObj.siyuan?.layout?.centerLayout?.children) {
+    const children = windowObj.siyuan.layout.centerLayout.children
+    for (const item of children) {
+      // 尝试多种可能的路径
+      const element = item?.model?.element || item?.element || item?.tab?.element
+      if (element && !element.classList.contains('fn__none')) {
+        const editor = element.querySelector('.protyle') || element.closest('.protyle')
+        if (editor) {
+          const protyle = (editor as any).protyle || (editor as any).__protyle
+          if (protyle) return protyle
+        }
+      }
+    }
+  }
+
+  // 方式3：通过 window.siyuan.editor 或 editors
+  if (windowObj.siyuan?.editor) {
+    return windowObj.siyuan.editor.protyle || windowObj.siyuan.editor
+  }
+  if (windowObj.siyuan?.editors?.length > 0) {
+    const activeEditor = windowObj.siyuan.editors.find((e: any) =>
+      e.protyle && !e.protyle.element?.classList.contains('fn__hidden')
+    )
+    if (activeEditor?.protyle) return activeEditor.protyle
+  }
+
+  // 方式4：通过 DOM 反查 protyle 实例
+  const activeProtyleEl = document.querySelector('.protyle:not(.fn__hidden):not(.fn__none)') as HTMLElement
+  if (activeProtyleEl) {
+    const protyle = (activeProtyleEl as any).protyle ||
+                    (activeProtyleEl as any).__protyle ||
+                    (activeProtyleEl as any).protyleInstance
+    if (protyle) return protyle
+
+    // 如果元素本身没有，尝试从子元素查找
+    const wysiwyg = activeProtyleEl.querySelector('.protyle-wysiwyg')
+    if (wysiwyg) {
+      const p = (wysiwyg as any).protyle || (wysiwyg as any).__protyle
+      if (p) return p
+    }
+  }
+
+  // 方式5：遍历所有 .protyle 元素
+  const allProtyles = document.querySelectorAll('.protyle')
+  for (const el of allProtyles) {
+    const p = (el as any).protyle || (el as any).__protyle || (el as any).protyleInstance
+    if (p?.contentElement) {
+      const rect = el.getBoundingClientRect()
+      if (rect.width > 0 && rect.height > 0) {
+        return p
+      }
+    }
+  }
+
+  return null
+}
+
+/**
+ * 通过 DOM 获取 contentElement（原生方式）
+ */
+function getContentElementFromDOM(): HTMLElement | null {
+  // 查找当前活动的 protyle
+  const activeProtyle = document.querySelector('.protyle:not(.fn__hidden):not(.fn__none)') as HTMLElement
+  if (!activeProtyle) return null
+
+  // 在 protyle 内部查找 contentElement（通常是 .protyle-content）
+  const contentEl = activeProtyle.querySelector('.protyle-content') as HTMLElement
+  if (contentEl) return contentEl
+
+  // 备选：查找 .protyle-scroll
+  const scrollEl = activeProtyle.querySelector('.protyle-scroll') as HTMLElement
+  if (scrollEl) return scrollEl
+
+  // 备选：查找 .protyle-wysiwyg 的父元素
+  const wysiwyg = activeProtyle.querySelector('.protyle-wysiwyg')
+  if (wysiwyg && wysiwyg.parentElement) {
+    return wysiwyg.parentElement as HTMLElement
+  }
+
+  return null
+}
+
+/**
  * 执行滚动文档到顶部或底部
- * 获取当前活动的编辑器并滚动到指定位置
+ * 使用模拟键盘快捷键方式（Ctrl+Home / Ctrl+End）
  */
 function executeScrollDoc(config: ButtonConfig) {
   const direction = config.scrollDirection || 'top'
 
-  // 获取当前活动的编辑器（兼容电脑端 fn__hidden 和手机端 fn__none）
-  const activeEditor = document.querySelector('.protyle:not(.fn__none):not(.fn__hidden) .protyle-content')
-  if (!activeEditor) {
-    // 尝试获取任意可见的编辑器
-    const anyEditor = document.querySelector('.protyle .protyle-content')
-    if (!anyEditor) {
-      Notify.showInfoEditorNotFocused()
-      return
-    }
-    // 滚动
-    if (direction === 'top') {
-      ;(anyEditor as HTMLElement).scrollTop = 0
-    } else {
-      ;(anyEditor as HTMLElement).scrollTop = (anyEditor as HTMLElement).scrollHeight
-    }
+  // 检查是否有活动的编辑器
+  const activeProtyle = document.querySelector('.protyle:not(.fn__hidden):not(.fn__none)')
+  if (!activeProtyle) {
+    Notify.showInfoEditorNotFocused()
     return
   }
 
-  // 滚动到顶部或底部
-  if (direction === 'top') {
-    ;(activeEditor as HTMLElement).scrollTop = 0
-  } else {
-    ;(activeEditor as HTMLElement).scrollTop = (activeEditor as HTMLElement).scrollHeight
+  // 模拟键盘快捷键
+  // Ctrl+Home = 文档顶部, Ctrl+End = 文档底部
+  const key = direction === 'top' ? 'Home' : 'End'
+  const event = new KeyboardEvent('keydown', {
+    key: key,
+    code: key,
+    ctrlKey: true,
+    bubbles: true,
+    cancelable: true
+  })
+
+  // 分发给编辑器容器
+  activeProtyle.dispatchEvent(event)
+
+  // 同时分发给 wysiwyg 编辑区域，确保被捕获
+  const wysiwyg = activeProtyle.querySelector('.protyle-wysiwyg')
+  if (wysiwyg) {
+    wysiwyg.dispatchEvent(event)
   }
 }
 

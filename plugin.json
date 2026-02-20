@@ -2,7 +2,7 @@
   "name": "siyuan-toolbar-customizer",
   "author": "whale🐋",
   "url": "https://github.com/HaoCeans/siyuan-toolbar-customizer",
-  "version": "3.1.1",
+  "version": "3.2.0",
   "minAppVersion": "3.0.0",
   "backends": [
     "all"
@@ -16,8 +16,8 @@
     "zh_CN": "思源手机端增强"
   },
   "description": {
-    "default": "Replace Quicker, FV, Notion automation within SiYuan! Click automation, quick access to built-in features, date templates, mobile shortcuts. Supports both mobile and desktop!",
-    "zh_CN": "可在思源内基本替换Quicker、FV悬浮球、notion自动化、宏命令等~自动化模拟点击！一键直达：思源内置功能、日期模板插入、手机快捷键、自动化模拟点击。手机端、电脑端均支持！"
+    "default": "Quick note on app switch, click automation, quick access to built-in features, date templates, mobile shortcuts. Replace Quicker, FV, Notion automation within SiYuan! Supports both mobile and desktop!",
+    "zh_CN": "一键记事，手机端全流程解决方案！定制化工具栏按钮！按钮功能：可在思源内基本替换Quicker、FV悬浮球、notion自动化、宏命令等~自动化模拟点击！一键直达：思源内置功能、日期模板插入、手机快捷键、自动化模拟点击。手机端、电脑端均支持！"
   },
   "readme": {
     "default": "README.md",
@@ -43,6 +43,8 @@
     "按钮",
     "鲸鱼",
     "工具箱",
-    "鲸鱼工具箱"
+    "鲸鱼工具箱",
+    "一键记事",
+    "快速记事"
   ]
 }

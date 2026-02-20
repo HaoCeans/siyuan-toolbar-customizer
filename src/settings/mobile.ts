@@ -53,6 +53,12 @@ export interface MobileFeatureConfig {
   popupConfig?: 'disabled' | 'smallWindowOnly' | 'bothModes'
   quickNoteNotebookId?: string
   quickNoteDocumentId?: string  // 新增：一键记事目标文档ID
+  // 一键记事按钮样式配置
+  useCustomButtonStyle?: boolean    // 是否使用自定义按钮样式
+  quickNoteButtonMinWidth?: number  // 按钮自身宽度
+  quickNoteButtonMargin?: number    // 按钮自身外边距
+  quickNoteButtonPadding?: number   // 按钮内容的内边距
+  quickNoteButtonGap?: number       // 按钮之间的间距
 }
 
 /**
@@ -903,12 +909,12 @@ export function createMobileSettingLayout(
     }
   })
 
-  // === 工具栏位置配置 ===
+  // === 工具栏位置配置（整合顶部和底部配置） ===
   createGroupTitle('📍', '工具栏位置配置')
 
   setting.addItem({
     title: '工具栏位置',
-    description: '💡选择工具栏显示位置（顶部固定/底部固定）',
+    description: '💡选择工具栏显示位置，下方会显示对应的配置选项',
     createActionElement: () => {
       const container = document.createElement('div')
       container.style.cssText = 'display: flex; gap: 12px; align-items: center;'
@@ -956,6 +962,35 @@ export function createMobileSettingLayout(
             ;(el as HTMLInputElement).style.opacity = isTop ? '' : '0.5'
           })
 
+          // 动态显示/隐藏整个配置分区
+          document.querySelectorAll('.top-toolbar-section').forEach(el => {
+            const parent = el.closest('.b3-dialog__content .config__item') as HTMLElement
+            if (parent) {
+              parent.style.display = isTop ? '' : 'none'
+            }
+          })
+
+          document.querySelectorAll('.bottom-toolbar-section').forEach(el => {
+            const parent = el.closest('.b3-dialog__content .config__item') as HTMLElement
+            if (parent) {
+              parent.style.display = isBottom ? '' : 'none'
+            }
+          })
+
+          // 同时显示/隐藏分区下的所有配置项
+          const updateSectionVisibility = (className: string, show: boolean) => {
+            document.querySelectorAll(className).forEach(el => {
+              const input = el as HTMLInputElement
+              const item = input.closest('.b3-dialog__content .config__item') as HTMLElement
+              if (item) {
+                item.style.display = show ? '' : 'none'
+              }
+            })
+          }
+
+          updateSectionVisibility('.top-toolbar-setting', isTop)
+          updateSectionVisibility('.bottom-toolbar-setting', isBottom)
+
           // 重新初始化工具栏
           context.updateMobileToolbar()
         }
@@ -968,15 +1003,58 @@ export function createMobileSettingLayout(
         container.appendChild(label)
       })
 
+      // 初始化时根据当前配置设置显示状态（使用setTimeout确保DOM已渲染）
+      setTimeout(() => {
+        const isTop = context.mobileConfig.enableTopToolbar
+        const isBottom = context.mobileConfig.enableBottomToolbar
+
+        document.querySelectorAll('.top-toolbar-section').forEach(el => {
+          const parent = el.closest('.b3-dialog__content .config__item') as HTMLElement
+          if (parent) {
+            parent.style.display = isTop ? '' : 'none'
+          }
+        })
+
+        document.querySelectorAll('.bottom-toolbar-section').forEach(el => {
+          const parent = el.closest('.b3-dialog__content .config__item') as HTMLElement
+          if (parent) {
+            parent.style.display = isBottom ? '' : 'none'
+          }
+        })
+
+        const updateSectionVisibility = (className: string, show: boolean) => {
+          document.querySelectorAll(className).forEach(el => {
+            const input = el as HTMLInputElement
+            const item = input.closest('.b3-dialog__content .config__item') as HTMLElement
+            if (item) {
+              item.style.display = show ? '' : 'none'
+            }
+          })
+        }
+
+        updateSectionVisibility('.top-toolbar-setting', isTop)
+        updateSectionVisibility('.bottom-toolbar-setting', isBottom)
+      }, 100)
+
       return container
     }
   })
 
-  // === 顶部工具栏专用配置 ===
-  createGroupTitle('⬆️', '顶部工具栏配置')
+  // === 顶部工具栏专用配置（作为子分区） ===
+  // 子分区标题项，使用思源原生的 config__item 结构
+  setting.addItem({
+    title: '',
+    description: '',
+    createActionElement: () => {
+      const div = document.createElement('div')
+      div.className = 'top-toolbar-section'
+      div.innerHTML = '<span style="font-size: 14px; font-weight: 600; color: #3b82f6; display: flex; align-items: center; gap: 6px;"><span>⬆️</span><span>顶部工具栏配置</span></span>'
+      return div
+    }
+  })
 
   setting.addItem({
-    title: '①距离顶部高度',
+    title: '距离顶部高度',
     description: '💡顶部工具栏距离屏幕顶部的距离（仅在顶部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -996,7 +1074,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '②扩展工具栏距离顶部工具栏',
+    title: '扩展工具栏距离顶部工具栏',
     description: '💡扩展工具栏第1层距离顶部主工具栏的距离（仅在顶部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1015,7 +1093,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '③扩展工具栏自身高度',
+    title: '扩展工具栏自身高度',
     description: '💡顶部模式时扩展工具栏每一层的高度',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1033,11 +1111,21 @@ export function createMobileSettingLayout(
     }
   })
 
-  // === 底部工具栏专用配置 ===
-  createGroupTitle('⬇️', '底部工具栏配置')
+  // === 底部工具栏专用配置（作为子分区） ===
+  // 子分区标题项，使用思源原生的 config__item 结构
+  setting.addItem({
+    title: '',
+    description: '',
+    createActionElement: () => {
+      const div = document.createElement('div')
+      div.className = 'bottom-toolbar-section'
+      div.innerHTML = '<span style="font-size: 14px; font-weight: 600; color: #22c55e; display: flex; align-items: center; gap: 6px;"><span>⬇️</span><span>底部工具栏配置</span></span>'
+      return div
+    }
+  })
 
   setting.addItem({
-    title: '①输入法关闭时底部高度',
+    title: '输入法关闭时底部高度',
     description: '💡输入法关闭时，工具栏距底部距离（仅在底部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1058,7 +1146,7 @@ export function createMobileSettingLayout(
 
 
   setting.addItem({
-    title: '②输入法打开时底部高度',
+    title: '输入法打开时底部高度',
     description: '💡输入法弹出时，底部工具栏距底部距离（仅在底部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1077,7 +1165,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '③输入法灵敏度检查',
+    title: '输入法灵敏度检查',
     description: '💡不建议修改：窗口高度变化超过此百分比触发：30-90（仅在底部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1100,7 +1188,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '④扩展工具栏距离底部工具栏',
+    title: '扩展工具栏距离底部工具栏',
     description: '💡扩展工具栏第1层距离底部主工具栏的距离（仅在底部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1119,7 +1207,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '⑤扩展工具栏自身高度',
+    title: '扩展工具栏自身高度',
     description: '💡底部模式时扩展工具栏每一层的高度',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1546,49 +1634,267 @@ export function createMobileSettingLayout(
     }
   })
 
-  // 弹窗按钮高度设置
+  // 按钮样式配置模式切换
   setting.addItem({
-    title: '🔘 弹窗按钮高度',
-    description: '调整一键记事弹窗内按钮的高度（像素）',
+    title: '🔘 按钮样式配置',
+    description: '选择使用默认配置或自定义配置按钮样式',
     createActionElement: () => {
       const container = document.createElement('div');
-      container.style.cssText = 'display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 0;';
+      container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; width: 100%;';
 
       const config = context.mobileFeatureConfig as any;
-      const currentHeight = config.quickNoteButtonHeight || 32;
+      const useCustom = config.useCustomButtonStyle || false;
 
-      // 高度滑块
-      const slider = document.createElement('input');
-      slider.type = 'range';
-      slider.min = '24';
-      slider.max = '66';
-      slider.value = String(currentHeight);
-      slider.style.cssText = 'flex: 1; cursor: pointer;';
+      // 选项容器
+      const optionsContainer = document.createElement('div');
+      optionsContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
 
-      // 数值显示
-      const valueDisplay = document.createElement('span');
-      valueDisplay.textContent = `${currentHeight}px`;
-      valueDisplay.style.cssText = 'min-width: 45px; text-align: right; font-size: 14px; font-weight: 500;';
+      // 默认配置选项
+      const defaultOption = document.createElement('div');
+      defaultOption.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--b3-border-color); border-radius: 6px; cursor: pointer;';
 
-      slider.oninput = () => {
-        const value = parseInt(slider.value);
-        valueDisplay.textContent = `${value}px`;
-        config.quickNoteButtonHeight = value;
+      const defaultRadio = document.createElement('input');
+      defaultRadio.type = 'radio';
+      defaultRadio.name = 'button-style-config';
+      defaultRadio.checked = !useCustom;
+      defaultRadio.style.cssText = 'transform: scale(1.2);';
+
+      const defaultLabel = document.createElement('span');
+      defaultLabel.textContent = '使用默认配置';
+      defaultLabel.style.cssText = 'font-size: 14px;';
+
+      defaultOption.appendChild(defaultRadio);
+      defaultOption.appendChild(defaultLabel);
+
+      // 自定义配置选项
+      const customOption = document.createElement('div');
+      customOption.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--b3-border-color); border-radius: 6px; cursor: pointer;';
+
+      const customRadio = document.createElement('input');
+      customRadio.type = 'radio';
+      customRadio.name = 'button-style-config';
+      customRadio.checked = useCustom;
+      customRadio.style.cssText = 'transform: scale(1.2);';
+
+      const customLabel = document.createElement('span');
+      customLabel.textContent = '使用自定义配置';
+      customLabel.style.cssText = 'font-size: 14px;';
+
+      customOption.appendChild(customRadio);
+      customOption.appendChild(customLabel);
+
+      // 更新选中样式
+      const updateSelection = () => {
+        if (defaultRadio.checked) {
+          defaultOption.style.borderColor = 'var(--b3-theme-primary)';
+          defaultOption.style.backgroundColor = 'var(--b3-theme-primary-lightest)';
+          customOption.style.borderColor = 'var(--b3-border-color)';
+          customOption.style.backgroundColor = 'transparent';
+        } else {
+          customOption.style.borderColor = 'var(--b3-theme-primary)';
+          customOption.style.backgroundColor = 'var(--b3-theme-primary-lightest)';
+          defaultOption.style.borderColor = 'var(--b3-border-color)';
+          defaultOption.style.backgroundColor = 'transparent';
+        }
       };
 
-      slider.onchange = async () => {
-        const value = parseInt(slider.value);
-        config.quickNoteButtonHeight = value;
+      updateSelection();
+
+      // 点击事件
+      defaultOption.onclick = async () => {
+        defaultRadio.checked = true;
+        config.useCustomButtonStyle = false;
         await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+        updateSelection();
+        // 触发自定义事件通知设置项显示/隐藏
+        window.dispatchEvent(new CustomEvent('quicknote-button-style-changed', { detail: false }));
       };
 
-      container.appendChild(slider);
-      container.appendChild(valueDisplay);
+      customOption.onclick = async () => {
+        customRadio.checked = true;
+        config.useCustomButtonStyle = true;
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+        updateSelection();
+        // 触发自定义事件通知设置项显示/隐藏
+        window.dispatchEvent(new CustomEvent('quicknote-button-style-changed', { detail: true }));
+      };
+
+      optionsContainer.appendChild(defaultOption);
+      optionsContainer.appendChild(customOption);
+      container.appendChild(optionsContainer);
 
       return container;
     }
   })
 
+  // 创建按钮样式自定义配置容器
+  const createButtonStyleConfigContainer = () => {
+    const wrapper = document.createElement('div');
+    wrapper.id = 'quicknote-button-style-configs';
+    wrapper.style.cssText = 'display: flex; flex-direction: column; gap: 8px; width: 100%;';
+
+    const config = context.mobileFeatureConfig as any;
+    const useCustom = config.useCustomButtonStyle || false;
+
+    // 根据初始状态设置显示/隐藏
+    if (!useCustom) {
+      wrapper.style.display = 'none';
+    }
+
+    // 监听切换事件
+    window.addEventListener('quicknote-button-style-changed', ((e: CustomEvent) => {
+      wrapper.style.display = e.detail ? 'flex' : 'none';
+    }) as EventListener);
+
+    // 弹窗按钮高度
+    const heightRow = document.createElement('div');
+    heightRow.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--b3-border-color);';
+    const heightLabel = document.createElement('span');
+    heightLabel.textContent = '按钮高度:';
+    heightLabel.style.cssText = 'min-width: 100px; font-size: 14px;';
+    const heightSlider = document.createElement('input');
+    heightSlider.type = 'range';
+    heightSlider.min = '24';
+    heightSlider.max = '66';
+    heightSlider.value = String(config.quickNoteButtonHeight || 40);
+    heightSlider.style.cssText = 'flex: 1; cursor: pointer;';
+    const heightValue = document.createElement('span');
+    heightValue.textContent = `${heightSlider.value}px`;
+    heightValue.style.cssText = 'min-width: 45px; text-align: right; font-size: 14px;';
+    heightSlider.oninput = () => {
+      heightValue.textContent = `${heightSlider.value}px`;
+      config.quickNoteButtonHeight = parseInt(heightSlider.value);
+    };
+    heightSlider.onchange = async () => {
+      config.quickNoteButtonHeight = parseInt(heightSlider.value);
+      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+    };
+    heightRow.appendChild(heightLabel);
+    heightRow.appendChild(heightSlider);
+    heightRow.appendChild(heightValue);
+    wrapper.appendChild(heightRow);
+
+    // 按钮自身宽度
+    const widthRow = document.createElement('div');
+    widthRow.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--b3-border-color);';
+    const widthLabel = document.createElement('span');
+    widthLabel.textContent = '按钮宽度:';
+    widthLabel.style.cssText = 'min-width: 100px; font-size: 14px;';
+    const widthSlider = document.createElement('input');
+    widthSlider.type = 'range';
+    widthSlider.min = '20';
+    widthSlider.max = '60';
+    widthSlider.value = String(config.quickNoteButtonMinWidth || 36);
+    widthSlider.style.cssText = 'flex: 1; cursor: pointer;';
+    const widthValue = document.createElement('span');
+    widthValue.textContent = `${widthSlider.value}px`;
+    widthValue.style.cssText = 'min-width: 45px; text-align: right; font-size: 14px;';
+    widthSlider.oninput = () => {
+      widthValue.textContent = `${widthSlider.value}px`;
+      config.quickNoteButtonMinWidth = parseInt(widthSlider.value);
+    };
+    widthSlider.onchange = async () => {
+      config.quickNoteButtonMinWidth = parseInt(widthSlider.value);
+      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+    };
+    widthRow.appendChild(widthLabel);
+    widthRow.appendChild(widthSlider);
+    widthRow.appendChild(widthValue);
+    wrapper.appendChild(widthRow);
+
+    // 按钮外边距
+    const marginRow = document.createElement('div');
+    marginRow.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--b3-border-color);';
+    const marginLabel = document.createElement('span');
+    marginLabel.textContent = '外边距:';
+    marginLabel.style.cssText = 'min-width: 100px; font-size: 14px;';
+    const marginSlider = document.createElement('input');
+    marginSlider.type = 'range';
+    marginSlider.min = '0';
+    marginSlider.max = '10';
+    marginSlider.value = String(config.quickNoteButtonMargin || 2);
+    marginSlider.style.cssText = 'flex: 1; cursor: pointer;';
+    const marginValue = document.createElement('span');
+    marginValue.textContent = `${marginSlider.value}px`;
+    marginValue.style.cssText = 'min-width: 45px; text-align: right; font-size: 14px;';
+    marginSlider.oninput = () => {
+      marginValue.textContent = `${marginSlider.value}px`;
+      config.quickNoteButtonMargin = parseInt(marginSlider.value);
+    };
+    marginSlider.onchange = async () => {
+      config.quickNoteButtonMargin = parseInt(marginSlider.value);
+      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+    };
+    marginRow.appendChild(marginLabel);
+    marginRow.appendChild(marginSlider);
+    marginRow.appendChild(marginValue);
+    wrapper.appendChild(marginRow);
+
+    // 按钮内边距
+    const paddingRow = document.createElement('div');
+    paddingRow.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--b3-border-color);';
+    const paddingLabel = document.createElement('span');
+    paddingLabel.textContent = '内边距:';
+    paddingLabel.style.cssText = 'min-width: 100px; font-size: 14px;';
+    const paddingSlider = document.createElement('input');
+    paddingSlider.type = 'range';
+    paddingSlider.min = '0';
+    paddingSlider.max = '20';
+    paddingSlider.value = String(config.quickNoteButtonPadding || 8);
+    paddingSlider.style.cssText = 'flex: 1; cursor: pointer;';
+    const paddingValue = document.createElement('span');
+    paddingValue.textContent = `${paddingSlider.value}px`;
+    paddingValue.style.cssText = 'min-width: 45px; text-align: right; font-size: 14px;';
+    paddingSlider.oninput = () => {
+      paddingValue.textContent = `${paddingSlider.value}px`;
+      config.quickNoteButtonPadding = parseInt(paddingSlider.value);
+    };
+    paddingSlider.onchange = async () => {
+      config.quickNoteButtonPadding = parseInt(paddingSlider.value);
+      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+    };
+    paddingRow.appendChild(paddingLabel);
+    paddingRow.appendChild(paddingSlider);
+    paddingRow.appendChild(paddingValue);
+    wrapper.appendChild(paddingRow);
+
+    // 按钮间距
+    const gapRow = document.createElement('div');
+    gapRow.style.cssText = 'display: flex; align-items: center; gap: 12px; padding: 8px 0;';
+    const gapLabel = document.createElement('span');
+    gapLabel.textContent = '按钮间距:';
+    gapLabel.style.cssText = 'min-width: 100px; font-size: 14px;';
+    const gapSlider = document.createElement('input');
+    gapSlider.type = 'range';
+    gapSlider.min = '0';
+    gapSlider.max = '20';
+    gapSlider.value = String(config.quickNoteButtonGap || 6);
+    gapSlider.style.cssText = 'flex: 1; cursor: pointer;';
+    const gapValue = document.createElement('span');
+    gapValue.textContent = `${gapSlider.value}px`;
+    gapValue.style.cssText = 'min-width: 45px; text-align: right; font-size: 14px;';
+    gapSlider.oninput = () => {
+      gapValue.textContent = `${gapSlider.value}px`;
+      config.quickNoteButtonGap = parseInt(gapSlider.value);
+    };
+    gapSlider.onchange = async () => {
+      config.quickNoteButtonGap = parseInt(gapSlider.value);
+      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+    };
+    gapRow.appendChild(gapLabel);
+    gapRow.appendChild(gapSlider);
+    gapRow.appendChild(gapValue);
+    wrapper.appendChild(gapRow);
+
+    return wrapper;
+  };
+
+  // 添加按钮样式配置容器
+  setting.addItem({
+    title: '',
+    description: '',
+    createActionElement: () => createButtonStyleConfigContainer()
+  });
 
   // === 小功能选择 ===
   createGroupTitle('⚙️', '小功能选择')

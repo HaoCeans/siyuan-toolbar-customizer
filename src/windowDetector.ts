@@ -7,12 +7,55 @@ let visibilityChangeListener: (() => void) | null = null;
 // 记录设备初始高度
 let deviceInitialHeight: number | null = null;
 
+// 记录设备最大高度（用于检测小窗模式）
+let deviceMaxHeight: number | null = null;
+
+// Screen Wake Lock 用于检测锁屏状态
+let wakeLock: WakeLockSentinel | null = null;
+let isLockScreenJustReleased = false; // 标记是否刚从锁屏状态释放
+
 /**
  * 检查应用是否在前台
  * 使用 Page Visibility API 检测应用是否可见
  */
 function isAppInForeground(): boolean {
   return !document.hidden;  // 如果 document.hidden 为 false，说明在前台
+}
+
+/**
+ * 请求屏幕唤醒锁
+ * 用于检测锁屏状态：锁屏时唤醒锁会被释放
+ */
+async function requestWakeLock(): Promise<void> {
+  try {
+    if ('wakeLock' in navigator) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      
+      // 监听锁释放事件（屏幕锁定或切换到后台会导致释放）
+      wakeLock.addEventListener('release', () => {
+        // 标记刚从锁屏状态释放
+        isLockScreenJustReleased = true;
+        
+        // 短暂延迟后重置标记，避免误判正常切换
+        setTimeout(() => {
+          isLockScreenJustReleased = false;
+        }, 1000);
+      });
+    }
+  } catch (err) {
+    // 锁屏状态下无法获取唤醒锁，这是正常的
+    // 不需要处理错误
+  }
+}
+
+/**
+ * 释放屏幕唤醒锁
+ */
+function releaseWakeLock(): void {
+  if (wakeLock) {
+    wakeLock.release();
+    wakeLock = null;
+  }
 }
 
 /**
@@ -380,16 +423,28 @@ function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null):
   
   // 防止按钮获取焦点，保持输入法不关闭
   clonedBtn.tabIndex = -1;
-  
-  // 获取配置的按钮高度
-  const buttonHeight = pluginInstance?.mobileFeatureConfig?.quickNoteButtonHeight || 32;
-  
+
+  // 获取配置的按钮样式
+  const useCustomStyle = pluginInstance?.mobileFeatureConfig?.useCustomButtonStyle || false;
+  const buttonHeight = useCustomStyle
+    ? (pluginInstance?.mobileFeatureConfig?.quickNoteButtonHeight || 40)
+    : 40;  // 默认配置
+  const buttonMinWidth = useCustomStyle
+    ? (pluginInstance?.mobileFeatureConfig?.quickNoteButtonMinWidth || 36)
+    : 36;  // 默认配置
+  const buttonMargin = useCustomStyle
+    ? (pluginInstance?.mobileFeatureConfig?.quickNoteButtonMargin || 2)
+    : 2;   // 默认配置
+  const buttonPadding = useCustomStyle
+    ? (pluginInstance?.mobileFeatureConfig?.quickNoteButtonPadding || 8)
+    : 8;   // 默认配置
+
   // 设置按钮基本样式
   clonedBtn.style.cssText = `
-    min-width: 36px;
+    min-width: ${buttonMinWidth}px;
     height: ${buttonHeight}px;
-    padding: 4px 8px;
-    margin: 2px;
+    padding: 4px ${buttonPadding}px;
+    margin: ${buttonMargin}px;
     border: 1px solid #e0e0e0;
     border-radius: 6px;
     background: white;
@@ -478,20 +533,26 @@ function renderButtons(
   // 创建按钮容器
   const buttonsContainer = document.createElement('div');
   buttonsContainer.className = 'buttons-container';
-  
+
+  // 获取配置的按钮间距
+  const useCustomStyle = pluginInstance?.mobileFeatureConfig?.useCustomButtonStyle || false;
+  const buttonGap = useCustomStyle
+    ? (pluginInstance?.mobileFeatureConfig?.quickNoteButtonGap || 6)
+    : 6;  // 默认配置
+
   // 先过滤掉扩展工具栏按钮和未启用的按钮
   const filteredConfigs = buttonConfigs.filter(btn => btn.id !== 'overflow-button-mobile' && btn.enabled !== false);
-  
+
   // 根据排序方法设置样式和排序
   let sortedConfigs: any[];
-  
+
   if (sortMethod === 'topToolbar') {
     // 顶部工具栏排序：每行从右往左，sort小的在右，sort大的在左，居中
     // 使用 row-reverse + 升序 + center
     buttonsContainer.style.cssText = `
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: ${buttonGap}px;
       flex-direction: row-reverse;
       justify-content: center;
       align-content: flex-start;
@@ -503,14 +564,14 @@ function renderButtons(
   } else {
     // 底部工具栏排序：最新按钮在左上，居中显示
     // 效果：按行填充，从左到右，不满行居中
-    
+
     // 降序排列：sort大的在前（新按钮优先）
     sortedConfigs = [...filteredConfigs].sort((a, b) => b.sort - a.sort);
-    
+
     buttonsContainer.style.cssText = `
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: ${buttonGap}px;
       flex-direction: row;
       justify-content: center;
       align-content: flex-start;
@@ -800,6 +861,22 @@ function showSuccessMessage(message: string) {
 }
 
 /**
+ * 检查一键记事弹窗是否有内容
+ * @returns {boolean} 如果有内容返回true，否则返回false
+ */
+function hasNoteDialogContent(): boolean {
+  const noteDialog = document.getElementById('quick-note-dialog');
+  if (!noteDialog) {
+    return false;
+  }
+  const textarea = noteDialog.querySelector('textarea') as HTMLTextAreaElement;
+  if (!textarea) {
+    return false;
+  }
+  return textarea.value.trim().length > 0;
+}
+
+/**
  * 处理前后台切换
  * 根据配置决定是否触发弹窗
  */
@@ -808,26 +885,46 @@ function handleVisibilityChange() {
   if (isMobileDevice() && pluginInstance) {
     // 当应用从后台回到前台时
     if (isAppInForeground()) {
+      // 重新请求唤醒锁（从锁屏恢复后可以成功获取）
+      requestWakeLock();
+      
+      // 检查是否刚从锁屏状态释放，如果是则忽略本次触发
+      if (isLockScreenJustReleased) {
+        // 重置标记
+        isLockScreenJustReleased = false;
+        return;
+      }
+
       // 获取弹窗配置
       const popupConfig = pluginInstance.mobileFeatureConfig?.popupConfig || 'bothModes';
-      
+
       // 如果配置为关闭弹窗，则不执行任何操作
       if (popupConfig === 'disabled') {
         return;
       }
-      
+
+      // 检查是否已有弹窗且有内容，有内容则不打开新弹窗
+      if (hasNoteDialogContent()) {
+        return;
+      }
+
       // 获取当前窗口高度
       const currentHeight = window.innerHeight;
-      
+
+      // 更新设备最大高度（用于判断小窗模式）
+      if (deviceMaxHeight === null || currentHeight > deviceMaxHeight) {
+        deviceMaxHeight = currentHeight;
+      }
+
       // 如果还没有记录设备初始高度，则记录当前高度作为参考
       if (deviceInitialHeight === null) {
         deviceInitialHeight = currentHeight;
       }
-      
-      // 检查当前是否为小窗模式（高度减少≥80px）
-      const heightDifference = deviceInitialHeight - currentHeight;
+
+      // 检查当前是否为小窗模式（与最大高度相比减少≥80px）
+      const heightDifference = deviceMaxHeight - currentHeight;
       const isSmallWindowMode = heightDifference >= 80;
-      
+
       // 根据配置决定是否触发弹窗
       if (popupConfig === 'bothModes') {
         // 小窗和全屏模式都打开弹窗
@@ -839,7 +936,14 @@ function handleVisibilityChange() {
         }
       }
     } else {
-      // 应用切换到后台时，自动关闭一键记事弹窗
+      // 应用切换到后台时，释放唤醒锁
+      releaseWakeLock();
+      
+      // 如果弹窗有内容则不关闭
+      if (hasNoteDialogContent()) {
+        return;
+      }
+      // 没有内容时，自动关闭一键记事弹窗
       closeNoteDialogImmediately();
     }
   }
@@ -856,6 +960,12 @@ export function initSmallWindowDetector(): void {
     visibilityChangeListener = null;
   }
   
+  // 重置锁屏标记
+  isLockScreenJustReleased = false;
+  
+  // 初始化时请求唤醒锁
+  requestWakeLock();
+  
   // 添加可见性变化监听器（用于检测前后台切换）
   visibilityChangeListener = handleVisibilityChange;
   document.addEventListener('visibilitychange', visibilityChangeListener);
@@ -871,6 +981,9 @@ export function clearSmallWindowDetector(): void {
     document.removeEventListener('visibilitychange', visibilityChangeListener);
     visibilityChangeListener = null;
   }
+  
+  // 释放唤醒锁
+  releaseWakeLock();
 }
 
 /**

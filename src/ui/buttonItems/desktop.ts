@@ -944,11 +944,19 @@ export function createDesktopButtonItem(
     // 初始化按钮序列数据
     if (!button.buttonSequenceSteps || button.buttonSequenceSteps.length === 0) {
       button.buttonSequenceSteps = [
-        { buttonName: '', delayMs: 200 },
-        { buttonName: '', delayMs: 200 },
-        { buttonName: '', delayMs: 200 }
+        { buttonId: '', buttonName: '', delayMs: 200 },
+        { buttonId: '', buttonName: '', delayMs: 200 },
+        { buttonId: '', buttonName: '', delayMs: 200 }
       ]
     }
+    // 兼容性处理：为旧数据添加 buttonId 字段
+    button.buttonSequenceSteps.forEach(step => {
+      if (!step.buttonId) {
+        // 根据 buttonName 查找对应的 buttonId
+        const matchedBtn = context.buttonConfigs.find(b => b.name === step.buttonName)
+        step.buttonId = matchedBtn ? matchedBtn.id : ''
+      }
+    })
 
     // 获取可选择的按钮列表（排除当前按钮自己和扩展工具栏按钮，按 sort 排序）
     const getAvailableButtons = () => {
@@ -974,24 +982,24 @@ export function createDesktopButtonItem(
         defaultOption.value = ''
         defaultOption.textContent = '-- 请选择按钮 --'
         nameSelect.appendChild(defaultOption)
-        
+
         availableButtons.forEach((btn) => {
           const option = document.createElement('option')
           option.value = btn.id  // 使用按钮ID作为value，避免名称重复问题
           const iconDisplay = btn.icon.startsWith('icon') ? '⭐' : btn.icon
           option.textContent = `${iconDisplay} ${btn.name}`
-          // 通过ID匹配当前选中的按钮
-          const currentBtn = availableButtons.find(b => b.name === step.buttonName)
-          if (currentBtn && currentBtn.id === btn.id) {
+          // 通过ID匹配当前选中的按钮（使用 buttonId 而不是 buttonName）
+          if (step.buttonId === btn.id) {
             option.selected = true
           }
           nameSelect.appendChild(option)
         })
-        
+
         nameSelect.onchange = () => {
           // 根据选中的ID找到对应的按钮名称
           const selectedBtn = availableButtons.find(b => b.id === nameSelect.value)
           if (selectedBtn) {
+            button.buttonSequenceSteps![idx].buttonId = selectedBtn.id
             button.buttonSequenceSteps![idx].buttonName = selectedBtn.name
           }
         }
@@ -1026,7 +1034,7 @@ export function createDesktopButtonItem(
     addSequenceRowBtn.textContent = '+ 添加步骤'
     addSequenceRowBtn.style.cssText = 'padding: 6px 12px; border: 1px dashed var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 13px; align-self: flex-start;'
     addSequenceRowBtn.onclick = () => {
-      button.buttonSequenceSteps!.push({ buttonName: '', delayMs: 200 })
+      button.buttonSequenceSteps!.push({ buttonId: '', buttonName: '', delayMs: 200 })
       renderButtonSequenceRows()
     }
     buttonSequenceConfigDiv.appendChild(addSequenceRowBtn)
@@ -2147,11 +2155,18 @@ export function populateDesktopEditForm(
 
     if (!button.buttonSequenceSteps || button.buttonSequenceSteps.length === 0) {
       button.buttonSequenceSteps = [
-        { buttonName: '', delayMs: 200 },
-        { buttonName: '', delayMs: 200 },
-        { buttonName: '', delayMs: 200 }
+        { buttonId: '', buttonName: '', delayMs: 200 },
+        { buttonId: '', buttonName: '', delayMs: 200 },
+        { buttonId: '', buttonName: '', delayMs: 200 }
       ]
     }
+    // 兼容性处理：为旧数据添加 buttonId 字段
+    button.buttonSequenceSteps.forEach(step => {
+      if (!step.buttonId) {
+        const matchedBtn = context.buttonConfigs.find(b => b.name === step.buttonName)
+        step.buttonId = matchedBtn ? matchedBtn.id : ''
+      }
+    })
 
     // 获取可选择的按钮列表（排除当前按钮自己和扩展工具栏按钮，按 sort 排序）
     const getAvailableButtons2 = () => {
@@ -2171,30 +2186,30 @@ export function populateDesktopEditForm(
         // 改为下拉选择框
         const nameSelect = document.createElement('select')
         nameSelect.className = 'b3-select'
-        
+
         // 使用 DOM 方式构建选项（避免 HTML 转义问题）
         const defaultOption = document.createElement('option')
         defaultOption.value = ''
         defaultOption.textContent = '-- 请选择按钮 --'
         nameSelect.appendChild(defaultOption)
-        
+
         availableButtons.forEach((btn) => {
           const option = document.createElement('option')
           option.value = btn.id  // 使用按钮ID作为value，避免名称重复问题
           const iconDisplay = btn.icon.startsWith('icon') ? '⭐' : btn.icon
           option.textContent = `${iconDisplay} ${btn.name}`
-          // 通过ID匹配当前选中的按钮
-          const currentBtn = availableButtons.find(b => b.name === step.buttonName)
-          if (currentBtn && currentBtn.id === btn.id) {
+          // 通过ID匹配当前选中的按钮（使用 buttonId 而不是 buttonName）
+          if (step.buttonId === btn.id) {
             option.selected = true
           }
           nameSelect.appendChild(option)
         })
-        
+
         nameSelect.onchange = () => {
           // 根据选中的ID找到对应的按钮名称
           const selectedBtn = availableButtons.find(b => b.id === nameSelect.value)
           if (selectedBtn) {
+            button.buttonSequenceSteps![idx].buttonId = selectedBtn.id
             button.buttonSequenceSteps![idx].buttonName = selectedBtn.name
           }
         }
@@ -2229,7 +2244,7 @@ export function populateDesktopEditForm(
     addSequenceRowBtn2.textContent = '+ 添加步骤'
     addSequenceRowBtn2.style.cssText = 'padding: 6px 12px; border: 1px dashed var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 13px; align-self: flex-start;'
     addSequenceRowBtn2.onclick = () => {
-      button.buttonSequenceSteps!.push({ buttonName: '', delayMs: 200 })
+      button.buttonSequenceSteps!.push({ buttonId: '', buttonName: '', delayMs: 200 })
       renderButtonSequenceRows2()
     }
     buttonSequenceConfigDiv.appendChild(addSequenceRowBtn2)

@@ -10,9 +10,12 @@ let deviceInitialHeight: number | null = null;
 // 记录设备最大高度（用于检测小窗模式）
 let deviceMaxHeight: number | null = null;
 
-// Screen Wake Lock 用于检测锁屏状态
-let wakeLock: WakeLockSentinel | null = null;
-let isLockScreenJustReleased = false; // 标记是否刚从锁屏状态释放
+// 标记页面是否被冻结过（锁屏或系统冻结）
+let wasPageFrozen = false;
+// 记录从冻结恢复的时间戳
+let lastFreezeRecoveryTime = 0;
+// 冻结恢复后的防抖时间（2秒内不触发弹窗）
+const FREEZE_RECOVERY_DEBOUNCE_MS = 2000;
 
 /**
  * 检查应用是否在前台
@@ -20,42 +23,6 @@ let isLockScreenJustReleased = false; // 标记是否刚从锁屏状态释放
  */
 function isAppInForeground(): boolean {
   return !document.hidden;  // 如果 document.hidden 为 false，说明在前台
-}
-
-/**
- * 请求屏幕唤醒锁
- * 用于检测锁屏状态：锁屏时唤醒锁会被释放
- */
-async function requestWakeLock(): Promise<void> {
-  try {
-    if ('wakeLock' in navigator) {
-      wakeLock = await navigator.wakeLock.request('screen');
-      
-      // 监听锁释放事件（屏幕锁定或切换到后台会导致释放）
-      wakeLock.addEventListener('release', () => {
-        // 标记刚从锁屏状态释放
-        isLockScreenJustReleased = true;
-        
-        // 短暂延迟后重置标记，避免误判正常切换
-        setTimeout(() => {
-          isLockScreenJustReleased = false;
-        }, 1000);
-      });
-    }
-  } catch (err) {
-    // 锁屏状态下无法获取唤醒锁，这是正常的
-    // 不需要处理错误
-  }
-}
-
-/**
- * 释放屏幕唤醒锁
- */
-function releaseWakeLock(): void {
-  if (wakeLock) {
-    wakeLock.release();
-    wakeLock = null;
-  }
 }
 
 /**
@@ -885,13 +852,18 @@ function handleVisibilityChange() {
   if (isMobileDevice() && pluginInstance) {
     // 当应用从后台回到前台时
     if (isAppInForeground()) {
-      // 重新请求唤醒锁（从锁屏恢复后可以成功获取）
-      requestWakeLock();
+      // 检查页面是否被冻结过（锁屏或系统冻结）
+      // 如果被冻结过，说明是从锁屏/后台恢复，不触发弹窗
+      if (wasPageFrozen) {
+        // 重置标记并记录恢复时间
+        wasPageFrozen = false;
+        lastFreezeRecoveryTime = Date.now();
+        return;
+      }
       
-      // 检查是否刚从锁屏状态释放，如果是则忽略本次触发
-      if (isLockScreenJustReleased) {
-        // 重置标记
-        isLockScreenJustReleased = false;
+      // 检查是否在冻结恢复后的防抖时间内
+      const timeSinceRecovery = Date.now() - lastFreezeRecoveryTime;
+      if (timeSinceRecovery < FREEZE_RECOVERY_DEBOUNCE_MS) {
         return;
       }
 
@@ -936,9 +908,6 @@ function handleVisibilityChange() {
         }
       }
     } else {
-      // 应用切换到后台时，释放唤醒锁
-      releaseWakeLock();
-      
       // 如果弹窗有内容则不关闭
       if (hasNoteDialogContent()) {
         return;
@@ -960,11 +929,14 @@ export function initSmallWindowDetector(): void {
     visibilityChangeListener = null;
   }
   
-  // 重置锁屏标记
-  isLockScreenJustReleased = false;
+  // 重置冻结标记和时间戳
+  wasPageFrozen = false;
+  lastFreezeRecoveryTime = 0;
   
-  // 初始化时请求唤醒锁
-  requestWakeLock();
+  // 添加页面冻结事件监听（锁屏或系统冻结时触发）
+  document.addEventListener('freeze', () => {
+    wasPageFrozen = true;
+  });
   
   // 添加可见性变化监听器（用于检测前后台切换）
   visibilityChangeListener = handleVisibilityChange;
@@ -981,9 +953,6 @@ export function clearSmallWindowDetector(): void {
     document.removeEventListener('visibilitychange', visibilityChangeListener);
     visibilityChangeListener = null;
   }
-  
-  // 释放唤醒锁
-  releaseWakeLock();
 }
 
 /**

@@ -1,5 +1,6 @@
 /**
  * 图标选择器
+ * 两级分区结构：本体图标 | 思源图标
  */
 
 import { iconCategories, updateIconDisplay } from '../data/icons'
@@ -8,6 +9,36 @@ export interface IconPickerOptions {
   title?: string
   currentValue?: string
   onSelect: (icon: string) => void
+}
+
+type PartitionType = 'local' | 'siyuan'
+
+/**
+ * Unicode 转 Emoji 字符串
+ */
+function unicodeToEmoji(unicode: string): string {
+  if (!unicode) return ""
+
+  // 自定义图片表情
+  if (unicode.includes(".")) {
+    return unicode
+  }
+
+  // Unicode emoji
+  return unicode
+    .split("-")
+    .map((item) => {
+      const code = item.length < 5 ? "0" + item : item
+      return String.fromCodePoint(parseInt(code, 16))
+    })
+    .join("")
+}
+
+/**
+ * 获取思源表情数据
+ */
+function getSiYuanEmojis() {
+  return (window as any).siyuan?.emojis || []
 }
 
 /**
@@ -67,19 +98,30 @@ export function showIconPicker(options: IconPickerOptions): void {
     padding: 16px 20px;
   `
 
-  // 分类标签
-  const tabs = document.createElement('div')
-  tabs.style.cssText = `
+  // ===== 一级分区标签 =====
+  const partitionTabs = document.createElement('div')
+  partitionTabs.style.cssText = `
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--b3-border-color);
+  `
+
+  // ===== 二级分类标签容器 =====
+  const categoryTabs = document.createElement('div')
+  categoryTabs.style.cssText = `
     display: flex;
     gap: 8px;
     margin-bottom: 16px;
     flex-wrap: wrap;
   `
 
+  let activePartition: PartitionType = 'local'
   let activeCategory = iconCategories[0].id
 
-  const renderContent = (category: string) => {
-    // 清空内容但保留 tabs
+  // ===== 渲染本体图标内容 =====
+  const renderLocalContent = (categoryId: string) => {
     const existingGrid = content.querySelector('.icon-grid')
     if (existingGrid) {
       existingGrid.remove()
@@ -93,16 +135,10 @@ export function showIconPicker(options: IconPickerOptions): void {
       gap: 8px;
     `
 
-    let icons: string[] = []
+    const cat = iconCategories.find(c => c.id === categoryId)
+    if (!cat) return
 
-    // 查找对应的分类
-    const cat = iconCategories.find(c => c.id === category)
-
-    if (cat) {
-      icons = cat.icons
-    }
-
-    icons.forEach(icon => {
+    cat.icons.forEach(icon => {
       const btn = document.createElement('button')
       btn.className = 'b3-button'
       btn.style.cssText = `
@@ -116,9 +152,20 @@ export function showIconPicker(options: IconPickerOptions): void {
         cursor: pointer;
         font-size: 24px;
         background: var(--b3-theme-background);
+        padding: 0;
       `
 
-      updateIconDisplay(btn, icon)
+      // 创建图标容器
+      const iconSpan = document.createElement('span')
+      iconSpan.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+      `
+      updateIconDisplay(iconSpan, icon)
+      btn.appendChild(iconSpan)
 
       btn.onclick = () => {
         onSelect(icon)
@@ -141,59 +188,192 @@ export function showIconPicker(options: IconPickerOptions): void {
     content.appendChild(grid)
   }
 
-  // 创建分类标签
-  iconCategories.forEach(cat => {
+  // ===== 渲染思源表情内容 =====
+  const renderSiyuanContent = (categoryId: string) => {
+    const existingGrid = content.querySelector('.icon-grid')
+    if (existingGrid) {
+      existingGrid.remove()
+    }
+
+    const grid = document.createElement('div')
+    grid.className = 'icon-grid'
+    grid.style.cssText = `
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+      gap: 8px;
+    `
+
+    const emojiCategories = getSiYuanEmojis()
+    const category = emojiCategories.find((c: any) => c.id === categoryId)
+    if (!category) return
+
+    category.items.forEach((item: any) => {
+      const btn = document.createElement('button')
+      btn.className = 'b3-button'
+      btn.style.cssText = `
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--b3-border-color);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 20px;
+        background: var(--b3-theme-background);
+        padding: 0;
+      `
+
+      if (item.unicode.includes(".")) {
+        btn.innerHTML = `<img src="/emojis/${item.unicode}" style="width:20px;height:20px;"/>`
+      } else {
+        btn.textContent = unicodeToEmoji(item.unicode)
+      }
+
+      btn.onclick = () => {
+        const emoji = unicodeToEmoji(item.unicode)
+        onSelect(emoji)
+        document.body.removeChild(dialog)
+      }
+
+      btn.onmouseenter = () => {
+        btn.style.background = 'var(--b3-theme-surface)'
+        btn.style.borderColor = 'var(--b3-theme-primary)'
+      }
+
+      btn.onmouseleave = () => {
+        btn.style.background = 'var(--b3-theme-background)'
+        btn.style.borderColor = 'var(--b3-border-color)'
+      }
+
+      grid.appendChild(btn)
+    })
+
+    content.appendChild(grid)
+  }
+
+  // ===== 更新二级分类标签 =====
+  const updateCategoryTabs = () => {
+    categoryTabs.innerHTML = ''
+
+    if (activePartition === 'local') {
+      // 生成本地图标分类标签
+      // 默认选择"表情"分类（emoji-smileys）
+      const defaultCategoryId = 'emoji-smileys'
+      activeCategory = iconCategories.find(c => c.id === defaultCategoryId)?.id || iconCategories[0]?.id
+
+      iconCategories.forEach(cat => {
+        const tab = createCategoryTab(cat.id, cat.name, activeCategory === cat.id, () => {
+          activeCategory = cat.id
+          updateCategoryTabStyles()
+          renderLocalContent(cat.id)
+        })
+        categoryTabs.appendChild(tab)
+      })
+      // 渲染默认分类
+      renderLocalContent(activeCategory)
+    } else if (activePartition === 'siyuan') {
+      // 生成思源表情分类标签
+      // 默认选择"笑脸和人类"分类（people）
+      const emojiCategories = getSiYuanEmojis()
+      const defaultCategoryId = 'people'
+      activeCategory = emojiCategories.find((c: any) => c.id === defaultCategoryId)?.id || emojiCategories[0]?.id
+
+      emojiCategories.forEach((cat: any) => {
+        const tab = createCategoryTab(cat.id, cat.title_zh_cn || cat.title, activeCategory === cat.id, () => {
+          activeCategory = cat.id
+          updateCategoryTabStyles()
+          renderSiyuanContent(cat.id)
+        })
+        categoryTabs.appendChild(tab)
+      })
+      // 渲染默认分类
+      if (activeCategory) {
+        renderSiyuanContent(activeCategory)
+      }
+    }
+  }
+
+  // ===== 创建分类标签按钮 =====
+  const createCategoryTab = (id: string, name: string, isActive: boolean, onClick: () => void) => {
     const tab = document.createElement('button')
     tab.className = 'b3-button'
-    tab.textContent = cat.name
-    tab.dataset.categoryId = cat.id
+    tab.textContent = name
+    tab.dataset.categoryId = id
     tab.style.cssText = `
       padding: 6px 16px;
       border-radius: 16px;
       border: 1px solid var(--b3-border-color);
-      background: var(--b3-theme-background);
-      color: var(--b3-theme-on-background);
+      background: ${isActive ? 'var(--b3-theme-primary)' : 'var(--b3-theme-background)'};
+      color: ${isActive ? 'var(--b3-theme-on-primary)' : 'var(--b3-theme-on-background)'};
       cursor: pointer;
+      font-size: 13px;
     `
 
-    const updateTabStyle = () => {
-      if (activeCategory === cat.id) {
-        tab.style.background = 'var(--b3-theme-primary)'
-        tab.style.color = 'var(--b3-theme-on-primary)'
-        tab.style.borderColor = 'var(--b3-theme-primary)'
-      } else {
-        tab.style.background = 'var(--b3-theme-background)'
-        tab.style.color = 'var(--b3-theme-on-background)'
-        tab.style.borderColor = 'var(--b3-border-color)'
-      }
-    }
+    tab.onclick = onClick
+    return tab
+  }
 
-    updateTabStyle()
+  // ===== 更新分类标签样式 =====
+  const updateCategoryTabStyles = () => {
+    categoryTabs.querySelectorAll('button').forEach(b => {
+      const isActive = b.dataset.categoryId === activeCategory
+      b.style.background = isActive ? 'var(--b3-theme-primary)' : 'var(--b3-theme-background)'
+      b.style.color = isActive ? 'var(--b3-theme-on-primary)' : 'var(--b3-theme-on-background)'
+      b.style.borderColor = isActive ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
+    })
+  }
+
+  // ===== 创建分区标签 =====
+  const createPartitionTab = (type: PartitionType, label: string) => {
+    const tab = document.createElement('button')
+    tab.className = 'b3-button'
+    tab.textContent = label
+    tab.dataset.partition = type
+    tab.style.cssText = `
+      padding: 8px 20px;
+      border-radius: 20px;
+      border: 2px solid ${type === activePartition ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'};
+      background: ${type === activePartition ? 'var(--b3-theme-primary)' : 'var(--b3-theme-background)'};
+      color: ${type === activePartition ? 'var(--b3-theme-on-primary)' : 'var(--b3-theme-on-background)'};
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.2s;
+    `
 
     tab.onclick = () => {
-      activeCategory = cat.id
-      // 更新所有标签的样式
-      tabs.querySelectorAll('button').forEach(b => {
-        const categoryId = b.dataset.categoryId
-        if (categoryId === cat.id) {
-          b.style.background = 'var(--b3-theme-primary)'
-          b.style.color = 'var(--b3-theme-on-primary)'
-          b.style.borderColor = 'var(--b3-theme-primary)'
-        } else {
-          b.style.background = 'var(--b3-theme-background)'
-          b.style.color = 'var(--b3-theme-on-background)'
-          b.style.borderColor = 'var(--b3-border-color)'
-        }
+      if (activePartition === type) return
+
+      activePartition = type
+      activeCategory = '' // 重置分类
+
+      // 更新分区标签样式
+      partitionTabs.querySelectorAll('button').forEach(b => {
+        const bType = b.dataset.partition as PartitionType
+        const isActive = bType === type
+        b.style.background = isActive ? 'var(--b3-theme-primary)' : 'var(--b3-theme-background)'
+        b.style.color = isActive ? 'var(--b3-theme-on-primary)' : 'var(--b3-theme-on-background)'
+        b.style.borderColor = isActive ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
       })
-      renderContent(cat.id)
+
+      // 更新分类标签和内容
+      updateCategoryTabs()
     }
 
-    tabs.appendChild(tab)
-  })
+    return tab
+  }
 
-  content.appendChild(tabs)
-  // 默认显示第一个分类
-  renderContent(iconCategories[0].id)
+  // 添加分区标签
+  partitionTabs.appendChild(createPartitionTab('local', '本体图标'))
+  partitionTabs.appendChild(createPartitionTab('siyuan', '思源图标'))
+
+  // 组装界面
+  content.appendChild(partitionTabs)
+  content.appendChild(categoryTabs)
+
+  // 初始化显示本体图标分类
+  updateCategoryTabs()
 
   panel.appendChild(header)
   panel.appendChild(content)

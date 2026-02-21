@@ -701,7 +701,7 @@ export function createMobileSettingLayout(
       input.style.cssText = 'font-size: 14px; padding: 8px;'
       input.onchange = async () => {
         context.mobileConfig.toolbarHeight = input.value
-        await context.saveData('mobileConfig', context.mobileConfig)
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
         context.applyMobileToolbarStyle()
       }
       return input
@@ -741,7 +741,7 @@ export function createMobileSettingLayout(
       lightColorPicker.onchange = async () => {
         context.mobileConfig.toolbarBackgroundColor = lightColorPicker.value
         lightTextInput.value = lightColorPicker.value
-        await context.saveData('mobileConfig', context.mobileConfig)
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
         context.applyMobileToolbarStyle()
       }
 
@@ -750,7 +750,7 @@ export function createMobileSettingLayout(
         if (colorValue) {
           context.mobileConfig.toolbarBackgroundColor = colorValue
           lightColorPicker.value = colorValue.startsWith('#') ? colorValue : '#f8f9fa'
-          await context.saveData('mobileConfig', context.mobileConfig)
+          await context.saveData('mobileToolbarConfig', context.mobileConfig)
           context.applyMobileToolbarStyle()
         }
       }
@@ -784,7 +784,7 @@ export function createMobileSettingLayout(
       darkColorPicker.onchange = async () => {
         context.mobileConfig.toolbarBackgroundColorDark = darkColorPicker.value
         darkTextInput.value = darkColorPicker.value
-        await context.saveData('mobileConfig', context.mobileConfig)
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
         context.applyMobileToolbarStyle()
       }
 
@@ -793,7 +793,7 @@ export function createMobileSettingLayout(
         if (colorValue) {
           context.mobileConfig.toolbarBackgroundColorDark = colorValue
           darkColorPicker.value = colorValue.startsWith('#') ? colorValue : '#1a1a1a'
-          await context.saveData('mobileConfig', context.mobileConfig)
+          await context.saveData('mobileToolbarConfig', context.mobileConfig)
           context.applyMobileToolbarStyle()
         }
       }
@@ -838,7 +838,7 @@ export function createMobileSettingLayout(
       themeCheckbox.onchange = async () => {
         context.mobileConfig.useThemeColor = themeCheckbox.checked
         updateDisabledState()
-        await context.saveData('mobileConfig', context.mobileConfig)
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
         context.applyMobileToolbarStyle()
       }
 
@@ -878,7 +878,7 @@ export function createMobileSettingLayout(
 
       slider.onchange = async () => {
         context.mobileConfig.toolbarOpacity = parseInt(slider.value) / 100
-        await context.saveData('mobileConfig', context.mobileConfig)
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
         context.applyMobileToolbarStyle()
       }
 
@@ -902,7 +902,7 @@ export function createMobileSettingLayout(
       input.max = '10000'
       input.onchange = async () => {
         context.mobileConfig.toolbarZIndex = parseInt(input.value) || 512
-        await context.saveData('mobileConfig', context.mobileConfig)
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
         context.applyMobileToolbarStyle()
       }
       return input
@@ -946,7 +946,7 @@ export function createMobileSettingLayout(
           context.mobileConfig.enableTopToolbar = option.value === 'top'
           context.mobileConfig.enableBottomToolbar = option.value === 'bottom'
 
-          await context.saveData('mobileConfig', context.mobileConfig)
+          await context.saveData('mobileToolbarConfig', context.mobileConfig)
 
           // 动态更新底部/顶部专用设置的禁用状态
           const isBottom = option.value === 'bottom'
@@ -1066,7 +1066,7 @@ export function createMobileSettingLayout(
       if (!context.mobileConfig.enableTopToolbar) input.style.opacity = '0.5'
       input.onchange = async () => {
         context.mobileConfig.topToolbarOffset = input.value
-        await context.saveData('mobileConfig', context.mobileConfig)
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
         context.applyMobileToolbarStyle()
       }
       return input
@@ -1086,7 +1086,7 @@ export function createMobileSettingLayout(
       if (!context.mobileConfig.enableTopToolbar) input.style.opacity = '0.5'
       input.onchange = async () => {
         context.mobileConfig.overflowToolbarDistanceTop = input.value
-        await context.saveData('mobileConfig', context.mobileConfig)
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
       }
       return input
     }
@@ -1105,7 +1105,7 @@ export function createMobileSettingLayout(
       if (!context.mobileConfig.enableTopToolbar) input.style.opacity = '0.5'
       input.onchange = async () => {
         context.mobileConfig.overflowToolbarHeightTop = input.value
-        await context.saveData('mobileConfig', context.mobileConfig)
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
       }
       return input
     }
@@ -1137,7 +1137,7 @@ export function createMobileSettingLayout(
       if (!context.mobileConfig.enableBottomToolbar) input.style.opacity = '0.5'
       input.onchange = async () => {
         context.mobileConfig.closeInputOffset = input.value
-        await context.saveData('mobileConfig', context.mobileConfig)
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
         context.applyMobileToolbarStyle()
       }
       return input
@@ -1157,7 +1157,7 @@ export function createMobileSettingLayout(
       if (!context.mobileConfig.enableBottomToolbar) input.style.opacity = '0.5'
       input.onchange = async () => {
         context.mobileConfig.openInputOffset = input.value
-        await context.saveData('mobileConfig', context.mobileConfig)
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
         context.applyMobileToolbarStyle()
       }
       return input
@@ -1179,7 +1179,7 @@ export function createMobileSettingLayout(
       if (!context.mobileConfig.enableBottomToolbar) input.style.opacity = '0.5'
       input.onchange = async () => {
         context.mobileConfig.heightThreshold = parseInt(input.value) || 70
-        await context.saveData('mobileConfig', context.mobileConfig)
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
         // 需要重新初始化工具栏检测器以应用新阈值
         context.updateMobileToolbar()
       }
@@ -1200,7 +1200,7 @@ export function createMobileSettingLayout(
       if (!context.mobileConfig.enableBottomToolbar) input.style.opacity = '0.5'
       input.onchange = async () => {
         context.mobileConfig.overflowToolbarDistanceBottom = input.value
-        await context.saveData('mobileConfig', context.mobileConfig)
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
       }
       return input
     }
@@ -1219,7 +1219,7 @@ export function createMobileSettingLayout(
       if (!context.mobileConfig.enableBottomToolbar) input.style.opacity = '0.5'
       input.onchange = async () => {
         context.mobileConfig.overflowToolbarHeightBottom = input.value
-        await context.saveData('mobileConfig', context.mobileConfig)
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
       }
       return input
     }

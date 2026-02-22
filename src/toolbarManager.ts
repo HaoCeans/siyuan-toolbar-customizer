@@ -1172,8 +1172,8 @@ export function initCustomButtons(configs: ButtonConfig[]) {
   // 初始设置
   safeSetTimeout(() => setupEditorButtons(configs), 1000)
 
-  // 启动工具栏渲染监听（解决新打开文档时工具栏未就绪的问题）
-  startToolbarObserver(configs)
+  // 点击编辑器时触发按钮创建（不再使用 MutationObserver 持续监听，避免卡顿）
+  // startToolbarObserver(configs)  // 已禁用：改用点击触发
 
   // 移除旧的工具栏样式变化监听器
   if (toolbarStyleChangeHandler) {
@@ -1262,7 +1262,7 @@ function setupEditorButtons(configs: ButtonConfig[]) {
 /**
  * 为编辑器创建按钮
  */
-function createButtonsForEditors(editors: NodeListOf<Element>, configs: ButtonConfig[]) {
+export function createButtonsForEditors(editors: NodeListOf<Element>, configs: ButtonConfig[]) {
   // 获取工具栏样式配置（根据当前平台读取对应配置）
   const isMobile = pluginInstance?.isMobile
   const featureConfig = isMobile ? pluginInstance?.mobileFeatureConfig : pluginInstance?.desktopFeatureConfig
@@ -1333,53 +1333,88 @@ function startToolbarObserver(configs: ButtonConfig[]) {
   // 记录已处理的编辑器，避免重复处理
   const processedEditors = new Set<string>()
 
+  // 节流控制：使用 requestAnimationFrame 避免高频触发
+  let pendingUpdate = false
+
   // 创建观察器监听 DOM 变化
   toolbarObserver = new MutationObserver((mutations) => {
-    // 检查是否有新的编辑器或工具栏出现
-    const editors = document.querySelectorAll('.protyle')
-    let shouldRetry = false
+    // 如果已有待执行的更新，跳过本次
+    if (pendingUpdate) return
 
-    editors.forEach((editor, index) => {
-      // 使用编辑器的唯一标识（如果没有则使用索引）
-      const editorId = (editor as HTMLElement).dataset.nodeId || `editor-${index}`
-
-      // 检查该编辑器是否已处理过
-      if (processedEditors.has(editorId)) {
-        // 已处理过，但仍需检查按钮是否还存在（可能被思源重新渲染清除了）
-        const existingButtons = editor.querySelectorAll('[data-custom-button]')
-        if (existingButtons.length === 0) {
-          // 按钮被清除了，需要重新创建
-          shouldRetry = true
-        }
-        return
-      }
-
-      // 检查工具栏是否已就绪（锁定按钮是否存在）
-      const readonlyBtn = editor.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]') ||
-                          editor.querySelector('.protyle-breadcrumb [data-type="readonly"]')
-
-      if (readonlyBtn) {
-        // 工具栏已就绪，标记为已处理
-        processedEditors.add(editorId)
-        shouldRetry = true
-      }
+    // 智能过滤：检查 mutations 是否与编辑器相关
+    const hasEditorChange = mutations.some(mutation => {
+      // 检查新增节点是否包含编辑器或工具栏
+      const addedNodes = Array.from(mutation.addedNodes)
+      return addedNodes.some(node => {
+        if (node.nodeType !== Node.ELEMENT_NODE) return false
+        const el = node as Element
+        // 只关注 .protyle 或包含工具栏的元素
+        return el.classList?.contains('protyle') ||
+               el.classList?.contains('protyle-breadcrumb') ||
+               el.classList?.contains('protyle-breadcrumb__bar') ||
+               el.querySelector?.('.protyle, .protyle-breadcrumb, .protyle-breadcrumb__bar')
+      })
     })
 
-    // 如果有新的编辑器或按钮被清除，重新创建按钮
-    if (shouldRetry) {
-      // 使用 requestAnimationFrame 确保在 DOM 更新后执行
-      requestAnimationFrame(() => {
-        createButtonsForEditors(editors, configs)
+    // 如果没有编辑器相关的变化，跳过
+    if (!hasEditorChange) return
+
+    pendingUpdate = true
+
+    requestAnimationFrame(() => {
+      pendingUpdate = false
+
+      // 检查是否有新的编辑器或工具栏出现
+      const editors = document.querySelectorAll('.protyle')
+      const currentEditorIds = new Set<string>()
+      let shouldRetry = false
+
+      editors.forEach((editor, index) => {
+        // 使用编辑器的唯一标识（如果没有则使用索引）
+        const editorId = (editor as HTMLElement).dataset.nodeId || `editor-${index}`
+        currentEditorIds.add(editorId)
+
+        // 检查该编辑器是否已处理过
+        if (processedEditors.has(editorId)) {
+          // 已处理过，但仍需检查按钮是否还存在（可能被思源重新渲染清除了）
+          const existingButtons = editor.querySelectorAll('[data-custom-button]')
+          if (existingButtons.length === 0) {
+            // 按钮被清除了，需要重新创建
+            shouldRetry = true
+          }
+          return
+        }
+
+        // 检查工具栏是否已就绪（锁定按钮是否存在）
+        const readonlyBtn = editor.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]') ||
+                            editor.querySelector('.protyle-breadcrumb [data-type="readonly"]')
+
+        if (readonlyBtn) {
+          // 工具栏已就绪，标记为已处理
+          processedEditors.add(editorId)
+          shouldRetry = true
+        }
       })
-    }
+
+      // 清理已关闭的编辑器记录（只保留当前存在的）
+      processedEditors.forEach(id => {
+        if (!currentEditorIds.has(id)) {
+          processedEditors.delete(id)
+        }
+      })
+
+      // 如果有新的编辑器或按钮被清除，重新创建按钮
+      if (shouldRetry) {
+        createButtonsForEditors(editors, configs)
+      }
+    })
   })
 
-  // 开始观察整个文档的 DOM 变化
-  toolbarObserver.observe(document.body, {
+  // 开始观察编辑器容器的 DOM 变化（缩小监听范围，避免监听整个文档）
+  const editorContainer = document.querySelector('.layout__center') || document.body
+  toolbarObserver.observe(editorContainer, {
     childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['class', 'data-node-id']
+    subtree: true
   })
 
   // 同时启动定时重试机制（作为后备方案，最多重试 10 次）
@@ -4177,7 +4212,7 @@ function showDatabasePopup(
   })
 
   // 使用事件委托处理 block-link 点击
-  dialog.element.addEventListener('click', (e) => {
+  dialog.element.addEventListener('click', async (e) => {
     const target = e.target as HTMLElement
     if (!target.classList.contains('block-link')) {
       return
@@ -4196,57 +4231,57 @@ function showDatabasePopup(
 
     const isMobile = isMobileDevice()
 
-    // 先获取块信息，然后用正确的方式打开
-    fetchSyncPost('/api/block/getBlockInfo', { id: blockId }).then((response) => {
-      if (response.code === 0 && response.data) {
-        const docId = response.data.rootID
+    try {
+      // 先获取块信息，提取文档ID（rootID）
+      const response = await fetchSyncPost('/api/block/getBlockInfo', { id: blockId })
 
-        if (isMobile) {
-          // 移动端：使用 openMobileFileById 打开文档
-          try {
-            openMobileFileById(pluginInstance.app, docId)
-            // 等待文档加载后滚动到目标块
-            setTimeout(() => {
-              const blockElement = document.querySelector(`[data-node-id="${blockId}"]`)
-              if (blockElement) {
-                blockElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                // 高亮显示
-                ;(blockElement as HTMLElement).style.backgroundColor = 'var(--b3-theme-primary-lightest)'
-                setTimeout(() => {
-                  ;(blockElement as HTMLElement).style.backgroundColor = ''
-                }, 2000)
-              }
-            }, 500)
-          } catch (err) {
-            console.warn('[数据库弹窗] 移动端打开失败:', err)
-          }
-        } else {
-          // 桌面端：使用 openTab 打开文档
-          siyuanOpenTab({
-            app: pluginInstance.app,
-            doc: { id: docId },
-            keepCursor: true
-          }).then(() => {
-            // 等待文档加载后滚动到目标块
-            setTimeout(() => {
-              const blockElement = document.querySelector(`[data-node-id="${blockId}"]`)
-              if (blockElement) {
-                blockElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                // 高亮显示
-                ;(blockElement as HTMLElement).style.backgroundColor = 'var(--b3-theme-primary-lightest)'
-                setTimeout(() => {
-                  ;(blockElement as HTMLElement).style.backgroundColor = ''
-                }, 2000)
-              }
-            }, 500)
-          }).catch((err) => {
-            console.warn('[数据库弹窗] 桌面端打开失败:', err)
-          })
-        }
+      if (response.code !== 0 || !response.data) {
+        console.warn('[数据库弹窗] 获取块信息失败:', response)
+        return
       }
-    }).catch((err) => {
-      console.warn('[数据库弹窗] 获取块信息失败:', err)
-    })
+
+      const docId = response.data.rootID
+
+      if (isMobile) {
+        // ==================== 手机端：使用 openMobileFileById 打开文档 ====================
+        await openMobileFileById(pluginInstance.app, docId)
+
+        // 等待文档加载后滚动到目标块
+        setTimeout(() => {
+          const blockElement = document.querySelector(`[data-node-id="${blockId}"]`)
+          if (blockElement) {
+            blockElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            // 高亮显示
+            ;(blockElement as HTMLElement).style.backgroundColor = 'var(--b3-theme-primary-lightest)'
+            setTimeout(() => {
+              ;(blockElement as HTMLElement).style.backgroundColor = ''
+            }, 2000)
+          }
+        }, 500)
+      } else {
+        // ==================== 电脑端：使用 openTab 打开文档 ====================
+        await siyuanOpenTab({
+          app: pluginInstance.app,
+          doc: { id: docId }
+          // 注意：不设置 keepCursor，让思源自动跳转到新打开的标签页
+        })
+
+        // 等待文档加载后滚动到目标块
+        setTimeout(() => {
+          const blockElement = document.querySelector(`[data-node-id="${blockId}"]`)
+          if (blockElement) {
+            blockElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            // 高亮显示
+            ;(blockElement as HTMLElement).style.backgroundColor = 'var(--b3-theme-primary-lightest)'
+            setTimeout(() => {
+              ;(blockElement as HTMLElement).style.backgroundColor = ''
+            }, 2000)
+          }
+        }, 500)
+      }
+    } catch (err) {
+      console.warn('[数据库弹窗] 打开块失败:', err)
+    }
   })
 }
 

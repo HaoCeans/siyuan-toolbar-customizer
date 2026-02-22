@@ -22,6 +22,7 @@ import {
   initMobileToolbarAdjuster,
   initCustomButtons,
   cleanup,
+  createButtonsForEditors,
   DEFAULT_BUTTONS_CONFIG,
   DEFAULT_DESKTOP_BUTTONS,
   DEFAULT_MOBILE_BUTTONS,
@@ -116,6 +117,9 @@ export default class ToolbarCustomizer extends Plugin {
   private touchStartHandler: any = null
   private touchMoveHandler: any = null
   private touchEndHandler: any = null
+
+  // EventBus 事件回调引用（用于清理）
+  private eventBusRefreshHandler: (() => void) | null = null
 
   // 待保存的欢迎标记（延迟到用户保存设置时写入）
   private _pendingWelcomeSave = false
@@ -430,6 +434,33 @@ export default class ToolbarCustomizer extends Plugin {
     // 根据当前平台选择对应的按钮配置
     const buttonsToInit = this.isMobile ? this.mobileButtonConfigs : this.desktopButtonConfigs
     initCustomButtons(buttonsToInit)
+
+    // ===== 使用思源 EventBus 监听编辑器加载事件（替代 MutationObserver，避免卡顿） =====
+    // 先移除旧的监听器（避免重复监听）
+    if (this.eventBusRefreshHandler) {
+      this.eventBus.off('loaded-protyle-dynamic', this.eventBusRefreshHandler)
+      this.eventBus.off('switch-protyle', this.eventBusRefreshHandler)
+      this.eventBus.off('loaded-protyle-static', this.eventBusRefreshHandler)
+    }
+    // 定义刷新按钮的回调函数（电脑端直接创建按钮，避免 initCustomButtons 的重复清理和延迟）
+    this.eventBusRefreshHandler = () => {
+      if (this.isMobile) {
+        // 手机端需要完整的初始化流程（包括溢出计算）
+        initCustomButtons(this.mobileButtonConfigs)
+      } else {
+        // 电脑端直接创建按钮，无需 1 秒延迟和重复清理
+        const editors = document.querySelectorAll('.protyle')
+        if (editors.length > 0) {
+          createButtonsForEditors(editors, this.desktopButtonConfigs)
+        }
+      }
+    }
+    // 监听编辑器动态加载完成事件（最快触发）
+    this.eventBus.on('loaded-protyle-dynamic', this.eventBusRefreshHandler)
+    // 监听编辑器切换事件（切换标签页时触发）
+    this.eventBus.on('switch-protyle', this.eventBusRefreshHandler)
+    // 监听编辑器静态加载完成事件（后备）
+    this.eventBus.on('loaded-protyle-static', this.eventBusRefreshHandler)
     
     // ===== 初始化小窗模式检测器 =====
     // 在手机端检测小窗模式和前后台切换
@@ -457,6 +488,14 @@ export default class ToolbarCustomizer extends Plugin {
 
     // 清理 StressThreshold 事件监听器
     cleanupStressThreshold(this)
+
+    // 清理 EventBus 事件监听器
+    if (this.eventBusRefreshHandler) {
+      this.eventBus.off('loaded-protyle-dynamic', this.eventBusRefreshHandler)
+      this.eventBus.off('switch-protyle', this.eventBusRefreshHandler)
+      this.eventBus.off('loaded-protyle-static', this.eventBusRefreshHandler)
+      this.eventBusRefreshHandler = null
+    }
 
     // 清理全局 touch 事件监听器
     if (this.touchStartHandler) {

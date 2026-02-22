@@ -198,6 +198,36 @@ export function showInfoCopySuccess(): void {
 }
 
 /**
+ * 显示模板已插入通知（移动端一键记事弹窗内）
+ * @param enabled 是否启用通知
+ */
+export function showInfoTemplateInserted(enabled: boolean = true): void {
+  if (!enabled) return
+  
+  const successMsg = document.createElement('div')
+  successMsg.textContent = '模板已插入'
+  successMsg.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #4CAF50;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 6px;
+    z-index: 100001;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  `
+  document.body.appendChild(successMsg)
+  
+  setTimeout(() => {
+    if (successMsg.parentNode) {
+      successMsg.parentNode.removeChild(successMsg)
+    }
+  }, 2000)
+}
+
+/**
  * 显示成功通知
  */
 export function showSuccess(message: string): void {

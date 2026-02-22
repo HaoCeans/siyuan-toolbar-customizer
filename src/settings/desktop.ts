@@ -24,7 +24,32 @@ export function createDesktopGlobalButtonConfig(
   const container = document.createElement('div')
   container.className = 'toolbar-customizer-content'
   container.dataset.tabGroup = 'desktop'
-  container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 8px 0;'
+  container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 16px;'
+
+  // 外层模块框
+  const moduleBox = document.createElement('div')
+  moduleBox.style.cssText = `
+    border: 2px solid var(--b3-border-color);
+    border-radius: 8px;
+    background: var(--b3-theme-surface);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  `
+
+  // 模块标题
+  const moduleTitle = document.createElement('div')
+  moduleTitle.style.cssText = `
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--b3-theme-primary);
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--b3-border-color);
+    margin-bottom: 4px;
+  `
+  moduleTitle.textContent = '全局按钮配置'
+  moduleBox.appendChild(moduleTitle)
 
   const createRow = (
     label: string,
@@ -68,7 +93,7 @@ export function createDesktopGlobalButtonConfig(
       onConfigChange({ ...config, iconSize: newValue })
     }
   )
-  container.appendChild(iconSizeRow)
+  moduleBox.appendChild(iconSizeRow)
 
   // 按钮宽度
   const { row: widthRow, input: widthInput } = createRow(
@@ -80,7 +105,7 @@ export function createDesktopGlobalButtonConfig(
       onConfigChange({ ...config, minWidth: newValue })
     }
   )
-  container.appendChild(widthRow)
+  moduleBox.appendChild(widthRow)
 
   // 右边距
   const { row: marginRow, input: marginInput } = createRow(
@@ -92,7 +117,7 @@ export function createDesktopGlobalButtonConfig(
       onConfigChange({ ...config, marginRight: newValue })
     }
   )
-  container.appendChild(marginRow)
+  moduleBox.appendChild(marginRow)
 
   // 右上角提示
   const { row: notifyRow, input: notifyToggle } = createRow(
@@ -103,14 +128,15 @@ export function createDesktopGlobalButtonConfig(
       onConfigChange({ ...config, showNotification: input.checked })
     }
   )
-  container.appendChild(notifyRow)
+  moduleBox.appendChild(notifyRow)
 
   // 说明文字
   const hint = document.createElement('div')
   hint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light); margin-top: 8px; padding: 8px; background: var(--b3-theme-background); border-radius: 4px;'
   hint.innerHTML = '💡 修改后会批量应用到所有按钮单个按钮的独立配置优先级更高'
-  container.appendChild(hint)
+  moduleBox.appendChild(hint)
 
+  container.appendChild(moduleBox)
   return container
 }
 
@@ -119,6 +145,7 @@ export function createDesktopGlobalButtonConfig(
  */
 export interface FeatureConfig {
   toolbarHeight?: number
+  toolbarStyle?: 'default' | 'divider'
   hideBreadcrumbIcon: boolean
   hideReadonlyButton: boolean
   hideDocMenuButton: boolean
@@ -346,7 +373,7 @@ export interface DesktopSettingsContext {
   version?: string
   isAuthorToolActivated: () => boolean
   showConfirmDialog: (message: string) => Promise<boolean>
-  showIconPicker: (currentValue: string, onSelect: (icon: string) => void) => void
+  showIconPicker: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void
   saveData: (key: string, value: any) => Promise<void>
   applyFeatures: () => void
   refreshButtons: () => void
@@ -774,6 +801,38 @@ export function createDesktopSettingLayout(
     container.dataset.tabGroup = 'desktop'
     container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 8px 0;'
 
+    // 外层模块框
+    const moduleBox = document.createElement('div')
+    moduleBox.style.cssText = `
+      border: 2px solid var(--b3-border-color);
+      border-radius: 8px;
+      background: var(--b3-theme-surface);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    `
+
+    // 模块标题
+    const moduleTitle = document.createElement('div')
+    moduleTitle.style.cssText = `
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--b3-theme-primary);
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--b3-border-color);
+      margin-bottom: 4px;
+      text-align: center;
+    `
+    moduleTitle.textContent = '电脑端全局按钮配置🖥️'
+    moduleBox.appendChild(moduleTitle)
+
+    // 说明文字（放在开关上面）
+    const hint = document.createElement('div')
+    hint.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); padding: 10px 12px; background: var(--b3-theme-primary-lightest); border-radius: 6px; line-height: 1.5;'
+    hint.innerHTML = '💡 开启后会批量应用到所有按钮，单个按钮的独立配置优先级更高<br>⚠️建议：按钮图标大小与按钮宽度，设置数值相同，效果会更好'
+    moduleBox.appendChild(hint)
+
     const createRow = (label: string, inputValue: string | number | boolean, inputType: 'text' | 'number' | 'checkbox', onChange: (input: HTMLInputElement) => void) => {
       const row = document.createElement('div')
       row.style.cssText = 'display: flex; align-items: center; justify-content: space-between;'
@@ -803,7 +862,7 @@ export function createDesktopSettingLayout(
 
     // 全局配置启用开关（放在最前面）
     const { row: enabledRow, input: enabledToggle } = createRow(
-      '🔘 启用全局按钮配置',
+      '🔓启用电脑端全局按钮配置',
       context.desktopGlobalButtonConfig.enabled ?? true,
       'checkbox',
       async (input) => {
@@ -825,19 +884,19 @@ export function createDesktopSettingLayout(
         updateConfigItemsDisabled(!input.checked)
       }
     )
-    container.appendChild(enabledRow)
+    moduleBox.appendChild(enabledRow)
 
     // 分隔线
     const separator = document.createElement('div')
     separator.style.cssText = 'height: 1px; background: var(--b3-border-color); margin: 4px 0;'
-    container.appendChild(separator)
+    moduleBox.appendChild(separator)
 
     // 收集所有配置项的 input，用于统一控制禁用状态
     const configInputs: HTMLInputElement[] = []
 
     // 图标大小
     const { row: iconSizeRow, input: iconSizeInput } = createRow(
-      '🆖 所有按钮图标大小 (px)',
+      '①电脑按钮图标大小 (px)',
       context.desktopGlobalButtonConfig.iconSize,
       'number',
       async (input) => {
@@ -852,12 +911,12 @@ export function createDesktopSettingLayout(
         Notify.showInfoIconSizeApplied()
       }
     )
-    container.appendChild(iconSizeRow)
+    moduleBox.appendChild(iconSizeRow)
     configInputs.push(iconSizeInput)
 
     // 按钮宽度
     const { row: widthRow, input: widthInput } = createRow(
-      '📏 所有按钮宽度 (px)',
+      '②电脑按钮宽度 (px)📏',
       context.desktopGlobalButtonConfig.minWidth,
       'number',
       async (input) => {
@@ -872,12 +931,12 @@ export function createDesktopSettingLayout(
         Notify.showInfoButtonWidthApplied()
       }
     )
-    container.appendChild(widthRow)
+    moduleBox.appendChild(widthRow)
     configInputs.push(widthInput)
 
     // 右边距
     const { row: marginRow, input: marginInput } = createRow(
-      '➡️ 所有按钮右边距 (px)',
+      '③电脑按钮右边距 (px)➡️',
       context.desktopGlobalButtonConfig.marginRight,
       'number',
       async (input) => {
@@ -892,12 +951,12 @@ export function createDesktopSettingLayout(
         Notify.showInfoMarginRightApplied()
       }
     )
-    container.appendChild(marginRow)
+    moduleBox.appendChild(marginRow)
     configInputs.push(marginInput)
 
     // 右上角提示
     const { row: notifyRow, input: notifyToggle } = createRow(
-      '📢 所有按钮右上角提示',
+      ' ④电脑按钮右上角提示📢',
       context.desktopGlobalButtonConfig.showNotification,
       'checkbox',
       async (input) => {
@@ -913,7 +972,7 @@ export function createDesktopSettingLayout(
         Notify.showNotificationToggleStatus(input.checked)
       }
     )
-    container.appendChild(notifyRow)
+    moduleBox.appendChild(notifyRow)
     configInputs.push(notifyToggle)
 
     // 更新配置项禁用状态的函数
@@ -936,12 +995,7 @@ export function createDesktopSettingLayout(
       updateConfigItemsDisabled(true)
     }
 
-    // 说明文字
-    const hint = document.createElement('div')
-    hint.style.cssText = 'font-size: 16px; color: var(--b3-theme-on-surface-light); margin-top: 8px; padding: 8px; background: var(--b3-theme-background); border-radius: 4px;'
-    hint.innerHTML = '💡 修改后会批量应用到所有按钮,单个按钮的独立配置优先级更高（仅限桌面端🖥️）<br><br><span style="font-size: 18px; font-weight: bold; color: var(--b3-theme-primary);">💡 建议：图标大小与按钮宽度设置相同，效果会更好</span>'
-    container.appendChild(hint)
-
+    container.appendChild(moduleBox)
     return container
   }
 
@@ -985,6 +1039,38 @@ export function createDesktopSettingLayout(
         return item
       }
 
+      // 工具栏高度模块框
+      const toolbarBox = document.createElement('div')
+      toolbarBox.style.cssText = `
+        border: 2px solid var(--b3-border-color);
+        border-radius: 8px;
+        background: var(--b3-theme-surface);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      `
+
+      // 模块标题
+      const toolbarTitle = document.createElement('div')
+      toolbarTitle.style.cssText = `
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--b3-theme-primary);
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--b3-border-color);
+        margin-bottom: 4px;
+        text-align: center;
+      `
+      toolbarTitle.textContent = '电脑端全局工具栏配置🖥️'
+      toolbarBox.appendChild(toolbarTitle)
+
+      // 说明文字
+      const toolbarHint = document.createElement('div')
+      toolbarHint.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); padding: 10px 12px; background: var(--b3-theme-primary-lightest); border-radius: 6px; line-height: 1.5;'
+      toolbarHint.innerHTML = '💡 调整电脑端顶部工具栏的整体样式和显示效果'
+      toolbarBox.appendChild(toolbarHint)
+
       // 工具栏高度
       const heightItem = document.createElement('div')
       heightItem.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
@@ -994,7 +1080,7 @@ export function createDesktopSettingLayout(
 
       const heightLabel = document.createElement('label')
       heightLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
-      heightLabel.textContent = '工具栏高度'
+      heightLabel.textContent = '①电脑端工具栏高度'
 
       const heightInput = document.createElement('input')
       heightInput.type = 'number'
@@ -1010,29 +1096,158 @@ export function createDesktopSettingLayout(
       heightRow.appendChild(heightLabel)
       heightRow.appendChild(heightInput)
 
-      const heightDesc = document.createElement('div')
-      heightDesc.style.cssText = 'font-size: 16px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
-      heightDesc.textContent = '💡 调整工具栏的整体高度（仅桌面端）'
-
       heightItem.appendChild(heightRow)
-      heightItem.appendChild(heightDesc)
-      container.appendChild(heightItem)
+      toolbarBox.appendChild(heightItem)
 
-      container.appendChild(createSwitchItem('面包屑图标隐藏', context.desktopFeatureConfig.hideBreadcrumbIcon, (v) => {
+      // 工具栏样式选择
+      const styleItem = document.createElement('div')
+      styleItem.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+      const styleLabel = document.createElement('label')
+      styleLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
+      styleLabel.textContent = '②电脑端工具栏样式选择'
+      styleItem.appendChild(styleLabel)
+
+      const styleContainer = document.createElement('div')
+      styleContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+      const currentStyle = context.desktopFeatureConfig.toolbarStyle || 'default'
+
+      // 默认样式选项
+      const defaultOption = document.createElement('div')
+      defaultOption.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border: 1px solid ${currentStyle === 'default' ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'};
+        border-radius: 6px;
+        cursor: pointer;
+        background: ${currentStyle === 'default' ? 'rgba(66, 133, 244, 0.08)' : 'transparent'};
+      `
+
+      const defaultRadio = document.createElement('input')
+      defaultRadio.type = 'radio'
+      defaultRadio.name = 'desktop-toolbar-style'
+      defaultRadio.checked = currentStyle === 'default'
+      defaultRadio.style.cssText = 'cursor: pointer;'
+
+      const defaultLabel = document.createElement('span')
+      defaultLabel.textContent = '默认样式'
+      defaultLabel.style.cssText = 'font-size: 13px; flex: 1;'
+
+      defaultOption.appendChild(defaultRadio)
+      defaultOption.appendChild(defaultLabel)
+
+      // 分割线样式选项
+      const dividerOption = document.createElement('div')
+      dividerOption.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border: 1px solid ${currentStyle === 'divider' ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'};
+        border-radius: 6px;
+        cursor: pointer;
+        background: ${currentStyle === 'divider' ? 'rgba(66, 133, 244, 0.08)' : 'transparent'};
+      `
+
+      const dividerRadio = document.createElement('input')
+      dividerRadio.type = 'radio'
+      dividerRadio.name = 'desktop-toolbar-style'
+      dividerRadio.checked = currentStyle === 'divider'
+      dividerRadio.style.cssText = 'cursor: pointer;'
+
+      const dividerLabel = document.createElement('span')
+      dividerLabel.textContent = '加分割线'
+      dividerLabel.style.cssText = 'font-size: 13px; flex: 1;'
+
+      dividerOption.appendChild(dividerRadio)
+      dividerOption.appendChild(dividerLabel)
+
+      // 更新选中样式
+      const updateSelection = () => {
+        defaultOption.style.borderColor = defaultRadio.checked ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
+        defaultOption.style.background = defaultRadio.checked ? 'rgba(66, 133, 244, 0.08)' : 'transparent'
+        dividerOption.style.borderColor = dividerRadio.checked ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
+        dividerOption.style.background = dividerRadio.checked ? 'rgba(66, 133, 244, 0.08)' : 'transparent'
+      }
+
+      // 点击事件
+      defaultOption.onclick = async () => {
+        defaultRadio.checked = true
+        context.desktopFeatureConfig.toolbarStyle = 'default'
+        updateSelection()
+        await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+        // 触发自定义事件通知工具栏更新样式
+        window.dispatchEvent(new CustomEvent('toolbar-style-changed', { detail: 'default' }))
+      }
+
+      dividerOption.onclick = async () => {
+        dividerRadio.checked = true
+        context.desktopFeatureConfig.toolbarStyle = 'divider'
+        updateSelection()
+        await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+        // 触发自定义事件通知工具栏更新样式
+        window.dispatchEvent(new CustomEvent('toolbar-style-changed', { detail: 'divider' }))
+      }
+
+      styleContainer.appendChild(defaultOption)
+      styleContainer.appendChild(dividerOption)
+      styleItem.appendChild(styleContainer)
+      toolbarBox.appendChild(styleItem)
+
+      container.appendChild(toolbarBox)
+
+      // 小功能选择模块框
+      const featureBox = document.createElement('div')
+      featureBox.style.cssText = `
+        border: 2px solid var(--b3-border-color);
+        border-radius: 8px;
+        background: var(--b3-theme-surface);
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      `
+
+      // 模块标题
+      const featureTitle = document.createElement('div')
+      featureTitle.style.cssText = `
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--b3-theme-primary);
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--b3-border-color);
+        margin-bottom: 4px;
+        text-align: center;
+      `
+      featureTitle.textContent = '电脑端小功能选择⚙️'
+      featureBox.appendChild(featureTitle)
+
+      // 说明文字
+      const featureHint = document.createElement('div')
+      featureHint.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); padding: 10px 12px; background: var(--b3-theme-primary-lightest); border-radius: 6px; line-height: 1.5;'
+      featureHint.innerHTML = '💡 调整电脑端的图标隐藏设置'
+      featureBox.appendChild(featureHint)
+
+      featureBox.appendChild(createSwitchItem('①面包屑图标隐藏', context.desktopFeatureConfig.hideBreadcrumbIcon, (v) => {
         context.desktopFeatureConfig.hideBreadcrumbIcon = v
       }))
 
-      container.appendChild(createSwitchItem('锁定编辑按钮隐藏', context.desktopFeatureConfig.hideReadonlyButton, (v) => {
+      featureBox.appendChild(createSwitchItem('②锁定编辑按钮隐藏', context.desktopFeatureConfig.hideReadonlyButton, (v) => {
         context.desktopFeatureConfig.hideReadonlyButton = v
       }))
 
-      container.appendChild(createSwitchItem('文档菜单按钮隐藏', context.desktopFeatureConfig.hideDocMenuButton, (v) => {
+      featureBox.appendChild(createSwitchItem('③文档菜单按钮隐藏', context.desktopFeatureConfig.hideDocMenuButton, (v) => {
         context.desktopFeatureConfig.hideDocMenuButton = v
       }))
 
-      container.appendChild(createSwitchItem('更多按钮隐藏', context.desktopFeatureConfig.hideMoreButton, (v) => {
+      featureBox.appendChild(createSwitchItem('④更多按钮隐藏', context.desktopFeatureConfig.hideMoreButton, (v) => {
         context.desktopFeatureConfig.hideMoreButton = v
       }))
+
+      container.appendChild(featureBox)
 
       // ⚠️ 特殊醒目样式：禁用自定义按钮
       const dangerItem = document.createElement('div')
@@ -1166,7 +1381,7 @@ export function createDesktopSettingLayout(
 
   // 手机端自定义按钮
   setting.addItem({
-    title: '📱 手机端自定义按钮',
+    title: '手机端自定义按钮📱',
     description: `已配置 ${context.mobileButtonConfigs.length} 个按钮，点击展开编辑`,
     createActionElement: () => {
       const wrapper = document.createElement('div')

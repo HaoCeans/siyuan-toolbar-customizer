@@ -43,6 +43,12 @@ export function updateIconDisplay(element: HTMLElement, iconValue: string): void
   } else if (iconValue.startsWith('icon')) {
     // 思源内置图标
     element.innerHTML = `<svg class="b3-svg" style="width: 16px; height: 16px;"><use xlink:href="#${iconValue}"></use></svg>`
+  } else if (/\.(png|jpg|jpeg|gif|svg)$/i.test(iconValue)) {
+    // 图片路径（自定义图标）
+    // 使用绝对路径，思源插件资源路径格式
+    const pluginName = 'siyuan-toolbar-customizer'
+    const imagePath = iconValue.startsWith('/plugins/') ? iconValue : `/plugins/${pluginName}/${iconValue}`
+    element.innerHTML = `<img src="${imagePath}" style="width: 20px; height: 20px; object-fit: contain;"/>`
   } else {
     // Emoji 或其他文本
     element.textContent = iconValue
@@ -61,7 +67,8 @@ export function createDesktopIconField(
   label: string,
   value: string,
   onChange: (value: string) => void,
-  showIconPickerFn: (currentValue: string, onSelect: (icon: string) => void) => void
+  showIconPickerFn: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void,
+  iconSize?: number
 ): HTMLElement {
   const field = document.createElement('div')
   field.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
@@ -74,51 +81,50 @@ export function createDesktopIconField(
   inputWrapper.className = 'fn__flex-1'
   inputWrapper.style.cssText = 'display: flex; gap: 8px; align-items: center;'
 
-  const input = document.createElement('input')
-  input.type = 'text'
-  input.value = value
-  input.placeholder = 'emoji、lucide:图标名 或 icon名'
-  input.className = 'b3-text-field'
-  input.style.cssText = 'flex: 1;'
+  // 图标展示区域（代替输入框）
+  const iconDisplay = document.createElement('div')
+  iconDisplay.className = 'b3-text-field'
+  iconDisplay.style.cssText = `
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 32px;
+    cursor: pointer;
+    background: var(--b3-theme-background);
+  `
+  iconDisplay.title = '点击选择图标'
 
-  // 预览图标
-  const preview = document.createElement('span')
-  preview.style.cssText = `
+  // 图标容器
+  const iconContainer = document.createElement('span')
+  iconContainer.style.cssText = `
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 4px;
-    background: var(--b3-theme-background);
-    border: 1px solid var(--b3-border-color);
-    font-size: 14px;
-    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
   `
-  updateIconDisplay(preview, value)
+  updateIconDisplay(iconContainer, value)
+  iconDisplay.appendChild(iconContainer)
 
-  // 选择按钮
-  const selectBtn = document.createElement('button')
-  selectBtn.className = 'b3-button b3-button--outline'
-  selectBtn.textContent = '选择'
-  selectBtn.style.cssText = 'padding: 4px 12px; font-size: 12px; flex-shrink: 0;'
+  // 隐藏的实际值存储
+  const hiddenInput = document.createElement('input')
+  hiddenInput.type = 'hidden'
+  hiddenInput.value = value
 
-  input.oninput = () => {
-    onChange(input.value)
-    updateIconDisplay(preview, input.value)
-  }
-
-  selectBtn.onclick = () => {
-    showIconPickerFn(input.value, (selectedIcon) => {
-      input.value = selectedIcon
+  // 点击图标区域打开图标选择器
+  const openIconPicker = () => {
+    showIconPickerFn(hiddenInput.value, (selectedIcon) => {
+      hiddenInput.value = selectedIcon
       onChange(selectedIcon)
-      updateIconDisplay(preview, selectedIcon)
-    })
+      updateIconDisplay(iconContainer, selectedIcon)
+    }, iconSize)
   }
 
-  inputWrapper.appendChild(input)
-  inputWrapper.appendChild(preview)
-  inputWrapper.appendChild(selectBtn)
+  iconDisplay.onclick = openIconPicker
+
+  inputWrapper.appendChild(iconDisplay)
+  inputWrapper.appendChild(hiddenInput)
 
   field.appendChild(labelEl)
   field.appendChild(inputWrapper)
@@ -451,88 +457,76 @@ export function createIconField(
   label: string,
   value: string,
   onChange: (value: string) => void,
-  showIconPickerFn: (currentValue: string, onSelect: (icon: string) => void) => void
+  showIconPickerFn: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void,
+  iconSize?: number
 ): HTMLElement {
   const field = document.createElement('div')
   field.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
 
-  // 标题行：标签、选择按钮
+  // 标题行：仅标签
   const labelRow = document.createElement('div')
-  labelRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between;'
+  labelRow.style.cssText = 'display: flex; align-items: center;'
 
   const labelEl = document.createElement('label')
   labelEl.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
   labelEl.textContent = label
 
-  // 选择按钮
-  const selectBtn = document.createElement('button')
-  selectBtn.className = 'b3-button b3-button--outline'
-  selectBtn.textContent = '选择'
-  selectBtn.style.cssText = `
-    padding: 4px 12px;
-    font-size: 12px;
-    flex-shrink: 0;
-  `
-
   labelRow.appendChild(labelEl)
-  labelRow.appendChild(selectBtn)
 
   const inputWrapper = document.createElement('div')
   inputWrapper.style.cssText = 'display: flex; gap: 8px; align-items: center;'
 
-  const input = document.createElement('input')
-  input.type = 'text'
-  input.value = value
-  input.placeholder = '输入emoji、lucide:图标名 或 icon名'
-  input.className = 'b3-text-field'
-  input.style.cssText = `
+  // 图标展示区域（代替输入框）
+  const iconDisplay = document.createElement('div')
+  iconDisplay.className = 'b3-text-field'
+  iconDisplay.style.cssText = `
     flex: 1;
-    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 36px;
+    cursor: pointer;
+    background: var(--b3-theme-background);
     border-radius: 6px;
     border: 1px solid var(--b3-border-color);
-    background: var(--b3-theme-background);
-    color: var(--b3-theme-on-background);
-    font-size: 14px;
-    box-sizing: border-box;
   `
+  iconDisplay.title = '点击选择图标'
 
-  // 预览图标
-  const preview = document.createElement('span')
-  preview.style.cssText = `
+  // 图标容器
+  const iconContainer = document.createElement('span')
+  iconContainer.style.cssText = `
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    background: var(--b3-theme-background);
-    border: 1px solid var(--b3-border-color);
-    font-size: 16px;
-    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
   `
-  updateIconDisplay(preview, value)
+  updateIconDisplay(iconContainer, value)
+  iconDisplay.appendChild(iconContainer)
 
-  input.oninput = () => {
-    onChange(input.value)
-    updateIconDisplay(preview, input.value)
-  }
+  // 隐藏的实际值存储
+  const hiddenInput = document.createElement('input')
+  hiddenInput.type = 'hidden'
+  hiddenInput.value = value
 
-  // 点击选择按钮显示图标选择器
-  selectBtn.onclick = () => {
-    showIconPickerFn(input.value, (selectedIcon) => {
-      input.value = selectedIcon
+  // 点击图标区域或选择按钮都打开图标选择器
+  const openIconPicker = () => {
+    showIconPickerFn(hiddenInput.value, (selectedIcon) => {
+      hiddenInput.value = selectedIcon
       onChange(selectedIcon)
-      updateIconDisplay(preview, selectedIcon)
-    })
+      updateIconDisplay(iconContainer, selectedIcon)
+    }, iconSize)
   }
 
-  inputWrapper.appendChild(input)
-  inputWrapper.appendChild(preview)
+  iconDisplay.onclick = openIconPicker
 
-  // 提示信息（移到下一行）
+  inputWrapper.appendChild(iconDisplay)
+  inputWrapper.appendChild(hiddenInput)
+
+  // 提示信息
   const hint = document.createElement('div')
   hint.style.cssText = 'font-size: 10px; color: var(--b3-theme-on-surface-light); margin-top: 2px;'
-  hint.textContent = '🔍emoji | lucide:图标名 | icon名'
+  hint.textContent = '点击输入框选择图标'
 
   field.appendChild(labelRow)
   field.appendChild(inputWrapper)

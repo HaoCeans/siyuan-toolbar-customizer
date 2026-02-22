@@ -1,8 +1,10 @@
 import { isMobileDevice, pluginInstance, setPluginInstance, showPopupSelectDialog, processTemplateVariables, getToolbarAvailableWidth, getButtonWidth } from './toolbarManager';
+import * as Notify from './notification';
 import { appendBlock } from './api';
 
 // 存储当前的事件监听器，以便可以移除
 let visibilityChangeListener: (() => void) | null = null;
+let freezeListener: (() => void) | null = null;
 
 // 记录设备初始高度
 let deviceInitialHeight: number | null = null;
@@ -16,6 +18,13 @@ let wasPageFrozen = false;
 let lastFreezeRecoveryTime = 0;
 // 冻结恢复后的防抖时间（2秒内不触发弹窗）
 const FREEZE_RECOVERY_DEBOUNCE_MS = 2000;
+
+// 记录弹窗当前是否正在显示（防止重复弹出）
+let isNoteDialogShowing = false;
+// 记录最后显示弹窗的时间戳（用于防抖）
+let lastDialogShowTime = 0;
+// 弹窗显示后的防抖时间（3秒内不重复触发）
+const DIALOG_SHOW_DEBOUNCE_MS = 3000;
 
 /**
  * 检查应用是否在前台
@@ -76,6 +85,28 @@ function showSiyuanEditorDialog(notebookId: string, documentId?: string, saveTyp
 }
 
 function showNoteInputDialog(notebookId: string, documentId?: string, saveType: 'daily' | 'document' = 'daily', isFromButton: boolean = false) {
+  // 检查是否已有弹窗存在，防止重复创建
+  const existingDialog = document.getElementById('quick-note-dialog');
+  if (existingDialog) {
+    // 如果弹窗已存在，直接返回，不创建新弹窗
+    return;
+  }
+
+  // 检查是否在防抖时间内
+  const timeSinceLastShow = Date.now() - lastDialogShowTime;
+  if (timeSinceLastShow < DIALOG_SHOW_DEBOUNCE_MS && !isFromButton) {
+    // 自启动模式下，如果在防抖时间内，不显示新弹窗
+    return;
+  }
+
+  // 标记弹窗正在显示
+  isNoteDialogShowing = true;
+  lastDialogShowTime = Date.now();
+
+  // 获取样式配置
+  const styleConfig = pluginInstance?.mobileFeatureConfig?.quickNoteStyle || 'apple';
+  const isAppleStyle = styleConfig === 'apple';
+  
   // 创建美化版记事输入弹窗
   const dialog = document.createElement('div');
   dialog.id = 'quick-note-dialog';
@@ -97,7 +128,18 @@ function showNoteInputDialog(notebookId: string, documentId?: string, saveType: 
   const content = document.createElement('div');
   // 防止内容容器获取焦点
   content.tabIndex = -1;
-  content.style.cssText = `
+  content.style.cssText = isAppleStyle ? `
+    background: white;
+    border-radius: 14px;
+    padding: 20px;
+    width: 90%;
+    max-width: 500px;
+    height: 80vh;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  ` : `
     background: white;
     border-radius: 12px;
     padding: 24px;
@@ -111,8 +153,17 @@ function showNoteInputDialog(notebookId: string, documentId?: string, saveType: 
   `;
 
   const title = document.createElement('h2');
-  title.textContent = documentId ? '📝 文档记事' : '📝 一键记事';
-  title.style.cssText = `
+  title.textContent = isAppleStyle 
+    ? (documentId ? '文档记事' : '日记记事')
+    : (documentId ? '📒 文档记事' : '📒 日记记事');
+  title.style.cssText = isAppleStyle ? `
+    margin: 0 0 16px 0;
+    color: #000;
+    font-size: 17px;
+    font-weight: 600;
+    text-align: center;
+    letter-spacing: -0.3px;
+  ` : `
     margin: 0 0 16px 0;
     color: #333;
     font-size: 20px;
@@ -141,12 +192,30 @@ function showNoteInputDialog(notebookId: string, documentId?: string, saveType: 
   `;
 
   const textarea = document.createElement('textarea');
-  textarea.placeholder = documentId ? '请输入要追加到文档的内容...' : '请输入您的记事内容...';
+  textarea.placeholder = documentId ? (isAppleStyle ? '追加到文档' : '请输入要追加到文档的内容...') : (isAppleStyle ? '写日记' : '请输入您的日记内容...');
   
   // 获取字体大小配置
-  const fontSize = pluginInstance?.mobileFeatureConfig?.quickNoteFontSize || 16;
+  const fontSize = pluginInstance?.mobileFeatureConfig?.quickNoteFontSize || (isAppleStyle ? 17 : 16);
   
-  textarea.style.cssText = `
+  textarea.style.cssText = isAppleStyle ? `
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    background: #f2f2f7;
+    border-radius: 10px;
+    font-size: ${fontSize}px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    resize: none;
+    overflow-y: auto;
+    overflow-x: hidden;
+    word-wrap: break-word;
+    line-height: 1.4;
+    letter-spacing: -0.2px;
+    -webkit-overflow-scrolling: touch;
+    -ms-overflow-style: scrollbar;
+    scrollbar-width: thin;
+    scrollbar-color: #888 #f1f1f1;
+  ` : `
     flex: 1;
     padding: 16px;
     border: 2px solid #e0e0e0;
@@ -193,8 +262,6 @@ function showNoteInputDialog(notebookId: string, documentId?: string, saveType: 
   // 下半部分：工具栏按钮区域
   const toolbarSection = document.createElement('div');
   toolbarSection.style.cssText = `
-    border-top: 1px solid #e0e0e0;
-    padding-top: 8px;
     min-height: 40px;
     max-height: 50vh;  /* 按钮区域最大高度，超出可滚动 */
     overflow-y: auto;
@@ -202,7 +269,7 @@ function showNoteInputDialog(notebookId: string, documentId?: string, saveType: 
   `;
 
   const toolbarTitle = document.createElement('div');
-  toolbarTitle.textContent = '🔧 工具栏按钮';
+  //toolbarTitle.textContent = '🧰 工具栏按钮';
   toolbarTitle.style.cssText = `
     font-size: 12px;
     font-weight: 600;
@@ -231,13 +298,24 @@ function showNoteInputDialog(notebookId: string, documentId?: string, saveType: 
   buttonContainer.style.cssText = `
     display: flex;
     gap: 12px;
-    justify-content: flex-end;
+    justify-content: space-between;
     margin-top: 16px;
+    padding: 0 16px;
   `;
 
   const saveBtn = document.createElement('button');
-  saveBtn.textContent = documentId ? '追加到文档' : '保存记事';
-  saveBtn.className = 'b3-button b3-button--primary';
+  saveBtn.textContent = '发送';
+  saveBtn.style.cssText = `
+    font-size: 17px;
+    letter-spacing: 0.5px;
+    padding: 10px 24px;
+    background: ${isAppleStyle ? '#007AFF' : 'var(--b3-theme-primary)'};
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 500;
+    cursor: pointer;
+  `;
   // 防止按钮获取焦点，保持输入法不关闭
   saveBtn.tabIndex = -1;
   // 阻止 mousedown 导致的焦点转移
@@ -293,6 +371,8 @@ function showNoteInputDialog(notebookId: string, documentId?: string, saveType: 
             if (style) style.remove();
           });
           dialog.remove();
+          // 标记弹窗已关闭
+          isNoteDialogShowing = false;
         } else {
           alert('保存失败，请重试');
         }
@@ -304,7 +384,17 @@ function showNoteInputDialog(notebookId: string, documentId?: string, saveType: 
 
   const cancelBtn = document.createElement('button');
   cancelBtn.textContent = '取消';
-  cancelBtn.className = 'b3-button b3-button--outline';
+  cancelBtn.style.cssText = `
+    font-size: 17px;
+    letter-spacing: 0.5px;
+    padding: 10px 24px;
+    background: ${isAppleStyle ? '#E5E5EA' : 'transparent'};
+    color: ${isAppleStyle ? '#000' : 'var(--b3-theme-on-surface)'};
+    border: ${isAppleStyle ? 'none' : '1px solid var(--b3-border-color)'};
+    border-radius: 10px;
+    font-weight: 500;
+    cursor: pointer;
+  `;
   // 防止按钮获取焦点，保持输入法不关闭
   cancelBtn.tabIndex = -1;
   // 阻止 mousedown 导致的焦点转移
@@ -313,6 +403,8 @@ function showNoteInputDialog(notebookId: string, documentId?: string, saveType: 
   });
   cancelBtn.onclick = () => {
     dialog.remove();
+    // 标记弹窗已关闭
+    isNoteDialogShowing = false;
   };
 
   buttonContainer.appendChild(cancelBtn);
@@ -362,6 +454,8 @@ function closeNoteDialog() {
       if (style) style.remove();
     });
     noteDialog.remove();
+    // 标记弹窗已关闭
+    isNoteDialogShowing = false;
   }
 }
 
@@ -377,7 +471,8 @@ function closeNoteDialogImmediately() {
       }
     });
     noteDialog.remove();
-  } else {
+    // 标记弹窗已关闭
+    isNoteDialogShowing = false;
   }
 }
 /**
@@ -447,6 +542,20 @@ function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null):
       const iconName = buttonConfig.icon.substring(7);
       clonedBtn.textContent = iconName;
       clonedBtn.style.fontSize = `${buttonConfig.iconSize || 16}px`;
+    } else if (/\.(png|jpg|jpeg|gif|svg)$/i.test(buttonConfig.icon)) {
+      // 图片路径（自定义图标）
+      const pluginName = 'siyuan-toolbar-customizer';
+      const imagePath = buttonConfig.icon.startsWith('/plugins/') ? buttonConfig.icon : `/plugins/${pluginName}/${buttonConfig.icon}`;
+      const img = document.createElement('img');
+      img.src = imagePath;
+      img.style.cssText = `
+        width: ${buttonConfig.iconSize || 20}px;
+        height: ${buttonConfig.iconSize || 20}px;
+        object-fit: contain;
+        flex-shrink: 0;
+        display: block;
+      `;
+      clonedBtn.appendChild(img);
     } else {
       // Emoji 或其他文本图标
       clonedBtn.textContent = buttonConfig.icon;
@@ -454,6 +563,29 @@ function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null):
     }
   } else {
     clonedBtn.textContent = buttonConfig.name || '按钮';
+  }
+
+  // 如果开启显示名称，显示文字代替图标
+  if (buttonConfig.showName && buttonConfig.name) {
+    const nameLength = buttonConfig.name?.length || 0;
+    // 最多显示4个字，超过则截取前4个字
+    const displayName = nameLength > 4 ? buttonConfig.name?.slice(0, 4) : buttonConfig.name;
+    clonedBtn.innerHTML = '';
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = displayName;
+    // 动态计算字体大小：字数越少字体越大，字数越多字体越小
+    const displayLength = displayName?.length || 0;
+    let fontSize = 18; // 默认字体大小
+    if (displayLength === 1) fontSize = 22;
+    else if (displayLength === 2) fontSize = 20;
+    else if (displayLength === 3) fontSize = 18;
+    else if (displayLength >= 4) fontSize = 16;
+    nameSpan.style.cssText = `
+      font-size: ${fontSize}px;
+      width: 100%;
+      text-align: center;
+    `;
+    clonedBtn.appendChild(nameSpan);
   }
   
   // 添加hover效果
@@ -629,28 +761,8 @@ async function handleButtonClick(
         // 聚焦到输入框
         input.focus();
         
-        // 显示插入成功提示
-        const successMsg = document.createElement('div');
-        successMsg.textContent = '模板已插入';
-        successMsg.style.cssText = `
-          position: fixed;
-          top: 20px;
-          right: 20px;
-          background: #4CAF50;
-          color: white;
-          padding: 12px 20px;
-          border-radius: 6px;
-          z-index: 100001;
-          font-size: 14px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        `;
-        document.body.appendChild(successMsg);
-        
-        setTimeout(() => {
-          if (successMsg.parentNode) {
-            successMsg.parentNode.removeChild(successMsg);
-          }
-        }, 2000);
+        // 根据按钮配置决定是否显示插入成功提示
+        Notify.showInfoTemplateInserted(buttonConfig.showNotification !== false);
       }
       
       // template类型按钮不关闭弹窗，直接返回
@@ -875,6 +987,17 @@ function handleVisibilityChange() {
         return;
       }
 
+      // 检查是否已有弹窗正在显示（防止重复弹出）
+      if (isNoteDialogShowing || document.getElementById('quick-note-dialog')) {
+        return;
+      }
+
+      // 检查是否在弹窗显示后的防抖时间内（防止锁屏开屏反复触发）
+      const timeSinceLastShow = Date.now() - lastDialogShowTime;
+      if (timeSinceLastShow < DIALOG_SHOW_DEBOUNCE_MS) {
+        return;
+      }
+
       // 检查是否已有弹窗且有内容，有内容则不打开新弹窗
       if (hasNoteDialogContent()) {
         return;
@@ -933,10 +1056,21 @@ export function initSmallWindowDetector(): void {
   wasPageFrozen = false;
   lastFreezeRecoveryTime = 0;
   
+  // 重置弹窗显示状态
+  isNoteDialogShowing = false;
+  lastDialogShowTime = 0;
+  
+  // 清除可能存在的冻结事件监听器
+  if (freezeListener) {
+    document.removeEventListener('freeze', freezeListener);
+    freezeListener = null;
+  }
+  
   // 添加页面冻结事件监听（锁屏或系统冻结时触发）
-  document.addEventListener('freeze', () => {
+  freezeListener = () => {
     wasPageFrozen = true;
-  });
+  };
+  document.addEventListener('freeze', freezeListener);
   
   // 添加可见性变化监听器（用于检测前后台切换）
   visibilityChangeListener = handleVisibilityChange;
@@ -953,6 +1087,20 @@ export function clearSmallWindowDetector(): void {
     document.removeEventListener('visibilitychange', visibilityChangeListener);
     visibilityChangeListener = null;
   }
+  
+  // 清除冻结事件监听器
+  if (freezeListener) {
+    document.removeEventListener('freeze', freezeListener);
+    freezeListener = null;
+  }
+  
+  // 重置状态变量
+  wasPageFrozen = false;
+  lastFreezeRecoveryTime = 0;
+  deviceInitialHeight = null;
+  deviceMaxHeight = null;
+  isNoteDialogShowing = false;
+  lastDialogShowTime = 0;
 }
 
 /**

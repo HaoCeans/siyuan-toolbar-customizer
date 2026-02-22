@@ -1,17 +1,18 @@
 /**
  * 图标选择器
- * 两级分区结构：本体图标 | 思源图标
+ * 三级分区结构：本体图标 | 思源图标 | 阿里图标
  */
 
-import { iconCategories, updateIconDisplay } from '../data/icons'
+import { iconCategories, aliIconCategories, updateIconDisplay } from '../data/icons'
 
 export interface IconPickerOptions {
   title?: string
   currentValue?: string
+  iconSize?: number  // 图标大小（px），默认24
   onSelect: (icon: string) => void
 }
 
-type PartitionType = 'local' | 'siyuan'
+type PartitionType = 'local' | 'siyuan' | 'ali'
 
 /**
  * Unicode 转 Emoji 字符串
@@ -45,7 +46,7 @@ function getSiYuanEmojis() {
  * 显示图标选择器弹窗
  */
 export function showIconPicker(options: IconPickerOptions): void {
-  const { title = '选择图标', onSelect } = options
+  const { title = '选择图标', iconSize = 24, onSelect } = options
 
   // 创建弹窗
   const dialog = document.createElement('div')
@@ -129,9 +130,11 @@ export function showIconPicker(options: IconPickerOptions): void {
 
     const grid = document.createElement('div')
     grid.className = 'icon-grid'
+    // 根据图标大小动态计算按钮大小（图标大小 + 边距）
+    const btnSize = Math.max(40, iconSize + 16)
     grid.style.cssText = `
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(${btnSize}px, 1fr));
       gap: 8px;
     `
 
@@ -142,15 +145,15 @@ export function showIconPicker(options: IconPickerOptions): void {
       const btn = document.createElement('button')
       btn.className = 'b3-button'
       btn.style.cssText = `
-        width: 50px;
-        height: 50px;
+        width: ${btnSize}px;
+        height: ${btnSize}px;
         display: flex;
         align-items: center;
         justify-content: center;
         border: 1px solid var(--b3-border-color);
         border-radius: 6px;
         cursor: pointer;
-        font-size: 24px;
+        font-size: ${iconSize}px;
         background: var(--b3-theme-background);
         padding: 0;
       `
@@ -164,7 +167,7 @@ export function showIconPicker(options: IconPickerOptions): void {
         width: 100%;
         height: 100%;
       `
-      updateIconDisplay(iconSpan, icon)
+      updateIconDisplay(iconSpan, icon, iconSize)
       btn.appendChild(iconSpan)
 
       btn.onclick = () => {
@@ -252,6 +255,76 @@ export function showIconPicker(options: IconPickerOptions): void {
     content.appendChild(grid)
   }
 
+  // ===== 渲染阿里图标内容 =====
+  const renderAliContent = (categoryId: string) => {
+    const existingGrid = content.querySelector('.icon-grid')
+    if (existingGrid) {
+      existingGrid.remove()
+    }
+
+    const grid = document.createElement('div')
+    grid.className = 'icon-grid'
+    // 根据图标大小动态计算按钮大小（图标大小 + 边距）
+    const btnSize = Math.max(40, iconSize + 16)
+    grid.style.cssText = `
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(${btnSize}px, 1fr));
+      gap: 8px;
+    `
+
+    const cat = aliIconCategories.find(c => c.id === categoryId)
+    if (!cat) return
+
+    cat.icons.forEach(icon => {
+      const btn = document.createElement('button')
+      btn.className = 'b3-button'
+      btn.style.cssText = `
+        width: ${btnSize}px;
+        height: ${btnSize}px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--b3-border-color);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: ${iconSize}px;
+        background: var(--b3-theme-background);
+        padding: 0;
+      `
+
+      // 创建图标容器
+      const iconSpan = document.createElement('span')
+      iconSpan.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+      `
+      updateIconDisplay(iconSpan, icon, iconSize)
+      btn.appendChild(iconSpan)
+
+      btn.onclick = () => {
+        onSelect(icon)
+        document.body.removeChild(dialog)
+      }
+
+      btn.onmouseenter = () => {
+        btn.style.background = 'var(--b3-theme-surface)'
+        btn.style.borderColor = 'var(--b3-theme-primary)'
+      }
+
+      btn.onmouseleave = () => {
+        btn.style.background = 'var(--b3-theme-background)'
+        btn.style.borderColor = 'var(--b3-border-color)'
+      }
+
+      grid.appendChild(btn)
+    })
+
+    content.appendChild(grid)
+  }
+
   // ===== 更新二级分类标签 =====
   const updateCategoryTabs = () => {
     categoryTabs.innerHTML = ''
@@ -291,6 +364,22 @@ export function showIconPicker(options: IconPickerOptions): void {
       if (activeCategory) {
         renderSiyuanContent(activeCategory)
       }
+    } else if (activePartition === 'ali') {
+      // 生成阿里图标分类标签
+      // 默认选择"食物图标"分类
+      const defaultCategoryId = 'ali-food'
+      activeCategory = aliIconCategories.find(c => c.id === defaultCategoryId)?.id || aliIconCategories[0]?.id
+
+      aliIconCategories.forEach(cat => {
+        const tab = createCategoryTab(cat.id, cat.name, activeCategory === cat.id, () => {
+          activeCategory = cat.id
+          updateCategoryTabStyles()
+          renderAliContent(cat.id)
+        })
+        categoryTabs.appendChild(tab)
+      })
+      // 渲染默认分类
+      renderAliContent(activeCategory)
     }
   }
 
@@ -367,6 +456,7 @@ export function showIconPicker(options: IconPickerOptions): void {
   // 添加分区标签
   partitionTabs.appendChild(createPartitionTab('local', '本体图标'))
   partitionTabs.appendChild(createPartitionTab('siyuan', '思源图标'))
+  partitionTabs.appendChild(createPartitionTab('ali', '阿里图标'))
 
   // 组装界面
   content.appendChild(partitionTabs)

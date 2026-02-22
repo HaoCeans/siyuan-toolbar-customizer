@@ -22,7 +22,7 @@ import { showIconPicker as showIconPickerModal } from '../iconPicker'
 export interface DesktopButtonContext {
   isAuthorToolActivated: () => boolean
   showConfirmDialog: (message: string) => Promise<boolean>
-  showIconPicker: (currentValue: string, onSelect: (icon: string) => void) => void
+  showIconPicker: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void
   buttonConfigs: ButtonConfig[]
 }
 
@@ -1321,7 +1321,7 @@ export function createDesktopButtonItem(
     button.icon = v
     // 更新显示的图标
     updateIconDisplay(iconSpan, v)
-  }, context.showIconPicker))
+  }, context.showIconPicker, button.iconSize))
   editForm.appendChild(createDesktopField('图标大小', button.iconSize.toString(), '18', (v) => { button.iconSize = parseInt(v) || 18 }, 'number'))
   editForm.appendChild(createDesktopField('按钮宽度', button.minWidth.toString(), '32', (v) => { button.minWidth = parseInt(v) || 32 }, 'number'))
   editForm.appendChild(createDesktopField('右边距', button.marginRight.toString(), '8', (v) => { button.marginRight = parseInt(v) || 8 }, 'number'))
@@ -1351,7 +1351,47 @@ export function createDesktopButtonItem(
 
   notificationItem.appendChild(notificationLabel)
   notificationItem.appendChild(notificationSwitch)
-  editForm.appendChild(notificationItem)
+
+  // 开关组容器 - 带边框和淡蓝色背景
+  const switchesContainer = document.createElement('div')
+  switchesContainer.style.cssText = `
+    border: 1px solid var(--b3-border-color);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 8px 0;
+    background: rgba(66, 133, 244, 0.08);
+  `
+  switchesContainer.appendChild(notificationItem)
+
+  // 分隔线
+  const divider = document.createElement('div')
+  divider.style.cssText = 'height: 1px; background: var(--b3-border-color); margin: 10px 0;'
+  switchesContainer.appendChild(divider)
+
+  // 只显示名称开关
+  const showNameItem = document.createElement('div')
+  showNameItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
+
+  const showNameLabel = document.createElement('label')
+  showNameLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
+  showNameLabel.textContent = '只显示名称'
+
+  const showNameSwitch = document.createElement('input')
+  showNameSwitch.type = 'checkbox'
+  showNameSwitch.className = 'b3-switch'
+  showNameSwitch.checked = button.showName ?? false
+  showNameSwitch.onchange = () => { button.showName = showNameSwitch.checked }
+
+  showNameItem.appendChild(showNameLabel)
+  showNameItem.appendChild(showNameSwitch)
+  switchesContainer.appendChild(showNameItem)
+
+  // 添加提示文字
+  const showNameHint = document.createElement('div')
+  showNameHint.style.cssText = 'font-size: 10px; color: var(--b3-theme-on-surface-light); margin-top: 6px;'
+  showNameHint.textContent = '💡关闭只显示图标；最多显示4个字（大小自适应）'
+  switchesContainer.appendChild(showNameHint)
+  editForm.appendChild(switchesContainer)
 
   // 使用数据属性存储展开状态，设置统一的展开/收起处理器
   item.dataset.expanded = 'false'
@@ -2374,7 +2414,7 @@ export function populateDesktopEditForm(
   form.appendChild(createDesktopIconField('图标', button.icon, (v) => {
     button.icon = v
     // 需要找到对应的 iconSpan 来更新，这里简化处理
-  }, context.showIconPicker))
+  }, context.showIconPicker, button.iconSize))
   form.appendChild(createDesktopField('图标大小', button.iconSize.toString(), '18', (v) => { button.iconSize = parseInt(v) || 18 }, 'number'))
   form.appendChild(createDesktopField('按钮宽度', button.minWidth.toString(), '32', (v) => { button.minWidth = parseInt(v) || 32 }, 'number'))
   form.appendChild(createDesktopField('右边距', button.marginRight.toString(), '8', (v) => { button.marginRight = parseInt(v) || 8 }, 'number'))
@@ -2404,5 +2444,45 @@ export function populateDesktopEditForm(
 
   notificationItem.appendChild(notificationLabel)
   notificationItem.appendChild(notificationSwitch)
-  form.appendChild(notificationItem)
+
+  // 开关组容器 - 带边框和淡蓝色背景
+  const switchesContainer = document.createElement('div')
+  switchesContainer.style.cssText = `
+    border: 1px solid var(--b3-border-color);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 8px 0;
+    background: rgba(66, 133, 244, 0.08);
+  `
+  switchesContainer.appendChild(notificationItem)
+
+  // 分隔线
+  const divider = document.createElement('div')
+  divider.style.cssText = 'height: 1px; background: var(--b3-border-color); margin: 10px 0;'
+  switchesContainer.appendChild(divider)
+
+  // 只显示名称开关
+  const showNameItem = document.createElement('div')
+  showNameItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
+
+  const showNameLabel = document.createElement('label')
+  showNameLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
+  showNameLabel.textContent = '只显示名称'
+
+  const showNameSwitch = document.createElement('input')
+  showNameSwitch.type = 'checkbox'
+  showNameSwitch.className = 'b3-switch'
+  showNameSwitch.checked = button.showName ?? false
+  showNameSwitch.onchange = () => { button.showName = showNameSwitch.checked }
+
+  showNameItem.appendChild(showNameLabel)
+  showNameItem.appendChild(showNameSwitch)
+  switchesContainer.appendChild(showNameItem)
+
+  // 添加提示文字
+  const showNameHint = document.createElement('div')
+  showNameHint.style.cssText = 'font-size: 10px; color: var(--b3-theme-on-surface-light); margin-top: 6px;'
+  showNameHint.textContent = '💡关闭只显示图标；最多显示4个字（大小自适应）'
+  switchesContainer.appendChild(showNameHint)
+  form.appendChild(switchesContainer)
 }

@@ -59,6 +59,8 @@ export interface MobileFeatureConfig {
   quickNoteButtonMargin?: number    // 按钮自身外边距
   quickNoteButtonPadding?: number   // 按钮内容的内边距
   quickNoteButtonGap?: number       // 按钮之间的间距
+  // 工具栏样式配置
+  toolbarStyle?: 'default' | 'divider'  // 工具栏样式：默认或带分割线
 }
 
 /**
@@ -74,7 +76,7 @@ export interface MobileSettingsContext {
   desktopFeatureConfig: MobileFeatureConfig
   isAuthorToolActivated: () => boolean
   showConfirmDialog: (message: string) => Promise<boolean>
-  showIconPicker: (currentValue: string, onSelect: (icon: string) => void) => void
+  showIconPicker: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void
   showButtonIdPicker: (currentValue: string, onSelect: (result: any) => void) => void
   saveData: (key: string, value: any) => Promise<void>
   applyFeatures: () => void
@@ -347,31 +349,92 @@ export function createMobileSettingLayout(
       title: '',
       description: '',
       createActionElement: () => {
+        const wrapper = document.createElement('div')
+        wrapper.style.cssText = `
+          margin: 0 -16px;
+          width: calc(100% + 32px);
+        `
         const titleEl = document.createElement('div')
-        titleEl.className = 'fn__flex-center fn__size200'
         titleEl.style.cssText = `
-          padding: 16px 16px 8px 16px;
-          margin: 8px -16px 0 -16px;
+          padding: 16px;
           font-size: 16px;
           font-weight: 700;
-          color: var(--b3-theme-on-background);
-          background: var(--b3-theme-surface);
+          color: #6a1b9a;
+          background: #f3e5f5;
           display: flex;
           align-items: center;
+          justify-content: center;
           gap: 8px;
-          border-bottom: 2px solid var(--b3-border-color);
+          border-radius: 8px;
         `
-        titleEl.innerHTML = `<span style="font-size: 18px;">${icon}</span>${title}`
-        return titleEl
+        titleEl.innerHTML = `<span style="font-size: 20px;">${icon}</span><span style="font-size: 17px;">${title}</span>`
+        wrapper.appendChild(titleEl)
+        return wrapper
+      }
+    })
+  }
+
+  // === 说明文字样式 ===
+  const createNotice = (content: string) => {
+    setting.addItem({
+      title: '',
+      description: '',
+      createActionElement: () => {
+        const wrapper = document.createElement('div')
+        wrapper.style.cssText = `
+          margin: 0 -16px;
+          width: calc(100% + 32px);
+        `
+        const container = document.createElement('div')
+        container.style.cssText = `
+          padding: 14px 18px;
+          background: #ffebee;
+          border: 1px solid #ffcdd2;
+          border-radius: 6px;
+          font-size: 16px;
+          font-weight: 600;
+          color: var(--b3-theme-on-surface);
+          line-height: 1.6;
+        `
+        container.textContent = content
+        wrapper.appendChild(container)
+        return wrapper
       }
     })
   }
 
   // === 自定义按钮 ===
-  createGroupTitle('📱', '手机端自定义按钮')
+  createGroupTitle('📱','手机端自定义按钮')
+
+  // 说明文字
+  setting.addItem({
+    title: '',
+    description: '',
+    createActionElement: () => {
+      const wrapper = document.createElement('div')
+      wrapper.style.cssText = `
+        margin: 0 -16px;
+        width: calc(100% + 32px);
+      `
+      const container = document.createElement('div')
+      container.style.cssText = `
+        padding: 10px 14px;
+        background: #ffebee;
+        border: 1px solid #ffcdd2;
+        border-radius: 6px;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--b3-theme-on-surface);
+        line-height: 1.5;
+      `
+      container.innerHTML = '💡使用说明:<br>①点击+添加新按钮<br>②在按钮内选择6种功能<br>③点击右下角保存到工具栏<br>④按钮列表（长按拖动排序）'
+      wrapper.appendChild(container)
+      return wrapper
+    }
+  })
 
   setting.addItem({
-    title: '按钮列表（可长按拖动排序）',
+    title: '',
     description: `已配置 ${context.mobileButtonConfigs.length} 个按钮，点击展开编辑`,
     createActionElement: () => {
       const container = document.createElement('div')
@@ -488,7 +551,7 @@ export function createMobileSettingLayout(
   })
 
   // === 手机端全局按钮配置 ===
-  createGroupTitle('📱', '全局按钮配置')
+  createGroupTitle('1️⃣ ','全局按钮配置')
 
   // 存储所有配置项的 input 元素，用于统一控制禁用状态
   const mobileConfigInputs: HTMLInputElement[] = []
@@ -507,9 +570,12 @@ export function createMobileSettingLayout(
     })
   }
 
+// 说明文字
+  createNotice('📱手机端配置调整，修改后会批量应用到每个按钮配置值，单个按钮的独立配置优先级更高')
+
   // 全局配置启用开关（放在最前面）
   setting.addItem({
-    title: '🔘 启用全局按钮配置',
+    title: '①启用全局按钮配置',
     description: '💡 关闭后，修改全局配置不会影响已有按钮，仅作为新建按钮的默认值',
     createActionElement: () => {
       const toggle = document.createElement('input')
@@ -544,8 +610,8 @@ export function createMobileSettingLayout(
 
   // 图标大小
   setting.addItem({
-    title: '🆖 图标大小 (px)',
-    description: '所有按钮的图标大小，建议与【按钮宽度】设置相同',
+    title: '②图标大小 (px)',
+    description: '💡 所有按钮的图标大小，建议与【按钮宽度】设置相同',
     createActionElement: () => {
       const input = document.createElement('input')
       input.className = 'b3-text-field fn__flex-center fn__size200'
@@ -578,8 +644,8 @@ export function createMobileSettingLayout(
 
   // 按钮宽度
   setting.addItem({
-    title: '📏 按钮宽度 (px)',
-    description: '所有按钮的最小宽度，建议与【图标大小】设置相同，效果更好',
+    title: '③按钮宽度 (px)📏',
+    description: '💡 所有按钮的最小宽度，建议与【图标大小】设置相同，效果更好',
     createActionElement: () => {
       const input = document.createElement('input')
       input.className = 'b3-text-field fn__flex-center fn__size200'
@@ -612,8 +678,8 @@ export function createMobileSettingLayout(
 
   // 右边距
   setting.addItem({
-    title: '➡️ 右边距 (px)',
-    description: '所有按钮的右侧边距',
+    title: '④右边距 (px)➡️',
+    description: '💡 所有按钮的右侧边距',
     createActionElement: () => {
       const input = document.createElement('input')
       input.className = 'b3-text-field fn__flex-center fn__size200'
@@ -646,8 +712,8 @@ export function createMobileSettingLayout(
 
   // 右上角提示
   setting.addItem({
-    title: '📢 右上角提示',
-    description: '所有按钮是否显示右上角提示',
+    title: '⑤右上角提示📢',
+    description: '💡 所有按钮是否显示右上角提示',
     createActionElement: () => {
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
@@ -677,17 +743,13 @@ export function createMobileSettingLayout(
     }
   })
 
-  // 说明文字
-  setting.addItem({
-    title: '💡注意',
-    description: '修改后会批量应用到每个按钮配置值，单个按钮的独立配置优先级更高（仅限手机端📱）'
-  })
-
-
   // === 移动端工具栏设置 ===
 
   // === 全局工具栏配置 ===
-  createGroupTitle('📱', '全局工具栏配置')
+  createGroupTitle('2️⃣ ','全局工具栏配置')
+
+  // 说明文字
+  createNotice('📱手机端工具栏样式调整，推荐配置：40px高、分割线、跟随主题、100%')
 
   // 工具栏自身高度
   setting.addItem({
@@ -708,9 +770,106 @@ export function createMobileSettingLayout(
     }
   })
 
+  // 工具栏样式选择
+  setting.addItem({
+    title: '②工具栏样式选择',
+    description: '💡选择工具栏的显示样式',
+    createActionElement: () => {
+      const container = document.createElement('div')
+      container.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+      const config = context.mobileFeatureConfig as any
+      const currentStyle = config.toolbarStyle || 'default'
+
+      // 默认样式选项
+      const defaultOption = document.createElement('div')
+      defaultOption.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border: 1px solid ${currentStyle === 'default' ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'};
+        border-radius: 6px;
+        cursor: pointer;
+        background: ${currentStyle === 'default' ? 'rgba(66, 133, 244, 0.08)' : 'transparent'};
+      `
+
+      const defaultRadio = document.createElement('input')
+      defaultRadio.type = 'radio'
+      defaultRadio.name = 'toolbar-style'
+      defaultRadio.checked = currentStyle === 'default'
+      defaultRadio.style.cssText = 'cursor: pointer;'
+
+      const defaultLabel = document.createElement('span')
+      defaultLabel.textContent = '默认样式'
+      defaultLabel.style.cssText = 'font-size: 13px; flex: 1;'
+
+      defaultOption.appendChild(defaultRadio)
+      defaultOption.appendChild(defaultLabel)
+
+      // 分割线样式选项
+      const dividerOption = document.createElement('div')
+      dividerOption.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border: 1px solid ${currentStyle === 'divider' ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'};
+        border-radius: 6px;
+        cursor: pointer;
+        background: ${currentStyle === 'divider' ? 'rgba(66, 133, 244, 0.08)' : 'transparent'};
+      `
+
+      const dividerRadio = document.createElement('input')
+      dividerRadio.type = 'radio'
+      dividerRadio.name = 'toolbar-style'
+      dividerRadio.checked = currentStyle === 'divider'
+      dividerRadio.style.cssText = 'cursor: pointer;'
+
+      const dividerLabel = document.createElement('span')
+      dividerLabel.textContent = '加分割线'
+      dividerLabel.style.cssText = 'font-size: 13px; flex: 1;'
+
+      dividerOption.appendChild(dividerRadio)
+      dividerOption.appendChild(dividerLabel)
+
+      // 更新选中样式
+      const updateSelection = () => {
+        defaultOption.style.borderColor = defaultRadio.checked ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
+        defaultOption.style.background = defaultRadio.checked ? 'rgba(66, 133, 244, 0.08)' : 'transparent'
+        dividerOption.style.borderColor = dividerRadio.checked ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
+        dividerOption.style.background = dividerRadio.checked ? 'rgba(66, 133, 244, 0.08)' : 'transparent'
+      }
+
+      // 点击事件
+      defaultOption.onclick = async () => {
+        defaultRadio.checked = true
+        config.toolbarStyle = 'default'
+        updateSelection()
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+        // 触发自定义事件通知工具栏更新样式
+        window.dispatchEvent(new CustomEvent('toolbar-style-changed', { detail: 'default' }))
+      }
+
+      dividerOption.onclick = async () => {
+        dividerRadio.checked = true
+        config.toolbarStyle = 'divider'
+        updateSelection()
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+        // 触发自定义事件通知工具栏更新样式
+        window.dispatchEvent(new CustomEvent('toolbar-style-changed', { detail: 'divider' }))
+      }
+
+      container.appendChild(defaultOption)
+      container.appendChild(dividerOption)
+
+      return container
+    }
+  })
+
   // 工具栏背景颜色（明亮模式 + 黑暗模式）
   setting.addItem({
-    title: '②工具栏背景颜色',
+    title: '③工具栏背景颜色',
     description: '💡点击色块选择颜色，或直接输入颜色值，或跟随主题',
     createActionElement: () => {
       const container = document.createElement('div')
@@ -855,7 +1014,7 @@ export function createMobileSettingLayout(
 
   // 工具栏透明度
   setting.addItem({
-    title: '③工具栏透明度',
+    title: '④工具栏透明度',
     description: '💡(0=完全透明，100=完全不透明)',
     createActionElement: () => {
       const container = document.createElement('div')
@@ -890,7 +1049,7 @@ export function createMobileSettingLayout(
 
   // 工具栏层级（共享配置）
   setting.addItem({
-    title: '④工具栏层级',
+    title: '⑤工具栏层级',
     description: '💡值越大，越不容易被遮挡。默认512，显示在设置上层为1000（顶部和底部通用）',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -910,14 +1069,22 @@ export function createMobileSettingLayout(
   })
 
   // === 工具栏位置配置（整合顶部和底部配置） ===
-  createGroupTitle('📍', '工具栏位置配置')
+  createGroupTitle('3️⃣ ','工具栏位置配置📍')
+
+  // 说明文字
+  createNotice('📱选择工具栏显示位置，下方会显示对应的配置选项；默认配置已经调好，若修改，请认真阅读和理解')
 
   setting.addItem({
-    title: '工具栏位置',
-    description: '💡选择工具栏显示位置，下方会显示对应的配置选项',
+    title: '',
+    description: '',
     createActionElement: () => {
+      const wrapper = document.createElement('div')
+      wrapper.style.cssText = `
+        margin: 0 -16px;
+        width: calc(100% + 32px);
+      `
       const container = document.createElement('div')
-      container.style.cssText = 'display: flex; gap: 12px; align-items: center;'
+      container.style.cssText = 'display: flex; gap: 24px; align-items: center; justify-content: center;'
 
       const options = [
         { value: 'top', label: '顶部固定' },
@@ -932,7 +1099,7 @@ export function createMobileSettingLayout(
 
       options.forEach(option => {
         const label = document.createElement('label')
-        label.style.cssText = 'display: flex; align-items: center; gap: 4px; cursor: pointer; font-size: 13px;'
+        label.style.cssText = 'display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 16px; font-weight: 600;'
 
         const radio = document.createElement('input')
         radio.type = 'radio'
@@ -1036,7 +1203,8 @@ export function createMobileSettingLayout(
         updateSectionVisibility('.bottom-toolbar-setting', isBottom)
       }, 100)
 
-      return container
+      wrapper.appendChild(container)
+      return wrapper
     }
   })
 
@@ -1054,7 +1222,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '距离顶部高度',
+    title: '①距离顶部高度',
     description: '💡顶部工具栏距离屏幕顶部的距离（仅在顶部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1074,7 +1242,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '扩展工具栏距离顶部工具栏',
+    title: '②扩展工具栏距离顶部工具栏',
     description: '💡扩展工具栏第1层距离顶部主工具栏的距离（仅在顶部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1093,7 +1261,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '扩展工具栏自身高度',
+    title: '③扩展工具栏自身高度',
     description: '💡顶部模式时扩展工具栏每一层的高度',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1125,7 +1293,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '输入法关闭时底部高度',
+    title: '①输入法关闭时底部高度',
     description: '💡输入法关闭时，工具栏距底部距离（仅在底部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1146,7 +1314,7 @@ export function createMobileSettingLayout(
 
 
   setting.addItem({
-    title: '输入法打开时底部高度',
+    title: '②输入法打开时底部高度',
     description: '💡输入法弹出时，底部工具栏距底部距离（仅在底部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1165,7 +1333,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '输入法灵敏度检查',
+    title: '③输入法灵敏度检查',
     description: '💡不建议修改：窗口高度变化超过此百分比触发：30-90（仅在底部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1188,7 +1356,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '扩展工具栏距离底部工具栏',
+    title: '④扩展工具栏距离底部工具栏',
     description: '💡扩展工具栏第1层距离底部主工具栏的距离（仅在底部固定时有效）',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1207,7 +1375,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '扩展工具栏自身高度',
+    title: '⑤扩展工具栏自身高度',
     description: '💡底部模式时扩展工具栏每一层的高度',
     createActionElement: () => {
       const input = document.createElement('input')
@@ -1227,38 +1395,36 @@ export function createMobileSettingLayout(
 
 
   // === 自启动一键记事 ===
-  createGroupTitle('📝', '自启动一键记事')
+  createGroupTitle('4️⃣ ','自启动一键记事')
 
-  // 使用说明
-  setting.addItem({
-    title: '💡 使用说明',
-    description: '请先阅读步骤①和②再使用',
-    createActionElement: () => {
-      const container = document.createElement('div');
-      container.style.cssText = 'display: flex; flex-direction: column; gap: 8px; padding: 12px; background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(59, 130, 246, 0.08)); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 6px;';
-
-      const step1 = document.createElement('div');
-      step1.textContent = '①请先配置ID，再选择触发方式；';
-      step1.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); font-weight: 500;';
-
-      const step2 = document.createElement('div');
-      step2.textContent = '②打开软件切后台，再切到前台，即可自动弹出一键记事。';
-      step2.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); font-weight: 500;';
-
-      container.appendChild(step1);
-      container.appendChild(step2);
-
-      return container;
-    }
-  });
+  // 说明文字
+  createNotice('📝请先配置ID，再选择触发方式；打开软件切后台，再切到前台，即可自动弹出一键记事')
 
   // 一键记事保存配置（整合保存方式和ID配置）
   setting.addItem({
-    title: '💾 一键记事保存配置',
-    description: '选择保存方式并配置对应的目标ID，实时联动更新',
+    title: '',
+    description: '',
     createActionElement: () => {
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = `
+        margin: 0 -16px;
+        width: calc(100% + 32px);
+      `;
+      
       const container = document.createElement('div');
       container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 12px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.08)); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px;';
+      
+      // 标题
+      const titleDiv = document.createElement('div');
+      titleDiv.textContent = '①一键记事保存配置';
+      titleDiv.style.cssText = 'font-size: 16px; font-weight: 600; color: var(--b3-theme-on-background);';
+      container.appendChild(titleDiv);
+      
+      // 描述
+      const descDiv = document.createElement('div');
+      descDiv.textContent = '💡 选择保存方式配置对应的目标ID，实时联动更新';
+      descDiv.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); margin-bottom: 8px;';
+      container.appendChild(descDiv);
   
       const config = context.mobileFeatureConfig as any;
       const currentSaveType = config.quickNoteSaveType || 'daily';
@@ -1414,14 +1580,84 @@ export function createMobileSettingLayout(
       idConfigContainer.appendChild(input);
       idConfigContainer.appendChild(hint);
       container.appendChild(idConfigContainer);
-  
+        
+      wrapper.appendChild(container);
+      return wrapper;
+    }
+  });
+
+  // 弹窗编辑器样式选择
+  setting.addItem({
+    title: '② 弹窗编辑器样式选择',
+    description: '选择一键记事弹窗的UI风格',
+    createActionElement: () => {
+      const container = document.createElement('div');
+      container.style.cssText = 'display: flex; flex-direction: column; gap: 8px; padding: 8px 0;';
+
+      const config = context.mobileFeatureConfig as any;
+      const currentStyle = config.quickNoteStyle || 'apple';
+
+      const options = [
+        { value: 'default', label: '① 默认风格' },
+        { value: 'apple', label: '② 苹果风格' }
+      ];
+
+      options.forEach(option => {
+        const optionDiv = document.createElement('div');
+        optionDiv.style.cssText = `
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 12px;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: 2px solid ${currentStyle === option.value ? 'var(--b3-theme-primary)' : 'transparent'};
+          background: ${currentStyle === option.value ? 'rgba(59, 130, 246, 0.1)' : 'transparent'};
+        `;
+
+        const radio = document.createElement('input');
+        radio.type = 'radio';
+        radio.name = 'quickNoteStyle';
+        radio.value = option.value;
+        radio.checked = currentStyle === option.value;
+        radio.style.cssText = 'cursor: pointer;';
+
+        const label = document.createElement('span');
+        label.textContent = option.label;
+        label.style.cssText = 'font-size: 14px; flex: 1;';
+
+        optionDiv.appendChild(radio);
+        optionDiv.appendChild(label);
+
+        optionDiv.addEventListener('click', () => {
+          // 更新选中状态
+          container.querySelectorAll('div').forEach(div => {
+            div.style.borderColor = 'transparent';
+            div.style.background = 'transparent';
+          });
+          optionDiv.style.borderColor = 'var(--b3-theme-primary)';
+          optionDiv.style.background = 'rgba(59, 130, 246, 0.1)';
+          
+          // 更新radio
+          const radioInput = optionDiv.querySelector('input');
+          if (radioInput) radioInput.checked = true;
+          
+          // 保存配置
+          config.quickNoteStyle = option.value;
+          context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+        });
+
+        container.appendChild(optionDiv);
+      });
+
       return container;
     }
   });
 
   setting.addItem({
-    title: '自启动一键记事',
-    description: '💡设置自动触发记事功能的条件和默认存储位置',
+    title: '③自启动一键记事',
+    description: '💡设置自动触发记事功能的条件',
     createActionElement: () => {
       const container = document.createElement('div')
       container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; width: 100%;'
@@ -1503,8 +1739,8 @@ export function createMobileSettingLayout(
 
   // === 弹窗按钮排序方法 ===
   setting.addItem({
-    title: '🔘 弹窗按钮排序方法',
-    description: '选择一键记事弹窗中工具栏按钮的排列方式',
+    title: '③弹窗按钮排序方法',
+    description: '💡 选择一键记事弹窗中工具栏按钮的排列方式',
     createActionElement: () => {
       const container = document.createElement('div')
       container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; width: 100%;'
@@ -1593,8 +1829,8 @@ export function createMobileSettingLayout(
 
   // === 弹窗输入框字体大小 ===
   setting.addItem({
-    title: '📝 弹窗输入框字体大小',
-    description: '调节一键记事弹窗中输入框的字体大小',
+    title: '④弹窗输入框字体大小',
+    description: '💡 调节一键记事弹窗中输入框的字体大小',
     createActionElement: () => {
       const container = document.createElement('div');
       container.style.cssText = 'display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 0;';
@@ -1636,8 +1872,8 @@ export function createMobileSettingLayout(
 
   // 按钮样式配置模式切换
   setting.addItem({
-    title: '🔘 按钮样式配置',
-    description: '选择使用默认配置或自定义配置按钮样式',
+    title: '⑤按钮样式配置',
+    description: '💡 选择使用默认配置或自定义配置按钮样式',
     createActionElement: () => {
       const container = document.createElement('div');
       container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; width: 100%;';
@@ -1897,7 +2133,10 @@ export function createMobileSettingLayout(
   });
 
   // === 小功能选择 ===
-  createGroupTitle('⚙️', '小功能选择')
+  createGroupTitle('5️⃣ ','小功能选择⚙️')
+
+  // 说明文字
+  createNotice('⚙️调整手机端的图标隐藏设置，注意打开扩展工具栏，会强制隐藏，若想用面包屑等，请滚动到顶部，关闭扩展工具栏按钮')
 
   // 检查扩展工具栏按钮是否启用
   const isOverflowButtonEnabled = () => {
@@ -1907,7 +2146,7 @@ export function createMobileSettingLayout(
 
 
   setting.addItem({
-    title: '面包屑图标隐藏',
+    title: '①面包屑图标隐藏',
     description: '💡开启后隐藏面包屑左侧的图标',
     createActionElement: () => {
       const toggle = document.createElement('input')
@@ -1930,7 +2169,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '锁定编辑按钮隐藏',
+    title: '②锁定编辑按钮隐藏',
     description: '💡隐藏工具栏的锁定编辑按钮',
     createActionElement: () => {
       const toggle = document.createElement('input')
@@ -1953,7 +2192,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '文档菜单按钮隐藏',
+    title: '③文档菜单按钮隐藏',
     description: '💡隐藏工具栏的文档菜单按钮',
     createActionElement: () => {
       const toggle = document.createElement('input')
@@ -1976,7 +2215,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '更多按钮隐藏',
+    title: '④更多按钮隐藏',
     description: '💡隐藏工具栏的更多按钮',
     createActionElement: () => {
       const toggle = document.createElement('input')
@@ -2000,7 +2239,7 @@ export function createMobileSettingLayout(
 
   // 手机端禁止左右滑动弹出
   setting.addItem({
-    title: '禁止左右滑动弹出',
+    title: '⑤禁止左右滑动弹出',
     description: '💡开启后禁止左右滑动弹出文档树和设置菜单',
     createActionElement: () => {
       const toggle = document.createElement('input')
@@ -2019,7 +2258,7 @@ export function createMobileSettingLayout(
 
   // 鲸鱼定制工具箱激活码输入
   setting.addItem({
-    title: '🔐 鲸鱼定制工具箱激活',
+    title: '⑥鲸鱼定制工具箱激活',
     description: '💡输入激活码解锁「⑥鲸鱼定制工具箱」功能类型。激活码获取：请进QQ群1018010924咨询群主！',
     createActionElement: () => {
       const container = document.createElement('div')
@@ -2083,12 +2322,25 @@ export function createMobileSettingLayout(
 
 
   // === 使用帮助 ===
-  createGroupTitle('💡', '使用帮助')
+  createGroupTitle('6️⃣ ','使用帮助：自动点击')
+
+  // 说明文字
+  createNotice('💡思源内置菜单ID参考（F12查看更多）')
 
   setting.addItem({
-    title: '手机端常用功能ID',
-    description: '思源内置菜单ID参考（F12查看更多）',
+    title: '自动化模拟点击常用ID',
+    description: '',
     createActionElement: () => {
+      // 添加唯一标识以便滚动定位
+      setTimeout(() => {
+        const labels = document.querySelectorAll('.b3-label')
+        labels.forEach(label => {
+          const titleEl = label.querySelector('.b3-label__text')
+          if (titleEl?.textContent?.includes('自动化模拟点击常用ID')) {
+            label.id = 'common-ids-section'
+          }
+        })
+      }, 0)
       const container = document.createElement('div')
       container.style.cssText = `
         font-size: 13px;

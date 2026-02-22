@@ -91,6 +91,7 @@ export interface ButtonConfig {
   enabled?: boolean;         // 是否启用（默认true）
   layers?: number;           // 扩展工具栏层数（1-5），仅扩展工具栏按钮使用
   overflowLevel?: number;    // 溢出层级（0=底部工具栏可见，1-N=第几层扩展工具栏）
+  showName?: boolean;        // 是否在按钮上显示名称（默认false）
 }
 
 // 全局按钮配置（用于批量设置所有按钮的默认值）
@@ -384,9 +385,12 @@ let mutationObserver: MutationObserver | null = null
 let pageObserver: MutationObserver | null = null  // 用于检测页面变化的观察器
 let mobileToolbarClickHandler: ((e: Event) => void) | null = null  // 专门用于移动端工具栏的点击处理
 let customButtonClickHandler: ((e: Event) => void) | null = null  // 专门用于自定义按钮的点击处理
-let activeTimers: Set<ReturnType<typeof setTimeout>> = new Set()  // 跟踪所有活动的定时器
+let toolbarObserver: MutationObserver | null = null  // 用于监听工具栏渲染的观察器
+let toolbarStyleChangeHandler: (() => void) | null = null  // 工具栏样式变化事件处理器
+let activeTimers: Set<ReturnType<typeof setTimeout> | ReturnType<typeof setInterval>> = new Set()  // 跟踪所有活动的定时器（包括 setTimeout 和 setInterval）
 let focusEventHandlers: Array<{ element: HTMLElement; focusHandler: () => void; blurHandler: () => void }> = []  // 跟踪焦点事件监听器以便清理
 let isSettingUpToolbar = false  // 防止 MutationObserver 递归调用的标志
+let currentButtonConfigs: ButtonConfig[] = []  // 保存当前按钮配置，用于重试机制
 
 // 导出工具栏管理器对象
 export const toolbarManager = {
@@ -426,7 +430,10 @@ function safeSetTimeout(callback: () => void, delay: number): ReturnType<typeof 
  * 清除所有活动的定时器
  */
 function clearAllTimers() {
-  activeTimers.forEach(timerId => clearTimeout(timerId))
+  activeTimers.forEach(timerId => {
+    clearTimeout(timerId)
+    clearInterval(timerId)
+  })
   activeTimers.clear()
 }
 
@@ -1107,6 +1114,9 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
 
 // ===== 自定义按钮功能 =====
 export function initCustomButtons(configs: ButtonConfig[]) {
+  // 保存当前配置，用于后续重试机制
+  currentButtonConfigs = configs
+
   // 添加全局样式：移除主工具栏按钮的 focus 和 active 状态阴影（排除扩展工具栏按钮）
   if (!document.getElementById('custom-button-focus-style')) {
     const focusStyle = document.createElement('style')
@@ -1153,8 +1163,29 @@ export function initCustomButtons(configs: ButtonConfig[]) {
   // 清理旧的插件按钮
   cleanupCustomButtons()
 
+  // 清理旧的工具栏观察器
+  if (toolbarObserver) {
+    toolbarObserver.disconnect()
+    toolbarObserver = null
+  }
+
   // 初始设置
   safeSetTimeout(() => setupEditorButtons(configs), 1000)
+
+  // 启动工具栏渲染监听（解决新打开文档时工具栏未就绪的问题）
+  startToolbarObserver(configs)
+
+  // 移除旧的工具栏样式变化监听器
+  if (toolbarStyleChangeHandler) {
+    window.removeEventListener('toolbar-style-changed', toolbarStyleChangeHandler)
+  }
+
+  // 监听工具栏样式变化事件
+  toolbarStyleChangeHandler = () => {
+    const editors = document.querySelectorAll('.protyle')
+    createButtonsForEditors(editors, configs)
+  }
+  window.addEventListener('toolbar-style-changed', toolbarStyleChangeHandler)
 
   // 移除旧的监听器
   if (customButtonClickHandler) {
@@ -1232,6 +1263,12 @@ function setupEditorButtons(configs: ButtonConfig[]) {
  * 为编辑器创建按钮
  */
 function createButtonsForEditors(editors: NodeListOf<Element>, configs: ButtonConfig[]) {
+  // 获取工具栏样式配置（根据当前平台读取对应配置）
+  const isMobile = pluginInstance?.isMobile
+  const featureConfig = isMobile ? pluginInstance?.mobileFeatureConfig : pluginInstance?.desktopFeatureConfig
+  const toolbarStyle = featureConfig?.toolbarStyle || 'default'
+  const useDivider = toolbarStyle === 'divider'
+
   editors.forEach(editor => {
     // 找到锁定编辑按钮
     const readonlyBtn = editor.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]') ||
@@ -1243,13 +1280,37 @@ function createButtonsForEditors(editors: NodeListOf<Element>, configs: ButtonCo
       .filter(button => shouldShowButton(button) && shouldShowInMainToolbar(button))
       .sort((a, b) => b.sort - a.sort) // 降序
 
-    // 清理旧的插件按钮
+    // 清理旧的插件按钮和分割线
     const oldButtons = editor.querySelectorAll('[data-custom-button]')
     oldButtons.forEach(btn => btn.remove())
+    const oldDividers = editor.querySelectorAll('[data-toolbar-divider]')
+    oldDividers.forEach(div => div.remove())
 
     // 添加新按钮（插入到锁定按钮的左边）
     buttonsToAdd.forEach((buttonConfig, index) => {
-      const button = createButtonElement(buttonConfig)
+      // 创建按钮配置副本，如果使用分割线则减少右边距1px
+      const adjustedConfig = { ...buttonConfig }
+      if (useDivider) {
+        // 所有按钮右边距减1px，给分割线腾空间
+        adjustedConfig.marginRight = Math.max(0, (buttonConfig.marginRight || 8) - 1)
+      }
+
+      // 如果需要分割线且不是第一个按钮，先添加分割线
+      if (useDivider && index > 0) {
+        const divider = document.createElement('div')
+        divider.dataset.toolbarDivider = 'true'
+        divider.style.cssText = `
+          width: 1px;
+          height: 20px;
+          background: var(--b3-border-color);
+          margin: 0;
+          flex-shrink: 0;
+          align-self: center;
+        `
+        readonlyBtn.insertAdjacentElement('beforebegin', divider)
+      }
+
+      const button = createButtonElement(adjustedConfig)
       // 第一个按钮（最左边）添加特殊类，用于移除左边距
       if (index === 0) {
         button.classList.add('first-custom-button')
@@ -1257,6 +1318,106 @@ function createButtonsForEditors(editors: NodeListOf<Element>, configs: ButtonCo
       readonlyBtn.insertAdjacentElement('beforebegin', button)
     })
   })
+}
+
+/**
+ * 启动工具栏渲染监听
+ * 监听 DOM 变化，当工具栏（锁定按钮）出现或编辑器切换时自动插入按钮
+ */
+function startToolbarObserver(configs: ButtonConfig[]) {
+  // 如果观察器已存在，先断开
+  if (toolbarObserver) {
+    toolbarObserver.disconnect()
+  }
+
+  // 记录已处理的编辑器，避免重复处理
+  const processedEditors = new Set<string>()
+
+  // 创建观察器监听 DOM 变化
+  toolbarObserver = new MutationObserver((mutations) => {
+    // 检查是否有新的编辑器或工具栏出现
+    const editors = document.querySelectorAll('.protyle')
+    let shouldRetry = false
+
+    editors.forEach((editor, index) => {
+      // 使用编辑器的唯一标识（如果没有则使用索引）
+      const editorId = (editor as HTMLElement).dataset.nodeId || `editor-${index}`
+
+      // 检查该编辑器是否已处理过
+      if (processedEditors.has(editorId)) {
+        // 已处理过，但仍需检查按钮是否还存在（可能被思源重新渲染清除了）
+        const existingButtons = editor.querySelectorAll('[data-custom-button]')
+        if (existingButtons.length === 0) {
+          // 按钮被清除了，需要重新创建
+          shouldRetry = true
+        }
+        return
+      }
+
+      // 检查工具栏是否已就绪（锁定按钮是否存在）
+      const readonlyBtn = editor.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]') ||
+                          editor.querySelector('.protyle-breadcrumb [data-type="readonly"]')
+
+      if (readonlyBtn) {
+        // 工具栏已就绪，标记为已处理
+        processedEditors.add(editorId)
+        shouldRetry = true
+      }
+    })
+
+    // 如果有新的编辑器或按钮被清除，重新创建按钮
+    if (shouldRetry) {
+      // 使用 requestAnimationFrame 确保在 DOM 更新后执行
+      requestAnimationFrame(() => {
+        createButtonsForEditors(editors, configs)
+      })
+    }
+  })
+
+  // 开始观察整个文档的 DOM 变化
+  toolbarObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['class', 'data-node-id']
+  })
+
+  // 同时启动定时重试机制（作为后备方案，最多重试 10 次）
+  let retryCount = 0
+  const maxRetries = 10
+  const retryInterval = 500 // 500ms 间隔
+
+  const retryTimer = setInterval(() => {
+    retryCount++
+
+    // 获取所有编辑器
+    const editors = document.querySelectorAll('.protyle')
+    let needsCreate = false
+
+    editors.forEach(editor => {
+      const existingButtons = editor.querySelectorAll('[data-custom-button]')
+      if (existingButtons.length === 0) {
+        // 检查工具栏是否就绪
+        const readonlyBtn = editor.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]') ||
+                            editor.querySelector('.protyle-breadcrumb [data-type="readonly"]')
+        if (readonlyBtn) {
+          needsCreate = true
+        }
+      }
+    })
+
+    if (needsCreate) {
+      createButtonsForEditors(editors, configs)
+    }
+
+    // 达到最大重试次数或所有编辑器都有按钮了，停止重试
+    if (retryCount >= maxRetries || !needsCreate) {
+      clearInterval(retryTimer)
+    }
+  }, retryInterval)
+
+  // 保存定时器以便清理
+  activeTimers.add(retryTimer)
 }
 
 /**
@@ -1363,6 +1524,20 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
       button.textContent = config.icon
       button.style.fontSize = `${config.iconSize}px`
     }
+  } else if (/\.(png|jpg|jpeg|gif|svg)$/i.test(config.icon)) {
+    // 图片路径（自定义图标）
+    const pluginName = 'siyuan-toolbar-customizer'
+    const imagePath = config.icon.startsWith('/plugins/') ? config.icon : `/plugins/${pluginName}/${config.icon}`
+    const img = document.createElement('img')
+    img.src = imagePath
+    img.style.cssText = `
+      width: ${config.iconSize}px;
+      height: ${config.iconSize}px;
+      object-fit: contain;
+      flex-shrink: 0;
+      display: block;
+    `
+    button.appendChild(img)
   } else {
     // Emoji 或文本图标
     const iconSpan = document.createElement('span')
@@ -1370,6 +1545,29 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     iconSpan.style.lineHeight = '1'
     iconSpan.textContent = config.icon
     button.appendChild(iconSpan)
+  }
+
+  // 如果开启显示名称，显示文字代替图标
+  if (config.showName) {
+    const nameLength = config.name?.length || 0
+    // 最多显示4个字，超过则截取前4个字
+    const displayName = nameLength > 4 ? config.name?.slice(0, 4) : config.name
+    button.innerHTML = ''
+    const nameSpan = document.createElement('span')
+    nameSpan.textContent = displayName
+    // 动态计算字体大小：字数越少字体越大，字数越多字体越小
+    const displayLength = displayName?.length || 0
+    let fontSize = 18 // 默认字体大小
+    if (displayLength === 1) fontSize = 22
+    else if (displayLength === 2) fontSize = 20
+    else if (displayLength === 3) fontSize = 18
+    else if (displayLength >= 4) fontSize = 16
+    nameSpan.style.cssText = `
+      font-size: ${fontSize}px;
+      width: 100%;
+      text-align: center;
+    `
+    button.appendChild(nameSpan)
   }
 
   // 添加 hover 效果（与思源原生按钮一致）
@@ -1567,6 +1765,12 @@ function showOverflowToolbar(config: ButtonConfig) {
     btn.id !== 'overflow-button-mobile'
   )
 
+  // 获取工具栏样式配置（根据当前平台读取对应配置）
+  const isMobile = pluginInstance?.isMobile
+  const featureConfig = isMobile ? pluginInstance?.mobileFeatureConfig : pluginInstance?.desktopFeatureConfig
+  const toolbarStyle = featureConfig?.toolbarStyle || 'default'
+  const useDivider = toolbarStyle === 'divider'
+
   // 根据工具栏位置选择动画方向
   const animationName = isBottomToolbar ? 'slideUp' : 'slideDown'
 
@@ -1703,11 +1907,32 @@ function showOverflowToolbar(config: ButtonConfig) {
     }
 
     // 添加该层的所有按钮
-    layerButtons.forEach((btn: ButtonConfig) => {
+    layerButtons.forEach((btn: ButtonConfig, index: number) => {
+      // 如果需要分割线且不是第一个按钮，先添加分割线
+      if (useDivider && index > 0) {
+        const divider = document.createElement('div')
+        divider.dataset.toolbarDivider = 'true'
+        divider.style.cssText = `
+          width: 1px;
+          height: 20px;
+          background: var(--b3-border-color);
+          margin: 0;
+          flex-shrink: 0;
+          align-self: center;
+        `
+        toolbar.appendChild(divider)
+      }
+
+      // 创建按钮配置副本，如果使用分割线则减少右边距1px
+      const adjustedBtn = { ...btn }
+      if (useDivider) {
+        adjustedBtn.marginRight = Math.max(0, (btn.marginRight || 8) - 1)
+      }
+
       const layerBtn = document.createElement('button')
       // 使用与主工具栏相同的样式函数，确保完全一致
       layerBtn.className = 'fn__flex-center ariaLabel'
-      layerBtn.style.cssText = getButtonBaseStyle(btn)
+      layerBtn.style.cssText = getButtonBaseStyle(adjustedBtn)
       layerBtn.setAttribute('aria-label', btn.name)
       layerBtn.dataset.customButton = btn.id  // 添加 data-custom-button 属性，使按钮可被查找
 
@@ -1751,6 +1976,20 @@ function showOverflowToolbar(config: ButtonConfig) {
           layerBtn.textContent = btn.icon
           layerBtn.style.fontSize = `${btn.iconSize}px`
         }
+      } else if (/\.(png|jpg|jpeg|gif|svg)$/i.test(btn.icon)) {
+        // 图片路径（自定义图标）
+        const pluginName = 'siyuan-toolbar-customizer'
+        const imagePath = btn.icon.startsWith('/plugins/') ? btn.icon : `/plugins/${pluginName}/${btn.icon}`
+        const img = document.createElement('img')
+        img.src = imagePath
+        img.style.cssText = `
+          width: ${btn.iconSize}px;
+          height: ${btn.iconSize}px;
+          object-fit: contain;
+          flex-shrink: 0;
+          display: block;
+        `
+        layerBtn.appendChild(img)
       } else {
         // Emoji 或文本图标
         const iconSpan = document.createElement('span')
@@ -1758,6 +1997,29 @@ function showOverflowToolbar(config: ButtonConfig) {
         iconSpan.style.lineHeight = '1'
         iconSpan.textContent = btn.icon
         layerBtn.appendChild(iconSpan)
+      }
+
+      // 如果开启显示名称，显示文字代替图标
+      if (btn.showName) {
+        const nameLength = btn.name?.length || 0
+        // 最多显示4个字，超过则截取前4个字
+        const displayName = nameLength > 4 ? btn.name?.slice(0, 4) : btn.name
+        layerBtn.innerHTML = ''
+        const nameSpan = document.createElement('span')
+        nameSpan.textContent = displayName
+        // 动态计算字体大小：字数越少字体越大，字数越多字体越小
+        const displayLength = displayName?.length || 0
+        let fontSize = 18 // 默认字体大小
+        if (displayLength === 1) fontSize = 22
+        else if (displayLength === 2) fontSize = 20
+        else if (displayLength === 3) fontSize = 18
+        else if (displayLength >= 4) fontSize = 16
+        nameSpan.style.cssText = `
+          font-size: ${fontSize}px;
+          width: 100%;
+          text-align: center;
+        `
+        layerBtn.appendChild(nameSpan)
       }
 
       // 添加 hover 效果（与思源原生按钮一致）
@@ -2935,8 +3197,8 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
       // 桌面端使用 openTab 打开文档（使用文档ID而非块ID，避免只显示块内容）
       await siyuanOpenTab({
         app: pluginInstance.app,
-        doc: { id: docId },  // 使用文档ID打开整个文档
-        keepCursor: true     // 保持光标位置，不自动跳转到新标签页
+        doc: { id: docId }  // 使用文档ID打开整个文档
+        // 注意：不设置 keepCursor，让思源自动跳转到新打开的标签页
       })
     }
 
@@ -4037,6 +4299,18 @@ export function cleanup() {
   if (customButtonClickHandler) {
     document.removeEventListener('click', customButtonClickHandler, true)
     customButtonClickHandler = null
+  }
+
+  // 清理工具栏观察器
+  if (toolbarObserver) {
+    toolbarObserver.disconnect()
+    toolbarObserver = null
+  }
+
+  // 清理工具栏样式变化事件监听器
+  if (toolbarStyleChangeHandler) {
+    window.removeEventListener('toolbar-style-changed', toolbarStyleChangeHandler)
+    toolbarStyleChangeHandler = null
   }
 
   // 清理移动端样式

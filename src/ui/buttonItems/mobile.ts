@@ -17,6 +17,7 @@ import {
 } from '../fields'
 import { showConfirmDialog as showConfirmDialogModal } from '../dialog'
 import { showIconPicker as showIconPickerModal } from '../iconPicker'
+import { showMessage } from 'siyuan'
 
 /**
  * 手机端按钮上下文接口
@@ -25,7 +26,7 @@ import { showIconPicker as showIconPickerModal } from '../iconPicker'
 export interface MobileButtonContext {
   isAuthorToolActivated: () => boolean
   showConfirmDialog: (message: string) => Promise<boolean>
-  showIconPicker: (currentValue: string, onSelect: (icon: string) => void) => void
+  showIconPicker: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void
   showButtonIdPicker: (currentValue: string, onSelect: (result: ButtonInfo) => void) => void
   buttonConfigs: ButtonConfig[]
   mobileButtonConfigs: ButtonConfig[]
@@ -719,22 +720,91 @@ export function createMobileButtonItem(
       if (link) {
         (link as HTMLElement).onclick = (e) => {
           e.preventDefault()
+
+          // 获取设置面板的滚动容器
+          const getScrollContainer = () => {
+            // 首先尝试在 .b3-dialog__body 内部找到真正可滚动的子元素
+            const dialogBody = document.querySelector('.b3-dialog__body')
+            if (dialogBody) {
+              const children = dialogBody.querySelectorAll('*')
+              for (const child of children) {
+                const htmlEl = child as HTMLElement
+                if (htmlEl.scrollHeight > htmlEl.clientHeight + 10) {
+                  return htmlEl
+                }
+              }
+            }
+
+            // 尝试找到实际可滚动的容器
+            const possibleContainers = document.querySelectorAll('.b3-dialog__body, .b3-dialog__content, .b3-dialog .fn__flex-1, .config__panel')
+            for (const el of possibleContainers) {
+              const htmlEl = el as HTMLElement
+              const isScrollable = htmlEl.scrollHeight > htmlEl.clientHeight + 10
+              const computedStyle = window.getComputedStyle(htmlEl)
+              const canScroll = computedStyle.overflow === 'auto' || computedStyle.overflow === 'scroll' ||
+                               computedStyle.overflowY === 'auto' || computedStyle.overflowY === 'scroll'
+              if (isScrollable || canScroll) {
+                return htmlEl
+              }
+            }
+
+            // 回退：尝试标准选择器
+            const selectors = ['.b3-dialog__body', '.b3-dialog__content', '.b3-dialog .fn__flex-1']
+            for (const selector of selectors) {
+              const el = document.querySelector(selector)
+              if (el) return el as HTMLElement
+            }
+
+            return window
+          }
+
+          const scrollToElement = (element: HTMLElement) => {
+            const container = getScrollContainer()
+            const elementRect = element.getBoundingClientRect()
+
+            if (container === window) {
+              const targetY = window.scrollY + elementRect.top - window.innerHeight / 2
+              window.scrollTo({ top: targetY, behavior: 'smooth' })
+            } else {
+              const containerEl = container as HTMLElement
+              const containerRect = containerEl.getBoundingClientRect()
+              const relativeTop = elementRect.top - containerRect.top
+              const targetY = containerEl.scrollTop + relativeTop - containerRect.height / 2
+
+              containerEl.scrollTo({ top: targetY, behavior: 'smooth' })
+
+              // 备用方案：直接设置 scrollTop
+              setTimeout(() => {
+                if (Math.abs(containerEl.scrollTop - targetY) > 100) {
+                  containerEl.scrollTop = targetY
+                }
+              }, 100)
+            }
+
+            // 高亮效果
+            const originalBg = element.style.background
+            element.style.background = 'var(--b3-theme-primary-lightest)'
+            setTimeout(() => {
+              element.style.background = originalBg
+            }, 2000)
+          }
+
           setTimeout(() => {
-            const settingItems = Array.from(document.querySelectorAll('.b3-label'))
-            const helpSection = settingItems.find(item => {
-              const descEl = item.querySelector('.b3-label__text')
-              const text = descEl?.textContent
-              return descEl && text?.includes('思源内置菜单ID参考')
-            })
+            let helpSection = document.getElementById('common-ids-section')
+
+            if (!helpSection) {
+              const settingItems = Array.from(document.querySelectorAll('.b3-label, .config__item'))
+              helpSection = settingItems.find(item => {
+                const titleEl = item.querySelector('.b3-label__text, .config__item-title, .b3-label-title')
+                const text = titleEl?.textContent || item.textContent
+                return text?.includes('使用帮助：自动点击')
+              }) as HTMLElement | undefined
+            }
 
             if (helpSection) {
-              helpSection.scrollIntoView({ behavior: 'smooth', block: 'center' })
-              const helpElement = helpSection as HTMLElement
-              const originalBg = helpElement.style.background
-              helpElement.style.background = 'var(--b3-theme-primary-lightest)'
-              setTimeout(() => {
-                helpElement.style.background = originalBg
-              }, 2000)
+              scrollToElement(helpSection)
+            } else {
+              showMessage('请先展开"使用帮助：自动点击"区域查看ID列表', 3000, 'info')
             }
           }, 100)
         }
@@ -1502,7 +1572,7 @@ export function createMobileButtonItem(
     // 更新显示的图标 - 使用特定的 class 来查找
     const iconSpan = item.querySelector('.toolbar-customizer-button-icon') as HTMLElement
     if (iconSpan) updateIconDisplay(iconSpan, v)
-  }, context.showIconPicker)
+  }, context.showIconPicker, button.iconSize)
   editForm.appendChild(iconField)
   const iconInput = iconField.querySelector('input') as HTMLInputElement
   const iconPreview = iconField.querySelector('span') as HTMLElement
@@ -1522,10 +1592,39 @@ export function createMobileButtonItem(
     }, 'number'))
   }
 
-  // 右上角提示开关（手机端）
-  editForm.appendChild(createSwitchField('右上角提示', button.showNotification, (v) => {
+  // 开关组容器 - 带边框和淡蓝色背景
+  const switchesContainer = document.createElement('div')
+  switchesContainer.style.cssText = `
+    border: 1px solid var(--b3-border-color);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 8px 0;
+    background: rgba(66, 133, 244, 0.08);
+  `
+
+  // 右上角提示开关
+  const notificationField = createSwitchField('右上角提示', button.showNotification, (v) => {
     button.showNotification = v
-  }))
+  })
+  switchesContainer.appendChild(notificationField)
+
+  // 分隔线
+  const divider = document.createElement('div')
+  divider.style.cssText = 'height: 1px; background: var(--b3-border-color); margin: 8px 0;'
+  switchesContainer.appendChild(divider)
+
+  // 只显示名称开关
+  const showNameField = createSwitchField('只显示名称', button.showName ?? false, (v) => {
+    button.showName = v
+  })
+  switchesContainer.appendChild(showNameField)
+  // 添加提示文字
+  const showNameHint = document.createElement('div')
+  showNameHint.style.cssText = 'font-size: 10px; color: var(--b3-theme-on-surface-light); margin-top: 4px;'
+  showNameHint.textContent = '💡关闭只显示图标；最多显示4个字（大小自适应）'
+  switchesContainer.appendChild(showNameHint)
+
+  editForm.appendChild(switchesContainer)
 
   header.onclick = (e) => {
     if ((e.target as HTMLElement).closest('button')) return

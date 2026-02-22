@@ -141,6 +141,7 @@ export default class ToolbarCustomizer extends Plugin {
     hideDocMenuButton: true,    // 文档菜单按钮隐藏
     hideMoreButton: true,       // 更多按钮隐藏
     toolbarHeight: 32,          // 工具栏高度（px）
+    toolbarStyle: 'default' as 'default' | 'divider',  // 工具栏样式：默认或带分割线
     disableCustomButtons: false,// 禁用所有自定义按钮（恢复思源原始状态，仅桌面端）
     showAllNotifications: true, // 一键开启所有按钮右上角提示
     authorActivated: false,     // 鲸鱼定制工具箱是否已激活
@@ -486,24 +487,27 @@ export default class ToolbarCustomizer extends Plugin {
       height: this.isMobile ? '100%' : '70vh',
       confirmCallback: async () => {
         // 同步全局按钮配置到所有按钮（在保存前）
-        // 获取当前的全局配置值
-        const globalIconSize = this.mobileGlobalButtonConfig.iconSize
-        const globalMinWidth = this.mobileGlobalButtonConfig.minWidth
-        const globalMarginRight = this.mobileGlobalButtonConfig.marginRight
-        const globalShowNotification = this.mobileGlobalButtonConfig.showNotification
+        // 只有启用了全局配置时才批量应用
+        const isGlobalEnabled = this.mobileGlobalButtonConfig.enabled ?? true
 
-        // 应用到所有移动端按钮
-        this.mobileButtonConfigs.forEach(btn => {
-          // 只有当按钮使用的是默认值时才更新（避免覆盖用户自定义值）
-          // 这里简单处理：总是更新，因为用户可以在全局配置中修改
-          btn.iconSize = globalIconSize
-          btn.minWidth = globalMinWidth
-          btn.marginRight = globalMarginRight
-          // showNotification 暂时保留原有逻辑，如果未设置则使用全局值
-          if (btn.showNotification === undefined) {
-            btn.showNotification = globalShowNotification
-          }
-        })
+        if (isGlobalEnabled) {
+          // 获取当前的全局配置值
+          const globalIconSize = this.mobileGlobalButtonConfig.iconSize
+          const globalMinWidth = this.mobileGlobalButtonConfig.minWidth
+          const globalMarginRight = this.mobileGlobalButtonConfig.marginRight
+          const globalShowNotification = this.mobileGlobalButtonConfig.showNotification
+
+          // 应用到所有移动端按钮
+          this.mobileButtonConfigs.forEach(btn => {
+            btn.iconSize = globalIconSize
+            btn.minWidth = globalMinWidth
+            btn.marginRight = globalMarginRight
+            // showNotification 暂时保留原有逻辑，如果未设置则使用全局值
+            if (btn.showNotification === undefined) {
+              btn.showNotification = globalShowNotification
+            }
+          })
+        }
 
         // 如果扩展工具栏按钮启用，强制隐藏相关按钮
         const overflowBtn = this.mobileButtonConfigs.find(btn => btn.id === 'overflow-button-mobile')
@@ -682,8 +686,10 @@ export default class ToolbarCustomizer extends Plugin {
   }
 
   // 图标选择器（已迁移到 ui/iconPicker.ts）
-  private showIconPicker(currentValue: string, onSelect: (icon: string) => void) {
-    showIconPickerModal({ currentValue, onSelect })
+  private showIconPicker(currentValue: string, onSelect: (icon: string) => void, iconSize?: number) {
+    // 如果没有传入图标大小，使用桌面端全局配置的图标大小
+    const size = iconSize || this.desktopGlobalButtonConfig?.iconSize || 18
+    showIconPickerModal({ currentValue, onSelect, iconSize: size })
   }
 
   // 应用小功能

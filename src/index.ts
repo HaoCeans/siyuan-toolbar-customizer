@@ -178,6 +178,16 @@ export default class ToolbarCustomizer extends Plugin {
     return this.desktopFeatureConfig.authorActivated || this.mobileFeatureConfig.authorActivated
   }
 
+  // 安全清除激活状态（通过命令调用）
+  private async clearActivationStatusSafely(): Promise<void> {
+    this.desktopFeatureConfig.authorActivated = false
+    this.desktopFeatureConfig.authorCode = ''
+    this.mobileFeatureConfig.authorActivated = false
+    this.mobileFeatureConfig.authorCode = ''
+    await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
+    await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
+  }
+
   // 获取当前平台的功能配置（向后兼容）
   private get featureConfig() {
     return this.isMobile ? this.mobileFeatureConfig : this.desktopFeatureConfig
@@ -428,12 +438,20 @@ export default class ToolbarCustomizer extends Plugin {
     cleanup()
   
     // ===== 初始化移动端工具栏调整 =====
-    initMobileToolbarAdjuster(this.mobileConfig)
+    // 手机端：如果禁用自定义按钮，跳过工具栏位置调整（恢复思源默认顶部）
+    if (!(this.isMobile && this.mobileFeatureConfig.disableCustomButtons)) {
+      initMobileToolbarAdjuster(this.mobileConfig, this.mobileFeatureConfig.disableCustomButtons)
+    }
 
     // ===== 初始化自定义按钮 =====
     // 根据当前平台选择对应的按钮配置
-    const buttonsToInit = this.isMobile ? this.mobileButtonConfigs : this.desktopButtonConfigs
-    initCustomButtons(buttonsToInit)
+    // 手机端：如果禁用自定义按钮，跳过初始化
+    if (this.isMobile && this.mobileFeatureConfig.disableCustomButtons) {
+      // 跳过自定义按钮初始化
+    } else {
+      const buttonsToInit = this.isMobile ? this.mobileButtonConfigs : this.desktopButtonConfigs
+      initCustomButtons(buttonsToInit)
+    }
 
     // ===== 使用思源 EventBus 监听编辑器加载事件（替代 MutationObserver，避免卡顿） =====
     // 先移除旧的监听器（避免重复监听）
@@ -445,6 +463,10 @@ export default class ToolbarCustomizer extends Plugin {
     // 定义刷新按钮的回调函数（电脑端直接创建按钮，避免 initCustomButtons 的重复清理和延迟）
     this.eventBusRefreshHandler = () => {
       if (this.isMobile) {
+        // 手机端：如果禁用自定义按钮，直接返回不创建
+        if (this.mobileFeatureConfig.disableCustomButtons) {
+          return
+        }
         // 手机端需要完整的初始化流程（包括溢出计算）
         initCustomButtons(this.mobileButtonConfigs)
       } else {
@@ -656,13 +678,14 @@ export default class ToolbarCustomizer extends Plugin {
       applyFeatures: () => this.applyFeatures(),
       applyMobileToolbarStyle: () => this.applyMobileToolbarStyle(),
       updateMobileToolbar: () => {
-        initMobileToolbarAdjuster(this.mobileConfig)
+        initMobileToolbarAdjuster(this.mobileConfig, this.mobileFeatureConfig.disableCustomButtons)
         const buttonsToInit = this.mobileButtonConfigs
         initCustomButtons(buttonsToInit)
         
-        // 手机端功能初始化
+        // 手机端功能初始化 - 但不重新初始化小窗检测器以避免弹窗意外触发
         if (this.isMobile) {
-          initSmallWindowDetector()
+          // 只应用工具栏样式而不重新初始化检测器
+          this.applyMobileToolbarStyle();
         }
       },
       recalculateOverflow: () => {
@@ -742,8 +765,9 @@ export default class ToolbarCustomizer extends Plugin {
     let styleContent = ''
 
     // 面包屑图标隐藏（使用 transform 缩放到 0，保持按钮位置不变）
-    // 当桌面端禁用自定义按钮时，跳过此设置
-    if (this.featureConfig.hideBreadcrumbIcon && !(this.desktopFeatureConfig.disableCustomButtons && !this.isMobile)) {
+    // 当禁用自定义按钮时，跳过此设置
+    const disableCustomButtons = this.isMobile ? this.mobileFeatureConfig.disableCustomButtons : this.desktopFeatureConfig.disableCustomButtons
+    if (this.featureConfig.hideBreadcrumbIcon && !disableCustomButtons) {
       styleContent += `
         .protyle-breadcrumb__icon {
           transform: scale(0) !important;
@@ -757,7 +781,7 @@ export default class ToolbarCustomizer extends Plugin {
     }
 
     // 锁定编辑按钮隐藏（使用 transform 缩放到 0，保持按钮位置不变）
-    if (this.featureConfig.hideReadonlyButton && !(this.desktopFeatureConfig.disableCustomButtons && !this.isMobile)) {
+    if (this.featureConfig.hideReadonlyButton && !disableCustomButtons) {
       styleContent += `
         .protyle-breadcrumb__bar button[data-type="readonly"],
         .protyle-breadcrumb button[data-type="readonly"] {
@@ -772,7 +796,7 @@ export default class ToolbarCustomizer extends Plugin {
     }
 
     // 文档菜单按钮隐藏（使用 transform 缩放到 0，保持按钮位置不变）
-    if (this.featureConfig.hideDocMenuButton && !(this.desktopFeatureConfig.disableCustomButtons && !this.isMobile)) {
+    if (this.featureConfig.hideDocMenuButton && !disableCustomButtons) {
       styleContent += `
         .protyle-breadcrumb__bar button[data-type="doc"],
         .protyle-breadcrumb button[data-type="doc"] {
@@ -787,7 +811,7 @@ export default class ToolbarCustomizer extends Plugin {
     }
 
     // 更多按钮隐藏（使用 transform 缩放到 0，保持按钮位置不变）
-    if (this.featureConfig.hideMoreButton && !(this.desktopFeatureConfig.disableCustomButtons && !this.isMobile)) {
+    if (this.featureConfig.hideMoreButton && !disableCustomButtons) {
       styleContent += `
         .protyle-breadcrumb__bar button[data-type="more"],
         .protyle-breadcrumb button[data-type="more"] {
@@ -802,7 +826,7 @@ export default class ToolbarCustomizer extends Plugin {
     }
 
     // 桌面端工具栏高度（仅桌面端生效，禁用自定义按钮时跳过）
-    if (!this.isMobile && this.desktopFeatureConfig.toolbarHeight !== undefined && this.desktopFeatureConfig.toolbarHeight !== 32 && !this.desktopFeatureConfig.disableCustomButtons) {
+    if (!this.isMobile && this.desktopFeatureConfig.toolbarHeight !== undefined && this.desktopFeatureConfig.toolbarHeight !== 32 && !disableCustomButtons) {
       styleContent += `
         .protyle-breadcrumb__bar,
         .protyle-breadcrumb {
@@ -815,10 +839,25 @@ export default class ToolbarCustomizer extends Plugin {
         }
       `
     }
+    
+    // 手机端工具栏高度（仅在非禁用自定义按钮时应用）
+    if (this.isMobile && !disableCustomButtons) {
+      styleContent += `
+        @media (max-width: 768px) {
+          .protyle-breadcrumb,
+          .protyle-breadcrumb__bar,
+          .protyle-breadcrumb__bar[data-input-method],
+          .protyle-breadcrumb[data-input-method] {
+            height: ${this.mobileConfig.toolbarHeight} !important;
+            min-height: ${this.mobileConfig.toolbarHeight} !important;
+          }
+        }
+      `
+    }
 
-    // 桌面端：禁用自定义按钮（恢复思源原始状态）
+    // 禁用自定义按钮（恢复思源原始状态）
     // 前面的所有修改CSS都已跳过，这里只需要隐藏自定义按钮
-    if (!this.isMobile && this.desktopFeatureConfig.disableCustomButtons) {
+    if (disableCustomButtons) {
       styleContent += `
         /* 隐藏所有自定义按钮 */
         .protyle-breadcrumb__bar button[data-custom-button],
@@ -970,9 +1009,19 @@ export default class ToolbarCustomizer extends Plugin {
   // 应用手机端工具栏样式（仅用于动态更新样式，不处理背景颜色）
   private applyMobileToolbarStyle() {
     if (!this.isMobile) return
+    
+    // 如果禁用了自定义按钮（恢复原始状态），则不应用任何工具栏样式
+    if (this.mobileFeatureConfig.disableCustomButtons) {
+      // 移除可能存在的移动端工具栏样式
+      const style = document.getElementById('mobile-toolbar-dynamic-style')
+      if (style) {
+        style.remove()
+      }
+      return
+    }
 
     // 应用背景颜色（包括透明度）
-    applyToolbarBackgroundColor(this.mobileConfig)
+    applyToolbarBackgroundColor(this.mobileConfig, this.mobileFeatureConfig.disableCustomButtons)
 
     // 使用不同的 style ID 来避免冲突
     const styleId = 'mobile-toolbar-dynamic-style'
@@ -1000,7 +1049,6 @@ export default class ToolbarCustomizer extends Plugin {
     `)
 
     style.textContent = cssRules.join('\n')
-    document.head.appendChild(style)
   }
 
   // 移除功能样式

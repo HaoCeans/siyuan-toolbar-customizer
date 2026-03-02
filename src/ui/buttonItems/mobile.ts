@@ -31,6 +31,7 @@ export interface MobileButtonContext {
   buttonConfigs: ButtonConfig[]
   mobileButtonConfigs: ButtonConfig[]
   recalculateOverflow: () => void
+  saveData: (key: string, value: any) => Promise<void>
 }
 
 /**
@@ -368,8 +369,8 @@ export function createMobileButtonItem(
     'builtin': '①思源内置功能【简单】',
     'template': '②手写模板插入【简单】',
     'shortcut': '③电脑端快捷键【简单】',
-    'click-sequence': '④自动化模拟点击【难】',
-    'quick-note': '⑤一键记事【简单】',
+    'quick-note': '④一键记事弹窗【简单】',
+    'click-sequence': '⑤自动化模拟点击【难】',
     'author-tool': '⑥鲸鱼定制工具箱'
   }
   const typeLabel = typeLabels[button.type] || button.type
@@ -540,8 +541,8 @@ export function createMobileButtonItem(
       { value: 'builtin', label: '①思源内置功能【简单】' },
       { value: 'template', label: '②手写模板插入【简单】' },
       { value: 'shortcut', label: '③电脑端快捷键【简单】' },
-      { value: 'click-sequence', label: '④自动化模拟点击【难】' },
-      { value: 'quick-note', label: '⑤一键记事【简单】' }
+      { value: 'quick-note', label: '④一键记事弹窗【简单】' },
+      { value: 'click-sequence', label: '⑤自动化模拟点击【难】' }
     ]
     if (context.isAuthorToolActivated()) {
       typeOptions.push(
@@ -713,102 +714,7 @@ export function createMobileButtonItem(
 
       const hint = document.createElement('div')
       hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
-      hint.innerHTML = '<div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px;"><strong style="color: var(--b3-theme-primary);">🌟 社区可用代码分享（推荐）</strong><br><a href="https://ld246.com/article/1771266377449" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">https://ld246.com/article/1771266377449</a></div>💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">思源笔记常用功能 ID 速查表（GitHub）</a><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">模拟点击序列使用说明（GitHub）</a><br><a href="#" id="view-common-ids-link" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">查看常用ID（部分） →</a>'
-
-      // 绑定"查看常用ID（部分）"链接点击事件
-      const link = hint.querySelector('#view-common-ids-link')
-      if (link) {
-        (link as HTMLElement).onclick = (e) => {
-          e.preventDefault()
-
-          // 获取设置面板的滚动容器
-          const getScrollContainer = () => {
-            // 首先尝试在 .b3-dialog__body 内部找到真正可滚动的子元素
-            const dialogBody = document.querySelector('.b3-dialog__body')
-            if (dialogBody) {
-              const children = dialogBody.querySelectorAll('*')
-              for (const child of children) {
-                const htmlEl = child as HTMLElement
-                if (htmlEl.scrollHeight > htmlEl.clientHeight + 10) {
-                  return htmlEl
-                }
-              }
-            }
-
-            // 尝试找到实际可滚动的容器
-            const possibleContainers = document.querySelectorAll('.b3-dialog__body, .b3-dialog__content, .b3-dialog .fn__flex-1, .config__panel')
-            for (const el of possibleContainers) {
-              const htmlEl = el as HTMLElement
-              const isScrollable = htmlEl.scrollHeight > htmlEl.clientHeight + 10
-              const computedStyle = window.getComputedStyle(htmlEl)
-              const canScroll = computedStyle.overflow === 'auto' || computedStyle.overflow === 'scroll' ||
-                               computedStyle.overflowY === 'auto' || computedStyle.overflowY === 'scroll'
-              if (isScrollable || canScroll) {
-                return htmlEl
-              }
-            }
-
-            // 回退：尝试标准选择器
-            const selectors = ['.b3-dialog__body', '.b3-dialog__content', '.b3-dialog .fn__flex-1']
-            for (const selector of selectors) {
-              const el = document.querySelector(selector)
-              if (el) return el as HTMLElement
-            }
-
-            return window
-          }
-
-          const scrollToElement = (element: HTMLElement) => {
-            const container = getScrollContainer()
-            const elementRect = element.getBoundingClientRect()
-
-            if (container === window) {
-              const targetY = window.scrollY + elementRect.top - window.innerHeight / 2
-              window.scrollTo({ top: targetY, behavior: 'smooth' })
-            } else {
-              const containerEl = container as HTMLElement
-              const containerRect = containerEl.getBoundingClientRect()
-              const relativeTop = elementRect.top - containerRect.top
-              const targetY = containerEl.scrollTop + relativeTop - containerRect.height / 2
-
-              containerEl.scrollTo({ top: targetY, behavior: 'smooth' })
-
-              // 备用方案：直接设置 scrollTop
-              setTimeout(() => {
-                if (Math.abs(containerEl.scrollTop - targetY) > 100) {
-                  containerEl.scrollTop = targetY
-                }
-              }, 100)
-            }
-
-            // 高亮效果
-            const originalBg = element.style.background
-            element.style.background = 'var(--b3-theme-primary-lightest)'
-            setTimeout(() => {
-              element.style.background = originalBg
-            }, 2000)
-          }
-
-          setTimeout(() => {
-            let helpSection = document.getElementById('common-ids-section')
-
-            if (!helpSection) {
-              const settingItems = Array.from(document.querySelectorAll('.b3-label, .config__item'))
-              helpSection = settingItems.find(item => {
-                const titleEl = item.querySelector('.b3-label__text, .config__item-title, .b3-label-title')
-                const text = titleEl?.textContent || item.textContent
-                return text?.includes('使用帮助：自动点击')
-              }) as HTMLElement | undefined
-            }
-
-            if (helpSection) {
-              scrollToElement(helpSection)
-            } else {
-              showMessage('请先展开"使用帮助：自动点击"区域查看ID列表', 3000, 'info')
-            }
-          }, 100)
-        }
-      }
+      hint.innerHTML = '<div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px;"><strong style="color: var(--b3-theme-primary);">🌟 社区可用代码分享（推荐）</strong><br><a href="https://ld246.com/article/1771266377449" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">https://ld246.com/article/1771266377449</a></div>💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">思源笔记常用功能 ID 速查表（GitHub）</a><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">模拟点击序列使用说明（GitHub）</a>'
 
       clickSequenceContainer.appendChild(hint)
 
@@ -1133,17 +1039,28 @@ export function createMobileButtonItem(
           // 改为下拉选择框
           const nameSelect = document.createElement('select')
           nameSelect.className = 'b3-select'
+          nameSelect.style.cssText = 'max-width: 100%; min-width: 0; flex: 1;' // 添加样式防止超出容器
 
           // 使用 DOM 方式构建选项（避免 HTML 转义问题）
           const defaultOption = document.createElement('option')
           defaultOption.value = ''
           defaultOption.textContent = '-- 请选择按钮 --'
           nameSelect.appendChild(defaultOption)
-
+          
           availableButtons.forEach((btn) => {
             const option = document.createElement('option')
             option.value = btn.id  // 使用按钮ID作为value，避免名称重复问题
-            const iconDisplay = btn.icon.startsWith('icon') ? '⭐' : btn.icon
+                    
+            // 根据图标类型显示不同的占位符
+            let iconDisplay = btn.icon
+            if (btn.icon.startsWith('icon')) {
+              // 思源内置图标
+              iconDisplay = '⭐'
+            } else if (/\.(png|jpg|jpeg|gif|svg)$/i.test(btn.icon)) {
+              // 图片图标（包括阿里图标等本地图标）
+              iconDisplay = '🖼️'  // 使用图片图标表示
+            }
+                    
             option.textContent = `${iconDisplay} ${btn.name}`
             // 通过ID匹配当前选中的按钮（使用 buttonId 而不是 buttonName）
             if (step.buttonId === btn.id) {
@@ -1166,7 +1083,7 @@ export function createMobileButtonItem(
           delayInput.className = 'b3-text-field'
           delayInput.placeholder = '间隔(ms)'
           delayInput.value = String(step.delayMs || 200)
-          delayInput.style.cssText = 'font-size: 13px; flex: 1; min-width: 60px;'
+          delayInput.style.cssText = 'font-size: 13px; flex: 1; min-width: 60px; max-width: 100%;' // 添加样式防止超出容器
           delayInput.onchange = () => { button.buttonSequenceSteps![idx].delayMs = parseInt(delayInput.value) || 200 }
 
           const deleteBtn = document.createElement('button')
@@ -1380,182 +1297,45 @@ export function createMobileButtonItem(
 
       typeFieldsContainer.appendChild(authorToolContainer)
     } else if (button.type === 'quick-note') {
-      // 一键记事配置（单选模式）
+      // 一键记事配置说明（统一使用自启动一键记事配置）
       const quickNoteContainer = document.createElement('div');
       quickNoteContainer.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 12px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.08)); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 6px;';
 
       const header = document.createElement('div');
       header.style.cssText = 'display: flex; align-items: center; gap: 8px;';
-      header.innerHTML = '<span style="font-size: 16px;">📝</span><span style="font-weight: 600; color: #3b82f6;">一键记事配置</span>';
+      header.innerHTML = '<span style="font-size: 16px;">📝</span><span style="font-weight: 600; color: #3b82f6;">功能说明</span>';
       quickNoteContainer.appendChild(header);
 
       const desc = document.createElement('div');
-      desc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light);';
-      desc.textContent = '选择保存方式并配置目标ID，点击按钮后直接进入记事编辑界面。';
+      desc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface-light); line-height: 1.6;';
+      desc.innerHTML = '本按钮的功能是触发一键记事弹窗。<br>注：配置项统一使用【一键记事弹窗】中的配置：保存方式、插入位置、目标ID';
       quickNoteContainer.appendChild(desc);
 
-      // 保存方式选择
-      const saveTypeLabel = document.createElement('label');
-      saveTypeLabel.textContent = '💾 保存方式选择';
-      saveTypeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;';
-      quickNoteContainer.appendChild(saveTypeLabel);
+      const linkContainer = document.createElement('div');
+      linkContainer.style.cssText = 'margin-top: 4px;';
 
-      // 单选按钮组
-      const radioContainer = document.createElement('div');
-      radioContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px; margin-top: 4px;';
-
-      const options = [
-        { value: 'daily', label: '📘 保存到笔记本日记', description: '内容保存到指定笔记本的当日日记' },
-        { value: 'document', label: '📄 追加到指定文档', description: '内容直接追加到指定文档底部' }
-      ];
-
-      // 获取当前配置
-      const currentSaveType = button.quickNoteSaveType || 'daily';
-
-      options.forEach(option => {
-        const optionDiv = document.createElement('div');
-        optionDiv.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid var(--b3-border-color); border-radius: 6px; cursor: pointer;';
-
-        const radio = document.createElement('input');
-        radio.type = 'radio';
-        radio.name = 'quickNoteSaveType';
-        radio.value = option.value;
-        radio.checked = currentSaveType === option.value;
-        radio.style.cssText = 'transform: scale(1.2);';
-
-        const labelDiv = document.createElement('div');
-        labelDiv.style.cssText = 'flex: 1;';
-
-        const label = document.createElement('div');
-        label.textContent = option.label;
-        label.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);';
-
-        const desc = document.createElement('div');
-        desc.textContent = option.description;
-        desc.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: 2px;';
-
-        // 点击事件处理
-        optionDiv.onclick = () => {
-          // 清除其他选中状态
-          const allRadios = radioContainer.querySelectorAll('input[type="radio"]');
-          allRadios.forEach(r => (r as HTMLInputElement).checked = false);
-          
-          // 清除所有选项的选中样式 - 使用更准确的选择器
-          const allOptionDivs = radioContainer.children;
-          for (let i = 0; i < allOptionDivs.length; i++) {
-            const div = allOptionDivs[i] as HTMLElement;
-            if (div !== optionDiv) { // 排除当前点击的选项
-              div.style.borderColor = 'var(--b3-border-color)';
-              div.style.backgroundColor = 'transparent';
-            }
-          }
-          
-          // 选中当前项
-          radio.checked = true;
-          button.quickNoteSaveType = option.value as 'daily' | 'document';
-          
-          // 设置当前选项的选中样式
-          optionDiv.style.borderColor = 'var(--b3-theme-primary)';
-          optionDiv.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-          
-          // 更新ID输入框提示
-          updateIdInputPlaceholder();
-        };
-
-        // 默认选中样式
-        if (radio.checked) {
-          optionDiv.style.borderColor = 'var(--b3-theme-primary)';
-          optionDiv.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-        }
-
-        labelDiv.appendChild(label);
-        labelDiv.appendChild(desc);
-        optionDiv.appendChild(radio);
-        optionDiv.appendChild(labelDiv);
-        radioContainer.appendChild(optionDiv);
-      });
-
-      quickNoteContainer.appendChild(radioContainer);
-
-      // 统一的ID输入框
-      const idLabel = document.createElement('label');
-      idLabel.id = 'quick-note-id-label';
-      idLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 12px;';
-      quickNoteContainer.appendChild(idLabel);
-
-      const idInput = document.createElement('input');
-      idInput.type = 'text';
-      idInput.className = 'b3-text-field';
-      idInput.id = 'quick-note-id-input';
-      idInput.style.cssText = 'font-size: 13px;';
-
-      // 根据选择类型更新输入框
-      function updateIdInputPlaceholder() {
-        const saveType = button.quickNoteSaveType || 'daily';
-        const labelEl = quickNoteContainer.querySelector('#quick-note-id-label') as HTMLLabelElement;
-        const inputEl = quickNoteContainer.querySelector('#quick-note-id-input') as HTMLInputElement;
-
-        // 添加空值检查
-        if (!labelEl || !inputEl) {
-          return;
-        }
-
-        if (saveType === 'document') {
-          labelEl.textContent = '📄 目标文档ID';
-          inputEl.placeholder = '请输入文档ID，如：20250101000000-aaaaaa';
-          inputEl.value = button.quickNoteDocumentId || '';
+      const link = document.createElement('a');
+      link.href = '#';
+      link.textContent = '👉 点击此处跳转到【一键记事弹窗】配置';
+      link.style.cssText = 'color: #3b82f6; text-decoration: underline; cursor: pointer; font-size: 13px;';
+      link.onclick = (e) => {
+        e.preventDefault();
+        // 滚动到自启动一键记事配置区域
+        const targetElement = document.getElementById('quick-note-settings-section');
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          // 添加高亮效果
+          const originalBg = targetElement.style.background;
+          targetElement.style.background = '#fff9c4';
+          setTimeout(() => {
+            targetElement.style.background = originalBg;
+          }, 2000);
         } else {
-          labelEl.textContent = '📘 目标笔记本ID';
-          inputEl.placeholder = '请粘贴DailyNote所在笔记本ID';
-          inputEl.value = button.quickNoteNotebookId || '';
-        }
-      }
-
-      // 初始化显示 - 使用setTimeout确保DOM已渲染
-      setTimeout(() => {
-        updateIdInputPlaceholder();
-      }, 0);
-
-      idInput.onchange = () => {
-        const saveType = button.quickNoteSaveType || 'daily';
-        const value = idInput.value.trim();
-        
-        if (saveType === 'document') {
-          button.quickNoteDocumentId = value;
-          // 清空笔记本ID避免混淆
-          button.quickNoteNotebookId = '';
-        } else {
-          button.quickNoteNotebookId = value;
-          // 清空文档ID避免混淆
-          button.quickNoteDocumentId = '';
+          alert('未找到【一键记事弹窗】配置区域，请在移动端设置');
         }
       };
-
-      quickNoteContainer.appendChild(idInput);
-
-      const idHint = document.createElement('div');
-      idHint.id = 'quick-note-id-hint';
-      idHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: 4px;';
-      quickNoteContainer.appendChild(idHint);
-
-      // 更新提示文字
-      function updateIdHint() {
-        const saveType = button.quickNoteSaveType || 'daily';
-        const idHint = quickNoteContainer.querySelector('#quick-note-id-hint') as HTMLDivElement;
-        
-        // 添加空值检查
-        if (!idHint) {
-          return;
-        }
-        
-        if (saveType === 'document') {
-          idHint.textContent = '💡 内容将直接追加到该文档底部';
-        } else {
-          idHint.textContent = '💡 内容将保存到该笔记本的当日日记中';
-        }
-      }
-
-      updateIdHint();
+      linkContainer.appendChild(link);
+      quickNoteContainer.appendChild(linkContainer);
 
       typeFieldsContainer.appendChild(quickNoteContainer);
     }
@@ -1581,15 +1361,7 @@ export function createMobileButtonItem(
   editForm.appendChild(createInputField('右边距', button.marginRight.toString(), '8', (v) => { button.marginRight = parseInt(v) || 8 }, 'number'))
   // 扩展工具栏按钮不显示排序字段（固定第一位）
   if (!isOverflowButton) {
-    editForm.appendChild(createInputField('排序', button.sort.toString(), '数字越小越靠左', (v) => {
-      button.sort = parseInt(v) || 1
-      // 重新分配排序值
-      const sortedButtons = [...context.buttonConfigs].sort((a, b) => a.sort - b.sort)
-      sortedButtons.forEach((btn, idx) => {
-        btn.sort = idx + 1
-      })
-      renderList()
-    }, 'number'))
+    // 排序显示将移动到设置末尾
   }
 
   // 开关组容器 - 带边框和淡蓝色背景
@@ -1625,6 +1397,60 @@ export function createMobileButtonItem(
   switchesContainer.appendChild(showNameHint)
 
   editForm.appendChild(switchesContainer)
+
+  // 在设置末尾添加排序显示（只读）
+  if (!isOverflowButton) {
+    // 创建只读的排序显示（美化居中显示）
+    const sortDisplayContainer = document.createElement('div')
+    sortDisplayContainer.style.cssText = `
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px;
+      background: linear-gradient(135deg, rgba(107, 114, 128, 0.15), rgba(156, 163, 175, 0.15));
+      border: 1px solid var(--b3-border-color);
+      border-radius: 6px;
+      margin: 12px 0 0 0;
+    `
+    
+    const sortLabel = document.createElement('label')
+    sortLabel.style.cssText = `
+      font-size: 13px;
+      color: var(--b3-theme-on-surface);
+      font-weight: 500;
+      text-align: center;
+      margin-bottom: 4px;
+    `
+    sortLabel.textContent = '📊 当前排序位置'
+    sortDisplayContainer.appendChild(sortLabel)
+    
+    const sortValueDisplay = document.createElement('div')
+    sortValueDisplay.style.cssText = `
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--b3-theme-primary);
+      text-align: center;
+      background: var(--b3-theme-background);
+      padding: 8px 16px;
+      border-radius: 4px;
+      border: 1px solid var(--b3-theme-primary);
+    `
+    sortValueDisplay.textContent = button.sort.toString()
+    sortDisplayContainer.appendChild(sortValueDisplay)
+    
+    const sortHint = document.createElement('div')
+    sortHint.style.cssText = `
+      font-size: 11px;
+      color: var(--b3-theme-on-surface-light);
+      text-align: center;
+      margin-top: 4px;
+      display: none;
+    `
+    sortHint.textContent = '💡 拖动按钮调整位置，排序会自动更新'
+    sortDisplayContainer.appendChild(sortHint)
+    
+    editForm.appendChild(sortDisplayContainer)
+  }
 
   header.onclick = (e) => {
     if ((e.target as HTMLElement).closest('button')) return

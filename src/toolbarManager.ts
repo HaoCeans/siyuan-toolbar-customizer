@@ -46,8 +46,9 @@ export interface MobileToolbarConfig {
 export interface ButtonConfig {
   id: string;                 // 唯一标识
   name: string;              // 按钮名称
-  type: 'builtin' | 'template' | 'click-sequence' | 'shortcut' | 'author-tool' | 'quick-note' | 'popup-select'; // 功能类型
+  type: 'builtin' | 'builtin-refresh' | 'template' | 'click-sequence' | 'shortcut' | 'author-tool' | 'quick-note' | 'popup-select'; // 功能类型
   builtinId?: string;        // 思源功能ID（如：menuSearch）
+  builtinRefreshType?: 'refresh' | 'reload' | 'fullscreen' | 'doc-fullscreen'; // 思源功能类型：刷新、重载、全屏、文档全屏
   template?: string;         // 模板内容
     templateNotebookId?: string; // 模板追加到每日笔记的笔记本ID（可选，为空则在当前编辑器插入）
   clickSequence?: string[];  // 模拟点击选择器序列
@@ -76,6 +77,7 @@ export interface ButtonConfig {
   quickNoteNotebookId?: string; // 一键记事：目标笔记本ID
   quickNoteDocumentId?: string; // 一键记事：目标文档ID
   quickNoteSaveType?: 'daily' | 'document'; // 一键记事：保存方式（新增）
+  quickNoteInsertPosition?: 'top' | 'bottom'; // 一键记事：插入位置（顶部/底部）
   // 弹窗选择输入配置
   popupSelectTemplates?: { name: string; content: string }[]; // 弹窗选择：模板列表
   // 连续点击自定义按钮配置
@@ -663,9 +665,17 @@ function shouldShowInMainToolbar(button: ButtonConfig): boolean {
 /**
  * 应用工具栏背景颜色（顶部和底部工具栏通用）
  */
-export function applyToolbarBackgroundColor(config: MobileToolbarConfig) {
+export function applyToolbarBackgroundColor(config: MobileToolbarConfig, disableCustomButtons: boolean = false) {
   const backgroundColorStyleId = 'mobile-toolbar-background-color-style'
   let backgroundColorStyle = document.getElementById(backgroundColorStyleId) as HTMLStyleElement
+
+  // 如果禁用了自定义按钮，则移除背景颜色样式
+  if (disableCustomButtons) {
+    if (backgroundColorStyle) {
+      backgroundColorStyle.remove()
+    }
+    return
+  }
 
   if (!backgroundColorStyle) {
     backgroundColorStyle = document.createElement('style')
@@ -732,7 +742,7 @@ export function applyToolbarBackgroundColor(config: MobileToolbarConfig) {
 }
 
 // ===== 移动端工具栏调整 =====
-export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
+export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCustomButtons: boolean = false) {
   // 仅在移动端初始化
   if (!isMobileDevice()) return
 
@@ -851,58 +861,63 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
         document.head.appendChild(style)
       }
 
-      style.textContent = `
-        /* 移动端工具栏样式 - iOS z-index 修复版 */
-        @media (max-width: 768px) {
-          .protyle-breadcrumb__bar[data-input-method],
-          .protyle-breadcrumb[data-input-method] {
-            position: fixed !important;
-            bottom: calc(var(--mobile-toolbar-offset, 0px) + env(safe-area-inset-bottom)) !important;
-            top: auto !important;
-            left: 0 !important;
-            right: 0 !important;
-            z-index: ${config.toolbarZIndex} !important;
-            border-top: 1px solid var(--b3-border-color) !important;
-            padding: 8px 12px !important;
-            padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
-            display: flex !important;
-            justify-content: center !important;
-            align-items: center !important;
-            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1) !important;
-            transition: bottom 0.3s ease !important;
-            backdrop-filter: blur(10px);
-            height: ${config.toolbarHeight} !important;
-            min-height: ${config.toolbarHeight} !important;
-            /* iOS z-index 修复 - 启用硬件加速提升层级 */
-            -webkit-transform: translateZ(0);
-            transform: translateZ(0);
-            -webkit-backface-visibility: hidden;
-            backface-visibility: hidden;
-            will-change: transform;
-          }
+      // 如果禁用了自定义按钮，则不应用移动端工具栏样式
+      if (disableCustomButtons) {
+        style.textContent = ''
+      } else {
+        style.textContent = `
+          /* 移动端工具栏样式 - iOS z-index 修复版 */
+          @media (max-width: 768px) {
+            .protyle-breadcrumb__bar[data-input-method],
+            .protyle-breadcrumb[data-input-method] {
+              position: fixed !important;
+              bottom: calc(var(--mobile-toolbar-offset, 0px) + env(safe-area-inset-bottom)) !important;
+              top: auto !important;
+              left: 0 !important;
+              right: 0 !important;
+              z-index: ${config.toolbarZIndex} !important;
+              border-top: 1px solid var(--b3-border-color) !important;
+              padding: 8px 12px !important;
+              padding-bottom: max(8px, env(safe-area-inset-bottom)) !important;
+              display: flex !important;
+              justify-content: center !important;
+              align-items: center !important;
+              box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1) !important;
+              transition: bottom 0.3s ease !important;
+              backdrop-filter: blur(10px);
+              height: ${config.toolbarHeight} !important;
+              min-height: ${config.toolbarHeight} !important;
+              /* iOS z-index 修复 - 启用硬件加速提升层级 */
+              -webkit-transform: translateZ(0);
+              transform: translateZ(0);
+              -webkit-backface-visibility: hidden;
+              backface-visibility: hidden;
+              will-change: transform;
+            }
 
-          .protyle-breadcrumb__bar[data-input-method="open"],
-          .protyle-breadcrumb[data-input-method="open"] {
-            bottom: calc(var(--mobile-toolbar-offset, 50px) + env(safe-area-inset-bottom)) !important;
-          }
+            .protyle-breadcrumb__bar[data-input-method="open"],
+            .protyle-breadcrumb[data-input-method="open"] {
+              bottom: calc(var(--mobile-toolbar-offset, 50px) + env(safe-area-inset-bottom)) !important;
+            }
 
-          .protyle-breadcrumb__bar[data-input-method="close"],
-          .protyle-breadcrumb[data-input-method="close"] {
-            bottom: calc(var(--mobile-toolbar-offset, 0px) + env(safe-area-inset-bottom)) !important;
-          }
+            .protyle-breadcrumb__bar[data-input-method="close"],
+            .protyle-breadcrumb[data-input-method="close"] {
+              bottom: calc(var(--mobile-toolbar-offset, 0px) + env(safe-area-inset-bottom)) !important;
+            }
 
-          /* 防止编辑器内容被遮挡 - 仅在启用底部工具栏且工具栏显示时应用 */
-          body.siyuan-toolbar-customizer-enabled .protyle {
-            padding-bottom: calc(${config.toolbarHeight} + env(safe-area-inset-bottom) + 10px) !important;
-          }
+            /* 防止编辑器内容被遮挡 - 仅在启用底部工具栏且工具栏显示时应用 */
+            body.siyuan-toolbar-customizer-enabled .protyle {
+              padding-bottom: calc(${config.toolbarHeight} + env(safe-area-inset-bottom) + 10px) !important;
+            }
 
-          /* 使用思源原生的隐藏类 */
-          .protyle-breadcrumb__bar[data-input-method].fn__none,
-          .protyle-breadcrumb[data-input-method].fn__none {
-            display: none !important;
+            /* 使用思源原生的隐藏类 */
+            .protyle-breadcrumb__bar[data-input-method].fn__none,
+            .protyle-breadcrumb[data-input-method].fn__none {
+              display: none !important;
+            }
           }
-        }
-      `
+        `
+      }
     }
 
     // 尝试设置工具栏
@@ -914,7 +929,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
     }
 
     // 应用背景颜色
-    applyToolbarBackgroundColor(config)
+    applyToolbarBackgroundColor(config, disableCustomButtons)
 
     // 防抖变量
     let observerTimer: ReturnType<typeof setTimeout> | null = null
@@ -1004,111 +1019,116 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig) {
     const toolbarHeightValue = parseInt(config.toolbarHeight) || 52
     const paddingTopValue = topOffsetValue + toolbarHeightValue + 10
 
-    topToolbarStyle.textContent = `
-      /* 顶部工具栏样式 - 固定定位，脱离文档流，避免按钮重插导致的位置跳动 */
-      @media (max-width: 768px) {
-        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) {
-          position: fixed !important;
-          top: ${config.topToolbarOffset} !important;
-          bottom: auto !important;
-          left: 0 !important;
-          right: 0 !important;
-          z-index: ${config.toolbarZIndex} !important;
-          padding: 8px 12px !important;
-          display: flex !important;
-          justify-content: center !important;
-          align-items: center !important;
-          border-bottom: 1px solid var(--b3-border-color) !important;
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
-          transition: top 0.3s ease !important;
-          backdrop-filter: blur(10px);
-          height: ${config.toolbarHeight} !important;
-          min-height: ${config.toolbarHeight} !important;
-          /* 硬件加速，提升层级稳定性 */
-          -webkit-transform: translateZ(0);
-          transform: translateZ(0);
-          -webkit-backface-visibility: hidden;
-          backface-visibility: hidden;
-          will-change: transform;
+    // 如果禁用了自定义按钮，则不应用顶部工具栏样式
+    if (disableCustomButtons) {
+      topToolbarStyle.textContent = ''
+    } else {
+      topToolbarStyle.textContent = `
+        /* 顶部工具栏样式 - 固定定位，脱离文档流，避免按钮重插导致的位置跳动 */
+        @media (max-width: 768px) {
+          body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) {
+            position: fixed !important;
+            top: ${config.topToolbarOffset} !important;
+            bottom: auto !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: ${config.toolbarZIndex} !important;
+            padding: 8px 12px !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            border-bottom: 1px solid var(--b3-border-color) !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+            transition: top 0.3s ease !important;
+            backdrop-filter: blur(10px);
+            height: ${config.toolbarHeight} !important;
+            min-height: ${config.toolbarHeight} !important;
+            /* 硬件加速，提升层级稳定性 */
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            will-change: transform;
+          }
+
+          /* 隐藏空白间距 */
+          body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__space {
+            display: none !important;
+          }
+
+          /* 隐藏原生按钮 */
+          body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="mobile-menu"],
+          body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="exit-focus"] {
+            display: none !important;
+          }
+
+          /* 最左边的按钮左边距为0 */
+          body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .first-custom-button {
+            margin-left: 0 !important;
+          }
+
+          /* 防止编辑器内容被顶部工具栏遮挡 */
+          body.siyuan-toolbar-top-mode .protyle {
+            padding-top: ${paddingTopValue}px !important;
+          }
+
+          /* 使用思源原生的隐藏类 */
+          body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]).fn__none {
+            display: none !important;
+          }
         }
 
-        /* 隐藏空白间距 */
-        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__space {
-          display: none !important;
-        }
+        /* 桌面端样式 */
+        @media (min-width: 769px) {
+          body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) {
+            position: fixed !important;
+            top: ${config.topToolbarOffset} !important;
+            bottom: auto !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: ${config.toolbarZIndex} !important;
+            padding: 8px 12px !important;
+            display: flex !important;
+            justify-content: center !important;
+            align-items: center !important;
+            border-bottom: 1px solid var(--b3-border-color) !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+            height: ${config.toolbarHeight} !important;
+            min-height: ${config.toolbarHeight} !important;
+            /* 硬件加速 */
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            will-change: transform;
+          }
 
-        /* 隐藏原生按钮 */
-        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="mobile-menu"],
-        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="exit-focus"] {
-          display: none !important;
-        }
+          /* 隐藏空白间距（桌面端） */
+          body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) > .protyle-breadcrumb__space {
+            display: none !important;
+          }
 
-        /* 最左边的按钮左边距为0 */
-        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .first-custom-button {
-          margin-left: 0 !important;
-        }
+          /* 隐藏原生按钮（桌面端） */
+          body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="mobile-menu"],
+          body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="exit-focus"] {
+            display: none !important;
+          }
 
-        /* 防止编辑器内容被顶部工具栏遮挡 */
-        body.siyuan-toolbar-top-mode .protyle {
-          padding-top: ${paddingTopValue}px !important;
-        }
+          /* 最左边的按钮左边距为0（桌面端） */
+          body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) > .first-custom-button {
+            margin-left: 0 !important;
+          }
 
-        /* 使用思源原生的隐藏类 */
-        body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]).fn__none {
-          display: none !important;
+          /* 防止编辑器内容被顶部工具栏遮挡（桌面端） */
+          body.siyuan-toolbar-top-mode .protyle {
+            padding-top: ${paddingTopValue}px !important;
+          }
         }
-      }
-
-      /* 桌面端样式 */
-      @media (min-width: 769px) {
-        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) {
-          position: fixed !important;
-          top: ${config.topToolbarOffset} !important;
-          bottom: auto !important;
-          left: 0 !important;
-          right: 0 !important;
-          z-index: ${config.toolbarZIndex} !important;
-          padding: 8px 12px !important;
-          display: flex !important;
-          justify-content: center !important;
-          align-items: center !important;
-          border-bottom: 1px solid var(--b3-border-color) !important;
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
-          height: ${config.toolbarHeight} !important;
-          min-height: ${config.toolbarHeight} !important;
-          /* 硬件加速 */
-          -webkit-transform: translateZ(0);
-          transform: translateZ(0);
-          -webkit-backface-visibility: hidden;
-          backface-visibility: hidden;
-          will-change: transform;
-        }
-
-        /* 隐藏空白间距（桌面端） */
-        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) > .protyle-breadcrumb__space {
-          display: none !important;
-        }
-
-        /* 隐藏原生按钮（桌面端） */
-        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="mobile-menu"],
-        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="exit-focus"] {
-          display: none !important;
-        }
-
-        /* 最左边的按钮左边距为0（桌面端） */
-        body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) > .first-custom-button {
-          margin-left: 0 !important;
-        }
-
-        /* 防止编辑器内容被顶部工具栏遮挡（桌面端） */
-        body.siyuan-toolbar-top-mode .protyle {
-          padding-top: ${paddingTopValue}px !important;
-        }
-      }
-    `
+      `
+    }
 
     // ===== 应用顶部工具栏背景颜色 =====
-    applyToolbarBackgroundColor(config)
+    applyToolbarBackgroundColor(config, disableCustomButtons)
   }
 }
 
@@ -1219,6 +1239,9 @@ function cleanupCustomButtons() {
   // 清理旧的插件按钮
   const oldButtons = document.querySelectorAll('[data-custom-button]')
   oldButtons.forEach(btn => btn.remove())
+  // 清理分割线
+  const oldDividers = document.querySelectorAll('[data-toolbar-divider]')
+  oldDividers.forEach(div => div.remove())
 }
 
 function setupEditorButtons(configs: ButtonConfig[]) {
@@ -1267,7 +1290,8 @@ export function createButtonsForEditors(editors: NodeListOf<Element>, configs: B
   const isMobile = pluginInstance?.isMobile
   const featureConfig = isMobile ? pluginInstance?.mobileFeatureConfig : pluginInstance?.desktopFeatureConfig
   const toolbarStyle = featureConfig?.toolbarStyle || 'default'
-  const useDivider = toolbarStyle === 'divider'
+  const disableCustomButtons = featureConfig?.disableCustomButtons || false
+  const useDivider = !disableCustomButtons && toolbarStyle === 'divider'
 
   editors.forEach(editor => {
     // 找到锁定编辑按钮
@@ -1804,7 +1828,8 @@ function showOverflowToolbar(config: ButtonConfig) {
   const isMobile = pluginInstance?.isMobile
   const featureConfig = isMobile ? pluginInstance?.mobileFeatureConfig : pluginInstance?.desktopFeatureConfig
   const toolbarStyle = featureConfig?.toolbarStyle || 'default'
-  const useDivider = toolbarStyle === 'divider'
+  const disableCustomButtons = featureConfig?.disableCustomButtons || false
+  const useDivider = !disableCustomButtons && toolbarStyle === 'divider'
 
   // 根据工具栏位置选择动画方向
   const animationName = isBottomToolbar ? 'slideUp' : 'slideDown'
@@ -2167,6 +2192,9 @@ async function handleButtonClick(config: ButtonConfig, savedSelection: Range | n
   if (config.type === 'builtin') {
     // 执行思源内置功能
     executeBuiltinFunction(config)
+  } else if (config.type === 'builtin-refresh') {
+    // 执行思源刷新、重载、全屏功能
+    executeBuiltinRefreshFunction(config)
   } else if (config.type === 'template') {
     // 插入模板，传递保存的选区和焦点元素
     insertTemplate(config, savedSelection, lastActiveElement)
@@ -2257,6 +2285,266 @@ function executeBuiltinFunction(config: ButtonConfig) {
   Notify.showErrorBuiltinNotFound(config.builtinId)
 }
 
+/**
+ * 执行思源刷新、重载、全屏功能
+ * @param config 按钮配置
+ */
+function executeBuiltinRefreshFunction(config: ButtonConfig) {
+  if (!config.builtinRefreshType) {
+    // 如果没有指定功能类型，默认为刷新
+    config.builtinRefreshType = 'refresh'
+  }
+  
+  switch (config.builtinRefreshType) {
+    case 'refresh':
+      // 刷新当前文档
+      try {
+        // 方法1: 尝试通过 data-type 点击内置按钮
+        const refreshBtn = document.querySelector('[data-type="refresh"]') as HTMLElement
+        if (refreshBtn) {
+          refreshBtn.click()
+        } else {
+          // 方法2: 通过思源 API 刷新（推荐方法）
+          const { fetchSyncPost } = (window as any).siyuan
+          if (fetchSyncPost) {
+            // 获取当前编辑器实例并刷新
+            const editors = (window as any).siyuan?.layout?.getLayout().children.find((child: any) => child.type === 'wnd')?.children.find((child: any) => child.type === 'tab')?.children.filter((child: any) => child.headElement?.dataset.docId)
+            
+            if (editors && editors.length > 0) {
+              const editor = editors[0]
+              const docId = editor.headElement?.dataset.docId
+              const notebookId = editor.notebookId
+              const path = editor.path
+              
+              if (docId && notebookId && path) {
+                fetchSyncPost('/api/filetree/getDoc', {
+                  id: docId,
+                  notebook: notebookId,
+                  path: path
+                })
+              }
+            } else {
+              // 如果找不到编辑器，尝试其他方法
+              const refreshBtn2 = document.querySelector('#barRefresh') as HTMLElement
+              if (refreshBtn2) {
+                refreshBtn2.click()
+              } else {
+                // 方法3: 尝试通过思源API刷新当前文档
+                const currentTab = document.querySelector('.layout-tab-bar .item--cur')
+                if (currentTab) {
+                  const refreshAction = currentTab.querySelector('[data-type="fold-current-doc"]') as HTMLElement
+                  if (refreshAction) {
+                    refreshAction.click()
+                  }
+                }
+                
+                // 方法4: 尝试直接调用思源的刷新功能
+                if ((window as any).siyuan?.protyle) {
+                  // 尝试获取当前编辑器并刷新
+                  const protyles = document.querySelectorAll('.protyle')
+                  protyles.forEach((protyle: Element) => {
+                    const instance = (protyle as any).protyle
+                    if (instance && instance.model && instance.model.refetch) {
+                      instance.model.refetch()
+                    }
+                  })
+                }
+              }
+            }
+          } else {
+            // 如果没有API可用，尝试原始方法
+            const refreshBtn3 = document.querySelector('#barRefresh') as HTMLElement
+            if (refreshBtn3) {
+              refreshBtn3.click()
+            } else {
+              // 方法3: 尝试通过思源API刷新当前文档
+              const currentTab = document.querySelector('.layout-tab-bar .item--cur')
+              if (currentTab) {
+                const refreshAction = currentTab.querySelector('[data-type="fold-current-doc"]') as HTMLElement
+                if (refreshAction) {
+                  refreshAction.click()
+                }
+              }
+              
+              // 方法4: 尝试直接调用思源的刷新功能
+              if ((window as any).siyuan?.protyle) {
+                // 尝试获取当前编辑器并刷新
+                const protyles = document.querySelectorAll('.protyle')
+                protyles.forEach((protyle: Element) => {
+                  const instance = (protyle as any).protyle
+                  if (instance && instance.model && instance.model.refetch) {
+                    instance.model.refetch()
+                  }
+                })
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('刷新文档失败:', error)
+        
+        // 备用方法：尝试使用F5快捷键
+        try {
+          const keyEvent = {
+            key: 'F5',
+            code: 'F5',
+            keyCode: 116,
+            which: 116,
+            ctrlKey: false,
+            shiftKey: false,
+            altKey: false,
+            metaKey: false,
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            view: window
+          };
+          
+          const eventDown = new KeyboardEvent('keydown', keyEvent);
+          window.dispatchEvent(eventDown);
+        } catch (e) {
+          console.warn('F5快捷键方法也失败:', e)
+        }
+      }
+      
+      // 额外方案：总是尝试触发F5快捷键作为补充
+      try {
+        const keyEvent = {
+          key: 'F5',
+          code: 'F5',
+          keyCode: 116,
+          which: 116,
+          ctrlKey: false,
+          shiftKey: false,
+          altKey: false,
+          metaKey: false,
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          view: window
+        };
+        
+        const eventDown = new KeyboardEvent('keydown', keyEvent);
+        window.dispatchEvent(eventDown);
+      } catch (e) {
+        console.warn('F5快捷键补充方案失败:', e)
+      }
+      break
+      
+    case 'reload':
+      // 重新载入思源
+      try {
+        // 使用思源的重载功能
+        if ((window as any).siyuan && (window as any).siyuan.reload) {
+          (window as any).siyuan.reload()
+        } else {
+          // 如果没有API可用，尝试刷新页面
+          location.reload()
+        }
+      } catch (error) {
+        console.warn('重载思源失败:', error)
+        // 如果JavaScript方法失败，尝试刷新页面
+        location.reload()
+      }
+      break
+      
+    case 'fullscreen':
+      // 全屏来回切换
+      try {
+        const doc = document.documentElement
+        if (!document.fullscreenElement) {
+          // 进入全屏
+          if (doc.requestFullscreen) {
+            doc.requestFullscreen()
+          } else if ((doc as any).webkitRequestFullscreen) { /* Safari */
+            (doc as any).webkitRequestFullscreen()
+          } else if ((doc as any).msRequestFullscreen) { /* IE11 */
+            (doc as any).msRequestFullscreen()
+          }
+        } else {
+          // 退出全屏
+          if (document.exitFullscreen) {
+            document.exitFullscreen()
+          } else if ((document as any).webkitExitFullscreen) { /* Safari */
+            (document as any).webkitExitFullscreen()
+          } else if ((document as any).msExitFullscreen) { /* IE11 */
+            (document as any).msExitFullscreen()
+          }
+        }
+      } catch (error) {
+        console.warn('全屏切换失败:', error)
+      }
+      break
+      
+    case 'doc-fullscreen':
+      // 文档全屏切换 - 仅使用快捷键方案
+      try {
+        // 构建完整的键盘事件对象（参考快捷键功能实现）
+        const keyEvent = {
+          key: 'y',
+          code: 'KeyY',
+          keyCode: 89,
+          which: 89,
+          ctrlKey: false,
+          shiftKey: false,
+          altKey: true,
+          metaKey: false,
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          view: window
+        };
+        
+        // 尝试在活动编辑器上触发事件（优先方案）
+        const activeEditor = document.querySelector('.protyle-wysiwyg.protyle-wysiwyg--select') || document.querySelector('.protyle-wysiwyg:not(.fn__none):not(.fn__hidden)') as HTMLElement;
+        
+        if (activeEditor instanceof HTMLElement) {
+          // 先聚焦到编辑器
+          activeEditor.focus();
+          
+          // 延迟触发，确保焦点设置完成
+          setTimeout(() => {
+            const eventDown = new KeyboardEvent('keydown', keyEvent);
+            activeEditor.dispatchEvent(eventDown);
+          }, 50);
+        } else {
+          // 如果没有找到编辑器，在 window 上触发事件
+          const eventDown = new KeyboardEvent('keydown', keyEvent);
+          window.dispatchEvent(eventDown);
+        }
+      } catch (error) {
+        console.error('文档全屏切换失败:', error);
+        
+        // 备用方案：在 document 上触发
+        try {
+          const keyEvent = {
+            key: 'y',
+            code: 'KeyY',
+            keyCode: 89,
+            which: 89,
+            ctrlKey: false,
+            shiftKey: false,
+            altKey: true,
+            metaKey: false,
+            bubbles: true,
+            cancelable: true,
+            composed: true,
+            view: window
+          };
+          
+          const eventDown = new KeyboardEvent('keydown', keyEvent);
+          document.dispatchEvent(eventDown);
+        } catch (e) {
+          console.error('备用方案也失败:', e);
+        }
+      }
+      break
+      
+    default:
+      console.warn('未知的刷新功能类型:', config.builtinRefreshType)
+  }
+}
+
 function insertTemplate(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
   if (!config.template) {
     Notify.showErrorTemplateNotConfigured(config.name)
@@ -2298,6 +2586,31 @@ function insertTemplate(config: ButtonConfig, savedSelection: Range | null = nul
   // 原有逻辑：在当前编辑器光标位置插入
   // 优先使用保存的焦点元素，否则使用当前焦点元素
   const targetElement = lastActiveElement || document.activeElement
+  
+  // 检查是否在一键记事弹窗中（textarea元素）
+  const isQuickNoteDialog = targetElement?.closest('#quick-note-dialog') || targetElement?.closest('#quick-note-dialog-desktop')
+  if (isQuickNoteDialog && targetElement?.tagName === 'TEXTAREA') {
+    // 在一键记事弹窗的textarea中插入模板
+    const textarea = targetElement as HTMLTextAreaElement
+    const startPos = textarea.selectionStart || textarea.value.length
+    const endPos = textarea.selectionEnd || textarea.value.length
+    
+    // 插入模板内容
+    textarea.value = textarea.value.substring(0, startPos) + processedTemplate + textarea.value.substring(endPos)
+    
+    // 更新光标位置到插入内容之后
+    const newCursorPos = startPos + processedTemplate.length
+    textarea.setSelectionRange(newCursorPos, newCursorPos)
+    textarea.focus()
+    
+    // 显示插入成功提示（如果启用）
+    if (config.showNotification !== false) {
+      Notify.showInfoTemplateInserted(true)
+    }
+    return
+  }
+  
+  // 原有逻辑：在思源编辑器中插入
   const activeEditor = targetElement?.closest('.protyle')
   if (!activeEditor) {
     Notify.showInfoEditorNotFocused()
@@ -3145,32 +3458,36 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
   if (subtype === 'life-log') {
     try {
       const categories = config.lifeLogCategories || ['学习', '工作', '生活']
-      
+
       // 创建选择对话框（不恢复焦点，因为接下来还要弹出输入框）
       const selectedCategory = await showCategorySelectionDialog(categories, { restoreFocus: false })
-      
+
       if (selectedCategory) {
+        // 保存当前焦点元素和滚动位置（在弹出输入框之前）
+        const activeElementBeforeInput = document.activeElement as HTMLElement
+        const scrollPositionBefore = window.pageYOffset || document.documentElement.scrollTop
+
         // 弹出输入框，让用户输入具体内容
         const inputContent = await showTextInputDialog('请输入内容', '例如：写插件')
-        
+
         if (inputContent !== null) {
           // 获取当前时间
           const now = new Date()
           const hours = String(now.getHours()).padStart(2, '0')
           const minutes = String(now.getMinutes()).padStart(2, '0')
-          
+
           // 生成内容格式：19:50 工作：输入内容\n
           const content = `${hours}:${minutes} ${selectedCategory}：${inputContent}\n`
-          
+
           // 获取笔记本ID
           const notebookId = config.lifeLogNotebookId
-          
+
           if (!notebookId) {
             // 如果没有配置笔记本ID，给出提示
             Notify.showErrorCommandCannotExecute('请先配置笔记本ID');
             return;
           }
-          
+
           try {
             // 尝试使用appendDailyNoteBlock API将内容追加到指定笔记本的每日笔记
             const response = await fetchSyncPost('/api/block/appendDailyNoteBlock', {
@@ -3178,11 +3495,27 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
               dataType: 'markdown',
               notebook: notebookId
             });
-            
+
             if (response.code === 0) {
               if (config.showNotification) {
                 Notify.showInfoCopySuccess() // 使用现有的成功通知
               }
+
+              // 延迟恢复焦点和滚动位置（等待思源完成跳转）
+              setTimeout(() => {
+                // 恢复滚动位置
+                window.scrollTo(0, scrollPositionBefore)
+
+                // 恢复焦点到之前的元素
+                if (activeElementBeforeInput && document.contains(activeElementBeforeInput)) {
+                  try {
+                    activeElementBeforeInput.focus({ preventScroll: true })
+                  } catch (e) {
+                    // 如果无法聚焦，忽略错误
+                    console.warn('[叶归LifeLog适配] 恢复焦点失败:', e)
+                  }
+                }
+              }, 300) // 300ms延迟，确保思源的跳转动画完成
             } else {
               console.warn('[叶归LifeLog适配] 追加到每日笔记失败:', response.msg)
               // 如果API调用失败，尝试使用替代方案
@@ -3617,23 +3950,9 @@ async function showTextInputDialog(prompt: string, placeholder?: string): Promis
       });
     }
 
-    // 点击遮罩关闭
-    overlay.onclick = (e) => {
-      if (e.target === overlay) {
-        document.body.removeChild(overlay);
-        setTimeout(() => {
-          // 恢复焦点到原始元素
-          if (activeElement && document.contains(activeElement)) {
-            try {
-              activeElement.focus({ preventScroll: true });
-            } catch (e) {
-              // 如果无法聚焦原始元素，忽略错误
-            }
-          }
-          resolve(null);
-        }, 100);
-      }
-    };
+    // 已禁用点击遮罩关闭功能，避免误触关闭对话框
+    // 用户必须通过按钮或键盘快捷键来关闭对话框
+    // overlay.onclick = null;
 
     overlay.appendChild(dialog);
     document.body.appendChild(overlay);
@@ -5409,7 +5728,8 @@ async function executeQuickNote(config: ButtonConfig) {
     let notebookId = '';
     let documentId = '';
     let saveType = 'daily'; // 默认保存到日记
-    
+    let insertPosition: 'top' | 'bottom' = 'bottom'; // 默认插入到底部
+
     // 优先使用按钮自身的配置
     if (config.quickNoteSaveType) {
       saveType = config.quickNoteSaveType;
@@ -5417,6 +5737,13 @@ async function executeQuickNote(config: ButtonConfig) {
         documentId = config.quickNoteDocumentId || '';
       } else {
         notebookId = config.quickNoteNotebookId || '';
+      }
+      // 获取按钮的插入位置配置
+      if (config.quickNoteInsertPosition) {
+        insertPosition = config.quickNoteInsertPosition;
+      } else {
+        // 回退到全局配置
+        insertPosition = pluginInstance?.mobileFeatureConfig?.quickNoteInsertPosition || 'bottom';
       }
     } else {
       // 如果按钮没有配置，回退到全局配置
@@ -5427,10 +5754,12 @@ async function executeQuickNote(config: ButtonConfig) {
         } else {
           notebookId = pluginInstance.mobileFeatureConfig.quickNoteNotebookId || '';
         }
+        insertPosition = pluginInstance.mobileFeatureConfig.quickNoteInsertPosition || 'bottom';
       } else {
         // 兼容旧的配置方式
         notebookId = config.quickNoteNotebookId || '';
         documentId = config.quickNoteDocumentId || '';
+        insertPosition = pluginInstance?.mobileFeatureConfig?.quickNoteInsertPosition || 'bottom';
       }
     }
 
@@ -5442,12 +5771,13 @@ async function executeQuickNote(config: ButtonConfig) {
         ...existingConfig,
         quickNoteNotebookId: notebookId,
         quickNoteDocumentId: documentId,
-        quickNoteSaveType: saveType
+        quickNoteSaveType: saveType,
+        quickNoteInsertPosition: insertPosition
       }
     };
     (window as any).__pluginInstance = tempPlugin;
     showSmallWindowTipFromDetector();
-    
+
   } catch (error) {
     console.error('一键记事执行失败:', error);
     const message = `按钮 "${config.name}" 的一键记事功能执行失败`;
@@ -5475,6 +5805,26 @@ async function executePopupSelect(config: ButtonConfig, savedSelection: Range | 
     
     // 优先使用保存的焦点元素，否则使用当前焦点元素
     const targetElement = lastActiveElement || document.activeElement
+    
+    // 检查是否在一键记事弹窗中（textarea元素）
+    const isQuickNoteDialog = targetElement?.closest('#quick-note-dialog') || targetElement?.closest('#quick-note-dialog-desktop')
+    if (isQuickNoteDialog && targetElement?.tagName === 'TEXTAREA') {
+      // 在一键记事弹窗的textarea中插入模板
+      const textarea = targetElement as HTMLTextAreaElement
+      const startPos = textarea.selectionStart || textarea.value.length
+      const endPos = textarea.selectionEnd || textarea.value.length
+      
+      // 插入模板内容
+      textarea.value = textarea.value.substring(0, startPos) + processedContent + textarea.value.substring(endPos)
+      
+      // 更新光标位置到插入内容之后
+      const newCursorPos = startPos + processedContent.length
+      textarea.setSelectionRange(newCursorPos, newCursorPos)
+      textarea.focus()
+      return
+    }
+    
+    // 原有逻辑：在思源编辑器中插入
     const activeEditor = targetElement?.closest('.protyle')
     
     if (activeEditor) {

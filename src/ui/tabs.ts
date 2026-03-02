@@ -44,6 +44,12 @@ export function injectTabSwitcher(): void {
     // 重置计数器
     tabSwitcherAttempts = 0
 
+    // 移除预加载的隐藏样式（如果存在）
+    const preloadStyle = document.getElementById('toolbar-customizer-preload-hide')
+    if (preloadStyle && preloadStyle.parentNode) {
+      preloadStyle.parentNode.removeChild(preloadStyle)
+    }
+
     // 隐藏配置项的标题部分（左边的 .fn__flex-1），因为我们用标签切换器了
     // 先清理已存在的样式，避免累积
     if (injectedStyle && injectedStyle.parentNode) {
@@ -111,11 +117,11 @@ export function injectTabSwitcher(): void {
       border-radius: 4px;
     `
 
-    // 版本检查标签
+    // 更新、Q群、激活码获取标签
     const versionTab = document.createElement('button')
     versionTab.className = 'b3-button'
     versionTab.dataset.tab = 'version'
-    versionTab.textContent = '🔍 版本检查'
+    versionTab.textContent = '🔍 更新、Q群、激活码获取'
     versionTab.style.cssText = `
       flex: 1;
       padding: 8px 16px;

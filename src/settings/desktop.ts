@@ -3,6 +3,8 @@
  * 处理电脑端思源手机端增强的设置界面
  */
 
+import { validateActivationCode } from '../utils/activationCodeValidator'
+
 import type { Setting } from 'siyuan'
 import type { GlobalButtonConfig, ButtonConfig } from '../toolbarManager'
 import { createDesktopButtonItem, type DesktopButtonContext } from '../ui/buttonItems/desktop'
@@ -272,7 +274,7 @@ export function createDesktopFeatureConfig(
 
   const dangerLabel = document.createElement('label')
   dangerLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #ff4d4d; min-width: 180px;'
-  dangerLabel.textContent = '⚠️ 完全恢复思源原始状态'
+  dangerLabel.textContent = '⚠️ 电脑端完全恢复思源原始状态'
 
   const dangerSwitch = document.createElement('input')
   dangerSwitch.type = 'checkbox'
@@ -349,6 +351,11 @@ export function createDesktopFeatureConfig(
 
   activationInputRow.appendChild(activationInput)
   activationInputRow.appendChild(activationBtn)
+  
+  // 根据激活状态决定是否显示输入框
+  if (isAuthorToolActivated()) {
+    activationInputRow.style.display = 'none'  // 激活后隐藏输入框和按钮
+  }
 
   activationItem.appendChild(activationHeader)
   activationItem.appendChild(activationDesc)
@@ -388,11 +395,24 @@ export function createDesktopSettingLayout(
   setting: Setting,
   context: DesktopSettingsContext
 ): void {
+  // 预先注入样式：隐藏非 desktop 标签的配置项
+  // 这样可以避免打开设置时的闪烁（先显示全部，然后隐藏部分）
+  const preloadStyle = document.createElement('style')
+  preloadStyle.id = 'toolbar-customizer-preload-hide'
+  preloadStyle.textContent = `
+    .b3-dialog__content .config__item {
+      display: none !important;
+    }
+    .b3-dialog__content .config__item[data-tab-group="desktop"] {
+      display: block !important;
+    }
+  `
+  document.head.appendChild(preloadStyle)
 
 
-  // 版本检查
+  // 更新、Q群、激活码获取
   setting.addItem({
-    title: '🔍 版本检查',
+    title: '🔍 更新、Q群、激活码获取',
     description: '思源手机端增强插件信息',
     createActionElement: () => {
       const container = document.createElement('div')
@@ -448,7 +468,7 @@ export function createDesktopSettingLayout(
       updateLink.style.cssText = 'display: flex; align-items: center; gap: 4px; color: var(--b3-theme-primary); text-decoration: none; margin-left: auto; cursor: pointer;'
       
       const updateIcon = document.createElement('span')
-      updateIcon.innerHTML = '⬇️'
+      updateIcon.innerHTML = '🔃'
       updateIcon.style.cssText = 'font-size: 18px;'
       
       const updateText = document.createElement('span')
@@ -620,98 +640,351 @@ export function createDesktopSettingLayout(
       contactBox.appendChild(contactRow)
       container.appendChild(contactBox)
       
-      // 激活码获取方式框
-      const activationBox = document.createElement('div')
-      activationBox.style.cssText = 'padding: 16px; margin-top: 16px; border: 1px solid var(--b3-border-color); border-radius: 6px;'
       
-      const activationTitle = document.createElement('div')
-      activationTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #52c41a; margin-bottom: 12px;'
-      activationTitle.textContent = '《鲸鱼定制工具箱》激活码获取：'
+            
+      // 鲸鱼定制工具箱整体框
+      const whaleToolboxContainer = document.createElement('div')
+      whaleToolboxContainer.style.cssText = `
+        padding: 16px;
+        margin-top: 16px;
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(59, 130, 246, 0.1));
+        border: 2px solid rgba(139, 92, 246, 0.4);
+        border-radius: 8px;
+      `
       
-      const method1 = document.createElement('div')
-      method1.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 8px;'
-      method1.textContent = '1. 如果您觉得这个插件好用，不妨支持一下作者，任意金额的打赏，都可以进群私聊群主获得激活码。'
+      // 鲸鱼定制工具箱激活码输入
+      const activationItem = document.createElement('div')
+      activationItem.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 16px 0;
+        border-bottom: 1px solid rgba(139, 92, 246, 0.3);
+      `
+            
+      const activationHeader = document.createElement('div')
+      activationHeader.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
+            
+      const activationLabel = document.createElement('label')
+      activationLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #8b5cf6; min-width: 180px;'
+      activationLabel.textContent = '🔐 鲸鱼定制工具箱激活'
+            
+      const statusContainer = document.createElement('div')
+      statusContainer.style.cssText = 'display: flex; align-items: center; gap: 8px;'
       
-      const method2 = document.createElement('div')
-      method2.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 8px;'
-      method2.textContent = '2. 如果您是学生，可进群私聊群主，简单发一下能证明学生的信息，我会免费给您激活码。'
+      const activationStatus = document.createElement('span')
+      activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px;'
+      if (context.isAuthorToolActivated()) {
+        activationStatus.style.cssText += ' background: rgba(34, 197, 94, 0.2); color: #22c55e;'
+        activationStatus.textContent = '✓ 已激活'
+      } else {
+        activationStatus.style.cssText += ' background: rgba(255, 77, 77, 0.2); color: #ff4d4d;'
+        activationStatus.textContent = '✗ 未激活'
+      }
       
-      const method3 = document.createElement('div')
-      method3.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 8px;'
-      method3.textContent = '3. 如果您只是想进群交流、体验或观望，也欢迎进群沟通，我会不定期随缘赠送激活码'
+      // 添加重新激活按钮到状态容器中
+      if (context.isAuthorToolActivated()) {
+        const reActivateBtn = document.createElement('button')
+        reActivateBtn.className = 'b3-button b3-button--info'
+        reActivateBtn.textContent = '重新激活'
+        reActivateBtn.style.cssText = 'padding: 2px 8px; font-size: 12px; height: 24px;'
+        reActivateBtn.onclick = () => {
+          // 显示输入框和验证按钮
+          activationInputRow.style.display = 'flex'
+          // 隐藏重新激活按钮
+          reActivateBtn.style.display = 'none'
+        }
+        statusContainer.appendChild(reActivateBtn)
+      }
       
-      const method4 = document.createElement('div')
-      method4.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 16px;'
-      method4.textContent = '4. 后续，随着《鲸鱼定制工具箱》功能大幅增加，是否更改激活码获取规则？视情况而定。'
+      statusContainer.appendChild(activationStatus)
+            
+      activationHeader.appendChild(activationLabel)
+      activationHeader.appendChild(statusContainer)
+            
+      const activationDesc = document.createElement('div')
+      activationDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
+      activationDesc.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型。若想获得激活码，请进QQ群1018010924咨询群主！'
+            
+      const activationInputRow = document.createElement('div')
+      activationInputRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-top: 4px;'
+            
+      const activationInput = document.createElement('input')
+      activationInput.type = 'text'
+      activationInput.className = 'b3-text-field'
+      activationInput.placeholder = '请输入激活码'
+      activationInput.value = context.desktopFeatureConfig.authorCode || ''
+      activationInput.style.cssText = 'flex: 1; max-width: 200px;'
+            
+      const activationBtn = document.createElement('button')
+      activationBtn.className = 'b3-button b3-button--text'
+      activationBtn.textContent = '验证激活'
+      activationBtn.onclick = async () => {
+        const code = activationInput.value.trim()
+        if (validateActivationCode(code)) {
+          // 同时激活两端
+          context.desktopFeatureConfig.authorActivated = true
+          context.desktopFeatureConfig.authorCode = code
+          context.mobileFeatureConfig.authorActivated = true
+          context.mobileFeatureConfig.authorCode = code
+          await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+          activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px; background: rgba(34, 197, 94, 0.2); color: #22c55e;'
+          activationStatus.textContent = '✓ 已激活'
+          Notify.showInfoAuthorToolActivated()
+          // 延迟后重新加载设置页面
+          setTimeout(() => {
+            window.location.reload()
+          }, 1500)
+        } else {
+          Notify.showErrorActivationCodeInvalid()
+        }
+      }
+            
+      activationInputRow.appendChild(activationInput)
+      activationInputRow.appendChild(activationBtn)
       
-      activationBox.appendChild(activationTitle)
-      activationBox.appendChild(method1)
-      activationBox.appendChild(method2)
-      activationBox.appendChild(method3)
-      activationBox.appendChild(method4)
+      // 根据激活状态决定是否显示输入框和验证按钮
+      if (context.isAuthorToolActivated()) {
+        activationInputRow.style.display = 'none'  // 激活后隐藏输入框和验证按钮
+      }
+            
+      activationItem.appendChild(activationHeader)
+      activationItem.appendChild(activationDesc)
+      activationItem.appendChild(activationInputRow)
       
+      whaleToolboxContainer.appendChild(activationItem)
+            
+      // 鲸鱼定制工具箱功能列表说明
+      const whaleFunctionListContainer = document.createElement('div')
+      whaleFunctionListContainer.style.cssText = `
+        padding: 16px 0;
+        margin-top: 16px;
+        background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(59, 130, 246, 0.05));
+        border-radius: 8px;
+        box-sizing: border-box;
+      `
+      whaleFunctionListContainer.innerHTML = `
+        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表</div>
+        <div style="font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>
+        <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+          <thead>
+            <tr style="background: var(--b3-theme-primary-lightest);">
+              <th style="padding: 10px; text-align: center; border-bottom: 2px solid var(--b3-border-color); width: 36px;">序号</th>
+              <th style="padding: 10px; text-align: left; border-bottom: 2px solid var(--b3-border-color);">功能名称</th>
+              <th style="padding: 10px; text-align: left; border-bottom: 2px solid var(--b3-border-color);">功能说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">①</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">连续点击自定义按钮</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键自动执行多个按钮操作，告别重复点击，工作流自动化</td>
+            </tr>
+            <tr style="background: var(--b3-theme-background);">
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">②</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">打开指定ID块</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">瞬间跳转到任意文档任意位置，精准定位，省时省力</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">③</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">数据库悬浮弹窗</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">悬浮窗口快速查看数据库，无需切换页面，数据触手可及</td>
+            </tr>
+            <tr style="background: var(--b3-theme-background);">
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">④</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">日记底部</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键直达日记末尾，快速追加内容，记录生活点滴</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑤</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">叶归LifeLog适配</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">与LifeLog插件深度整合，时间记录更智能，生活管理更高效</td>
+            </tr>
+            <tr style="background: var(--b3-theme-background);">
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑥</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">弹窗框模板选择</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">弹出式模板选择器，快速插入常用内容，写作效率倍增</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑦</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">滚动文档顶部或底部</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键直达文档首尾，长文档浏览更轻松，阅读体验升级</td>
+            </tr>
+            <tr style="background: var(--b3-theme-background);">
+              <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑧</td>
+              <td style="padding: 10px; font-weight: 500;">持续更新中</td>
+              <td style="padding: 10px; color: var(--b3-theme-on-surface);">更多实用功能开发中，欢迎进群提出你的定制需求</td>
+            </tr>
+          </tbody>
+        </table>
+      `
+      whaleToolboxContainer.appendChild(whaleFunctionListContainer)
+            
+      container.appendChild(whaleToolboxContainer)
+            
       // 功能说明框
       const featureBox = document.createElement('div')
       featureBox.style.cssText = 'padding: 16px; margin-top: 16px; border: 1px solid var(--b3-border-color); border-radius: 6px;'
-      
+            
       const featureTitle = document.createElement('div')
       featureTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #722ed1; margin-bottom: 12px;'
       featureTitle.textContent = '《鲸鱼定制工具箱》功能说明：'
-      
+            
       const featureMethod1 = document.createElement('div')
       featureMethod1.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 8px;'
       featureMethod1.textContent = '1. 所有作者、个人的定制化需求，均会加入到工具箱。'
-      
+            
       const featureMethod2 = document.createElement('div')
       featureMethod2.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 8px;'
       featureMethod2.textContent = '2. 核心功能：开箱即用！除基础配置外，无需折腾！'
-      
+            
       const featureMethod3 = document.createElement('div')
-      featureMethod3.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background);'
-      featureMethod3.textContent = '3. 本插件的免费功能，已经占据99%，如果您仍然需要单独定制功能，请私聊作者，为您私人定制！完成后，按钮将加入工具箱。'
-      
+      featureMethod3.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background;'
+      featureMethod3.textContent = '3. 本插件的免费功能，已经占据95%，如果您仍然需要单独定制功能，请私聊作者，为您私人定制！完成后，按钮将加入工具箱。'
+            
       featureBox.appendChild(featureTitle)
       featureBox.appendChild(featureMethod1)
       featureBox.appendChild(featureMethod2)
       featureBox.appendChild(featureMethod3)
-      
-      container.appendChild(activationBox)
+            
       container.appendChild(featureBox)
-      
+            
+      // 激活码方案与权益说明框（移到功能说明框下面）
+      const activationBox = document.createElement('div')
+      activationBox.style.cssText = 'padding: 16px; margin-top: 16px; border: 1px solid var(--b3-border-color); border-radius: 6px;'
+                  
+      const activationTitle = document.createElement('div')
+      activationTitle.style.cssText = 'font-size: 20px; font-weight: bold; color: #722ed1; margin-bottom: 16px; text-align: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);'
+      activationTitle.textContent = '激活码方案与权益说明'
+      activationBox.appendChild(activationTitle)
+                  
+      // 正价支持方案
+      const regularSection = document.createElement('div')
+      regularSection.style.cssText = 'margin-bottom: 20px; padding: 12px; background: rgba(82, 196, 26, 0.05); border-radius: 6px; border-left: 3px solid #52c41a;'
+                  
+      const regularTitle = document.createElement('div')
+      regularTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #52c41a; margin-bottom: 10px;'
+      regularTitle.textContent = '1️⃣ 正价支持方案（原价 99 元）'
+      regularSection.appendChild(regularTitle)
+                  
+      const regularContent = document.createElement('div')
+      regularContent.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); line-height: 1.6;'
+      regularContent.innerHTML = `
+        <div style="margin-bottom: 8px;"><strong>包含内容：</strong></div>
+        <div style="margin-bottom: 6px;">• <strong>永久激活码（电脑、手机均可用）</strong></div>
+        <div style="margin-bottom: 6px;">• <strong>无限次自动化代码实现（作者帮写）</strong></div>
+        <div style="margin-left: 16px; margin-bottom: 6px; font-size: 13px;">• 对应功能：⑤ 自动化模拟点击（高难度功能）</div>
+        <div style="margin-bottom: 6px;">• <strong>1 次定制化需求（作者实现）</strong></div>
+        <div style="margin-left: 16px; margin-bottom: 4px; font-size: 13px;">• 功能可使用您的名字命名</div>
+        <div style="margin-left: 16px; font-size: 13px;">• 根据需求，作者在能力与合理范围内进行评估，尽最大可能满足！</div>
+      `
+      regularSection.appendChild(regularContent)
+      activationBox.appendChild(regularSection)
+                  
+      // 限时优惠方案
+      const discountSection = document.createElement('div')
+      discountSection.style.cssText = 'margin-bottom: 20px; padding: 12px; background: rgba(255, 107, 53, 0.05); border-radius: 6px; border-left: 3px solid #ff6b35;'
+                  
+      const discountTitle = document.createElement('div')
+      discountTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #ff6b35; margin-bottom: 10px;'
+      discountTitle.textContent = '2️⃣ 限时优惠方案（限量 50 个，送完即止）'
+      discountSection.appendChild(discountTitle)
+                  
+      // 普通优惠
+      const normalDiscount = document.createElement('div')
+      normalDiscount.style.cssText = 'margin-bottom: 12px; padding: 8px; background: rgba(255, 107, 53, 0.1); border-radius: 4px;'
+      normalDiscount.innerHTML = `
+        <div style="font-size: 15px; font-weight: bold; color: #ff6b35; margin-bottom: 6px;">① 普通优惠价：19.8 元（2 折）</div>
+        <div style="font-size: 13px; color: var(--b3-theme-on-background); margin-bottom: 4px;">• <strong>永久激活码（电脑、手机均可用）</strong></div>
+        <div style="font-size: 13px; color: var(--b3-theme-on-background); margin-bottom: 4px;">• <strong>1 次自动化代码实现（作者帮写）</strong></div>
+        <div style="margin-left: 16px; font-size: 12px;">• 对应功能：⑤ 自动化模拟点击（高难度功能）</div>
+      `
+      discountSection.appendChild(normalDiscount)
+                  
+      // 学生优惠
+      const studentDiscount = document.createElement('div')
+      studentDiscount.style.cssText = 'padding: 8px; background: rgba(255, 107, 53, 0.1); border-radius: 4px;'
+      studentDiscount.innerHTML = `
+        <div style="font-size: 15px; font-weight: bold; color: #ff6b35; margin-bottom: 6px;">② 学生优惠价：9.9 元（1 折）</div>
+        <div style="font-size: 13px; color: var(--b3-theme-on-background); margin-bottom: 4px;">• <strong>永久激活码（电脑、手机均可用）</strong></div>
+        <div style="font-size: 13px; color: var(--b3-theme-on-background);">• 备注：进群私聊群主，<strong>简单提供可证明学生身份的信息</strong></div>
+      `
+      discountSection.appendChild(studentDiscount)
+      activationBox.appendChild(discountSection)
+                  
+      // 免费获取方案
+      const freeSection = document.createElement('div')
+      freeSection.style.cssText = 'margin-bottom: 16px; padding: 12px; background: rgba(24, 144, 255, 0.05); border-radius: 6px; border-left: 3px solid #1890ff;'
+                  
+      const freeTitle = document.createElement('div')
+      freeTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #1890ff; margin-bottom: 8px;'
+      freeTitle.textContent = '3️⃣ 免费获取方案'
+      freeSection.appendChild(freeTitle)
+                  
+      const freeContent = document.createElement('div')
+      freeContent.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); line-height: 1.6;'
+      freeContent.innerHTML = `
+        <div style="margin-bottom: 6px;">1. 如果您只是想进群交流、体验功能或观望插件发展方向，也非常欢迎进群沟通交流～我会不定期随缘赠送激活码。</div>
+        <div>2. 对于在群聊中活跃度较高的小伙伴，我会视情况赠送永久激活码。</div>
+      `
+      freeSection.appendChild(freeContent)
+      activationBox.appendChild(freeSection)
+                  
+      // 说明
+      const noticeSection = document.createElement('div')
+      noticeSection.style.cssText = 'padding: 12px; background: rgba(114, 46, 209, 0.05); border-radius: 6px; border-left: 3px solid #722ed1;'
+                  
+      const noticeTitle = document.createElement('div')
+      noticeTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #722ed1; margin-bottom: 12px;'
+      noticeTitle.textContent = '说明'
+      noticeSection.appendChild(noticeTitle)
+                  
+      const noticeList = document.createElement('div')
+      noticeList.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); line-height: 1.6;'
+      noticeList.innerHTML = `
+        <div style="margin-bottom: 8px;">1. 扫码缴费后，进群私聊作者获取激活码；相关权益也均在群聊中@作者实现。</div>
+        <div>2. 后续随着《鲸鱼定制工具箱》功能持续增加、复杂度提升，是否推出新的优惠或调整获取规则，将视情况而定，如有变化，会提前在群内说明。</div>
+      `
+      noticeSection.appendChild(noticeList)
+      activationBox.appendChild(noticeSection)
+            
+      container.appendChild(activationBox)
+            
       // 打赏支持框
       const donationBox = document.createElement('div')
       donationBox.style.cssText = 'padding: 16px; margin-top: 16px; border: 1px solid var(--b3-border-color); border-radius: 8px;'
-      
+            
       const donationTitle = document.createElement('div')
       donationTitle.style.cssText = 'font-size: 20px; font-weight: bold; color: var(--b3-theme-on-background); text-align: center; margin-bottom: 12px;'
       donationTitle.textContent = '🧧 打赏支持'
-      
+            
       const donationText = document.createElement('div')
       donationText.style.cssText = 'font-size: 18px; color: var(--b3-theme-on-background); text-align: center; margin-bottom: 16px;'
       donationText.textContent = '感谢您的支持与反馈，这将鼓励作者持续开发'
-      
+            
       // 二维码容器 - 横向排列
       const qrContainer = document.createElement('div')
       qrContainer.style.cssText = 'display: flex; gap: 16px; align-items: center; justify-content: center;'
-      
+            
       // 二维码图片
       const qrImg1 = document.createElement('img')
       qrImg1.src = 'https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment2.png'
       qrImg1.alt = '打赏二维码'
       qrImg1.style.cssText = 'width: 300px; height: 300px; object-fit: contain; border-radius: 4px;'
-      
+            
       const qrImg2 = document.createElement('img')
       qrImg2.src = 'https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment1.png'
       qrImg2.alt = '打赏二维码'
       qrImg2.style.cssText = 'width: 300px; height: 300px; object-fit: contain; border-radius: 4px;'
-      
+            
       qrContainer.appendChild(qrImg1)
       qrContainer.appendChild(qrImg2)
-      
+            
       donationBox.appendChild(donationTitle)
       donationBox.appendChild(donationText)
       donationBox.appendChild(qrContainer)
-      
+
       container.appendChild(donationBox)
       
       return container
@@ -744,7 +1017,8 @@ export function createDesktopSettingLayout(
             isAuthorToolActivated: context.isAuthorToolActivated,
             showConfirmDialog: context.showConfirmDialog,
             showIconPicker: context.showIconPicker,
-            buttonConfigs: context.desktopButtonConfigs
+            buttonConfigs: context.desktopButtonConfigs,
+            saveData: context.saveData
           }
           const item = createDesktopButtonItem(button, index, renderList, context.desktopButtonConfigs, buttonContext)
           listContainer.appendChild(item)
@@ -771,8 +1045,8 @@ export function createDesktopSettingLayout(
         const newButton: ButtonConfig = {
           id: `button_${Date.now()}`,
           name: `新按钮${newButtonIndex}`,
-          type: 'builtin',
-          builtinId: 'menuSearch',
+          type: 'template',
+          template: '',
           icon: '♥️',
           iconSize: context.desktopGlobalButtonConfig.iconSize,
           minWidth: context.desktopGlobalButtonConfig.minWidth,
@@ -1267,7 +1541,7 @@ export function createDesktopSettingLayout(
 
       const dangerLabel = document.createElement('label')
       dangerLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #ff4d4d; min-width: 180px;'
-      dangerLabel.textContent = '⚠️ 完全恢复思源原始状态'
+      dangerLabel.textContent = '⚠️ 电脑端完全恢复思源原始状态'
 
       const dangerSwitch = document.createElement('input')
       dangerSwitch.type = 'checkbox'
@@ -1291,87 +1565,6 @@ export function createDesktopSettingLayout(
       dangerItem.appendChild(dangerDesc)
 
       container.appendChild(dangerItem)
-
-      // 鲸鱼定制工具箱激活码输入
-      const activationItem = document.createElement('div')
-      activationItem.style.cssText = `
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        padding: 16px;
-        margin-top: 12px;
-        background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(59, 130, 246, 0.1));
-        border: 2px solid rgba(139, 92, 246, 0.4);
-        border-radius: 8px;
-      `
-
-      const activationHeader = document.createElement('div')
-      activationHeader.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
-
-      const activationLabel = document.createElement('label')
-      activationLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #8b5cf6; min-width: 180px;'
-      activationLabel.textContent = '🔐 鲸鱼定制工具箱激活'
-
-      const activationStatus = document.createElement('span')
-      activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px;'
-      if (context.isAuthorToolActivated()) {
-        activationStatus.style.cssText += ' background: rgba(34, 197, 94, 0.2); color: #22c55e;'
-        activationStatus.textContent = '✓ 已激活'
-      } else {
-        activationStatus.style.cssText += ' background: rgba(255, 77, 77, 0.2); color: #ff4d4d;'
-        activationStatus.textContent = '✗ 未激活'
-      }
-
-      activationHeader.appendChild(activationLabel)
-      activationHeader.appendChild(activationStatus)
-
-      const activationDesc = document.createElement('div')
-      activationDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-      activationDesc.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型。若想获得激活码，请进QQ群1018010924咨询群主！'
-
-      const activationInputRow = document.createElement('div')
-      activationInputRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-top: 4px;'
-
-      const activationInput = document.createElement('input')
-      activationInput.type = 'text'
-      activationInput.className = 'b3-text-field'
-      activationInput.placeholder = '请输入激活码'
-      activationInput.value = context.desktopFeatureConfig.authorCode || ''
-      activationInput.style.cssText = 'flex: 1; max-width: 200px;'
-
-      const activationBtn = document.createElement('button')
-      activationBtn.className = 'b3-button b3-button--text'
-      activationBtn.textContent = '验证激活'
-      activationBtn.onclick = async () => {
-        const code = activationInput.value.trim()
-        if (code === '88888888') {
-          // 同时激活两端
-          context.desktopFeatureConfig.authorActivated = true
-          context.desktopFeatureConfig.authorCode = code
-          context.mobileFeatureConfig.authorActivated = true
-          context.mobileFeatureConfig.authorCode = code
-          await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
-          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
-          activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px; background: rgba(34, 197, 94, 0.2); color: #22c55e;'
-          activationStatus.textContent = '✓ 已激活'
-          Notify.showInfoAuthorToolActivated()
-          // 延迟后重新加载设置页面
-          setTimeout(() => {
-            window.location.reload()
-          }, 1500)
-        } else {
-          Notify.showErrorActivationCodeInvalid()
-        }
-      }
-
-      activationInputRow.appendChild(activationInput)
-      activationInputRow.appendChild(activationBtn)
-
-      activationItem.appendChild(activationHeader)
-      activationItem.appendChild(activationDesc)
-      activationItem.appendChild(activationInputRow)
-
-      container.appendChild(activationItem)
 
       return container
     }

@@ -200,6 +200,26 @@ A: 调整「输入法偏移」数值
 
 # 📌 更新说明
 
+### v3.3.1 — Quick Note Dialog Trigger Logic Optimization
+
+#### 🔧 Core Optimization
+
+- ✨ **Simplified Trigger Mechanism** - Popup on background switch, smart close on foreground
+- 🧹 **Removed Complex Detection Logic** - Eliminated frequent switching, long background, freeze recovery detection (~350 lines reduced)
+- 🎯 **Smart Dialog Management** - Automatically close empty dialogs in full-screen mode when returning to foreground, preserve dialogs with content
+- ⚡ **Maintained Stability** - Kept 3-second debounce mechanism for smooth user experience
+
+#### 📊 Technical Improvements
+
+| Item | Improvement |
+|------|-------------|
+| **Trigger Logic** | Changed from "foreground trigger" to "background trigger", more intuitive |
+| **Code Simplification** | Optimized from ~1800 to ~1450 lines (-19% code) |
+| **Detection Mechanism** | Simplified from 7 state detections to 1 trigger + 1 cleanup |
+| **Reliability** | Single trigger point avoids multi-detection race conditions |
+
+---
+
 ### v3.3.0 — 功能增强与体验优化版本
 
 #### ✨ 新增功能

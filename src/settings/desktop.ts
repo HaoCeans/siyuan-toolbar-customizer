@@ -943,7 +943,7 @@ export function createDesktopSettingLayout(
       const noticeList = document.createElement('div')
       noticeList.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); line-height: 1.6;'
       noticeList.innerHTML = `
-        <div style="margin-bottom: 8px;">1. 扫码缴费后，进群私聊作者获取激活码；相关权益也均在群聊中@作者实现。</div>
+        <div style="margin-bottom: 8px;">1. 👇打赏支持后，进群私聊作者获取激活码；相关权益也均在群聊中@作者实现。</div>
         <div>2. 后续随着《鲸鱼定制工具箱》功能持续增加、复杂度提升，是否推出新的优惠或调整获取规则，将视情况而定，如有变化，会提前在群内说明。</div>
       `
       noticeSection.appendChild(noticeList)

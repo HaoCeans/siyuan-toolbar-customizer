@@ -52,6 +52,7 @@ export interface MobileFeatureConfig {
   disableMobileSwipe?: boolean
   authorCode?: string
   authorActivated?: boolean
+  showConfigGuide?: boolean       // 初次配置导航提示
   popupConfig?: 'disabled' | 'smallWindowOnly' | 'bothModes'
   quickNoteNotebookId?: string
   quickNoteDocumentId?: string  // 新增：一键记事目标文档ID
@@ -1808,12 +1809,86 @@ export function createMobileSettingLayout(
   // === 一键记事弹窗 ===
   createGroupTitle('4️⃣ ','一键记事弹窗', 'quick-note-settings-section')
 
-  // 说明文字
-  createNotice('📝请先选择触发方式，再配置笔记本或文档ID，选择插入位置，进行弹窗细化设置。')
-  
+  // 初次配置导航提示开关 + 说明文字（合并到一个容器）
+  setting.addItem({
+    title: '',
+    description: '',
+    createActionElement: () => {
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = `
+        margin: 0 -16px;
+        width: calc(100% + 32px);
+      `;
 
-  
+      const container = document.createElement('div');
+      container.style.cssText = `
+        padding: 16px;
+        background: #ffebee;
+        border: 1px solid #ffcdd2;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      `;
 
+      // 顶部：开关区域
+      const toggleRow = document.createElement('div');
+      toggleRow.style.cssText = `
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      `;
+
+      // 左侧标签
+      const labelContainer = document.createElement('div');
+      labelContainer.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+
+      const label = document.createElement('span');
+      label.textContent = '💡 初次配置导航提示';
+      label.style.cssText = 'font-size: 15px; font-weight: 600; color: #c62828;';
+
+      const desc = document.createElement('div');
+      desc.textContent = '编辑框内引导';
+      desc.style.cssText = 'font-size: 12px; color: #d32f2f; margin-top: 2px;';
+
+      labelContainer.appendChild(label);
+      labelContainer.appendChild(desc);
+
+      // 右侧开关
+      const toggle = document.createElement('input');
+      toggle.type = 'checkbox';
+      toggle.className = 'b3-switch';
+      toggle.checked = context.mobileFeatureConfig.showConfigGuide ?? true;
+      toggle.style.cssText = 'transform: scale(1.2);';
+
+      toggle.onchange = async () => {
+        context.mobileFeatureConfig.showConfigGuide = toggle.checked;
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+      };
+
+      toggleRow.appendChild(labelContainer);
+      toggleRow.appendChild(toggle);
+
+      // 底部：说明文字
+      const noticeText = document.createElement('div');
+      noticeText.textContent = '📝 请先选择触发方式，再配置笔记本或文档ID，选择插入位置，进行弹窗细化设置。';
+      noticeText.style.cssText = `
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.6;
+        color: #b71c1c;
+        padding-top: 8px;
+        border-top: 1px solid #ffcdd2;
+      `;
+
+      container.appendChild(toggleRow);
+      container.appendChild(noticeText);
+
+      wrapper.appendChild(container);
+
+      return wrapper;
+    }
+  });
 
   // ===触发：后台切前台 ===
   setting.addItem({

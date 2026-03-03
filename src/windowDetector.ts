@@ -322,19 +322,14 @@ function showNoteInputDialogDesktop(notebookId: string, documentId?: string, sav
 
 // === 移动端专用弹窗 ===
 function showNoteInputDialogMobile(notebookId: string, documentId?: string, saveType: 'daily' | 'document' = 'daily', insertPosition: 'top' | 'bottom' = 'bottom', isFromButton: boolean = false) {
-  // 检查是否已有弹窗存在，防止重复创建
+  // 检查是否已有弹窗存在（防止重复创建）
   const existingDialog = document.getElementById('quick-note-dialog');
   if (existingDialog) {
-    // 如果弹窗已存在，直接返回，不创建新弹窗
+    console.log('[一键记事] 弹窗已存在，跳过创建');
     return;
   }
 
-  // 检查是否在防抖时间内
-  const timeSinceLastShow = Date.now() - lastDialogShowTime;
-  if (timeSinceLastShow < DIALOG_SHOW_DEBOUNCE_MS && !isFromButton) {
-    // 自启动模式下，如果在防抖时间内，不显示新弹窗
-    return;
-  }
+  // 注意：防抖检查已在 handleVisibilityChange() 中完成，这里不需要重复检查
 
   // 标记弹窗正在显示
   isNoteDialogShowing = true;
@@ -429,8 +424,46 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
   `;
 
   const textarea = document.createElement('textarea');
-  textarea.placeholder = documentId ? (isAppleStyle ? '追加到文档' : '请输入要追加到文档的内容...') : (isAppleStyle ? '写日记' : '请输入您的日记内容...');
-  
+
+  // 根据配置显示不同的 placeholder
+  const showConfigGuide = pluginInstance?.mobileFeatureConfig?.showConfigGuide ?? true;
+  if (showConfigGuide) {
+    textarea.placeholder = `《初次配置导航提示》：
+  欢迎使用一键记事弹窗，操作简单，请先配置，具体操作如下：
+
+1. ⚙️插件设置：点击下方⚙️图标按钮，进入设置界面
+2. 4️⃣一键记事弹窗：往下滚动到对应位置，进行配置
+3. 配置完成，保存，即可正常使用！
+
+注：💡初次配置导航提示：建议关闭`;
+
+    // 添加便利贴样式 - 淡黄色背景
+    const styleId = 'quick-note-mobile-placeholder-style';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        #quick-note-dialog textarea::placeholder {
+          color: #5d4e37;
+          font-size: 14px;
+          line-height: 1.8;
+          padding: 16px;
+          background: #fffbeb;
+          border: 1px solid #fde68a;
+          border-radius: 8px;
+          display: block;
+          margin: 20px 0;
+          max-width: 90%;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+          white-space: pre-line;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  } else {
+    textarea.placeholder = documentId ? (isAppleStyle ? '追加到文档' : '请输入要追加到文档的内容...') : (isAppleStyle ? '写日记' : '请输入您的日记内容...');
+  }
+
   // 获取字体大小配置
   const fontSize = pluginInstance?.mobileFeatureConfig?.quickNoteFontSize || (isAppleStyle ? 17 : 16);
   
@@ -469,7 +502,7 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
     scrollbar-width: thin;
     scrollbar-color: #888 #f1f1f1;
   `;
-  
+
   // 为Webkit浏览器添加滚动条样式（避免重复注入）
   const textareaStyleId = 'quick-note-textarea-scrollbar-style';
   if (!document.getElementById(textareaStyleId)) {
@@ -1233,8 +1266,60 @@ function hasNoteDialogContent(): boolean {
  * 延迟检测函数，供延迟调用使用
  */
 /**
+ * ②只在小窗模式：处理小窗模式下的弹窗逻辑
+ * 只有当前为小窗模式时才弹窗
+ */
+function handleSmallWindowOnlyMode() {
+  const isSmallWindow = checkIsSmallWindowMode();
+  if (!isSmallWindow) {
+    console.log('[一键记事] 当前为全屏模式，配置为仅小窗模式，跳过弹窗');
+    return;
+  }
+
+  // 检查是否有内容
+  if (hasNoteDialogContent()) {
+    console.log('[一键记事] 编辑器有内容，保留弹窗');
+    return;
+  }
+
+  // 防抖检查：3秒内不重复弹
+  const timeSinceLastShow = Date.now() - lastDialogShowTime;
+  if (timeSinceLastShow < DIALOG_COOLDOWN_MS) {
+    console.log('[一键记事] 在防抖期内，跳过弹窗');
+    return;
+  }
+
+  // 弹出弹窗
+  showOrReuseDialog();
+  console.log('[一键记事] 小窗模式切后台，弹窗');
+}
+
+/**
+ * ③小窗和全屏：处理全模式下的弹窗逻辑
+ * 无论小窗还是全屏都弹窗
+ */
+function handleBothModesMode() {
+  // 检查是否有内容
+  if (hasNoteDialogContent()) {
+    console.log('[一键记事] 编辑器有内容，保留弹窗');
+    return;
+  }
+
+  // 防抖检查：3秒内不重复弹
+  const timeSinceLastShow = Date.now() - lastDialogShowTime;
+  if (timeSinceLastShow < DIALOG_COOLDOWN_MS) {
+    console.log('[一键记事] 在防抖期内，跳过弹窗');
+    return;
+  }
+
+  // 弹出弹窗（无论小窗还是全屏）
+  showOrReuseDialog();
+  console.log('[一键记事] 全模式切后台，弹窗');
+}
+
+/**
  * 处理前后台切换
- * 新方案：切后台弹窗，切前台时全屏模式自动关闭空弹窗
+ * 新方案：只在切后台时操作，切前台永远不动
  */
 function handleVisibilityChange() {
   // 只在移动端处理
@@ -1246,51 +1331,21 @@ function handleVisibilityChange() {
   if (document.hidden) {
     // 获取弹窗配置
     const popupConfig = pluginInstance.mobileFeatureConfig?.popupConfig || 'bothModes';
-    if (popupConfig === 'disabled') {
-      return;  // 已禁用自启动
-    }
 
-    // 检查是否有内容（有内容则不动）
-    if (hasNoteDialogContent()) {
-      console.log('[一键记事] 编辑器有内容，不重新弹窗');
-      return;
+    // 根据配置调用不同的处理函数
+    if (popupConfig === 'smallWindowOnly') {
+      // ②只在小窗模式：使用小窗模式专用函数
+      handleSmallWindowOnlyMode();
+    } else if (popupConfig === 'bothModes') {
+      // ③小窗和全屏：使用全模式函数
+      handleBothModesMode();
     }
-
-    // 简单防抖：3秒内不重复弹
-    const timeSinceLastShow = Date.now() - lastDialogShowTime;
-    if (timeSinceLastShow < DIALOG_COOLDOWN_MS) {
-      console.log('[一键记事] 在防抖期内，跳过弹窗');
-      return;
-    }
-
-    // 弹出或复用弹窗（不管小窗还是全屏）
-    showOrReuseDialog();
-    console.log('[一键记事] 切后台，弹窗');
+    // disabled 模式不做任何处理
     return;
   }
 
-  // ========== 切前台时：全屏模式自动关闭空弹窗 ==========
-  if (isAppInForeground()) {
-    // 检查是否为全屏模式
-    const isFullScreen = !checkIsSmallWindowMode();
-
-    if (isFullScreen) {
-      // 全屏模式：检查是否有内容
-      if (!hasNoteDialogContent()) {
-        // 无内容：关闭弹窗
-        const noteDialog = document.getElementById('quick-note-dialog');
-        if (noteDialog) {
-          noteDialog.remove();
-          console.log('[一键记事] 全屏模式切前台，关闭空弹窗');
-        }
-      } else {
-        console.log('[一键记事] 全屏模式切前台，保留有内容的弹窗');
-      }
-    } else {
-      console.log('[一键记事] 小窗模式切前台，保留弹窗');
-    }
-    return;
-  }
+  // ========== 切前台时：不做任何操作 ==========
+  // 切前台永远不动，保留弹窗状态
 }
 
 /**
@@ -1318,14 +1373,14 @@ function checkIsSmallWindowMode(): boolean {
 
     if (isKeyboardOpen) {
       // 键盘弹出时：主要看宽度占比
-      return widthRatio < 0.85;
+      return widthRatio < 0.80;
     } else {
       // 无键盘时：同时判断宽度和高度
-      return widthRatio < 0.85 || visualHeightRatio < 0.85;
+      return widthRatio < 0.80 || visualHeightRatio < 0.80;
     }
   } else {
     // 降级：浏览器不支持 visualViewport
-    return widthRatio < 0.85 || heightRatio < 0.85;
+    return widthRatio < 0.80 || heightRatio < 0.80;
   }
 }
 
@@ -1409,6 +1464,12 @@ export function clearSmallWindowDetector(): void {
   const buttonsScrollbarStyle = document.getElementById('quick-note-buttons-scrollbar-style');
   if (buttonsScrollbarStyle) {
     buttonsScrollbarStyle.remove();
+  }
+
+  // 清理残留的 placeholder 样式元素
+  const placeholderStyle = document.getElementById('quick-note-mobile-placeholder-style');
+  if (placeholderStyle) {
+    placeholderStyle.remove();
   }
 
   // 重置状态变量

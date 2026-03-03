@@ -2,15 +2,15 @@
 
 # ✨ 核心功能亮点
 
-## 📋 设置功能
+#### ⚙️ 设置功能
 
 - ➕ **自定义按钮**：在工具栏添加个性化快捷按钮
 - 📂 **自定义工具栏**：顶部/底部位置随心切换
 - 📱 **扩展工具栏**：手机端多层扩展，智能溢出检测，自动收纳多余按钮
 - ⚖️ **双端独立配置**：电脑端和手机端分别设置，互不干扰
-- 🎨 **精美图标选择**：本体图标、思源图标、阿里巴巴图标，三种共支持1000种以上
+- 🎨 **精美图标选择**：本体图标、思源图标、阿里巴巴图标，三类共1000种以上
 
-## 🔘 按钮功能（6种类型）
+#### 💡 按钮功能（6种类型）
 
 - ① **思源内置功能选择**：一键触发思源笔记原生功能，如设置、搜索、文件树等
 - ② **手写模板插入编辑器**：一键插入时间、日期等预设文本，支持变量替换
@@ -19,7 +19,7 @@
 - ⑤ **一键记事弹窗**：应用切回前台自动弹出，或点击按钮快速记录想法
 - ⑥ **鲸鱼定制工具箱**：高级定制功能，需激活码解锁
 
-## 🐋 鲸鱼定制工具箱（7项功能）
+#### 🐋 鲸鱼定制工具箱（7项功能）
 
 - ① **连续点击按钮**：按名称遍历并自动点击多个自定义按钮，支持配置间隔时间
 - ② **打开指定ID块**：快速打开指定文档或块
@@ -172,8 +172,14 @@
 | **输入框字体** | 调节字体大小（12-30px） |
 | **按钮排序** | 按顶部工具栏或底部工具栏顺序展示 |
 | **按钮高度** | 调节弹窗内按钮高度（24-66px） |
+| **初次配置导航提示** | 开启后弹窗内显示配置引导（仅手机端） |
 
 **智能关闭**：应用切到后台时，弹窗自动关闭，未保存内容不会丢失，下次打开时自动恢复。
+
+**📝 初次配置导航提示**：
+- 首次使用时，弹窗内会显示便利贴式的配置引导
+- 淡黄色背景，包含详细的配置步骤说明
+- 配置完成后，可在「4️⃣一键记事弹窗」设置中关闭此提示，恢复简洁界面
 
 #### 2. 按钮一键记事
 
@@ -195,28 +201,34 @@ A: 检查选择器是否正确，尝试使用 `text:xxx` 文本匹配
 **Q: 手机端工具栏遮挡输入框？**
 A: 调整「输入法偏移」数值
 
+**Q: 如何关闭一键记事弹窗内的配置引导？**
+A: 进入「4️⃣一键记事弹窗」设置，关闭「💡 初次配置导航提示」开关即可
+
+**Q: 配置引导提示如何重新显示？**
+A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配置导航提示」开关
+
 </details>
+
 ---
 
 # 📌 更新说明
 
-### v3.3.1 — Quick Note Dialog Trigger Logic Optimization
+### v3.3.1 — 一键记事弹窗触发逻辑优化版本
 
-#### 🔧 Core Optimization
+#### 🔧 核心优化
 
-- ✨ **Simplified Trigger Mechanism** - Popup on background switch, smart close on foreground
-- 🧹 **Removed Complex Detection Logic** - Eliminated frequent switching, long background, freeze recovery detection (~350 lines reduced)
-- 🎯 **Smart Dialog Management** - Automatically close empty dialogs in full-screen mode when returning to foreground, preserve dialogs with content
-- ⚡ **Maintained Stability** - Kept 3-second debounce mechanism for smooth user experience
+- ✨ **简化触发机制** - 切后台弹窗，切前台智能关闭
+- 🧹 **移除复杂检测逻辑** - 删除频繁切换、长后台、冻结恢复等检测
+- 🎯 **智能弹窗管理** - 全屏模式切前台时自动关闭空弹窗，保留有内容的弹窗
+- ⚡ **保持稳定性** - 保留 3 秒防抖机制，确保用户体验流畅
 
-#### 📊 Technical Improvements
+#### ✨ 新增功能
 
-| Item | Improvement |
-|------|-------------|
-| **Trigger Logic** | Changed from "foreground trigger" to "background trigger", more intuitive |
-| **Code Simplification** | Optimized from ~1800 to ~1450 lines (-19% code) |
-| **Detection Mechanism** | Simplified from 7 state detections to 1 trigger + 1 cleanup |
-| **Reliability** | Single trigger point avoids multi-detection race conditions |
+- 📝 **初次配置导航提示** - 手机端一键记事弹窗新增配置引导功能
+  - 便利贴式设计，淡黄色背景，醒目且友好
+  - 首次使用时显示详细的配置步骤说明
+  - 可在「4️⃣一键记事弹窗」设置中开启/关闭此提示
+  - 默认开启，配置完成后建议关闭以恢复简洁的输入界面
 
 ---
 
@@ -287,6 +299,8 @@ A: 调整「输入法偏移」数值
 1. 扫码缴费后，进群私聊作者获取激活码；相关权益也均在群聊中@作者实现。
 2. 后续随着《鲸鱼定制工具箱》功能持续增加、复杂度提升，是否推出新的优惠或调整获取规则，将视情况而定，如有变化，会提前在群内说明。
 3. 《鲸鱼定制工具箱》包含 7 项高级定制功能（连续点击按钮、打开指定ID块、数据库悬浮弹窗、日记底部、叶归LifeLog适配、弹窗框模板选择、滚动文档顶部或底部）。本插件的 95% 功能完全免费，付费功能仅用于支持作者持续开发。
+
+---
 
 <details>
   <summary style="font-size: 18px; font-weight: 600; padding: 6px 0; cursor: pointer;">
@@ -397,7 +411,7 @@ A: 调整「输入法偏移」数值
 
 ---
 
-### v3.1.1 — 鲸鱼定制工具箱增强版本
+### v3.1.0 — 鲸鱼定制工具箱增强版本
 
 > 🐋 **《鲸鱼定制工具箱》功能详解**：为满足用户个性化需求，我们新增了鲸鱼定制工具箱，包含高级定制功能
 

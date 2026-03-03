@@ -163,6 +163,7 @@ export default class ToolbarCustomizer extends Plugin {
     disableFileTree: true,      // 禁止右滑弹出文档树
     disableSettingMenu: true,   // 禁止左滑弹出设置菜单
     showAllNotifications: true, // 一键开启所有按钮右上角提示
+    showConfigGuide: true,       // 初次配置导航提示
     authorActivated: false,     // 鲸鱼定制工具箱是否已激活
     authorCode: '',             // 鲸鱼定制工具箱激活码
     popupConfig: 'bothModes' as const, // 弹窗配置：'disabled'|'smallWindowOnly'|'bothModes'

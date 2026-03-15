@@ -24,6 +24,7 @@ export interface MobileToolbarConfig {
   heightThreshold?: number
   overflowToolbarDistanceBottom?: string  // 扩展工具栏距离底部工具栏的距离
   overflowToolbarHeightBottom?: string    // 底部模式扩展工具栏高度
+  bottomToolbarRetryDelay?: number;      // 底部工具栏重试延迟（毫秒，0=无重试）
 
   // 共享样式配置
   toolbarHeight: string
@@ -38,6 +39,7 @@ export interface MobileToolbarConfig {
   topToolbarOffset?: string
   overflowToolbarDistanceTop?: string  // 扩展工具栏距离顶部工具栏的距离
   overflowToolbarHeightTop?: string     // 顶部模式扩展工具栏高度
+  topToolbarRetryDelay?: number;        // 顶部工具栏重试延迟（毫秒，0=无重试）
 }
 
 /**
@@ -52,7 +54,6 @@ export interface MobileFeatureConfig {
   disableMobileSwipe?: boolean
   authorCode?: string
   authorActivated?: boolean
-  showConfigGuide?: boolean       // 初次配置导航提示
   popupConfig?: 'disabled' | 'smallWindowOnly' | 'bothModes'
   quickNoteNotebookId?: string
   quickNoteDocumentId?: string  // 新增：一键记事目标文档ID
@@ -790,7 +791,8 @@ export function createMobileSettingLayout(
                 }
               })
             },
-            saveData: context.saveData
+            saveData: context.saveData,
+            mobileConfig: context.mobileConfig
           }
           const item = createMobileButtonItem(button, index, renderList, context.buttonConfigs, mobileButtonContext)
           listContainer.appendChild(item)
@@ -1628,6 +1630,39 @@ export function createMobileSettingLayout(
     }
   })
 
+  setting.addItem({
+    title: '④重试加载机制',
+    description: '💡防止加载失效，延迟后重试（0=无重试）',
+    createActionElement: () => {
+      // 解析当前值，提取数字部分
+      const currentValue = context.mobileConfig.topToolbarRetryDelay ?? 0;
+      
+      const slider = createCustomSliderWithoutLabel(
+        currentValue,
+        0,      // 最小值
+        5000,   // 最大值 5000ms
+        'ms',   // 单位
+        async (value) => {
+          context.mobileConfig.topToolbarRetryDelay = value;
+          await context.saveData('mobileToolbarConfig', context.mobileConfig);
+          // 重新初始化工具栏以应用新配置
+          context.updateMobileToolbar();
+        }
+      );
+      
+      // 为滑杆添加顶部工具栏设置类名
+      slider.classList.add('top-toolbar-setting');
+
+      // 根据顶部工具栏启用状态设置滑杆的禁用状态
+      if (!context.mobileConfig.enableTopToolbar) {
+        slider.style.opacity = '0.5';
+        slider.style.pointerEvents = 'none';
+      }
+
+      return slider;
+    }
+  })
+
   // === 底部工具栏专用配置（作为子分区） ===
   // 子分区标题项，使用思源原生的 config__item 结构
   setting.addItem({
@@ -1652,12 +1687,13 @@ export function createMobileSettingLayout(
       const slider = createCustomSliderWithoutLabel(
         currentValue,
         0,    // 最小值
-        20,   // 最大值，按要求设置为20px
+        20,   // 最大值，按要求设置为 20px
         'px',
         async (value) => {
           context.mobileConfig.closeInputOffset = value + 'px';
           await context.saveData('mobileToolbarConfig', context.mobileConfig);
-          context.applyMobileToolbarStyle();
+          // 重新初始化工具栏以应用新配置
+          context.updateMobileToolbar();
         }
       );
       
@@ -1686,12 +1722,13 @@ export function createMobileSettingLayout(
       const slider = createCustomSliderWithoutLabel(
         currentValue,
         0,    // 最小值
-        100,  // 最大值，按要求设置为100px
+        100,  // 最大值，按要求设置为 100px
         'px',
         async (value) => {
           context.mobileConfig.openInputOffset = value + 'px';
           await context.saveData('mobileToolbarConfig', context.mobileConfig);
-          context.applyMobileToolbarStyle();
+          // 重新初始化工具栏以应用新配置
+          context.updateMobileToolbar();
         }
       );
       
@@ -1743,36 +1780,36 @@ export function createMobileSettingLayout(
 
   setting.addItem({
     title: '④扩展工具栏距离底部工具栏',
-    description: '💡扩展工具栏第1层距离底部主工具栏的距离（仅在底部固定时有效）',
+    description: '💡扩展工具栏第 1 层距离底部主工具栏的距离（仅在底部固定时有效）',
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValueStr = context.mobileConfig.overflowToolbarDistanceBottom ?? '8px';
       const currentValue = parseInt(currentValueStr) || 8;
-      
+        
       const slider = createCustomSliderWithoutLabel(
         currentValue,
         0,    // 最小值
-        20,   // 最大值，按要求设置为20px
+        20,   // 最大值，按要求设置为 20px
         'px',
         async (value) => {
           context.mobileConfig.overflowToolbarDistanceBottom = value + 'px';
           await context.saveData('mobileToolbarConfig', context.mobileConfig);
         }
       );
-      
+        
       // 为滑杆添加底部工具栏设置类名，以便动态显示/隐藏功能正常工作
       slider.classList.add('bottom-toolbar-setting');
-
+  
       // 根据底部工具栏启用状态设置滑杆的禁用状态
       if (!context.mobileConfig.enableBottomToolbar) {
         slider.style.opacity = '0.5';
         slider.style.pointerEvents = 'none';
       }
-
+  
       return slider;
     }
   })
-
+  
   setting.addItem({
     title: '⑤扩展工具栏自身高度',
     description: '💡底部模式时扩展工具栏每一层的高度',
@@ -1805,11 +1842,44 @@ export function createMobileSettingLayout(
     }
   })
 
+  setting.addItem({
+    title: '⑥重试加载机制',
+    description: '💡防止加载失效，延迟后重试（0=无重试）',
+    createActionElement: () => {
+      // 解析当前值，提取数字部分
+      const currentValue = context.mobileConfig.bottomToolbarRetryDelay ?? 2000;
+        
+      const slider = createCustomSliderWithoutLabel(
+        currentValue,
+        0,      // 最小值
+        5000,   // 最大值 5000ms
+        'ms',   // 单位
+        async (value) => {
+          context.mobileConfig.bottomToolbarRetryDelay = value;
+          await context.saveData('mobileToolbarConfig', context.mobileConfig);
+          // 重新初始化工具栏以应用新配置
+          context.updateMobileToolbar();
+        }
+      );
+        
+      // 为滑杆添加底部工具栏设置类名
+      slider.classList.add('bottom-toolbar-setting');
+  
+      // 根据底部工具栏启用状态设置滑杆的禁用状态
+      if (!context.mobileConfig.enableBottomToolbar) {
+        slider.style.opacity = '0.5';
+        slider.style.pointerEvents = 'none';
+      }
+  
+      return slider;
+    }
+  })
+
 
   // === 一键记事弹窗 ===
   createGroupTitle('4️⃣ ','一键记事弹窗', 'quick-note-settings-section')
-
-  // 初次配置导航提示开关 + 说明文字（合并到一个容器）
+  
+  // 总引导说明
   setting.addItem({
     title: '',
     description: '',
@@ -1819,77 +1889,24 @@ export function createMobileSettingLayout(
         margin: 0 -16px;
         width: calc(100% + 32px);
       `;
-
+      
       const container = document.createElement('div');
       container.style.cssText = `
         padding: 16px;
         background: #ffebee;
         border: 1px solid #ffcdd2;
         border-radius: 8px;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      `;
-
-      // 顶部：开关区域
-      const toggleRow = document.createElement('div');
-      toggleRow.style.cssText = `
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-      `;
-
-      // 左侧标签
-      const labelContainer = document.createElement('div');
-      labelContainer.style.cssText = 'display: flex; align-items: center; gap: 8px;';
-
-      const label = document.createElement('span');
-      label.textContent = '💡 初次配置导航提示';
-      label.style.cssText = 'font-size: 15px; font-weight: 600; color: #c62828;';
-
-      const desc = document.createElement('div');
-      desc.textContent = '编辑框内引导';
-      desc.style.cssText = 'font-size: 12px; color: #d32f2f; margin-top: 2px;';
-
-      labelContainer.appendChild(label);
-      labelContainer.appendChild(desc);
-
-      // 右侧开关
-      const toggle = document.createElement('input');
-      toggle.type = 'checkbox';
-      toggle.className = 'b3-switch';
-      toggle.checked = context.mobileFeatureConfig.showConfigGuide ?? true;
-      toggle.style.cssText = 'transform: scale(1.2);';
-
-      toggle.onchange = async () => {
-        context.mobileFeatureConfig.showConfigGuide = toggle.checked;
-        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
-      };
-
-      toggleRow.appendChild(labelContainer);
-      toggleRow.appendChild(toggle);
-
-      // 底部：说明文字
-      const noticeText = document.createElement('div');
-      noticeText.textContent = '📝 请先选择触发方式，再配置笔记本或文档ID，选择插入位置，进行弹窗细化设置。';
-      noticeText.style.cssText = `
-        font-size: 15px;
-        font-weight: 600;
+        font-size: 14px;
         line-height: 1.6;
         color: #b71c1c;
-        padding-top: 8px;
-        border-top: 1px solid #ffcdd2;
       `;
-
-      container.appendChild(toggleRow);
-      container.appendChild(noticeText);
-
+      
+      container.textContent = '📝 请先选择触发方式，再配置笔记本或文档 ID，选择插入位置，进行弹窗细化设置。';
       wrapper.appendChild(container);
-
       return wrapper;
     }
   });
-
+  
   // ===触发：后台切前台 ===
   setting.addItem({
     title: '',
@@ -2864,6 +2881,7 @@ export function createMobileSettingLayout(
     description: '',
     createActionElement: () => {
       const container = document.createElement('div')
+      container.id = 'whale-toolbox-activation-mobile'
       container.style.cssText = `
         display: flex;
         flex-direction: column;
@@ -2948,18 +2966,23 @@ export function createMobileSettingLayout(
       // 根据激活状态决定是否显示输入框和验证按钮
       if (context.isAuthorToolActivated()) {
         inputRow.style.display = 'none'  // 激活后隐藏输入框和验证按钮
-        // 添加重新激活按钮到容器中
+        // 添加按钮容器
+        const btnContainer = document.createElement('div')
+        btnContainer.style.cssText = 'display: flex; gap: 8px; align-items: center;'
+
+        // 添加重新激活按钮
         const reActivateBtn = document.createElement('button')
         reActivateBtn.className = 'b3-button b3-button--info'
         reActivateBtn.textContent = '重新激活'
-        reActivateBtn.style.cssText = 'margin-left: 8px;'
         reActivateBtn.onclick = () => {
           // 显示输入框和验证按钮
           inputRow.style.display = 'flex'
-          // 隐藏重新激活按钮
-          reActivateBtn.style.display = 'none'
+          // 隐藏按钮容器
+          btnContainer.style.display = 'none'
         }
-        container.appendChild(reActivateBtn)
+        btnContainer.appendChild(reActivateBtn)
+
+        container.appendChild(btnContainer)
       }
       
       container.appendChild(inputRow)

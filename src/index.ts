@@ -163,7 +163,6 @@ export default class ToolbarCustomizer extends Plugin {
     disableFileTree: true,      // 禁止右滑弹出文档树
     disableSettingMenu: true,   // 禁止左滑弹出设置菜单
     showAllNotifications: true, // 一键开启所有按钮右上角提示
-    showConfigGuide: true,       // 初次配置导航提示
     authorActivated: false,     // 鲸鱼定制工具箱是否已激活
     authorCode: '',             // 鲸鱼定制工具箱激活码
     popupConfig: 'bothModes' as const, // 弹窗配置：'disabled'|'smallWindowOnly'|'bothModes'
@@ -235,7 +234,8 @@ export default class ToolbarCustomizer extends Plugin {
           ...btn,
           minWidth: btn.minWidth !== undefined ? btn.minWidth : 32,
           showNotification: btn.showNotification !== undefined ? btn.showNotification : true,
-          clickSequence: btn.clickSequence || []
+          clickSequence: btn.clickSequence || [],
+          diaryPosition: btn.diaryPosition || 'bottom'  // 确保日记位置属性被正确加载
         }))
       } else {
         // 配置不存在或格式错误，使用默认配置（首次加载时不保存，等用户修改时再保存）

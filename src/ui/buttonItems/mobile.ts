@@ -32,6 +32,13 @@ export interface MobileButtonContext {
   mobileButtonConfigs: ButtonConfig[]
   recalculateOverflow: () => void
   saveData: (key: string, value: any) => Promise<void>
+  mobileConfig: {
+    enableTopToolbar?: boolean
+    enableBottomToolbar?: boolean
+    topToolbarRetryDelay?: number
+    bottomToolbarRetryDelay?: number
+    [key: string]: any
+  }
 }
 
 /**
@@ -251,7 +258,7 @@ export function createMobileButtonItem(
     })
   }
 
-  const handleTouchEnd = (e: TouchEvent) => {
+  const handleTouchEnd = async (e: TouchEvent) => {
     // 清除长按定时器
     if (longPressTimer) {
       clearTimeout(longPressTimer)
@@ -315,6 +322,9 @@ export function createMobileButtonItem(
         sortedButtons.forEach((btn, idx) => {
           btn.sort = idx + 1
         })
+
+        // 保存配置到文件
+        await context.saveData('mobileButtonConfigs', sortedButtons)
 
         // 重新计算溢出层级
         context.recalculateOverflow()
@@ -548,11 +558,47 @@ export function createMobileButtonItem(
       typeOptions.push(
         { value: 'author-tool', label: '⑥鲸鱼定制工具箱' }
       )
+    } else {
+      typeOptions.push(
+        { value: 'author-tool', label: '⑥鲸鱼定制工具箱（跳转激活）' }
+      )
     }
     const typeField = createSelectField('选择功能', button.type, typeOptions, (v) => {
+      // 如果选择的是鲸鱼定制工具箱但未激活，跳转到激活区域
+      if (v === 'author-tool' && !context.isAuthorToolActivated()) {
+        // 恢复之前的选择
+        const selectElement = typeField.querySelector('select') as HTMLSelectElement
+        if (selectElement) {
+          selectElement.value = button.type || 'builtin'
+        }
+        // 跳转到激活区域
+        setTimeout(() => {
+          const activationElement = document.getElementById('whale-toolbox-activation-mobile')
+          if (activationElement) {
+            activationElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          } else {
+            console.warn('[Mobile Debug] whale-toolbox-activation-mobile not found!')
+          }
+        }, 100)
+        return
+      }
       button.type = v as any
       updateTypeFields()
     })
+
+    // 给未激活的鲸鱼定制工具箱选项添加特殊样式
+    if (!context.isAuthorToolActivated()) {
+      const selectElement = typeField.querySelector('select') as HTMLSelectElement
+      if (selectElement) {
+        const options = selectElement.querySelectorAll('option')
+        options.forEach(option => {
+          if (option.value === 'author-tool') {
+            option.style.cssText = 'background-color: rgba(139, 92, 246, 0.15); color: #8b5cf6; font-style: italic;'
+          }
+        })
+      }
+    }
+
     editForm.appendChild(typeField)
   }
 
@@ -776,19 +822,20 @@ export function createMobileButtonItem(
 
       const subtypeSelect = document.createElement('select')
       subtypeSelect.className = 'b3-text-field'
+      subtypeSelect.id = `subtype-select-${button.id}` // 添加唯一ID
       subtypeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
       const currentSubtype = button.authorToolSubtype || 'button-sequence'
       subtypeSelect.innerHTML = `
         <option value="button-sequence" ${currentSubtype === 'button-sequence' ? 'selected' : ''}>① 连续点击自定义按钮</option>
         <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>② 打开指定ID块</option>
         <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>③ 数据库悬浮弹窗</option>
-        <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>④ 日记底部</option>
+        <option value="diary" ${currentSubtype === 'diary' || currentSubtype === 'diary-top' || currentSubtype === 'diary-bottom' ? 'selected' : ''}>④ 日记顶部或底部</option>
         <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>⑤ 叶归LifeLog适配</option>
         <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
         <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
       `
       subtypeSelect.onchange = () => {
-        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc'
+        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc'
         ;(subtypeSelect as any).refreshForm?.()
       }
       authorToolContainer.appendChild(subtypeSelect)
@@ -847,8 +894,55 @@ export function createMobileButtonItem(
         <option value="cards" ${currentDisplayMode === 'cards' ? 'selected' : ''}>卡片模式</option>
         <option value="table" ${currentDisplayMode === 'table' ? 'selected' : ''}>表格模式</option>
       `
-      displayModeSelect.onchange = () => { button.dbDisplayMode = displayModeSelect.value as 'cards' | 'table' }
+      displayModeSelect.onchange = () => {
+        button.dbDisplayMode = displayModeSelect.value as 'cards' | 'table'
+        // 切换卡片模式配置显示
+        const cardConfigDiv = document.getElementById(`card-mode-config-${button.id}`)
+        if (cardConfigDiv) {
+          cardConfigDiv.style.display = displayModeSelect.value === 'cards' ? 'flex' : 'none'
+        }
+      }
       dbConfigDiv.appendChild(displayModeSelect)
+
+      // 卡片模式配置（仅卡片模式显示）
+      const cardConfigDivMobile = document.createElement('div')
+      cardConfigDivMobile.id = `card-mode-config-${button.id}`
+      cardConfigDivMobile.style.cssText = 'display: flex; flex-direction: column; gap: 8px; margin-top: 8px;'
+      if (currentDisplayMode !== 'cards') {
+        cardConfigDivMobile.style.display = 'none'
+      }
+
+      // 容器高度
+      const containerHeightLabel = document.createElement('label')
+      containerHeightLabel.textContent = '容器高度（卡片模式）'
+      containerHeightLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      cardConfigDivMobile.appendChild(containerHeightLabel)
+
+      const containerHeightInput = document.createElement('input')
+      containerHeightInput.type = 'text'
+      containerHeightInput.className = 'b3-text-field'
+      containerHeightInput.placeholder = '如: 700px（留空自动适应）'
+      containerHeightInput.value = button.cardContainerHeight || ''
+      containerHeightInput.style.cssText = 'font-size: 13px;'
+      containerHeightInput.onchange = () => { button.cardContainerHeight = containerHeightInput.value }
+      cardConfigDivMobile.appendChild(containerHeightInput)
+
+      // 可滚动容器最大高度
+      const scrollMaxHeightLabel = document.createElement('label')
+      scrollMaxHeightLabel.textContent = '可滚动容器最大高度（卡片模式）'
+      scrollMaxHeightLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
+      cardConfigDivMobile.appendChild(scrollMaxHeightLabel)
+
+      const scrollMaxHeightInput = document.createElement('input')
+      scrollMaxHeightInput.type = 'text'
+      scrollMaxHeightInput.className = 'b3-text-field'
+      scrollMaxHeightInput.placeholder = '如: 700px'
+      scrollMaxHeightInput.value = button.cardScrollMaxHeight || '700px'
+      scrollMaxHeightInput.style.cssText = 'font-size: 13px;'
+      scrollMaxHeightInput.onchange = () => { button.cardScrollMaxHeight = scrollMaxHeightInput.value }
+      cardConfigDivMobile.appendChild(scrollMaxHeightInput)
+
+      dbConfigDiv.appendChild(cardConfigDivMobile)
 
       // 要显示的列名
       dbConfigDiv.appendChild(createInputField('显示列名（逗号分隔）', (button.showColumns || []).join(','), 'DO,预计分钟,时间段', (v) => {
@@ -1160,7 +1254,7 @@ export function createMobileButtonItem(
       scrollDocConfigDiv.appendChild(radioContainer)
       authorToolContainer.appendChild(scrollDocConfigDiv)
 
-      // 日记底部配置区（说明 + 笔记本ID + 等待时间配置）
+      // 日记顶部或底部配置区（说明 + 位置选择 + 笔记本ID + 等待时间配置）
       const diaryConfigDiv = document.createElement('div')
       diaryConfigDiv.id = 'diary-config-mobile'
       diaryConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 15px; background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(59, 130, 246, 0.1)); border-radius: 8px; border: 1px solid rgba(34, 197, 94, 0.3);'
@@ -1172,8 +1266,82 @@ export function createMobileButtonItem(
 
       const diaryDesc = document.createElement('div')
       diaryDesc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.6;'
-      diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 或 API 打开日记<br>2. 自动滚动到文档底部<br>💡 配置笔记本ID后将直接使用API，无需弹窗选择'
+      diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 或 API 打开日记<br>2. 根据下方设置决定跳转位置<br>💡 配置笔记本ID后将直接使用API，无需弹窗选择'
       diaryConfigDiv.appendChild(diaryDesc)
+
+      // 位置选择配置
+      const diaryPositionContainerMobile = document.createElement('div')
+      diaryPositionContainerMobile.style.cssText = 'display: flex; flex-direction: column; gap: 10px; margin-top: 12px; padding: 12px; background: rgba(66, 133, 244, 0.08); border-radius: 6px; border: 1px solid rgba(66, 133, 244, 0.2);'
+
+      const diaryPositionLabelMobile = document.createElement('label')
+      diaryPositionLabelMobile.textContent = '📍 打开后位置'
+      diaryPositionLabelMobile.style.cssText = 'font-size: 14px; color: var(--b3-theme-primary); font-weight: 600; display: flex; align-items: center; gap: 6px;'
+      diaryPositionContainerMobile.appendChild(diaryPositionLabelMobile)
+
+      const diaryPositionOptionsMobile = document.createElement('div')
+      diaryPositionOptionsMobile.style.cssText = 'display: flex; flex-direction: column; gap: 12px;'
+
+      const currentPositionMobile = button.diaryPosition || 'top'
+
+      // 顶部选项
+      const diaryTopRadioContainerMobile = document.createElement('label')
+      diaryTopRadioContainerMobile.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; font-weight: 500; padding: 8px 12px; border-radius: 6px; transition: background 0.2s;'
+      diaryTopRadioContainerMobile.addEventListener('mouseenter', () => { diaryTopRadioContainerMobile.style.background = 'rgba(66, 133, 244, 0.08)' })
+      diaryTopRadioContainerMobile.addEventListener('mouseleave', () => { diaryTopRadioContainerMobile.style.background = 'transparent' })
+      const diaryTopRadioMobile = document.createElement('input')
+      diaryTopRadioMobile.type = 'radio'
+      diaryTopRadioMobile.name = 'diary-position-mobile'
+      diaryTopRadioMobile.value = 'top'
+      diaryTopRadioMobile.checked = currentPositionMobile === 'top'
+      diaryTopRadioMobile.style.cssText = 'cursor: pointer; width: 18px; height: 18px; accent-color: var(--b3-theme-primary);'
+      // 同时监听 click 和 change 事件，确保值被保存
+      diaryTopRadioMobile.addEventListener('click', async () => {
+        button.diaryPosition = 'top'
+        await context.saveData('mobileButtonConfigs', context.buttonConfigs)
+      })
+      diaryTopRadioMobile.addEventListener('change', async () => {
+        if (diaryTopRadioMobile.checked) {
+          button.diaryPosition = 'top'
+          await context.saveData('mobileButtonConfigs', context.buttonConfigs)
+        }
+      })
+      diaryTopRadioContainerMobile.appendChild(diaryTopRadioMobile)
+      diaryTopRadioContainerMobile.appendChild(document.createTextNode('⬆️ 日记顶部'))
+      diaryPositionOptionsMobile.appendChild(diaryTopRadioContainerMobile)
+
+      // 底部选项
+      const diaryBottomRadioContainerMobile = document.createElement('label')
+      diaryBottomRadioContainerMobile.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; font-weight: 500; padding: 8px 12px; border-radius: 6px; transition: background 0.2s;'
+      diaryBottomRadioContainerMobile.addEventListener('mouseenter', () => { diaryBottomRadioContainerMobile.style.background = 'rgba(66, 133, 244, 0.08)' })
+      diaryBottomRadioContainerMobile.addEventListener('mouseleave', () => { diaryBottomRadioContainerMobile.style.background = 'transparent' })
+      const diaryBottomRadioMobile = document.createElement('input')
+      diaryBottomRadioMobile.type = 'radio'
+      diaryBottomRadioMobile.name = 'diary-position-mobile'
+      diaryBottomRadioMobile.value = 'bottom'
+      diaryBottomRadioMobile.checked = currentPositionMobile === 'bottom'
+      diaryBottomRadioMobile.style.cssText = 'cursor: pointer; width: 18px; height: 18px; accent-color: var(--b3-theme-primary);'
+      // 同时监听 click 和 change 事件，确保值被保存
+      diaryBottomRadioMobile.addEventListener('click', async () => {
+        button.diaryPosition = 'bottom'
+        await context.saveData('mobileButtonConfigs', context.buttonConfigs)
+      })
+      diaryBottomRadioMobile.addEventListener('change', async () => {
+        if (diaryBottomRadioMobile.checked) {
+          button.diaryPosition = 'bottom'
+          await context.saveData('mobileButtonConfigs', context.buttonConfigs)
+        }
+      })
+      diaryBottomRadioContainerMobile.appendChild(diaryBottomRadioMobile)
+      diaryBottomRadioContainerMobile.appendChild(document.createTextNode('⬇️ 日记底部'))
+      diaryPositionOptionsMobile.appendChild(diaryBottomRadioContainerMobile)
+
+      diaryPositionContainerMobile.appendChild(diaryPositionOptionsMobile)
+
+      // 保存单选按钮引用，用于刷新状态
+      ;(diaryPositionOptionsMobile as any).diaryTopRadio = diaryTopRadioMobile
+      ;(diaryPositionOptionsMobile as any).diaryBottomRadio = diaryBottomRadioMobile
+
+      diaryConfigDiv.appendChild(diaryPositionContainerMobile)
 
       // 笔记本ID配置
       const diaryNotebookIdContainerMobile = document.createElement('div')
@@ -1242,7 +1410,7 @@ export function createMobileButtonItem(
           popupSelectConfigDiv.style.display = 'none'
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'none'
-        } else if (subtype === 'diary-bottom') {
+        } else if (subtype === 'diary' || subtype === 'diary-top' || subtype === 'diary-bottom') {
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
           diaryConfigDiv.style.display = 'flex'
@@ -1250,6 +1418,19 @@ export function createMobileButtonItem(
           popupSelectConfigDiv.style.display = 'none'
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'none'
+          // 更新日记位置单选按钮状态
+          const position = button.diaryPosition || 'top'
+          if ((diaryPositionOptionsMobile as any).diaryTopRadio && (diaryPositionOptionsMobile as any).diaryBottomRadio) {
+            // 使用 requestAnimationFrame 确保 DOM 更新
+            requestAnimationFrame(() => {
+              ;(diaryPositionOptionsMobile as any).diaryTopRadio.checked = (position === 'top')
+              ;(diaryPositionOptionsMobile as any).diaryBottomRadio.checked = (position === 'bottom')
+
+              // 强制触发重排
+              void (diaryPositionOptionsMobile as any).diaryTopRadio.offsetWidth
+              void (diaryPositionOptionsMobile as any).diaryBottomRadio.offsetWidth
+            })
+          }
         } else if (subtype === 'life-log') {
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
@@ -1457,6 +1638,18 @@ export function createMobileButtonItem(
     isExpanded = !isExpanded
     editForm.style.display = isExpanded ? 'flex' : 'none'
     expandIcon.style.transform = isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
+
+    // 当展开编辑区域时，调用 refreshForm 刷新配置区状态
+    if (isExpanded) {
+      // 查找 subtypeSelect 元素（使用唯一ID）
+      const subtypeSelect = editForm.querySelector(`#subtype-select-${button.id}`) as HTMLSelectElement
+      if (subtypeSelect && (subtypeSelect as any).refreshForm) {
+        // 使用 requestAnimationFrame 确保 DOM 渲染完成后再刷新
+        requestAnimationFrame(() => {
+          (subtypeSelect as any).refreshForm()
+        })
+      }
+    }
   }
 
   item.appendChild(header)

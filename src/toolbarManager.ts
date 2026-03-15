@@ -26,6 +26,7 @@ export interface MobileToolbarConfig {
   heightThreshold: number;    // 高度变化阈值百分比
   overflowToolbarDistanceBottom?: string;  // 扩展工具栏距离底部工具栏的距离
   overflowToolbarHeightBottom?: string;  // 底部模式扩展工具栏高度
+  bottomToolbarRetryDelay?: number;      // 底部工具栏重试延迟（毫秒，0=无重试）
 
   // 共享样式配置（顶部和底部工具栏都使用）
   toolbarBackgroundColor: string; // 工具栏背景颜色（明亮模式）
@@ -41,6 +42,7 @@ export interface MobileToolbarConfig {
   topToolbarPaddingLeft: string; // 顶部工具栏左边距
   overflowToolbarDistanceTop?: string  // 扩展工具栏距离顶部工具栏的距离（如 "8px"）
   overflowToolbarHeightTop?: string     // 顶部模式扩展工具栏高度（如 "40px"）
+  topToolbarRetryDelay?: number;        // 顶部工具栏重试延迟（毫秒，0=无重试）
 }
 
 export interface ButtonConfig {
@@ -56,7 +58,7 @@ export interface ButtonConfig {
   targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
   mobileTargetDocId?: string; // 打开指定ID块：目标块ID（移动端），支持文档ID或块ID
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
-  authorToolSubtype?: 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary-bottom=日记底部, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮, scroll-doc=滚动文档顶部或底部
+  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary=日记, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮, scroll-doc=滚动文档顶部或底部
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
   viewName?: string;         // 视图名称
@@ -67,6 +69,7 @@ export interface ButtonConfig {
   dbDisplayMode?: 'cards' | 'table'; // 显示模式：cards=卡片, table=表格
   showColumns?: string[];    // 要显示的列名数组
   timeRangeColumnName?: string; // 时间段列的名称
+  diaryPosition?: 'top' | 'bottom'; // 日记功能：打开后位置（top=顶部不滚动，bottom=底部自动滚动）
   diaryWaitTime?: number;     // 日记底部功能：移动端等待时间（毫秒，默认 1000）
   diaryNotebookId?: string;   // 日记底部功能：指定笔记本ID（留空则使用Alt+5快捷键）
   lifeLogCategories?: string[]; // 叶归LifeLog适配：分类选项列表
@@ -393,6 +396,7 @@ let activeTimers: Set<ReturnType<typeof setTimeout> | ReturnType<typeof setInter
 let focusEventHandlers: Array<{ element: HTMLElement; focusHandler: () => void; blurHandler: () => void }> = []  // 跟踪焦点事件监听器以便清理
 let isSettingUpToolbar = false  // 防止 MutationObserver 递归调用的标志
 let currentButtonConfigs: ButtonConfig[] = []  // 保存当前按钮配置，用于重试机制
+const toolbarCheckTimers = new Map<Element, ReturnType<typeof setTimeout>>()  // 跟踪每个工具栏的检测定时器
 
 // 导出工具栏管理器对象
 export const toolbarManager = {
@@ -792,26 +796,26 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
       (toolbar as HTMLElement).dataset.toolbarCustomized = 'true'
 
       // 初始设置
-      let lastKnownHeight = window.innerHeight
+      let baseHeight = window.innerHeight  // 基准高度（输入法关闭时的高度）
       let inputMethodOpen = false
 
-      // 创建CSS变量
+      // 创建 CSS 变量
       document.documentElement.style.setProperty('--mobile-toolbar-offset', config.closeInputOffset)
-
+      
       // 更新工具栏位置
       function updateToolbarPosition() {
         const currentHeight = window.innerHeight
-
-        // 计算高度变化百分比
-        const heightRatio = currentHeight / lastKnownHeight
-
-        // 如果当前高度比上次记录的高度小阈值以上，认为输入法打开了
+      
+        // 计算高度变化百分比（相对于基准高度）
+        const heightRatio = currentHeight / baseHeight
+      
+        // 如果当前高度比基准高度小阈值以上，认为输入法打开了
         const threshold = config.heightThreshold / 100
-        const isNowOpen = heightRatio < threshold
-
+        const isNowOpen = heightRatio <= threshold
+      
         if (isNowOpen !== inputMethodOpen) {
           inputMethodOpen = isNowOpen
-
+      
           if (inputMethodOpen) {
             // 输入法打开时
             document.documentElement.style.setProperty('--mobile-toolbar-offset', config.openInputOffset)
@@ -820,18 +824,31 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
             // 输入法关闭时
             document.documentElement.style.setProperty('--mobile-toolbar-offset', config.closeInputOffset)
             toolbar.setAttribute('data-input-method', 'close')
+            // 重置基准高度为当前高度（因为现在输入法已关闭）
+            baseHeight = currentHeight
           }
         }
-
-        // 更新记录的高度
-        lastKnownHeight = currentHeight
       }
-
-      // 初始调用一次
-      updateToolbarPosition()
-
-      // 设置初始属性
-      toolbar.setAttribute('data-input-method', 'close')
+      
+      // 持续检测函数（使用定时器而不是依赖 resize 事件）
+      function startContinuousCheck() {
+        const check = () => {
+          updateToolbarPosition()
+          // 每 200ms 检查一次
+          toolbarCheckTimers.set(toolbar, safeSetTimeout(check, 200))
+        }
+        
+        check()
+      }
+      
+      // 延迟初始化，让 DOM 先渲染完成
+      safeSetTimeout(() => {
+        updateToolbarPosition()
+        // 设置初始属性（根据实际状态）
+        toolbar.setAttribute('data-input-method', inputMethodOpen ? 'open' : 'close')
+        // 开始持续检测
+        startContinuousCheck()
+      }, 100)
 
       // 监听窗口大小变化
       resizeHandler = updateToolbarPosition
@@ -871,7 +888,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
             .protyle-breadcrumb__bar[data-input-method],
             .protyle-breadcrumb[data-input-method] {
               position: fixed !important;
-              bottom: calc(var(--mobile-toolbar-offset, 0px) + env(safe-area-inset-bottom)) !important;
+              bottom: calc(var(--mobile-toolbar-offset) + env(safe-area-inset-bottom)) !important;
               top: auto !important;
               left: 0 !important;
               right: 0 !important;
@@ -897,12 +914,12 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
 
             .protyle-breadcrumb__bar[data-input-method="open"],
             .protyle-breadcrumb[data-input-method="open"] {
-              bottom: calc(var(--mobile-toolbar-offset, 50px) + env(safe-area-inset-bottom)) !important;
+              bottom: calc(var(--mobile-toolbar-offset) + env(safe-area-inset-bottom)) !important;
             }
 
             .protyle-breadcrumb__bar[data-input-method="close"],
             .protyle-breadcrumb[data-input-method="close"] {
-              bottom: calc(var(--mobile-toolbar-offset, 0px) + env(safe-area-inset-bottom)) !important;
+              bottom: calc(var(--mobile-toolbar-offset) + env(safe-area-inset-bottom)) !important;
             }
 
             /* 防止编辑器内容被遮挡 - 仅在启用底部工具栏且工具栏显示时应用 */
@@ -922,10 +939,13 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
 
     // 尝试设置工具栏
     if (!setupToolbar()) {
-      // 如果没找到，延迟尝试
-      safeSetTimeout(() => {
-        setupToolbar()
-      }, 2000)
+      // 如果没找到，根据配置延迟尝试
+      const retryDelay = config.bottomToolbarRetryDelay ?? 2000;  // 默认 2000ms
+      if (retryDelay > 0) {
+        safeSetTimeout(() => {
+          setupToolbar()
+        }, retryDelay)
+      }
     }
 
     // 应用背景颜色
@@ -956,15 +976,15 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
         observerTimer = null
       }, 100)
     }
-
-    // 监听DOM变化
+    
+    // 监听 DOM 变化（缩小监听范围，只监听直接子元素变化）
     const toolbarContainer = document.querySelector('.layout__center') ||
                             document.querySelector('.fn__flex-1.fn__flex-column') ||
                             document.body
     mutationObserver = new MutationObserver(handleMutation)
     mutationObserver.observe(toolbarContainer, {
-      childList: true,
-      subtree: true
+      childList: true,  // 只监听直接子元素
+      subtree: false    // 不监听后代节点，提升性能
     })
 
     // 页面加载完成后检查一次
@@ -1129,6 +1149,17 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
 
     // ===== 应用顶部工具栏背景颜色 =====
     applyToolbarBackgroundColor(config, disableCustomButtons)
+    
+    // ===== 添加重试加载机制（防止加载失效）=====
+    const retryDelay = config.topToolbarRetryDelay ?? 0;  // 默认 0ms（无重试）
+    if (retryDelay > 0) {
+      safeSetTimeout(() => {
+        // 重新检查并设置顶部工具栏
+        if (config.enableTopToolbar) {
+          applyToolbarBackgroundColor(config, disableCustomButtons)
+        }
+      }, retryDelay)
+    }
   }
 }
 
@@ -1437,8 +1468,8 @@ function startToolbarObserver(configs: ButtonConfig[]) {
   // 开始观察编辑器容器的 DOM 变化（缩小监听范围，避免监听整个文档）
   const editorContainer = document.querySelector('.layout__center') || document.body
   toolbarObserver.observe(editorContainer, {
-    childList: true,
-    subtree: true
+    childList: true,  // 只监听直接子元素
+    subtree: false    // 不监听后代节点，提升性能
   })
 
   // 同时启动定时重试机制（作为后备方案，最多重试 10 次）
@@ -3124,9 +3155,9 @@ function waitForElement(selector: string, timeout: number = 5000): Promise<HTMLE
     })
 
     observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true
+      childList: true,   // 只监听直接子元素
+      subtree: false,    // 不监听后代节点
+      attributes: false  // 不监听属性变化，除非必要
     })
 
     // 超时处理 - 使用 tracked timeout
@@ -3245,59 +3276,137 @@ function clickElement(element: HTMLElement): void {
 }
 
 /**
- * 执行日记底部功能
- * 打开日记后跳转到文档底部
+ * 执行日记功能
+ * 根据 diaryPosition 参数决定打开日记后滚动到顶部还是底部
  * 如果配置了 notebookId，直接调用API创建/打开日记
  * 否则使用 Alt+5 快捷键模拟（电脑端和手机端）
  */
-async function executeDiaryBottom(config: ButtonConfig) {
+async function executeDiary(config: ButtonConfig) {
   try {
     const windowObj = window as any
+    const position = config.diaryPosition || 'bottom' // 默认为底部
 
     // 检测是否为手机端
     const isMobile = /mobile|android|iphone|ipad/i.test(navigator.userAgent) ||
                      windowObj.siyuan?.config?.fronted === 'mobile' ||
                      document.body.classList.contains('mobile')
 
-    // ==================== 滚动到底部函数（电脑端和手机端共用） ====================
+    // ==================== 滚动到底部函数（仅在 position === 'bottom' 时使用） ====================
     let scrollAttempts = 0
-    const maxScrollAttempts = 5
-    const retryDelay = 200
+    const maxScrollAttempts = 2  // 减少重试次数：5次 -> 2次
+    const retryDelay = 150  // 减少重试间隔：200ms -> 150ms
+
+    // DOM 缓存：避免重复查询
+    let cachedProtyles: NodeListOf<HTMLElement> | null = null
 
     function startScrolling() {
-      scrollAttempts = 0
-      scrollToBottom()
+      if (position === 'bottom') {
+        scrollAttempts = 0
+        cachedProtyles = null // 重置缓存
+        scrollToBottom()
+      } else if (position === 'top' && !isMobile) {
+        // 电脑端顶部模式：滚动到顶部
+        scrollAttempts = 0
+        cachedProtyles = null // 重置缓存
+        scrollToTop()
+      }
     }
 
     function scrollToBottom() {
       scrollAttempts++
 
-      // 查找所有 .protyle 元素
-      const allProtyles = document.querySelectorAll('.protyle') as NodeListOf<HTMLElement>
+      // 使用缓存或查询 DOM
+      const allProtyles = cachedProtyles || document.querySelectorAll('.protyle') as NodeListOf<HTMLElement>
+
+      // 首次查询时缓存结果
+      if (!cachedProtyles) {
+        cachedProtyles = allProtyles
+      }
+
+      // 如果找不到任何 protyle 元素，说明文档还未加载，需要重试
+      if (allProtyles.length === 0) {
+        if (scrollAttempts < maxScrollAttempts) {
+          safeSetTimeout(scrollToBottom, retryDelay)
+          return
+        }
+      }
+
       let scrolled = false
+      let hasScrollableContent = false
 
       allProtyles.forEach((protyle) => {
         // 尝试滚动 .protyle-content 元素
         const content = protyle.querySelector('.protyle-content') as HTMLElement
-        if (content && content.scrollHeight > content.clientHeight) {
-          content.scrollTop = content.scrollHeight
+        if (content) {
+          if (content.scrollHeight > content.clientHeight) {
+            // 有可滚动的内容，执行滚动
+            content.scrollTop = content.scrollHeight
+            scrolled = true
+          }
+          hasScrollableContent = true
+        }
+      })
+
+      // 显示通知（只显示一次）
+      if (config.showNotification !== false && scrollAttempts === 1) {
+        if (scrolled) {
+          Notify.showInfoDiaryOpenedAndScrolled()
+        } else if (hasScrollableContent || allProtyles.length > 0) {
+          // 找到了 protyle 但没有滚动（文档内容较少），也视为成功
+          Notify.showInfoDiaryOpened()
+        }
+      }
+
+      // 如果没有找到任何 protyle，继续重试
+      if (!hasScrollableContent && scrollAttempts < maxScrollAttempts) {
+        safeSetTimeout(scrollToBottom, retryDelay)
+      }
+    }
+
+    // ==================== 滚动到顶部函数（仅电脑端 position === 'top' 时使用） ====================
+    function scrollToTop() {
+      scrollAttempts++
+
+      // 使用缓存或查询 DOM
+      const allProtyles = cachedProtyles || document.querySelectorAll('.protyle') as NodeListOf<HTMLElement>
+
+      // 首次查询时缓存结果
+      if (!cachedProtyles) {
+        cachedProtyles = allProtyles
+      }
+
+      // 如果找不到任何 protyle 元素，说明文档还未加载，需要重试
+      if (allProtyles.length === 0) {
+        if (scrollAttempts < maxScrollAttempts) {
+          safeSetTimeout(scrollToTop, retryDelay)
+          return
+        }
+      }
+
+      let scrolled = false
+
+      allProtyles.forEach((protyle) => {
+        // 尝试滚动 .protyle-content 元素到顶部
+        const content = protyle.querySelector('.protyle-content') as HTMLElement
+        if (content) {
+          content.scrollTop = 0
           scrolled = true
         }
       })
 
-      if (scrolled) {
-        if (config.showNotification !== false) {
-          Notify.showInfoDiaryOpenedAndScrolled()
-        }
-        return
-      }
-
-      if (scrollAttempts < maxScrollAttempts) {
-        safeSetTimeout(scrollToBottom, retryDelay)
-      } else {
-        if (config.showNotification !== false) {
+      // 显示通知（只显示一次）
+      if (config.showNotification !== false && scrollAttempts === 1) {
+        if (scrolled) {
+          Notify.showInfoDiaryOpened()
+        } else if (allProtyles.length > 0) {
+          // 找到了 protyle，也视为成功
           Notify.showInfoDiaryOpened()
         }
+      }
+
+      // 如果没有找到任何 protyle，继续重试
+      if (!scrolled && allProtyles.length === 0 && scrollAttempts < maxScrollAttempts) {
+        safeSetTimeout(scrollToTop, retryDelay)
       }
     }
 
@@ -3327,19 +3436,30 @@ async function executeDiaryBottom(config: ButtonConfig) {
               })
             }
           } catch (openError) {
-            console.warn('[日记底部] 打开文档失败:', openError)
+            console.warn('[日记功能] 打开文档失败:', openError)
           }
 
-          // 等待文档加载后滚动到底部
-          const waitTime = isMobile ? (config.diaryWaitTime || 1000) : 800
-          safeSetTimeout(startScrolling, waitTime)
+          // 根据位置模式，等待文档加载后滚动
+          if (position === 'bottom') {
+            // 底部模式：滚动到底部
+            const waitTime = isMobile ? (config.diaryWaitTime || 1000) : 800
+            safeSetTimeout(startScrolling, waitTime)
+          } else if (position === 'top' && !isMobile) {
+            // 顶部模式（仅电脑端）：滚动到顶部
+            safeSetTimeout(startScrolling, 800)
+          } else {
+            // 其他情况（移动端顶部模式等），显示成功通知
+            if (config.showNotification !== false) {
+              Notify.showInfoDiaryOpened()
+            }
+          }
           return
         } else {
-          console.warn('[日记底部] API调用失败:', response.msg)
+          console.warn('[日记功能] API调用失败:', response.msg)
           // API失败，回退到快捷键方式
         }
       } catch (apiError) {
-        console.warn('[日记底部] API调用异常:', apiError)
+        console.warn('[日记功能] API调用异常:', apiError)
         // API异常，回退到快捷键方式
       }
     }
@@ -3361,8 +3481,19 @@ async function executeDiaryBottom(config: ButtonConfig) {
         window.dispatchEvent(new KeyboardEvent('keydown', keyEvent))
       }
 
-      // 2. 等待文档加载后滚动到底部（800ms 延迟）
-      safeSetTimeout(startScrolling, 800)
+      // 2. 根据位置模式，等待文档加载后滚动
+      if (position === 'bottom') {
+        // 底部模式：滚动到底部
+        safeSetTimeout(startScrolling, 800)
+      } else if (position === 'top') {
+        // 顶部模式（仅电脑端）：滚动到顶部
+        safeSetTimeout(startScrolling, 800)
+      } else {
+        // 其他情况，显示成功通知
+        if (config.showNotification !== false) {
+          Notify.showInfoDiaryOpened()
+        }
+      }
       return
     }
 
@@ -3373,12 +3504,12 @@ async function executeDiaryBottom(config: ButtonConfig) {
       window.dispatchEvent(new KeyboardEvent('keydown', keyEvent))
     }
 
-    // 2. 等待对话框出现并自动确认（每步延迟500ms）
-    let dialogCheckAttempts = 0
-    const maxDialogChecks = 15
+    // 2. 使用 MutationObserver 等待对话框出现并自动确认（比轮询更高效）
+    let dialogFound = false
+    let dialogTimeout: ReturnType<typeof setTimeout> | null = null
 
-    const checkAndConfirmDialog = () => {
-      dialogCheckAttempts++
+    const confirmDialog = () => {
+      if (dialogFound) return
 
       // 查找日记笔记本选择对话框
       const dialogs = document.querySelectorAll('.b3-dialog__container')
@@ -3391,29 +3522,68 @@ async function executeDiaryBottom(config: ButtonConfig) {
         if (select && header && confirmBtn) {
           const headerText = header.textContent || ''
           if (headerText.includes('选择') || headerText.includes('请先')) {
+            dialogFound = true
+
+            // 清除超时定时器
+            if (dialogTimeout) {
+              clearTimeout(dialogTimeout)
+              dialogTimeout = null
+            }
+
             // 直接点击确定按钮
             (confirmBtn as HTMLElement).click()
-            // 对话框确认后，使用配置的等待时间后再滚动
-            const waitTime = config.diaryWaitTime || 1000
-            safeSetTimeout(startScrolling, waitTime)
+
+            // 根据位置模式决定后续操作
+            if (position === 'bottom') {
+              // 对话框确认后，使用配置的等待时间后再滚动
+              const waitTime = config.diaryWaitTime || 1000
+              safeSetTimeout(startScrolling, waitTime)
+            } else {
+              // 顶部模式，显示成功通知
+              if (config.showNotification !== false) {
+                Notify.showInfoDiaryOpened()
+              }
+            }
             return
           }
         }
       }
-
-      if (dialogCheckAttempts < maxDialogChecks) {
-        safeSetTimeout(checkAndConfirmDialog, 100)
-      } else {
-        // 没有检测到对话框，延迟500ms后开始滚动
-        safeSetTimeout(startScrolling, 500)
-      }
     }
 
-    // 延迟500ms后开始检查对话框
-    safeSetTimeout(checkAndConfirmDialog, 500)
+    // 使用 MutationObserver 监听 DOM 变化
+    const observer = new MutationObserver(() => {
+      confirmDialog()
+    })
+
+    // 开始观察
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    })
+
+    // 立即检查一次（可能在触发快捷键前对话框已存在）
+    confirmDialog()
+
+    // 设置超时保护（3秒后停止观察）
+    dialogTimeout = setTimeout(() => {
+      observer.disconnect()
+
+      // 如果没找到对话框，直接开始滚动
+      if (!dialogFound) {
+        if (position === 'bottom') {
+          // 延迟500ms后开始滚动
+          safeSetTimeout(startScrolling, 500)
+        } else {
+          // 显示成功通知
+          if (config.showNotification !== false) {
+            Notify.showInfoDiaryOpened()
+          }
+        }
+      }
+    }, 3000)
 
   } catch (error) {
-    console.error('日记底部功能失败:', error)
+    console.error('日记功能失败:', error)
     Notify.showErrorDiaryFailed(error)
   }
 }
@@ -3442,9 +3612,9 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
     return
   }
 
-  // 日记底部类型
-  if (subtype === 'diary-bottom') {
-    executeDiaryBottom(config)
+  // 日记类型（兼容旧的 diary-top 和 diary-bottom）
+  if (subtype === 'diary' || subtype === 'diary-top' || subtype === 'diary-bottom') {
+    await executeDiary(config)
     return
   }
 
@@ -4415,7 +4585,7 @@ function showDatabasePopup(
         font-size: 13px;
         margin-right: 10px;
         display: inline-block;
-        width: 40px;
+        min-width: 80px;
         flex-shrink: 0;
         font-weight: 500;
       }
@@ -4424,7 +4594,8 @@ function showDatabasePopup(
         font-size: 13px;
         font-weight: 400;
         flex-grow: 1;
-        word-break: break-word;
+        word-break: keep-all;
+        overflow-wrap: break-word;
       }
       .task-field-value.primary-key {
         color: #800080;
@@ -4467,8 +4638,7 @@ function showDatabasePopup(
         } else if (isTimeRange) {
           cardsHtml += `<div class="time-range-container"><span class="time-range-display">${value}</span></div>`
         } else {
-          const shortLabel = col.length > 4 ? col.substring(0, 4) : col
-          cardsHtml += `<div class="task-field"><span class="task-field-label">${shortLabel}</span><span class="task-field-value">${value}</span></div>`
+          cardsHtml += `<div class="task-field"><span class="task-field-label">${col}</span><span class="task-field-value">${value}</span></div>`
         }
       })
 
@@ -4627,6 +4797,12 @@ export function cleanup() {
     window.removeEventListener('resize', resizeHandler)
     resizeHandler = null
   }
+
+  // 清理持续检测定时器
+  toolbarCheckTimers.forEach((timer, toolbarElement) => {
+    clearTimeout(timer)
+  })
+  toolbarCheckTimers.clear()
 
   // 清理焦点事件监听器
   focusEventHandlers.forEach(({ element, focusHandler, blurHandler }) => {

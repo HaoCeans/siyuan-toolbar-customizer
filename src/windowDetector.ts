@@ -12,7 +12,7 @@ const DIALOG_COOLDOWN_MS = 3000;
 // 弹窗显示后的防抖时间（3秒内不重复触发）
 const DIALOG_SHOW_DEBOUNCE_MS = 3000;
 
-// 存储弹窗相关的定时器ID，用于清理
+// 存储弹窗相关的定时器 ID，用于清理
 let dialogFocusTimer: ReturnType<typeof setTimeout> | null = null;
 let dialogBuiltinCloseTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -23,6 +23,9 @@ const DIALOG_PROTECTION_MS = 500;
 
 // 记录弹窗当前是否正在显示（防止重复弹出）
 let isNoteDialogShowing = false;
+
+// 高度变化检测定时器 ID（已弃用，保留用于向后兼容清理）
+let heightCheckTimer: ReturnType<typeof setInterval> | null = null;
 
 /**
  * 检查应用是否在前台
@@ -325,7 +328,6 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
   // 检查是否已有弹窗存在（防止重复创建）
   const existingDialog = document.getElementById('quick-note-dialog');
   if (existingDialog) {
-    console.log('[一键记事] 弹窗已存在，跳过创建');
     return;
   }
 
@@ -426,43 +428,7 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
   const textarea = document.createElement('textarea');
 
   // 根据配置显示不同的 placeholder
-  const showConfigGuide = pluginInstance?.mobileFeatureConfig?.showConfigGuide ?? true;
-  if (showConfigGuide) {
-    textarea.placeholder = `《初次配置导航提示》：
-  欢迎使用一键记事弹窗，操作简单，请先配置，具体操作如下：
-
-1. ⚙️插件设置：点击下方⚙️图标按钮，进入设置界面
-2. 4️⃣一键记事弹窗：往下滚动到对应位置，进行配置
-3. 配置完成，保存，即可正常使用！
-
-注：💡初次配置导航提示：建议关闭`;
-
-    // 添加便利贴样式 - 淡黄色背景
-    const styleId = 'quick-note-mobile-placeholder-style';
-    if (!document.getElementById(styleId)) {
-      const style = document.createElement('style');
-      style.id = styleId;
-      style.textContent = `
-        #quick-note-dialog textarea::placeholder {
-          color: #5d4e37;
-          font-size: 14px;
-          line-height: 1.8;
-          padding: 16px;
-          background: #fffbeb;
-          border: 1px solid #fde68a;
-          border-radius: 8px;
-          display: block;
-          margin: 20px 0;
-          max-width: 90%;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-          white-space: pre-line;
-        }
-      `;
-      document.head.appendChild(style);
-    }
-  } else {
-    textarea.placeholder = documentId ? (isAppleStyle ? '追加到文档' : '请输入要追加到文档的内容...') : (isAppleStyle ? '写日记' : '请输入您的日记内容...');
-  }
+  textarea.placeholder = documentId ? (isAppleStyle ? '追加到文档' : '请输入要追加到文档的内容...') : (isAppleStyle ? '写日记' : '请输入您的日记内容...');
 
   // 获取字体大小配置
   const fontSize = pluginInstance?.mobileFeatureConfig?.quickNoteFontSize || (isAppleStyle ? 17 : 16);
@@ -733,7 +699,6 @@ function closeNoteDialog() {
     const timeSinceOpen = Date.now() - dialogOpenTime;
     if (timeSinceOpen < DIALOG_PROTECTION_MS) {
       // 保护期内不关闭，防止刚显示就被误关闭
-      console.log('[弹窗保护] 在保护期内，拒绝关闭弹窗');
       return;
     }
 
@@ -1272,26 +1237,28 @@ function hasNoteDialogContent(): boolean {
 function handleSmallWindowOnlyMode() {
   const isSmallWindow = checkIsSmallWindowMode();
   if (!isSmallWindow) {
-    console.log('[一键记事] 当前为全屏模式，配置为仅小窗模式，跳过弹窗');
+    return;
+  }
+
+  // 新增：检查键盘高度，抑制全屏大键盘的误触发
+  const keyboardHeight = Math.max(0, window.screen.height - window.innerHeight);
+  if (keyboardHeight > 300) {
     return;
   }
 
   // 检查是否有内容
   if (hasNoteDialogContent()) {
-    console.log('[一键记事] 编辑器有内容，保留弹窗');
     return;
   }
 
-  // 防抖检查：3秒内不重复弹
+  // 防抖检查：3 秒内不重复弹
   const timeSinceLastShow = Date.now() - lastDialogShowTime;
   if (timeSinceLastShow < DIALOG_COOLDOWN_MS) {
-    console.log('[一键记事] 在防抖期内，跳过弹窗');
     return;
   }
 
   // 弹出弹窗
   showOrReuseDialog();
-  console.log('[一键记事] 小窗模式切后台，弹窗');
 }
 
 /**
@@ -1301,25 +1268,24 @@ function handleSmallWindowOnlyMode() {
 function handleBothModesMode() {
   // 检查是否有内容
   if (hasNoteDialogContent()) {
-    console.log('[一键记事] 编辑器有内容，保留弹窗');
     return;
   }
 
-  // 防抖检查：3秒内不重复弹
+  // 防抖检查：3 秒内不重复弹
   const timeSinceLastShow = Date.now() - lastDialogShowTime;
   if (timeSinceLastShow < DIALOG_COOLDOWN_MS) {
-    console.log('[一键记事] 在防抖期内，跳过弹窗');
     return;
   }
 
   // 弹出弹窗（无论小窗还是全屏）
   showOrReuseDialog();
-  console.log('[一键记事] 全模式切后台，弹窗');
 }
 
 /**
  * 处理前后台切换
- * 新方案：只在切后台时操作，切前台永远不动
+ * 新方案：
+ * - 切后台：弹出弹窗
+ * - 切前台：检测是否是小窗，如果是则弹出弹窗
  */
 function handleVisibilityChange() {
   // 只在移动端处理
@@ -1327,11 +1293,11 @@ function handleVisibilityChange() {
     return;
   }
 
+  // 获取弹窗配置
+  const popupConfig = pluginInstance.mobileFeatureConfig?.popupConfig || 'bothModes';
+
   // ========== 切后台时：弹出弹窗 ==========
   if (document.hidden) {
-    // 获取弹窗配置
-    const popupConfig = pluginInstance.mobileFeatureConfig?.popupConfig || 'bothModes';
-
     // 根据配置调用不同的处理函数
     if (popupConfig === 'smallWindowOnly') {
       // ②只在小窗模式：使用小窗模式专用函数
@@ -1344,43 +1310,49 @@ function handleVisibilityChange() {
     return;
   }
 
-  // ========== 切前台时：不做任何操作 ==========
-  // 切前台永远不动，保留弹窗状态
+  // ========== 切前台时：检测是否是小窗 ==========
+  if (!document.hidden && popupConfig === 'smallWindowOnly') {
+    // 延迟检测，等待窗口调整完成
+    setTimeout(() => {
+      // 检测当前是否是小窗模式
+      const isSmallWindow = checkIsSmallWindowMode();
+      if (isSmallWindow) {
+        // 是小窗模式，弹出弹窗
+        handleSmallWindowOnlyMode();
+      }
+    }, 400);
+  }
 }
 
 /**
  * 检查是否为小窗模式
- * 沿用现有的小窗检测逻辑
+ * 修复版：只用高度判断，因为宽度在小窗模式下不会变化
  */
 function checkIsSmallWindowMode(): boolean {
-  const currentWidth = window.innerWidth;
   const currentHeight = window.innerHeight;
-  const screenWidth = window.screen.width;
   const screenHeight = window.screen.height;
-
-  const widthRatio = currentWidth / screenWidth;
   const heightRatio = currentHeight / screenHeight;
 
-  // 使用 visualViewport 排除键盘干扰
+  // 使用 visualViewport 获取更精确的可见高度
   if (window.visualViewport) {
     const vv = window.visualViewport;
     const visualHeight = vv.height;
     const visualHeightRatio = visualHeight / screenHeight;
 
-    // 确保键盘高度不为负数
-    const keyboardHeight = Math.max(0, currentHeight - visualHeight);
+    // 修复：用屏幕高度减去当前高度判断键盘
+    const keyboardHeight = Math.max(0, screenHeight - currentHeight);
     const isKeyboardOpen = keyboardHeight > 200;
 
     if (isKeyboardOpen) {
-      // 键盘弹出时：主要看宽度占比
-      return widthRatio < 0.80;
+      // 键盘弹出时：也只看高度比例
+      return visualHeightRatio < 0.80;
     } else {
-      // 无键盘时：同时判断宽度和高度
-      return widthRatio < 0.80 || visualHeightRatio < 0.80;
+      // 无键盘时：只看高度比例
+      return visualHeightRatio < 0.80;
     }
   } else {
-    // 降级：浏览器不支持 visualViewport
-    return widthRatio < 0.80 || heightRatio < 0.80;
+    // 降级：浏览器不支持 visualViewport，使用普通高度比
+    return heightRatio < 0.80;
   }
 }
 
@@ -1392,13 +1364,11 @@ function checkIsSmallWindowMode(): boolean {
 function showOrReuseDialog() {
   const existingDialog = document.getElementById('quick-note-dialog');
   if (existingDialog) {
-    console.log('[一键记事] 复用现有弹窗（不清空内容）');
     // 弹窗已存在，复用（不清空内容）
     lastDialogShowTime = Date.now();
     return;
   }
 
-  console.log('[一键记事] 弹出新弹窗');
   // 弹出新弹窗
   showSmallWindowTip();
   lastDialogShowTime = Date.now();
@@ -1415,14 +1385,29 @@ export function initSmallWindowDetector(): void {
     visibilityChangeListener = null;
   }
 
+  // 清除高度变化检测定时器（向后兼容）
+  if (heightCheckTimer) {
+    clearInterval(heightCheckTimer);
+    heightCheckTimer = null;
+  }
+
+  // 获取当前配置
+  const popupConfig = pluginInstance?.mobileFeatureConfig?.popupConfig || 'bothModes';
+
+  // 如果是 disabled 模式，不做任何初始化
+  if (popupConfig === 'disabled') {
+    return;
+  }
+
   // 重置弹窗显示状态
   lastDialogShowTime = 0;
 
-  // 添加可见性变化监听器（用于检测前后台切换）
+  // 添加可见性变化监听器（用于检测前后台切换）- ②和③都需要
   visibilityChangeListener = handleVisibilityChange;
   document.addEventListener('visibilitychange', visibilityChangeListener);
 
-  console.log('[一键记事] 小窗检测器已初始化（新方案：切后台弹窗）');
+  // 不再需要持续性定时器，改为切前台时主动检测一次
+  // 配置②（smallWindowOnly）会在切前台时检测是否是小窗模式
 }
 
 /**
@@ -1438,6 +1423,10 @@ export function clearSmallWindowDetector(): void {
   if (dialogBuiltinCloseTimer) {
     clearTimeout(dialogBuiltinCloseTimer);
     dialogBuiltinCloseTimer = null;
+  }
+  if (heightCheckTimer) {
+    clearInterval(heightCheckTimer);
+    heightCheckTimer = null;
   }
 
   // 清除可见性变化监听器
@@ -1475,8 +1464,6 @@ export function clearSmallWindowDetector(): void {
   // 重置状态变量
   lastDialogShowTime = 0;
   dialogOpenTime = 0;
-
-  console.log('[一键记事] 小窗检测器已清理');
 }
 
 /**

@@ -78,7 +78,7 @@ export function createDesktopButtonItem(
     item.style.borderColor = 'var(--b3-border-color)'
   }
 
-  item.ondrop = (e) => {
+  item.ondrop = async (e) => {
     e.preventDefault()
     item.style.borderColor = 'var(--b3-border-color)'
 
@@ -95,6 +95,9 @@ export function createDesktopButtonItem(
       sortedButtons.forEach((btn, idx) => {
         btn.sort = idx + 1
       })
+
+      // 保存配置到文件
+      await context.saveData('buttonConfigs', sortedButtons)
 
       renderList()
     }
@@ -244,9 +247,41 @@ export function createDesktopButtonItem(
     typeOptions.push(
       { value: 'author-tool', label: '⑥鲸鱼定制工具箱' }
     )
+  } else {
+    typeOptions.push(
+      { value: 'author-tool', label: '⑥鲸鱼定制工具箱（跳转激活）' }
+    )
   }
 
-  editForm.appendChild(createDesktopSelectField('选择功能', button.type, typeOptions, (v) => {
+  const typeSelectField = createDesktopSelectField('选择功能', button.type, typeOptions, (v) => {
+    // 如果选择的是鲸鱼定制工具箱但未激活，跳转到激活区域
+    if (v === 'author-tool' && !context.isAuthorToolActivated()) {
+      // 立即恢复 select 的值为原来的类型
+      const selectElement = typeSelectField.querySelector('select') as HTMLSelectElement
+      if (selectElement) {
+        selectElement.value = button.type || 'builtin-refresh'
+      }
+    
+      // 直接点击"更新、Q 群、激活码获取"标签按钮
+      requestAnimationFrame(() => {
+        const versionTab = document.querySelector('button[data-tab="version"]') as HTMLElement
+        if (versionTab) {
+          versionTab.click()
+        } else {
+          console.warn('[Desktop Debug] version tab button not found!')
+        }
+      })
+      
+      // 不更新 button.type，但要重新渲染表单以反映原始状态
+      const newForm = document.createElement('div')
+      newForm.className = 'toolbar-customizer-edit-form'
+      newForm.style.cssText = editForm.style.cssText
+      newForm.style.display = item.dataset.expanded === 'true' ? 'flex' : 'none'
+      populateDesktopEditForm(newForm, button, iconSpan, infoDiv, item, renderList, context)
+      editForm.replaceWith(newForm)
+      return
+    }
+
     button.type = v as any
 
     // 保存当前展开状态
@@ -273,7 +308,24 @@ export function createDesktopButtonItem(
       }
       typeDesc.textContent = typeLabels[button.type] || button.type
     }
-  }))
+  });
+
+  editForm.appendChild(typeSelectField);
+
+  // 给未激活的鲸鱼定制工具箱选项添加特殊样式
+  if (!context.isAuthorToolActivated()) {
+    requestAnimationFrame(() => {
+      const selectElement = typeSelectField.querySelector('select') as HTMLSelectElement;
+      if (selectElement) {
+        const options = selectElement.querySelectorAll('option');
+        options.forEach(option => {
+          if (option.value === 'author-tool') {
+            option.style.cssText = 'background-color: rgba(139, 92, 246, 0.15); color: #8b5cf6; font-style: italic;';
+          }
+        });
+      }
+    });
+  }
 
   // 电脑端隐藏'思源内置功能'类型，代码保留以便后续使用
   if (button.type === 'builtin-refresh') {
@@ -766,13 +818,13 @@ export function createDesktopButtonItem(
       <option value="button-sequence" ${currentSubtype === 'button-sequence' ? 'selected' : ''}>① 连续点击自定义按钮</option>
       <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>② 打开指定ID块</option>
       <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>③ 数据库悬浮弹窗</option>
-      <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>④ 日记底部</option>
+      <option value="diary" ${currentSubtype === 'diary' || currentSubtype === 'diary-top' || currentSubtype === 'diary-bottom' ? 'selected' : ''}>④ 日记顶部或底部</option>
       <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>⑤ 叶归LifeLog适配</option>
       <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
       <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc'
       // 刷新表单以显示/隐藏相关配置
       if ((subtypeSelect as any).refreshForm) {
         (subtypeSelect as any).refreshForm()
@@ -824,8 +876,70 @@ export function createDesktopButtonItem(
 
     const diaryDesc = document.createElement('div')
     diaryDesc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.6;'
-    diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 或 API 打开日记<br>2. 自动滚动到文档底部<br>💡 配置笔记本ID后将直接使用API，无需弹窗选择'
+    diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 或 API 打开日记<br>2. 根据下方设置决定跳转位置<br>💡 配置笔记本ID后将直接使用API，无需弹窗选择'
     diaryConfigDiv.appendChild(diaryDesc)
+
+    // 位置选择配置
+    const diaryPositionContainer = document.createElement('div')
+    diaryPositionContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px; margin-top: 12px; padding: 12px; background: rgba(66, 133, 244, 0.08); border-radius: 6px; border: 1px solid rgba(66, 133, 244, 0.2);'
+
+    const diaryPositionLabel = document.createElement('label')
+    diaryPositionLabel.textContent = '📍 打开后位置'
+    diaryPositionLabel.style.cssText = 'font-size: 14px; color: var(--b3-theme-primary); font-weight: 600; display: flex; align-items: center; gap: 6px;'
+    diaryPositionContainer.appendChild(diaryPositionLabel)
+
+    const diaryPositionOptions = document.createElement('div')
+    diaryPositionOptions.style.cssText = 'display: flex; flex-direction: column; gap: 12px;'
+
+    const currentPosition = button.diaryPosition || 'bottom'
+
+    // 顶部选项
+    const diaryTopRadioContainer = document.createElement('label')
+    diaryTopRadioContainer.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; font-weight: 500; padding: 8px 12px; border-radius: 6px; transition: background 0.2s;'
+    diaryTopRadioContainer.addEventListener('mouseenter', () => { diaryTopRadioContainer.style.background = 'rgba(66, 133, 244, 0.08)' })
+    diaryTopRadioContainer.addEventListener('mouseleave', () => { diaryTopRadioContainer.style.background = 'transparent' })
+    const diaryTopRadio = document.createElement('input')
+    diaryTopRadio.type = 'radio'
+    diaryTopRadio.name = `diary-position-${button.id}`  // 使用按钮ID确保唯一性
+    diaryTopRadio.value = 'top'
+    diaryTopRadio.checked = currentPosition === 'top'
+    diaryTopRadio.style.cssText = 'cursor: pointer; width: 18px; height: 18px; accent-color: var(--b3-theme-primary);'
+    diaryTopRadio.addEventListener('change', () => {
+      if (diaryTopRadio.checked) {
+        button.diaryPosition = 'top'
+      }
+    })
+    diaryTopRadioContainer.appendChild(diaryTopRadio)
+    diaryTopRadioContainer.appendChild(document.createTextNode('⬆️ 日记顶部'))
+    diaryPositionOptions.appendChild(diaryTopRadioContainer)
+
+    // 底部选项
+    const diaryBottomRadioContainer = document.createElement('label')
+    diaryBottomRadioContainer.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; font-weight: 500; padding: 8px 12px; border-radius: 6px; transition: background 0.2s;'
+    diaryBottomRadioContainer.addEventListener('mouseenter', () => { diaryBottomRadioContainer.style.background = 'rgba(66, 133, 244, 0.08)' })
+    diaryBottomRadioContainer.addEventListener('mouseleave', () => { diaryBottomRadioContainer.style.background = 'transparent' })
+    const diaryBottomRadio = document.createElement('input')
+    diaryBottomRadio.type = 'radio'
+    diaryBottomRadio.name = `diary-position-${button.id}`  // 使用按钮ID确保唯一性
+    diaryBottomRadio.value = 'bottom'
+    diaryBottomRadio.checked = currentPosition === 'bottom'
+    diaryBottomRadio.style.cssText = 'cursor: pointer; width: 18px; height: 18px; accent-color: var(--b3-theme-primary);'
+    diaryBottomRadio.addEventListener('change', () => {
+      if (diaryBottomRadio.checked) {
+        button.diaryPosition = 'bottom'
+      }
+    })
+    diaryBottomRadioContainer.appendChild(diaryBottomRadio)
+    diaryBottomRadioContainer.appendChild(document.createTextNode('⬇️ 日记底部'))
+    diaryPositionOptions.appendChild(diaryBottomRadioContainer)
+
+    diaryPositionContainer.appendChild(diaryPositionOptions)
+
+    // 保存单选按钮引用，用于刷新状态
+    ;(diaryPositionOptions as any).diaryTopRadio = diaryTopRadio
+    ;(diaryPositionOptions as any).diaryBottomRadio = diaryBottomRadio
+
+    diaryConfigDiv.appendChild(diaryPositionContainer)
 
     // 笔记本ID配置
     const diaryNotebookIdContainer = document.createElement('div')
@@ -1361,7 +1475,7 @@ export function createDesktopButtonItem(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
-      } else if (subtype === 'diary-bottom') {
+      } else if (subtype === 'diary' || subtype === 'diary-top' || subtype === 'diary-bottom') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'flex'
@@ -1369,6 +1483,19 @@ export function createDesktopButtonItem(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
+        // 更新日记位置单选按钮状态
+        const position = button.diaryPosition || 'bottom'
+        if ((diaryPositionOptions as any).diaryTopRadio && (diaryPositionOptions as any).diaryBottomRadio) {
+          // 使用 requestAnimationFrame 确保 DOM 更新
+          requestAnimationFrame(() => {
+            ;(diaryPositionOptions as any).diaryTopRadio.checked = (position === 'top')
+            ;(diaryPositionOptions as any).diaryBottomRadio.checked = (position === 'bottom')
+
+            // 强制触发重排
+            void (diaryPositionOptions as any).diaryTopRadio.offsetWidth
+            void (diaryPositionOptions as any).diaryBottomRadio.offsetWidth
+          })
+        }
       } else if (subtype === 'life-log') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -1599,8 +1726,40 @@ export function populateDesktopEditForm(
     typeOptions.push(
       { value: 'author-tool', label: '⑥鲸鱼定制工具箱' }
     )
+  } else {
+    typeOptions.push(
+      { value: 'author-tool', label: '⑥鲸鱼定制工具箱（跳转激活）' }
+    )
   }
   form.appendChild(createDesktopSelectField('选择功能', button.type, typeOptions, (v) => {
+    // 如果选择的是鲸鱼定制工具箱但未激活，跳转到激活区域
+    if (v === 'author-tool' && !context.isAuthorToolActivated()) {
+      // 立即恢复 select 的值为原来的类型
+      const selectElement = form.querySelector('select') as HTMLSelectElement
+      if (selectElement) {
+        selectElement.value = button.type || 'builtin-refresh'
+      }
+    
+      // 直接点击"更新、Q 群、激活码获取"标签按钮
+      requestAnimationFrame(() => {
+        const versionTab = document.querySelector('button[data-tab="version"]') as HTMLElement
+        if (versionTab) {
+          versionTab.click()
+        } else {
+          console.warn('[Desktop Debug] version tab button not found!')
+        }
+      })
+      
+      // 不更新 button.type，但要重新渲染表单以反映原始状态
+      const newForm = document.createElement('div')
+      newForm.className = 'toolbar-customizer-edit-form'
+      newForm.style.cssText = form.style.cssText
+      newForm.style.display = item.dataset.expanded === 'true' ? 'flex' : 'none'
+      populateDesktopEditForm(newForm, button, iconSpan, infoDiv, item, renderList, context)
+      form.replaceWith(newForm)
+      return
+    }
+
     button.type = v as any
 
     // 保存当前展开状态
@@ -1627,6 +1786,21 @@ export function populateDesktopEditForm(
       typeDesc.textContent = typeLabels[button.type] || button.type
     }
   }))
+
+  // 给未激活的鲸鱼定制工具箱选项添加特殊样式（重新渲染时也需要）
+  if (!context.isAuthorToolActivated()) {
+    requestAnimationFrame(() => {
+      const selectElement = form.querySelector('select') as HTMLSelectElement;
+      if (selectElement) {
+        const options = selectElement.querySelectorAll('option');
+        options.forEach(option => {
+          if (option.value === 'author-tool') {
+            option.style.cssText = 'background-color: rgba(139, 92, 246, 0.15); color: #8b5cf6; font-style: italic;';
+          }
+        });
+      }
+    });
+  }
 
   // 电脑端隐藏'思源内置功能'类型，代码保留以便后续使用
   // if (button.type === 'builtin') {
@@ -2219,13 +2393,13 @@ export function populateDesktopEditForm(
       <option value="button-sequence" ${currentSubtype === 'button-sequence' ? 'selected' : ''}>① 连续点击自定义按钮</option>
       <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>② 打开指定ID块</option>
       <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>③ 数据库悬浮弹窗</option>
-      <option value="diary-bottom" ${currentSubtype === 'diary-bottom' ? 'selected' : ''}>④ 日记底部</option>
+      <option value="diary" ${currentSubtype === 'diary' || currentSubtype === 'diary-top' || currentSubtype === 'diary-bottom' ? 'selected' : ''}>④ 日记顶部或底部</option>
       <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>⑤ 叶归LifeLog适配</option>
       <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
       <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary-bottom' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc'
       ;(subtypeSelect as any).refreshForm?.()
     }
     authorToolField.appendChild(subtypeSelect)
@@ -2457,8 +2631,70 @@ export function populateDesktopEditForm(
 
     const diaryDesc = document.createElement('div')
     diaryDesc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.6;'
-    diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 或 API 打开日记<br>2. 自动滚动到文档底部<br>💡 配置笔记本ID后将直接使用API，无需弹窗选择'
+    diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 或 API 打开日记<br>2. 根据下方设置决定跳转位置<br>💡 配置笔记本ID后将直接使用API，无需弹窗选择'
     diaryConfigDiv.appendChild(diaryDesc)
+
+    // 位置选择配置
+    const diaryPositionContainer = document.createElement('div')
+    diaryPositionContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px; margin-top: 12px; padding: 12px; background: rgba(66, 133, 244, 0.08); border-radius: 6px; border: 1px solid rgba(66, 133, 244, 0.2);'
+
+    const diaryPositionLabel = document.createElement('label')
+    diaryPositionLabel.textContent = '📍 打开后位置'
+    diaryPositionLabel.style.cssText = 'font-size: 14px; color: var(--b3-theme-primary); font-weight: 600; display: flex; align-items: center; gap: 6px;'
+    diaryPositionContainer.appendChild(diaryPositionLabel)
+
+    const diaryPositionOptions = document.createElement('div')
+    diaryPositionOptions.style.cssText = 'display: flex; flex-direction: column; gap: 12px;'
+
+    const currentPosition = button.diaryPosition || 'bottom'
+
+    // 顶部选项
+    const diaryTopRadioContainer = document.createElement('label')
+    diaryTopRadioContainer.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; font-weight: 500; padding: 8px 12px; border-radius: 6px; transition: background 0.2s;'
+    diaryTopRadioContainer.addEventListener('mouseenter', () => { diaryTopRadioContainer.style.background = 'rgba(66, 133, 244, 0.08)' })
+    diaryTopRadioContainer.addEventListener('mouseleave', () => { diaryTopRadioContainer.style.background = 'transparent' })
+    const diaryTopRadio = document.createElement('input')
+    diaryTopRadio.type = 'radio'
+    diaryTopRadio.name = `diary-position-${button.id}`  // 使用按钮ID确保唯一性
+    diaryTopRadio.value = 'top'
+    diaryTopRadio.checked = currentPosition === 'top'
+    diaryTopRadio.style.cssText = 'cursor: pointer; width: 18px; height: 18px; accent-color: var(--b3-theme-primary);'
+    diaryTopRadio.addEventListener('change', () => {
+      if (diaryTopRadio.checked) {
+        button.diaryPosition = 'top'
+      }
+    })
+    diaryTopRadioContainer.appendChild(diaryTopRadio)
+    diaryTopRadioContainer.appendChild(document.createTextNode('⬆️ 日记顶部'))
+    diaryPositionOptions.appendChild(diaryTopRadioContainer)
+
+    // 底部选项
+    const diaryBottomRadioContainer = document.createElement('label')
+    diaryBottomRadioContainer.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; font-weight: 500; padding: 8px 12px; border-radius: 6px; transition: background 0.2s;'
+    diaryBottomRadioContainer.addEventListener('mouseenter', () => { diaryBottomRadioContainer.style.background = 'rgba(66, 133, 244, 0.08)' })
+    diaryBottomRadioContainer.addEventListener('mouseleave', () => { diaryBottomRadioContainer.style.background = 'transparent' })
+    const diaryBottomRadio = document.createElement('input')
+    diaryBottomRadio.type = 'radio'
+    diaryBottomRadio.name = `diary-position-${button.id}`  // 使用按钮ID确保唯一性
+    diaryBottomRadio.value = 'bottom'
+    diaryBottomRadio.checked = currentPosition === 'bottom'
+    diaryBottomRadio.style.cssText = 'cursor: pointer; width: 18px; height: 18px; accent-color: var(--b3-theme-primary);'
+    diaryBottomRadio.addEventListener('change', () => {
+      if (diaryBottomRadio.checked) {
+        button.diaryPosition = 'bottom'
+      }
+    })
+    diaryBottomRadioContainer.appendChild(diaryBottomRadio)
+    diaryBottomRadioContainer.appendChild(document.createTextNode('⬇️ 日记底部'))
+    diaryPositionOptions.appendChild(diaryBottomRadioContainer)
+
+    diaryPositionContainer.appendChild(diaryPositionOptions)
+
+    // 保存单选按钮引用，用于刷新状态
+    ;(diaryPositionOptions as any).diaryTopRadio = diaryTopRadio
+    ;(diaryPositionOptions as any).diaryBottomRadio = diaryBottomRadio
+
+    diaryConfigDiv.appendChild(diaryPositionContainer)
 
     // 笔记本ID配置
     const diaryNotebookIdContainer2 = document.createElement('div')
@@ -2835,7 +3071,7 @@ export function populateDesktopEditForm(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
-      } else if (subtype === 'diary-bottom') {
+      } else if (subtype === 'diary' || subtype === 'diary-top' || subtype === 'diary-bottom') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'flex'
@@ -2843,6 +3079,19 @@ export function populateDesktopEditForm(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
+        // 更新日记位置单选按钮状态
+        const position = button.diaryPosition || 'bottom'
+        if ((diaryPositionOptions as any).diaryTopRadio && (diaryPositionOptions as any).diaryBottomRadio) {
+          // 使用 requestAnimationFrame 确保 DOM 更新
+          requestAnimationFrame(() => {
+            ;(diaryPositionOptions as any).diaryTopRadio.checked = (position === 'top')
+            ;(diaryPositionOptions as any).diaryBottomRadio.checked = (position === 'bottom')
+
+            // 强制触发重排
+            void (diaryPositionOptions as any).diaryTopRadio.offsetWidth
+            void (diaryPositionOptions as any).diaryBottomRadio.offsetWidth
+          })
+        }
       } else if (subtype === 'life-log') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'

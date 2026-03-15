@@ -416,6 +416,7 @@ export function createDesktopSettingLayout(
     description: '思源手机端增强插件信息',
     createActionElement: () => {
       const container = document.createElement('div')
+      container.id = 'version-update-section'
       container.className = 'toolbar-customizer-content'
       container.dataset.tabGroup = 'version'
       container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--b3-theme-background); border-radius: 8px;'
@@ -644,6 +645,7 @@ export function createDesktopSettingLayout(
             
       // 鲸鱼定制工具箱整体框
       const whaleToolboxContainer = document.createElement('div')
+      whaleToolboxContainer.id = 'whale-toolbox-activation-desktop'
       whaleToolboxContainer.style.cssText = `
         padding: 16px;
         margin-top: 16px;
@@ -691,8 +693,8 @@ export function createDesktopSettingLayout(
         reActivateBtn.onclick = () => {
           // 显示输入框和验证按钮
           activationInputRow.style.display = 'flex'
-          // 隐藏重新激活按钮
-          reActivateBtn.style.display = 'none'
+          // 隐藏按钮容器
+          ;(reActivateBtn.parentElement as HTMLElement).style.display = 'none'
         }
         statusContainer.appendChild(reActivateBtn)
       }

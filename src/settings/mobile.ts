@@ -3052,8 +3052,13 @@ export function createMobileSettingLayout(
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">滚动文档顶部或底部</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键直达文档首尾，长文档浏览更轻松，阅读体验升级</td>
             </tr>
+            <tr>
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑧</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">图片快捷导入日记</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">选择图片快速导入日记，支持手动定位或自动追加，图片管理更便捷</td>
+            </tr>
             <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑧</td>
+              <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑨</td>
               <td style="padding: 10px; font-weight: 500;">持续更新中</td>
               <td style="padding: 10px; color: var(--b3-theme-on-surface);">更多实用功能开发中，欢迎进群提出你的定制需求</td>
             </tr>

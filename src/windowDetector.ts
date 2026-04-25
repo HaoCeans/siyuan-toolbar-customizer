@@ -28,6 +28,28 @@ let isNoteDialogShowing = false;
 let heightCheckTimer: ReturnType<typeof setInterval> | null = null;
 
 /**
+ * 检测思源当前是否为暗黑模式
+ * 通过读取思源主题背景色的亮度来判断
+ */
+function isSiyuanDarkMode(): boolean {
+  const style = getComputedStyle(document.documentElement);
+  const bg = style.getPropertyValue('--b3-theme-background').trim();
+  if (bg.startsWith('#')) {
+    const r = parseInt(bg.slice(1, 3), 16);
+    const g = parseInt(bg.slice(3, 5), 16);
+    const b = parseInt(bg.slice(5, 7), 16);
+    return (r * 299 + g * 587 + b * 114) / 1000 < 128;
+  }
+  if (bg.startsWith('rgb')) {
+    const match = bg.match(/(\d+)/g);
+    if (match && match.length >= 3) {
+      return (parseInt(match[0]) * 299 + parseInt(match[1]) * 587 + parseInt(match[2]) * 114) / 1000 < 128;
+    }
+  }
+  return false;
+}
+
+/**
  * 检查应用是否在前台
  * 使用 Page Visibility API 检测应用是否可见
  */
@@ -129,6 +151,9 @@ function showNoteInputDialogDesktop(notebookId: string, documentId?: string, sav
   isNoteDialogShowing = true;
   lastDialogShowTime = Date.now();
 
+  // 检测暗黑模式
+  const isDark = isSiyuanDarkMode();
+
   // 创建电脑端专用弹窗
   const dialog = document.createElement('div');
   dialog.id = 'quick-note-dialog-desktop';
@@ -138,20 +163,20 @@ function showNoteInputDialogDesktop(notebookId: string, documentId?: string, sav
     left: 0;
     width: 100%;
     height: 100%;
-    background: transparent;
+    background: ${isDark ? 'rgba(0, 0, 0, 0.7)' : 'transparent'};
     z-index: 100000;
-    pointer-events: none;
+    pointer-events: ${isDark ? 'auto' : 'none'};
   `;
 
   const content = document.createElement('div');
   content.style.cssText = `
-    background: white;
+    background: ${isDark ? '#1e1e1e' : 'white'};
     border-radius: 12px;
     padding: 24px;
     width: 320px;
     max-width: 320px;
     height: 80vh;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    box-shadow: ${isDark ? '0 10px 40px rgba(0, 0, 0, 0.5)' : '0 10px 40px rgba(0, 0, 0, 0.3)'};
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -160,13 +185,14 @@ function showNoteInputDialogDesktop(notebookId: string, documentId?: string, sav
     top: 57%;
     transform: translateY(-50%);
     pointer-events: auto;
+    border: 1px solid ${isDark ? '#404040' : 'transparent'};
   `;
 
   const title = document.createElement('h2');
   title.textContent = documentId ? '📒 文档记事' : '📒 日记记事';
   title.style.cssText = `
     margin: 0 0 20px 0;
-    color: #333;
+    color: ${isDark ? '#e0e0e0' : '#333'};
     font-size: 20px;
     text-align: center;
     font-weight: 600;
@@ -180,8 +206,10 @@ function showNoteInputDialogDesktop(notebookId: string, documentId?: string, sav
     min-height: 300px;
     max-height: calc(80vh - 160px);
     padding: 16px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid ${isDark ? '#404040' : '#e0e0e0'};
     border-radius: 8px;
+    background: ${isDark ? '#2a2a2a' : 'white'};
+    color: ${isDark ? '#e0e0e0' : '#333'};
     font-size: ${fontSize}px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     resize: none;
@@ -191,16 +219,16 @@ function showNoteInputDialogDesktop(notebookId: string, documentId?: string, sav
     line-height: 1.6;
   `;
   textarea.addEventListener('focus', () => {
-    textarea.style.borderColor = '#3b82f6';
+    textarea.style.borderColor = isDark ? '#2E7BBF' : '#3b82f6';
   });
   textarea.addEventListener('blur', () => {
-    textarea.style.borderColor = '#e0e0e0';
+    textarea.style.borderColor = isDark ? '#404040' : '#e0e0e0';
   });
 
   const hint = document.createElement('div');
   hint.style.cssText = `
     font-size: 12px;
-    color: #666;
+    color: ${isDark ? '#888' : '#666'};
     margin-top: 8px;
     text-align: center;
   `;
@@ -237,7 +265,7 @@ function showNoteInputDialogDesktop(notebookId: string, documentId?: string, sav
     font-size: 14px;
     border-radius: 6px;
     cursor: pointer;
-    background: #3b82f6;
+    background: ${isDark ? '#2E7BBF' : '#3b82f6'};
     color: white;
     border: none;
   `;
@@ -340,7 +368,10 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
   // 获取样式配置
   const styleConfig = pluginInstance?.mobileFeatureConfig?.quickNoteStyle || 'apple';
   const isAppleStyle = styleConfig === 'apple';
-  
+
+  // 检测暗黑模式
+  const isDark = isSiyuanDarkMode();
+
   // 创建美化版记事输入弹窗
   const dialog = document.createElement('div');
   dialog.id = 'quick-note-dialog';
@@ -352,7 +383,7 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.6);
+    background: ${isDark ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.6)'};
     z-index: 100000;
     display: flex;
     justify-content: center;
@@ -363,43 +394,45 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
   // 防止内容容器获取焦点
   content.tabIndex = -1;
   content.style.cssText = isAppleStyle ? `
-    background: white;
+    background: ${isDark ? '#1e1e1e' : 'white'};
     border-radius: 14px;
     padding: 20px;
     width: 90%;
     max-width: 500px;
     height: 80vh;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    box-shadow: ${isDark ? '0 20px 40px rgba(0, 0, 0, 0.5)' : '0 20px 40px rgba(0, 0, 0, 0.15)'};
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    border: 1px solid ${isDark ? '#404040' : 'transparent'};
   ` : `
-    background: white;
+    background: ${isDark ? '#1e1e1e' : 'white'};
     border-radius: 12px;
     padding: 24px;
     width: 90%;
     max-width: 500px;
     height: 80vh;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    box-shadow: ${isDark ? '0 10px 30px rgba(0, 0, 0, 0.5)' : '0 10px 30px rgba(0, 0, 0, 0.3)'};
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    border: 1px solid ${isDark ? '#404040' : 'transparent'};
   `;
 
   const title = document.createElement('h2');
-  title.textContent = isAppleStyle 
+  title.textContent = isAppleStyle
     ? (documentId ? '文档记事' : '日记记事')
     : (documentId ? '📒 文档记事' : '📒 日记记事');
   title.style.cssText = isAppleStyle ? `
     margin: 0 0 16px 0;
-    color: #000;
+    color: ${isDark ? '#e0e0e0' : '#000'};
     font-size: 17px;
     font-weight: 600;
     text-align: center;
     letter-spacing: -0.3px;
   ` : `
     margin: 0 0 16px 0;
-    color: #333;
+    color: ${isDark ? '#e0e0e0' : '#333'};
     font-size: 20px;
     text-align: center;
   `;
@@ -437,8 +470,9 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
     flex: 1;
     padding: 12px 16px;
     border: none;
-    background: #f2f2f7;
+    background: ${isDark ? '#2a2a2a' : '#f2f2f7'};
     border-radius: 10px;
+    color: ${isDark ? '#e0e0e0' : '#000'};
     font-size: ${fontSize}px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     resize: none;
@@ -450,12 +484,14 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
     -webkit-overflow-scrolling: touch;
     -ms-overflow-style: scrollbar;
     scrollbar-width: thin;
-    scrollbar-color: #888 #f1f1f1;
+    scrollbar-color: ${isDark ? '#555 #2a2a2a' : '#888 #f1f1f1'};
   ` : `
     flex: 1;
     padding: 16px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid ${isDark ? '#404040' : '#e0e0e0'};
     border-radius: 8px;
+    background: ${isDark ? '#2a2a2a' : 'white'};
+    color: ${isDark ? '#e0e0e0' : '#333'};
     font-size: ${fontSize}px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     resize: none;
@@ -466,7 +502,7 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
     -webkit-overflow-scrolling: touch;
     -ms-overflow-style: scrollbar;
     scrollbar-width: thin;
-    scrollbar-color: #888 #f1f1f1;
+    scrollbar-color: ${isDark ? '#555 #2a2a2a' : '#888 #f1f1f1'};
   `;
 
   // 为Webkit浏览器添加滚动条样式（避免重复注入）
@@ -479,15 +515,15 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
         width: 8px;
       }
       #quick-note-dialog textarea::-webkit-scrollbar-track {
-        background: #f1f1f1;
+        background: ${isDark ? '#2a2a2a' : '#f1f1f1'};
         border-radius: 4px;
       }
       #quick-note-dialog textarea::-webkit-scrollbar-thumb {
-        background: #888;
+        background: ${isDark ? '#555' : '#888'};
         border-radius: 4px;
       }
       #quick-note-dialog textarea::-webkit-scrollbar-thumb:hover {
-        background: #555;
+        background: ${isDark ? '#777' : '#555'};
       }
     `;
     document.head.appendChild(scrollbarStyle);
@@ -509,7 +545,7 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
   toolbarTitle.style.cssText = `
     font-size: 12px;
     font-weight: 600;
-    color: #666;
+    color: ${isDark ? '#888' : '#666'};
     margin-bottom: 8px;
     text-align: center;
   `;
@@ -545,7 +581,7 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
     font-size: 17px;
     letter-spacing: 0.5px;
     padding: 10px 24px;
-    background: ${isAppleStyle ? '#007AFF' : 'var(--b3-theme-primary)'};
+    background: ${isDark ? '#2E7BBF' : (isAppleStyle ? '#007AFF' : '#3b82f6')};
     color: white;
     border: none;
     border-radius: 10px;
@@ -624,9 +660,9 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
     font-size: 17px;
     letter-spacing: 0.5px;
     padding: 10px 24px;
-    background: ${isAppleStyle ? '#E5E5EA' : 'transparent'};
-    color: ${isAppleStyle ? '#000' : 'var(--b3-theme-on-surface)'};
-    border: ${isAppleStyle ? 'none' : '1px solid var(--b3-border-color)'};
+    background: ${isDark ? '#333' : (isAppleStyle ? '#E5E5EA' : 'transparent')};
+    color: ${isDark ? '#e0e0e0' : (isAppleStyle ? '#000' : '#5f6368')};
+    border: ${isDark ? '1px solid #555' : (isAppleStyle ? 'none' : '1px solid #e0e0e0')};
     border-radius: 10px;
     font-weight: 500;
     cursor: pointer;
@@ -738,7 +774,7 @@ function closeNoteDialogImmediately() {
  * 创建按钮元素
  * 根据按钮配置创建克隆按钮
  */
-function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null): HTMLElement {
+function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null, isDark: boolean): HTMLElement {
   // 创建按钮副本
   const clonedBtn = document.createElement('button');
   
@@ -766,10 +802,10 @@ function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null):
     height: ${buttonHeight}px;
     padding: 4px ${buttonPadding}px;
     margin: ${buttonMargin}px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid ${isDark ? '#404040' : '#e0e0e0'};
     border-radius: 6px;
-    background: white;
-    color: #333;
+    background: ${isDark ? '#2a2a2a' : 'white'};
+    color: ${isDark ? '#e0e0e0' : '#333'};
     font-size: 14px;
     cursor: pointer;
     display: inline-flex;
@@ -849,13 +885,13 @@ function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null):
   
   // 添加hover效果
   clonedBtn.addEventListener('mouseenter', () => {
-    clonedBtn.style.backgroundColor = '#f5f5f5';
+    clonedBtn.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#f5f5f5';
     clonedBtn.style.transform = 'translateY(-1px)';
     clonedBtn.style.boxShadow = '0 2px 6px rgba(0,0,0,0.15)';
   });
-  
+
   clonedBtn.addEventListener('mouseleave', () => {
-    clonedBtn.style.backgroundColor = 'white';
+    clonedBtn.style.backgroundColor = isDark ? '#2a2a2a' : 'white';
     clonedBtn.style.transform = 'translateY(0)';
     clonedBtn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
   });
@@ -886,7 +922,8 @@ function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null):
 function renderButtons(
   container: HTMLElement,
   buttonConfigs: any[],
-  sortMethod: string
+  sortMethod: string,
+  isDark: boolean
 ): void {
   // 创建按钮容器
   const buttonsContainer = document.createElement('div');
@@ -944,7 +981,7 @@ function renderButtons(
     const originalBtn = document.querySelector(`[data-custom-button="${buttonConfig.id}"]`) as HTMLElement;
     
     // 创建按钮副本
-    const clonedBtn = createClonedButton(buttonConfig, originalBtn);
+    const clonedBtn = createClonedButton(buttonConfig, originalBtn, isDark);
     
     // 添加点击事件
     clonedBtn.addEventListener('click', async (e) => {
@@ -1131,6 +1168,9 @@ function copyBottomToolbarButtons(container: HTMLElement) {
     // 获取排序方法配置（使用从 toolbarManager 导入的 pluginInstance）
     const sortMethod = pluginInstance?.mobileFeatureConfig?.quickNoteSortMethod || 'bottomToolbar';
 
+    // 检测暗黑模式
+    const isDark = isSiyuanDarkMode();
+
     // 为滚动条添加样式（避免重复注入）
     const styleId = 'quick-note-buttons-scrollbar-style';
     if (!document.getElementById(styleId)) {
@@ -1141,22 +1181,22 @@ function copyBottomToolbarButtons(container: HTMLElement) {
           width: 6px;
         }
         #quick-note-dialog .buttons-container::-webkit-scrollbar-track {
-          background: #f1f1f1;
+          background: ${isDark ? '#2a2a2a' : '#f1f1f1'};
           border-radius: 3px;
         }
         #quick-note-dialog .buttons-container::-webkit-scrollbar-thumb {
-          background: #888;
+          background: ${isDark ? '#555' : '#888'};
           border-radius: 3px;
         }
         #quick-note-dialog .buttons-container::-webkit-scrollbar-thumb:hover {
-          background: #555;
+          background: ${isDark ? '#777' : '#555'};
         }
       `;
       document.head.appendChild(scrollbarStyle);
     }
 
     // 根据排序方法调用渲染函数
-    renderButtons(container, buttonConfigs, sortMethod);
+    renderButtons(container, buttonConfigs, sortMethod, isDark);
 
   } catch (error) {
     const errorMsg = document.createElement('div');
@@ -1189,13 +1229,14 @@ async function appendToSpecificDocument(documentId: string, content: string, ins
 }
 
 function showSuccessMessage(message: string) {
+  const isDark = isSiyuanDarkMode();
   const msg = document.createElement('div');
   msg.textContent = message;
   msg.style.cssText = `
     position: fixed;
     top: 20px;
     right: 20px;
-    background: #4CAF50;
+    background: ${isDark ? '#4a9eff' : '#4CAF50'};
     color: white;
     padding: 12px 20px;
     border-radius: 6px;

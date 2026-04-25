@@ -833,9 +833,10 @@ export function createMobileButtonItem(
         <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>⑤ 叶归LifeLog适配</option>
         <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
         <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
+        <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>⑧ 图片快捷导入日记</option>
       `
       subtypeSelect.onchange = () => {
-        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc'
+        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload'
         ;(subtypeSelect as any).refreshForm?.()
       }
       authorToolContainer.appendChild(subtypeSelect)
@@ -1254,6 +1255,42 @@ export function createMobileButtonItem(
       scrollDocConfigDiv.appendChild(radioContainer)
       authorToolContainer.appendChild(scrollDocConfigDiv)
 
+      // 图片快捷导入日记配置区
+      const imageUploadConfigDiv = document.createElement('div')
+      imageUploadConfigDiv.id = 'image-upload-config-mobile'
+      imageUploadConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+      // 功能说明
+      const imageUploadDesc = document.createElement('div')
+      imageUploadDesc.innerHTML = `
+        <div style="font-size: 12px; color: #60a5fa; margin-bottom: 8px;">
+          📸 <strong>使用说明：</strong>选择本地图片后自动上传并插入到今日日记底部
+        </div>
+      `
+      imageUploadConfigDiv.appendChild(imageUploadDesc)
+
+      // 笔记本ID
+      const notebookIdRow = document.createElement('div')
+      notebookIdRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
+
+      const imgNotebookLabel = document.createElement('label')
+      imgNotebookLabel.innerHTML = '📓 <strong>日记笔记本ID</strong>'
+      imgNotebookLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 120px; flex-shrink: 0;'
+
+      const imgNotebookInput = document.createElement('input')
+      imgNotebookInput.className = 'b3-text-field'
+      imgNotebookInput.type = 'text'
+      imgNotebookInput.value = button.imageUploadNotebookId || ''
+      imgNotebookInput.placeholder = '输入日记所在笔记本ID'
+      imgNotebookInput.style.cssText = 'width: 100%; font-size: 14px; padding: 6px 8px;'
+      imgNotebookInput.onchange = () => { button.imageUploadNotebookId = imgNotebookInput.value }
+
+      notebookIdRow.appendChild(imgNotebookLabel)
+      notebookIdRow.appendChild(imgNotebookInput)
+      imageUploadConfigDiv.appendChild(notebookIdRow)
+
+      authorToolContainer.appendChild(imageUploadConfigDiv)
+
       // 日记顶部或底部配置区（说明 + 位置选择 + 笔记本ID + 等待时间配置）
       const diaryConfigDiv = document.createElement('div')
       diaryConfigDiv.id = 'diary-config-mobile'
@@ -1410,6 +1447,7 @@ export function createMobileButtonItem(
           popupSelectConfigDiv.style.display = 'none'
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'none'
+          imageUploadConfigDiv.style.display = 'none'
         } else if (subtype === 'diary' || subtype === 'diary-top' || subtype === 'diary-bottom') {
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
@@ -1418,6 +1456,7 @@ export function createMobileButtonItem(
           popupSelectConfigDiv.style.display = 'none'
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'none'
+          imageUploadConfigDiv.style.display = 'none'
           // 更新日记位置单选按钮状态
           const position = button.diaryPosition || 'top'
           if ((diaryPositionOptionsMobile as any).diaryTopRadio && (diaryPositionOptionsMobile as any).diaryBottomRadio) {
@@ -1439,6 +1478,7 @@ export function createMobileButtonItem(
           popupSelectConfigDiv.style.display = 'none'
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'none'
+          imageUploadConfigDiv.style.display = 'none'
         } else if (subtype === 'popup-select') {
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
@@ -1447,6 +1487,7 @@ export function createMobileButtonItem(
           popupSelectConfigDiv.style.display = 'flex'
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'none'
+          imageUploadConfigDiv.style.display = 'none'
         } else if (subtype === 'button-sequence') {
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
@@ -1455,6 +1496,7 @@ export function createMobileButtonItem(
           popupSelectConfigDiv.style.display = 'none'
           buttonSequenceConfigDiv.style.display = 'flex'
           scrollDocConfigDiv.style.display = 'none'
+          imageUploadConfigDiv.style.display = 'none'
         } else if (subtype === 'scroll-doc') {
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
@@ -1463,6 +1505,16 @@ export function createMobileButtonItem(
           popupSelectConfigDiv.style.display = 'none'
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'flex'
+          imageUploadConfigDiv.style.display = 'none'
+        } else if (subtype === 'image-upload') {
+          docConfigDiv.style.display = 'none'
+          dbConfigDiv.style.display = 'none'
+          diaryConfigDiv.style.display = 'none'
+          lifeLogConfigDiv.style.display = 'none'
+          popupSelectConfigDiv.style.display = 'none'
+          buttonSequenceConfigDiv.style.display = 'none'
+          scrollDocConfigDiv.style.display = 'none'
+          imageUploadConfigDiv.style.display = 'flex'
         } else {
           docConfigDiv.style.display = 'flex'
           dbConfigDiv.style.display = 'none'
@@ -1471,6 +1523,7 @@ export function createMobileButtonItem(
           popupSelectConfigDiv.style.display = 'none'
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'none'
+          imageUploadConfigDiv.style.display = 'none'
         }
       }
       ;(subtypeSelect as any).refreshForm = updateVisibility

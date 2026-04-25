@@ -58,7 +58,7 @@ export interface ButtonConfig {
   targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
   mobileTargetDocId?: string; // 打开指定ID块：目标块ID（移动端），支持文档ID或块ID
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
-  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary=日记, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮, scroll-doc=滚动文档顶部或底部
+  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary=日记, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮, scroll-doc=滚动文档顶部或底部, image-upload=图片快捷导入日记
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
   viewName?: string;         // 视图名称
@@ -74,6 +74,8 @@ export interface ButtonConfig {
   diaryNotebookId?: string;   // 日记底部功能：指定笔记本ID（留空则使用Alt+5快捷键）
   lifeLogCategories?: string[]; // 叶归LifeLog适配：分类选项列表
   lifeLogNotebookId?: string; // 叶归LifeLog适配：目标笔记本ID
+  imageUploadMode?: 'manual' | 'daily-note'; // 图片快捷导入：插入模式（manual=手动位置, daily-note=日记底部）
+  imageUploadNotebookId?: string; // 图片快捷导入：日记模式目标笔记本ID
   cardContainerHeight?: string; // 卡片模式容器高度
   cardScrollMaxHeight?: string; // 卡片模式滚动容器最大高度
   // 一键记事配置
@@ -390,6 +392,7 @@ let mutationObserver: MutationObserver | null = null
 let pageObserver: MutationObserver | null = null  // 用于检测页面变化的观察器
 let mobileToolbarClickHandler: ((e: Event) => void) | null = null  // 专门用于移动端工具栏的点击处理
 let customButtonClickHandler: ((e: Event) => void) | null = null  // 专门用于自定义按钮的点击处理
+let overflowCloseHandler: ((e: Event) => void) | null = null  // 扩展工具栏点击外部关闭监听器
 let toolbarObserver: MutationObserver | null = null  // 用于监听工具栏渲染的观察器
 let toolbarStyleChangeHandler: (() => void) | null = null  // 工具栏样式变化事件处理器
 let activeTimers: Set<ReturnType<typeof setTimeout> | ReturnType<typeof setInterval>> = new Set()  // 跟踪所有活动的定时器（包括 setTimeout 和 setInterval）
@@ -1735,9 +1738,9 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     if (config.id === 'overflow-button-mobile') {
       // 扩展工具栏按钮：立即移除焦点并恢复输入框焦点，保持输入法状态
       button.blur() // 立即移除按钮焦点
-      // 如果之前有输入框焦点，立即恢复
+      // 如果之前有输入框焦点，立即恢复（preventScroll 防止滚动）
       if (lastActiveElement && isInputOrEditable(lastActiveElement)) {
-        lastActiveElement.focus()
+        lastActiveElement.focus({ preventScroll: true })
       }
       showOverflowToolbar(config)
       return
@@ -1751,7 +1754,7 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     // 弹窗框模板选择特殊处理：立即恢复焦点，保持输入法不关闭
     const isPopupSelect = config.type === 'author-tool' && config.authorToolSubtype === 'popup-select'
     if (isPopupSelect && lastActiveElement && isInputOrEditable(lastActiveElement)) {
-      lastActiveElement.focus()
+      lastActiveElement.focus({ preventScroll: true })
     }
     
     // 如果扩展工具栏已打开，先关闭它（其他按钮点击会关闭扩展工具栏）
@@ -1770,10 +1773,10 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     await handleButtonClick(config, savedSelection, lastActiveElement, null)
 
     // builtin 类型的按钮不恢复焦点，让输入法自然关闭
-    // 其他类型恢复焦点
+    // 其他类型恢复焦点（preventScroll 防止浏览器自动滚动到顶部）
     if (config.type !== 'builtin') {
       if (lastActiveElement && lastActiveElement !== document.activeElement) {
-        ;(lastActiveElement as HTMLElement).focus()
+        ;(lastActiveElement as HTMLElement).focus({ preventScroll: true })
       }
     }
   })
@@ -1990,7 +1993,7 @@ function showOverflowToolbar(config: ButtonConfig) {
         toolbar.style.opacity = mobileConfig.toolbarOpacity.toString()
       } else {
         // 使用自定义颜色
-        const isDark = document.body.classList.contains('b3-theme-dark')
+        const isDark = document.documentElement.getAttribute('data-theme-mode') === 'dark'
         const bgColor = isDark ? mobileConfig.toolbarBackgroundColorDark : mobileConfig.toolbarBackgroundColor
         toolbar.style.backgroundColor = bgColor
         toolbar.style.opacity = mobileConfig.toolbarOpacity.toString()
@@ -2168,17 +2171,17 @@ function showOverflowToolbar(config: ButtonConfig) {
         // 弹窗框模板选择特殊处理：在执行功能前先恢复焦点，保持输入法不关闭
         const isPopupSelect = btn.type === 'author-tool' && btn.authorToolSubtype === 'popup-select'
         if (isPopupSelect && lastActiveElement && isInputOrEditable(lastActiveElement)) {
-          lastActiveElement.focus()
+          lastActiveElement.focus({ preventScroll: true })
         }
 
         // 将保存的选区传递给处理函数（使用 await 保持 async 链条）
         await handleButtonClick(btn, savedSelection, lastActiveElement)
 
         // builtin 类型的按钮不恢复焦点，让输入法自然关闭
-        // 其他类型恢复焦点，保持输入法打开
+        // 其他类型恢复焦点，保持输入法打开（preventScroll 防止浏览器自动滚动到顶部）
         if (btn.type !== 'builtin') {
           if (lastActiveElement && lastActiveElement !== document.activeElement) {
-            ;(lastActiveElement as HTMLElement).focus()
+            ;(lastActiveElement as HTMLElement).focus({ preventScroll: true })
           }
         }
 
@@ -2206,11 +2209,17 @@ function showOverflowToolbar(config: ButtonConfig) {
       if (overflowButton) {
         overflowButton.blur()
       }
-      document.removeEventListener('click', closeOnClickOutside)
+      if (overflowCloseHandler) {
+        document.removeEventListener('click', overflowCloseHandler)
+        overflowCloseHandler = null
+      }
     }
   }
+  overflowCloseHandler = closeOnClickOutside
   setTimeout(() => {
-    document.addEventListener('click', closeOnClickOutside)
+    if (overflowCloseHandler) {
+      document.addEventListener('click', overflowCloseHandler)
+    }
   }, 100)
 }
 
@@ -2883,15 +2892,17 @@ function executeScrollDoc(config: ButtonConfig) {
 
   // 手机端：直接操作 scrollTop 实现滚动
   if (isMobileDevice()) {
-    const content = activeProtyle.querySelector('.protyle-content') as HTMLElement
-    if (content) {
-      content.scrollTop = direction === 'top' ? 0 : content.scrollHeight
+    const scrollEl = (activeProtyle.querySelector('.protyle-scroll') || activeProtyle.querySelector('.protyle-content')) as HTMLElement
+    if (scrollEl) {
+      scrollEl.scrollTop = direction === 'top' ? 0 : scrollEl.scrollHeight
     }
     return
   }
 
-  // 电脑端：模拟键盘快捷键
-  // Ctrl+Home = 文档顶部, Ctrl+End = 文档底部
+  // 电脑端：先尝试键盘事件，若滚动未生效则回退到 scrollIntoView
+  const scrollEl = (activeProtyle.querySelector('.protyle-scroll') || activeProtyle.querySelector('.protyle-content')) as HTMLElement
+  const scrollTopBefore = scrollEl ? scrollEl.scrollTop : 0
+
   const key = direction === 'top' ? 'Home' : 'End'
   const event = new KeyboardEvent('keydown', {
     key: key,
@@ -2909,6 +2920,20 @@ function executeScrollDoc(config: ButtonConfig) {
   if (wysiwyg) {
     wysiwyg.dispatchEvent(event)
   }
+
+  // 检测滚动是否生效，未生效则用 scrollIntoView 回退
+  requestAnimationFrame(() => {
+    if (scrollEl && scrollEl.scrollTop === scrollTopBefore) {
+      const content = activeProtyle.querySelector('.protyle-content') as HTMLElement
+      if (content) {
+        if (direction === 'top') {
+          content.firstElementChild?.scrollIntoView({ behavior: 'instant', block: 'start' })
+        } else {
+          content.lastElementChild?.scrollIntoView({ behavior: 'instant', block: 'end' })
+        }
+      }
+    }
+  })
 }
 
 /**
@@ -3635,7 +3660,11 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
       if (selectedCategory) {
         // 保存当前焦点元素和滚动位置（在弹出输入框之前）
         const activeElementBeforeInput = document.activeElement as HTMLElement
-        const scrollPositionBefore = window.pageYOffset || document.documentElement.scrollTop
+        // 查找思源实际的滚动容器（.protyle-scroll 或 .layout__center）
+        const scrollContainer = (document.querySelector('.protyle-scroll') || document.querySelector('.layout__center')) as HTMLElement | null
+        const scrollPositionBefore = scrollContainer
+          ? scrollContainer.scrollTop
+          : (window.pageYOffset || document.documentElement.scrollTop)
 
         // 弹出输入框，让用户输入具体内容
         const inputContent = await showTextInputDialog('请输入内容', '例如：写插件')
@@ -3671,13 +3700,20 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
                 Notify.showInfoCopySuccess() // 使用现有的成功通知
               }
 
-              // 延迟恢复焦点和滚动位置（等待思源完成跳转）
+              // 延迟恢复滚动位置（等待思源完成跳转）
               setTimeout(() => {
-                // 恢复滚动位置
-                window.scrollTo(0, scrollPositionBefore)
+                // 恢复滚动位置到思源的实际滚动容器
+                const currentScrollContainer = (document.querySelector('.protyle-scroll') || document.querySelector('.layout__center')) as HTMLElement | null
+                if (currentScrollContainer) {
+                  currentScrollContainer.scrollTop = scrollPositionBefore
+                } else {
+                  window.scrollTo(0, scrollPositionBefore)
+                }
 
-                // 恢复焦点到之前的元素
-                if (activeElementBeforeInput && document.contains(activeElementBeforeInput)) {
+                // 移动端不恢复焦点，避免重新弹出输入法
+                const frontend = getFrontend()
+                const isMobileDevice = frontend === 'mobile' || frontend === 'browser-mobile'
+                if (!isMobileDevice && activeElementBeforeInput && document.contains(activeElementBeforeInput)) {
                   try {
                     activeElementBeforeInput.focus({ preventScroll: true })
                   } catch (e) {
@@ -3702,6 +3738,12 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
       console.warn('[叶归LifeLog适配] 执行失败:', error)
       Notify.showErrorCommandCannotExecute('叶归LifeLog适配')
     }
+    return
+  }
+
+  // ⑧图片快捷导入日记
+  if (subtype === 'image-upload') {
+    await executeImageUpload(config)
     return
   }
 
@@ -3790,6 +3832,97 @@ function minutesToHHMM(minutes: number): string {
   const hours = Math.floor(minutes / 60) % 24
   const mins = minutes % 60
   return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`
+}
+
+/**
+ * ⑧图片快捷导入日记
+ */
+async function executeImageUpload(config: ButtonConfig) {
+  // 创建文件选择器
+  const fileInput = document.createElement('input')
+  fileInput.type = 'file'
+  fileInput.accept = 'image/*'
+  fileInput.style.display = 'none'
+  document.body.appendChild(fileInput)
+
+  fileInput.onchange = async () => {
+    document.body.removeChild(fileInput)
+
+    const file = fileInput.files?.[0]
+    if (!file) return
+
+    try {
+      // 上传图片到思源资源库
+      // 字段名必须是 file[]（对应思源内核 form.File["file[]"]）
+      const formData = new FormData()
+      formData.append('file[]', file)
+
+      // 使用原生 fetch，避免 fetchSyncPost 的 processMessage 触发 UI 刷新
+      const httpResponse = await fetch('/api/asset/upload', {
+        method: 'POST',
+        body: formData
+      })
+      const response = await httpResponse.json()
+      console.log('[图片快捷导入] 上传响应:', JSON.stringify(response))
+
+      if (response.code !== 0) {
+        console.error('[图片快捷导入] 上传失败:', response)
+        Notify.showErrorCommandCannotExecute('图片上传失败: ' + (response.msg || ''))
+        return
+      }
+
+      // 思源返回 succMap 格式: { "filename.jpg": "assets/xxx-xxx.jpg" }
+      const succMap = response.data?.succMap
+      if (!succMap || Object.keys(succMap).length === 0) {
+        console.error('[图片快捷导入] succMap 为空:', response.data)
+        Notify.showErrorCommandCannotExecute('图片上传失败: 无返回路径')
+        return
+      }
+
+      const uploadedPath = Object.values(succMap)[0] as string
+      console.log('[图片快捷导入] 文件路径:', uploadedPath)
+
+      if (!uploadedPath) {
+        Notify.showErrorCommandCannotExecute('图片上传失败: 路径为空')
+        return
+      }
+
+      // 插入到日记底部
+      const notebookId = config.imageUploadNotebookId
+      if (!notebookId) {
+        Notify.showErrorCommandCannotExecute('请先配置笔记本ID')
+        return
+      }
+
+      const imageMarkdown = `![](${uploadedPath})\n`
+
+      // 使用原生 fetch 调用，避免 fetchSyncPost 的 processMessage 触发 UI 刷新导致滚动位置重置
+      const appendResponse = await fetch('/api/block/appendDailyNoteBlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          data: imageMarkdown,
+          dataType: 'markdown',
+          notebook: notebookId
+        })
+      })
+      const appendResult = await appendResponse.json()
+      console.log('[图片快捷导入] 追加到日记响应:', JSON.stringify(appendResult))
+
+      if (appendResult.code === 0) {
+        if (config.showNotification) {
+          Notify.showInfoCopySuccess()
+        }
+      } else {
+        Notify.showErrorCommandCannotExecute('追加到日记失败: ' + (appendResult.msg || ''))
+      }
+    } catch (error) {
+      console.warn('[图片快捷导入日记] 执行失败:', error)
+      Notify.showErrorCommandCannotExecute('图片导入失败')
+    }
+  }
+
+  fileInput.click()
 }
 
 /**
@@ -4829,6 +4962,11 @@ export function cleanup() {
   if (customButtonClickHandler) {
     document.removeEventListener('click', customButtonClickHandler, true)
     customButtonClickHandler = null
+  }
+
+  if (overflowCloseHandler) {
+    document.removeEventListener('click', overflowCloseHandler)
+    overflowCloseHandler = null
   }
 
   // 清理工具栏观察器

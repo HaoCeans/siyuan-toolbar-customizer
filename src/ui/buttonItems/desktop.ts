@@ -822,9 +822,10 @@ export function createDesktopButtonItem(
       <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>⑤ 叶归LifeLog适配</option>
       <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
       <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
+      <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>⑧ 图片快捷导入日记</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload'
       // 刷新表单以显示/隐藏相关配置
       if ((subtypeSelect as any).refreshForm) {
         (subtypeSelect as any).refreshForm()
@@ -1300,6 +1301,42 @@ export function createDesktopButtonItem(
     scrollDocConfigDiv.appendChild(radioContainer)
     authorToolField.appendChild(scrollDocConfigDiv)
 
+    // 图片快捷导入日记配置区
+    const img1UploadConfigDiv = document.createElement('div')
+    img1UploadConfigDiv.id = 'image-upload-config'
+    img1UploadConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+    // 功能说明
+    const img1Desc = document.createElement('div')
+    img1Desc.innerHTML = `
+      <div style="font-size: 12px; color: #60a5fa; margin-bottom: 8px;">
+        📸 <strong>使用说明：</strong>选择本地图片后自动上传并插入到今日日记底部
+      </div>
+    `
+    img1UploadConfigDiv.appendChild(img1Desc)
+
+    // 笔记本ID
+    const img1NotebookRow = document.createElement('div')
+    img1NotebookRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
+
+    const img1NotebookLabel = document.createElement('label')
+    img1NotebookLabel.innerHTML = '📓 <strong>日记笔记本ID</strong>'
+    img1NotebookLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 120px; flex-shrink: 0;'
+
+    const img1NotebookInput = document.createElement('input')
+    img1NotebookInput.className = 'b3-text-field'
+    img1NotebookInput.type = 'text'
+    img1NotebookInput.value = button.imageUploadNotebookId || ''
+    img1NotebookInput.placeholder = '输入日记所在笔记本ID'
+    img1NotebookInput.style.cssText = 'width: 100%; font-size: 14px; padding: 6px 8px;'
+    img1NotebookInput.onchange = () => { button.imageUploadNotebookId = img1NotebookInput.value }
+
+    img1NotebookRow.appendChild(img1NotebookLabel)
+    img1NotebookRow.appendChild(img1NotebookInput)
+    img1UploadConfigDiv.appendChild(img1NotebookRow)
+
+    authorToolField.appendChild(img1UploadConfigDiv)
+
     // 数据库块ID
     const dbBlockIdLabel = document.createElement('label')
     dbBlockIdLabel.textContent = '数据库块ID'
@@ -1467,6 +1504,7 @@ export function createDesktopButtonItem(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
+        img1UploadConfigDiv.style.display = 'none'
       } else if (subtype === 'database') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'flex'
@@ -1475,6 +1513,7 @@ export function createDesktopButtonItem(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
+        img1UploadConfigDiv.style.display = 'none'
       } else if (subtype === 'diary' || subtype === 'diary-top' || subtype === 'diary-bottom') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -1483,6 +1522,7 @@ export function createDesktopButtonItem(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
+        img1UploadConfigDiv.style.display = 'none'
         // 更新日记位置单选按钮状态
         const position = button.diaryPosition || 'bottom'
         if ((diaryPositionOptions as any).diaryTopRadio && (diaryPositionOptions as any).diaryBottomRadio) {
@@ -1504,6 +1544,7 @@ export function createDesktopButtonItem(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
+        img1UploadConfigDiv.style.display = 'none'
       } else if (subtype === 'popup-select') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -1512,6 +1553,7 @@ export function createDesktopButtonItem(
         popupSelectConfigDiv.style.display = 'flex'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
+        img1UploadConfigDiv.style.display = 'none'
       } else if (subtype === 'button-sequence') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -1520,6 +1562,7 @@ export function createDesktopButtonItem(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'flex'
         scrollDocConfigDiv.style.display = 'none'
+        img1UploadConfigDiv.style.display = 'none'
       } else if (subtype === 'scroll-doc') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -1528,6 +1571,16 @@ export function createDesktopButtonItem(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'flex'
+        img1UploadConfigDiv.style.display = 'none'
+      } else if (subtype === 'image-upload') {
+        docConfigDiv.style.display = 'none'
+        dbConfigDiv.style.display = 'none'
+        diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
+        img1UploadConfigDiv.style.display = 'flex'
       } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'
@@ -1536,6 +1589,7 @@ export function createDesktopButtonItem(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
+        img1UploadConfigDiv.style.display = 'none'
       }
     }
     ;(subtypeSelect as any).refreshForm = updateVisibility
@@ -2397,9 +2451,10 @@ export function populateDesktopEditForm(
       <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>⑤ 叶归LifeLog适配</option>
       <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
       <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
+      <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>⑧ 图片快捷导入日记</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload'
       ;(subtypeSelect as any).refreshForm?.()
     }
     authorToolField.appendChild(subtypeSelect)
@@ -3052,6 +3107,42 @@ export function populateDesktopEditForm(
     scrollDocConfigDiv.appendChild(radioContainer2)
     authorToolField.appendChild(scrollDocConfigDiv)
 
+    // 图片快捷导入日记配置区
+    const img2UploadConfigDiv = document.createElement('div')
+    img2UploadConfigDiv.id = 'image-upload-config-2'
+    img2UploadConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+    // 功能说明
+    const img2Desc = document.createElement('div')
+    img2Desc.innerHTML = `
+      <div style="font-size: 12px; color: #60a5fa; margin-bottom: 8px;">
+        📸 <strong>使用说明：</strong>选择本地图片后自动上传并插入到今日日记底部
+      </div>
+    `
+    img2UploadConfigDiv.appendChild(img2Desc)
+
+    // 笔记本ID
+    const img2NotebookRow = document.createElement('div')
+    img2NotebookRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
+
+    const img2NotebookLabel = document.createElement('label')
+    img2NotebookLabel.innerHTML = '📓 <strong>日记笔记本ID</strong>'
+    img2NotebookLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 120px; flex-shrink: 0;'
+
+    const img2NotebookInput = document.createElement('input')
+    img2NotebookInput.className = 'b3-text-field'
+    img2NotebookInput.type = 'text'
+    img2NotebookInput.value = button.imageUploadNotebookId || ''
+    img2NotebookInput.placeholder = '输入日记所在笔记本ID'
+    img2NotebookInput.style.cssText = 'width: 100%; font-size: 14px; padding: 6px 8px;'
+    img2NotebookInput.onchange = () => { button.imageUploadNotebookId = img2NotebookInput.value }
+
+    img2NotebookRow.appendChild(img2NotebookLabel)
+    img2NotebookRow.appendChild(img2NotebookInput)
+    img2UploadConfigDiv.appendChild(img2NotebookRow)
+
+    authorToolField.appendChild(img2UploadConfigDiv)
+
     // 根据当前选择显示/隐藏配置区
     const updateVisibility = () => {
       const subtype = subtypeSelect.value
@@ -3063,6 +3154,7 @@ export function populateDesktopEditForm(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
+        img2UploadConfigDiv.style.display = 'none'
       } else if (subtype === 'database') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'flex'
@@ -3071,6 +3163,7 @@ export function populateDesktopEditForm(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
+        img2UploadConfigDiv.style.display = 'none'
       } else if (subtype === 'diary' || subtype === 'diary-top' || subtype === 'diary-bottom') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -3079,6 +3172,7 @@ export function populateDesktopEditForm(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
+        img2UploadConfigDiv.style.display = 'none'
         // 更新日记位置单选按钮状态
         const position = button.diaryPosition || 'bottom'
         if ((diaryPositionOptions as any).diaryTopRadio && (diaryPositionOptions as any).diaryBottomRadio) {
@@ -3100,6 +3194,7 @@ export function populateDesktopEditForm(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
+        img2UploadConfigDiv.style.display = 'none'
       } else if (subtype === 'popup-select') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -3108,6 +3203,7 @@ export function populateDesktopEditForm(
         popupSelectConfigDiv.style.display = 'flex'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
+        img2UploadConfigDiv.style.display = 'none'
       } else if (subtype === 'button-sequence') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -3116,6 +3212,7 @@ export function populateDesktopEditForm(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'flex'
         scrollDocConfigDiv.style.display = 'none'
+        img2UploadConfigDiv.style.display = 'none'
       } else if (subtype === 'scroll-doc') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
@@ -3124,6 +3221,16 @@ export function populateDesktopEditForm(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'flex'
+        img2UploadConfigDiv.style.display = 'none'
+      } else if (subtype === 'image-upload') {
+        docConfigDiv.style.display = 'none'
+        dbConfigDiv.style.display = 'none'
+        diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
+        img2UploadConfigDiv.style.display = 'flex'
       } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'
@@ -3132,6 +3239,7 @@ export function populateDesktopEditForm(
         popupSelectConfigDiv.style.display = 'none'
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
+        img2UploadConfigDiv.style.display = 'none'
       }
     }
     ;(subtypeSelect as any).refreshForm = updateVisibility

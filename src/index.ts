@@ -22,6 +22,7 @@ import {
   initMobileToolbarAdjuster,
   initCustomButtons,
   cleanup,
+  clearWindowDimensionDisplay,
   createButtonsForEditors,
   DEFAULT_BUTTONS_CONFIG,
   DEFAULT_DESKTOP_BUTTONS,
@@ -496,6 +497,7 @@ export default class ToolbarCustomizer extends Plugin {
   onunload() {
     // 清理资源
     cleanup()
+    clearWindowDimensionDisplay()
     destroy()
 
     // 清理标签切换器资源
@@ -544,6 +546,15 @@ export default class ToolbarCustomizer extends Plugin {
   }
 
   openSetting() {
+    // 保存配置快照，用于变更检测
+    const snapshot = JSON.stringify({
+      mobileToolbarConfig: this.mobileConfig,
+      desktopButtonConfigs: this.desktopButtonConfigs,
+      mobileButtonConfigs: this.mobileButtonConfigs,
+      desktopFeatureConfig: this.desktopFeatureConfig,
+      mobileFeatureConfig: this.mobileFeatureConfig
+    })
+
     const setting = new Setting({
       width: this.isMobile ? '100%' : '800px',
       height: this.isMobile ? '100%' : '70vh',
@@ -591,11 +602,40 @@ export default class ToolbarCustomizer extends Plugin {
           })
         }
 
-        await this.saveData('mobileToolbarConfig', this.mobileConfig)
-        await this.saveData('desktopButtonConfigs', this.desktopButtonConfigs)
-        await this.saveData('mobileButtonConfigs', this.mobileButtonConfigs)
-        await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
-        await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
+        // 变更检测：逐项对比当前配置与打开设置时的快照
+        const savedSnapshot = JSON.parse(snapshot) as Record<string, any>
+        const changed = (key: string, data: any) => JSON.stringify(data) !== JSON.stringify(savedSnapshot[key])
+
+        const desktopButtonsChanged = changed('desktopButtonConfigs', this.desktopButtonConfigs)
+        const mobileButtonsChanged = changed('mobileButtonConfigs', this.mobileButtonConfigs)
+        const mobileToolbarChanged = changed('mobileToolbarConfig', this.mobileConfig)
+        const desktopFeatureChanged = changed('desktopFeatureConfig', this.desktopFeatureConfig)
+        const mobileFeatureChanged = changed('mobileFeatureConfig', this.mobileFeatureConfig)
+
+        const hasAnyChange = desktopButtonsChanged || mobileButtonsChanged || mobileToolbarChanged || desktopFeatureChanged || mobileFeatureChanged
+
+        if (!hasAnyChange && !this._pendingWelcomeSave) {
+          showMessage('配置无变化，未保存', 3000, 'info')
+          await new Promise(r => setTimeout(r, 100))
+          return
+        }
+
+        // 只保存实际发生变化的配置
+        if (mobileToolbarChanged) {
+          await this.saveData('mobileToolbarConfig', this.mobileConfig)
+        }
+        if (!this.isMobile && desktopButtonsChanged) {
+          await this.saveData('desktopButtonConfigs', this.desktopButtonConfigs)
+        }
+        if (mobileButtonsChanged) {
+          await this.saveData('mobileButtonConfigs', this.mobileButtonConfigs)
+        }
+        if (!this.isMobile && desktopFeatureChanged) {
+          await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
+        }
+        if (mobileFeatureChanged) {
+          await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
+        }
 
         // 如果有待保存的欢迎标记，一并保存
         if (this._pendingWelcomeSave) {

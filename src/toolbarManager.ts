@@ -6,6 +6,11 @@
 import { Dialog, fetchSyncPost, getFrontend, showMessage, openTab as siyuanOpenTab, openMobileFileById } from "siyuan";
 // 通知模块
 import * as Notify from "./notification";
+// 手机端标签页Tab模块
+import { toggleVisibility as toggleMobileTabs } from "./ui/mobileTabs";
+// 手机端悬浮大纲模块
+import { toggleVisibility as toggleMobileOutline } from "./ui/mobileOutline";
+import { toggleVisibility as toggleMobileDocNav } from "./ui/mobileDocNav";
 
 // ===== 插件实例（用于需要 app 参数的 API 调用） =====
 export let pluginInstance: any = null;
@@ -58,7 +63,7 @@ export interface ButtonConfig {
   targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
   mobileTargetDocId?: string; // 打开指定ID块：目标块ID（移动端），支持文档ID或块ID
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
-  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary=日记, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮, scroll-doc=滚动文档顶部或底部, image-upload=图片快捷导入日记
+  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary=日记, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮, scroll-doc=滚动文档顶部或底部, image-upload=图片快捷导入日记, mobile-tabs=手机端标签页Tab, mobile-outline=手机端悬浮大纲, doc-nav=手机端前一篇/后一篇文档
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
   viewName?: string;         // 视图名称
@@ -99,6 +104,7 @@ export interface ButtonConfig {
   layers?: number;           // 扩展工具栏层数（1-5），仅扩展工具栏按钮使用
   overflowLevel?: number;    // 溢出层级（0=底部工具栏可见，1-N=第几层扩展工具栏）
   showName?: boolean;        // 是否在按钮上显示名称（默认false）
+  showInContextMenu?: boolean; // 是否显示在文本右键菜单中（仅模板类型，默认false）
 }
 
 // 全局按钮配置（用于批量设置所有按钮的默认值）
@@ -108,6 +114,7 @@ export interface GlobalButtonConfig {
   minWidth: number;          // 按钮最小宽度（px）
   marginRight: number;       // 右侧边距（px）
   showNotification: boolean; // 是否显示右上角提示
+  externalButtonsReserveWidth?: number; // 其他插件按钮预留宽度（px，仅影响主工具栏溢出计算，默认0）
 }
 
 // 桌面端全局按钮默认值
@@ -116,7 +123,8 @@ export const DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG: GlobalButtonConfig = {
   iconSize: 18,
   minWidth: 32,
   marginRight: 8,
-  showNotification: true
+  showNotification: true,
+  externalButtonsReserveWidth: 0
 }
 
 // 手机端全局按钮默认值
@@ -125,7 +133,8 @@ export const DEFAULT_MOBILE_GLOBAL_BUTTON_CONFIG: GlobalButtonConfig = {
   iconSize: 23,
   minWidth: 23,
   marginRight: 10,
-  showNotification: true
+  showNotification: true,
+  externalButtonsReserveWidth: 0
 }
 
 // 兼容性：保留旧的导出名称（默认为桌面端）
@@ -394,6 +403,8 @@ let mobileToolbarClickHandler: ((e: Event) => void) | null = null  // 专门用�
 let customButtonClickHandler: ((e: Event) => void) | null = null  // 专门用于自定义按钮的点击处理
 let overflowCloseHandler: ((e: Event) => void) | null = null  // 扩展工具栏点击外部关闭监听器
 let toolbarObserver: MutationObserver | null = null  // 用于监听工具栏渲染的观察器
+// MutationObserver 防抖用的待执行定时器（需要能在 cleanup 中清理）
+let pendingTimer: ReturnType<typeof setTimeout> | null = null
 let toolbarStyleChangeHandler: (() => void) | null = null  // 工具栏样式变化事件处理器
 let activeTimers: Set<ReturnType<typeof setTimeout> | ReturnType<typeof setInterval>> = new Set()  // 跟踪所有活动的定时器（包括 setTimeout 和 setInterval）
 let focusEventHandlers: Array<{ element: HTMLElement; focusHandler: () => void; blurHandler: () => void }> = []  // 跟踪焦点事件监听器以便清理
@@ -514,7 +525,11 @@ export function getButtonWidth(button: ButtonConfig): number {
  * @param overflowToolbarLayers 扩展工具栏层数
  * @returns 更新后的按钮配置
  */
-export function calculateButtonOverflow(buttons: ButtonConfig[], overflowToolbarLayers: number = 1): ButtonConfig[] {
+export function calculateButtonOverflow(
+  buttons: ButtonConfig[],
+  overflowToolbarLayers: number = 1,
+  externalButtonsReserveWidth: number = 0
+): ButtonConfig[] {
   // 过滤出启用的移动端按钮，按排序值排序（从左到右）
   const enabledButtons = buttons.filter(btn =>
     btn.enabled !== false &&
@@ -526,15 +541,21 @@ export function calculateButtonOverflow(buttons: ButtonConfig[], overflowToolbar
   const overflowButton = buttons.find(btn => btn.id === 'overflow-button-mobile')
 
   // 获取可用宽度
-  let availableWidth = getToolbarAvailableWidth()
+  const toolbarAvailableWidth = getToolbarAvailableWidth()
 
-  // 如果扩展工具栏按钮已启用，需要减去它占用的宽度
+  // 主工具栏：需要预留 “⋯” 按钮 + 其他插件按钮预留宽度
+  let mainAvailableWidth = toolbarAvailableWidth
   if (overflowButton && overflowButton.enabled !== false) {
-    const overflowButtonWidth = getButtonWidth(overflowButton)
-    availableWidth -= overflowButtonWidth
+    mainAvailableWidth -= getButtonWidth(overflowButton)
   }
+  const reserveWidth = Math.max(0, Number(externalButtonsReserveWidth) || 0)
+  mainAvailableWidth -= reserveWidth
 
-  if (availableWidth <= 0) {
+  // 扩展工具栏实际渲染有 left:10px; right:10px; 共 20px 边距 + border:1px 左右共 2px
+  // toolbarAvailableWidth 是面包屑宽度减去面包屑内边距，不含扩展工具栏的这 22px
+  const overflowAvailableWidth = toolbarAvailableWidth - 22
+
+  if (mainAvailableWidth <= 0 || overflowAvailableWidth <= 0) {
     return buttons.map(btn => ({ ...btn, overflowLevel: 0 }))
   }
 
@@ -561,8 +582,9 @@ export function calculateButtonOverflow(buttons: ButtonConfig[], overflowToolbar
   let currentLayer = 0
 
   for (const { button, width } of buttonWidths) {
+    const availableWidthForLayer = currentLayer === 0 ? mainAvailableWidth : overflowAvailableWidth
     // 检查当前层是否已满
-    if (currentWidth + width > availableWidth) {
+    if (currentWidth + width > availableWidthForLayer) {
       currentLayer++
       currentWidth = 0
       // 超过最大层数就放在隐藏层（overflowLevel = maxLayers + 1）
@@ -1214,8 +1236,9 @@ export function initCustomButtons(configs: ButtonConfig[]) {
     document.head.appendChild(focusStyle)
   }
 
-  // 清理旧的插件按钮
-  cleanupCustomButtons()
+  // 注意：这里不要做“全局清理所有按钮”，否则在文档切换/动态刷新时会出现
+  // “按钮整排先消失再出现”的闪烁。按钮的增删改由 createButtonsForEditors
+  // 在每个编辑器内做差异判断后局部更新即可。
 
   // 清理旧的工具栏观察器
   if (toolbarObserver) {
@@ -1223,8 +1246,10 @@ export function initCustomButtons(configs: ButtonConfig[]) {
     toolbarObserver = null
   }
 
-  // 初始设置
-  safeSetTimeout(() => setupEditorButtons(configs), 1000)
+  // 初始设置：用 rAF 等待一帧，尽量避免因 DOM 尚未就绪而反复重建
+  // 额外加一个短延迟重试，覆盖某些设备/模式下工具栏渲染较慢的情况
+  requestAnimationFrame(() => setupEditorButtons(configs))
+  safeSetTimeout(() => setupEditorButtons(configs), 200)
 
   // 点击编辑器时触发按钮创建（不再使用 MutationObserver 持续监听，避免卡顿）
   // startToolbarObserver(configs)  // 已禁用：改用点击触发
@@ -1297,7 +1322,8 @@ function setupEditorButtons(configs: ButtonConfig[]) {
         return
       }
 
-      const updatedButtons = calculateButtonOverflow(configs, overflowLayers)
+      const reserveWidth = pluginInstance?.mobileGlobalButtonConfig?.externalButtonsReserveWidth ?? 0
+      const updatedButtons = calculateButtonOverflow(configs, overflowLayers, reserveWidth)
       // 更新 configs 中的 overflowLevel
       updatedButtons.forEach(btn => {
         const original = configs.find(b => b.id === btn.id)
@@ -1338,9 +1364,16 @@ export function createButtonsForEditors(editors: NodeListOf<Element>, configs: B
       .filter(button => shouldShowButton(button) && shouldShowInMainToolbar(button))
       .sort((a, b) => b.sort - a.sort) // 降序
 
+    // 检查现有按钮是否与配置匹配，如果完全匹配则跳过重建
+    const existingButtons = editor.querySelectorAll('[data-custom-button]')
+    if (existingButtons.length > 0 && existingButtons.length === buttonsToAdd.length) {
+      const existingIds = new Set(Array.from(existingButtons).map(btn => (btn as HTMLElement).dataset.customButtonId))
+      const allMatch = buttonsToAdd.every(b => existingIds.has(b.id))
+      if (allMatch) return // 按钮已存在且配置匹配，跳过
+    }
+
     // 清理旧的插件按钮和分割线
-    const oldButtons = editor.querySelectorAll('[data-custom-button]')
-    oldButtons.forEach(btn => btn.remove())
+    existingButtons.forEach(btn => btn.remove())
     const oldDividers = editor.querySelectorAll('[data-toolbar-divider]')
     oldDividers.forEach(div => div.remove())
 
@@ -1391,22 +1424,16 @@ function startToolbarObserver(configs: ButtonConfig[]) {
   // 记录已处理的编辑器，避免重复处理
   const processedEditors = new Set<string>()
 
-  // 节流控制：使用 requestAnimationFrame 避免高频触发
-  let pendingUpdate = false
+  // 节流控制：使用 debounce 避免高频触发，150ms 合并多次快速变化
 
   // 创建观察器监听 DOM 变化
   toolbarObserver = new MutationObserver((mutations) => {
-    // 如果已有待执行的更新，跳过本次
-    if (pendingUpdate) return
-
     // 智能过滤：检查 mutations 是否与编辑器相关
     const hasEditorChange = mutations.some(mutation => {
-      // 检查新增节点是否包含编辑器或工具栏
       const addedNodes = Array.from(mutation.addedNodes)
       return addedNodes.some(node => {
         if (node.nodeType !== Node.ELEMENT_NODE) return false
         const el = node as Element
-        // 只关注 .protyle 或包含工具栏的元素
         return el.classList?.contains('protyle') ||
                el.classList?.contains('protyle-breadcrumb') ||
                el.classList?.contains('protyle-breadcrumb__bar') ||
@@ -1414,13 +1441,15 @@ function startToolbarObserver(configs: ButtonConfig[]) {
       })
     })
 
-    // 如果没有编辑器相关的变化，跳过
     if (!hasEditorChange) return
 
-    pendingUpdate = true
+    // 取消之前的待执行更新，合并为一次
+    if (pendingTimer) {
+      clearTimeout(pendingTimer)
+    }
 
-    requestAnimationFrame(() => {
-      pendingUpdate = false
+    pendingTimer = setTimeout(() => {
+      pendingTimer = null
 
       // 检查是否有新的编辑器或工具栏出现
       const editors = document.querySelectorAll('.protyle')
@@ -1434,12 +1463,14 @@ function startToolbarObserver(configs: ButtonConfig[]) {
 
         // 检查该编辑器是否已处理过
         if (processedEditors.has(editorId)) {
-          // 已处理过，但仍需检查按钮是否还存在（可能被思源重新渲染清除了）
+          // 已处理过，仍需检查按钮是否还存在（可能被思源重新渲染清除了）
           const existingButtons = editor.querySelectorAll('[data-custom-button]')
-          if (existingButtons.length === 0) {
-            // 按钮被清除了，需要重新创建
-            shouldRetry = true
+          if (existingButtons.length > 0) {
+            // 按钮还在，无需重建
+            return
           }
+          // 按钮被清除了，需要重新创建
+          shouldRetry = true
           return
         }
 
@@ -2585,7 +2616,7 @@ function executeBuiltinRefreshFunction(config: ButtonConfig) {
   }
 }
 
-function insertTemplate(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
+export function insertTemplate(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
   if (!config.template) {
     Notify.showErrorTemplateNotConfigured(config.name)
     return
@@ -2719,6 +2750,96 @@ export function processTemplateVariables(template: string): string {
     .replace(/\{\{second\}\}/g, second)
     .replace(/\{\{week\}\}/g, week)
     .replace(/\{\{timestamp\}\}/g, String(now.getTime()))
+}
+
+/**
+ * 显示模板右键菜单（用于一键记事弹窗等 textarea 场景）
+ * 在 textarea 上弹出包含模板按钮的自定义右键菜单
+ */
+export function showTemplateContextMenu(e: MouseEvent, textarea: HTMLTextAreaElement) {
+  e.preventDefault()
+  e.stopPropagation()
+
+  const desktopConfigs = pluginInstance?.desktopButtonConfigs || []
+  const mobileConfigs = pluginInstance?.mobileButtonConfigs || []
+  const allConfigs = [...desktopConfigs, ...mobileConfigs]
+  const contextMenuButtons = allConfigs.filter(
+    (btn: ButtonConfig) => btn.type === 'template' && btn.showInContextMenu && btn.template && btn.enabled !== false
+  )
+
+  if (contextMenuButtons.length === 0) return
+
+  // 移除旧的自定义右键菜单
+  const oldMenu = document.getElementById('template-context-menu')
+  if (oldMenu) oldMenu.remove()
+
+  const menu = document.createElement('div')
+  menu.id = 'template-context-menu'
+  menu.style.cssText = `
+    position: fixed;
+    z-index: 999999;
+    background: var(--b3-menu-background, #fff);
+    border: 1px solid var(--b3-border-color, #e0e0e0);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    padding: 4px 0;
+    min-width: 120px;
+  `
+
+  contextMenuButtons.forEach((btn: ButtonConfig) => {
+    const item = document.createElement('div')
+    item.style.cssText = `
+      padding: 8px 16px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--b3-theme-on-background, #333);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    `
+    item.textContent = btn.name || '模板插入'
+    item.addEventListener('mouseenter', () => {
+      item.style.background = 'var(--b3-list-hover, #f0f0f0)'
+    })
+    item.addEventListener('mouseleave', () => {
+      item.style.background = ''
+    })
+    item.addEventListener('click', () => {
+      menu.remove()
+      // 在 textarea 中插入模板内容
+      const processed = processTemplateVariables(btn.template || '')
+      const start = textarea.selectionStart || textarea.value.length
+      const end = textarea.selectionEnd || textarea.value.length
+      textarea.value = textarea.value.substring(0, start) + processed + textarea.value.substring(end)
+      const newPos = start + processed.length
+      textarea.setSelectionRange(newPos, newPos)
+      textarea.focus()
+    })
+    menu.appendChild(item)
+  })
+
+  // 定位菜单
+  document.body.appendChild(menu)
+
+  const menuRect = menu.getBoundingClientRect()
+  let x = e.clientX
+  let y = e.clientY
+  if (x + menuRect.width > window.innerWidth) x = window.innerWidth - menuRect.width - 4
+  if (y + menuRect.height > window.innerHeight) y = window.innerHeight - menuRect.height - 4
+  menu.style.left = x + 'px'
+  menu.style.top = y + 'px'
+
+  // 点击其他地方关闭菜单
+  const closeMenu = () => {
+    menu.remove()
+    document.removeEventListener('click', closeMenu)
+    document.removeEventListener('contextmenu', closeMenu, true)
+  }
+  setTimeout(() => {
+    document.addEventListener('click', closeMenu)
+    document.addEventListener('contextmenu', closeMenu, true)
+  }, 0)
 }
 
 // ===== 点击序列执行 =====
@@ -3744,6 +3865,24 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
   // ⑧图片快捷导入日记
   if (subtype === 'image-upload') {
     await executeImageUpload(config)
+    return
+  }
+
+  // ⑨手机端标签页Tab
+  if (subtype === 'mobile-tabs') {
+    executeMobileTabs(config)
+    return
+  }
+
+  // ⑩手机端悬浮大纲
+  if (subtype === 'mobile-outline') {
+    executeMobileOutline(config)
+    return
+  }
+
+  // ⑪手机端前一篇/后一篇文档
+  if (subtype === 'doc-nav') {
+    executeMobileDocNav(config)
     return
   }
 
@@ -4970,6 +5109,10 @@ export function cleanup() {
   }
 
   // 清理工具栏观察器
+  if (pendingTimer) {
+    clearTimeout(pendingTimer)
+    pendingTimer = null
+  }
   if (toolbarObserver) {
     toolbarObserver.disconnect()
     toolbarObserver = null
@@ -5046,6 +5189,33 @@ function parseHotkeyToKeyEvent(hotkey: string): KeyboardEventInit | null {
     .trim()
 
   if (!mainKey) return null
+
+  // 规范化主键：兼容用户输入的符号/大小写差异（移动端常见）
+  // 例如：⇧⌘↑ / ⇧⌘↓ / ⇧ENTER / ENTER 等
+  const normalizeMainKey = (key: string): string => {
+    const k = key.trim()
+    if (k === '↑') return 'ArrowUp'
+    if (k === '↓') return 'ArrowDown'
+    if (k === '←') return 'ArrowLeft'
+    if (k === '→') return 'ArrowRight'
+    if (k.toUpperCase() === 'ENTER') return 'Enter'
+    if (k.toUpperCase() === 'ESC') return 'Escape'
+    if (k.toUpperCase() === 'SPACE') return 'Space'
+    if (k.toUpperCase() === 'TAB') return 'Tab'
+    if (k.toUpperCase() === 'BACKSPACE') return 'Backspace'
+    if (k.toUpperCase() === 'DEL') return 'Delete'
+    // 统一特殊键大小写：ArrowUp / Enter / Escape 等保持首字母大写
+    // 若是 ArrowUp/Down 这种，保持原样；否则做首字母大写的弱规范
+    if (/^arrow(up|down|left|right)$/i.test(k)) {
+      const dir = k.slice(5).toLowerCase()
+      return `Arrow${dir.charAt(0).toUpperCase()}${dir.slice(1)}`
+    }
+    if (/^f\d{1,2}$/i.test(k)) return k.toUpperCase()
+    // 其他保持原样（单字母/数字走后续逻辑）
+    return k
+  }
+
+  mainKey = normalizeMainKey(mainKey)
 
   // keyCode 映射表
   const keyCodeMap: Record<string, number> = {
@@ -5722,8 +5892,24 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
       const keyEvent = parseHotkeyToKeyEvent(siyuanHotkey)
       if (keyEvent) {
         try {
+          // 尽量向“当前编辑器可编辑区域”派发（很多快捷键只在编辑器焦点内生效）
+          const protyleElement = getActiveProtyleElement()
+          const editArea =
+            (lastActiveElement?.matches?.('[contenteditable="true"]') ? lastActiveElement : null) ||
+            (protyleElement?.querySelector?.('[contenteditable="true"]') as HTMLElement | null) ||
+            (document.activeElement?.matches?.('[contenteditable="true"]') ? (document.activeElement as HTMLElement) : null)
+
           const eventDown = new KeyboardEvent('keydown', keyEvent)
-          window.dispatchEvent(eventDown)
+          const eventUp = new KeyboardEvent('keyup', keyEvent)
+
+          if (editArea) {
+            editArea.focus?.()
+            editArea.dispatchEvent(eventDown)
+            editArea.dispatchEvent(eventUp)
+          } else {
+            window.dispatchEvent(eventDown)
+            window.dispatchEvent(eventUp)
+          }
         } catch (e) {
           // 思源内部处理此快捷键时出错（可能不是有效快捷键）
           console.warn('思源处理此快捷键时出错:', e)
@@ -6413,4 +6599,26 @@ export async function showPopupSelectDialog(templates: { name: string; content: 
       } catch (e) {}
     }
   })
+}
+
+/**
+ * ⑨手机端标签页Tab - 切换显示/隐藏悬浮Tab栏
+ */
+function executeMobileTabs(config: ButtonConfig) {
+  toggleMobileTabs(config)
+}
+
+/**
+ * ⑩手机端悬浮大纲 - 切换显示/隐藏悬浮大纲面板
+ */
+function executeMobileOutline(config: ButtonConfig) {
+  toggleMobileOutline(config)
+}
+
+/**
+ * ⑪手机端前一篇/后一篇文档 - 切换显示/隐藏文档导航栏
+ */
+function executeMobileDocNav(config: ButtonConfig) {
+  console.log('[文档导航] executeMobileDocNav called')
+  toggleMobileDocNav(config)
 }

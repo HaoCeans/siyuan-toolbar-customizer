@@ -5129,6 +5129,9 @@ export function cleanup() {
     }
   })
 
+  // 清理扩展工具栏弹出层 DOM
+  document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove())
+
   // 移除CSS变量
   document.documentElement.style.removeProperty('--mobile-toolbar-offset')
 
@@ -5142,7 +5145,8 @@ export function cleanup() {
     'mobile-toolbar-background-color-style',
     'overflow-toolbar-animation',
     'custom-button-focus-style',
-    'mobile-toolbar-dynamic-style'
+    'mobile-toolbar-dynamic-style',
+    'popup-select-scrollbar-style'
   ]
   idsToRemove.forEach(id => {
     const el = document.getElementById(id)
@@ -5151,6 +5155,7 @@ export function cleanup() {
 
   // 重置模块级变量
   currentButtonConfigs = []
+  isSettingUpToolbar = false
 }
 
 // ===== 快捷键执行功能 =====

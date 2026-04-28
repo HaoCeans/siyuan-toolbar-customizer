@@ -55,6 +55,7 @@ let keyboardBaselineHeight: number | null = null
 let vvResizeHandler: (() => void) | null = null
 let focusInHandler: ((e: FocusEvent) => void) | null = null
 let focusOutHandler: ((e: FocusEvent) => void) | null = null
+let visibilityChangeHandler: (() => void) | null = null
 
 function getViewportHeight(): number {
   return window.visualViewport?.height || window.innerHeight
@@ -766,15 +767,15 @@ export async function init(context: OutlineContext): Promise<void> {
   document.addEventListener('focusout', focusOutHandler, true)
 
   // 前后台切换
-  document.addEventListener('visibilitychange', () => {
+  visibilityChangeHandler = () => {
     if (document.hidden) {
       stopTitleRefresh()
     } else if (state.isVisible) {
       startTitleRefresh()
-      // 回到前台时刷新大纲
       renderOutlinePanel()
     }
-  })
+  }
+  document.addEventListener('visibilitychange', visibilityChangeHandler)
 }
 
 export function toggleVisibility(config: ButtonConfig): void {
@@ -829,6 +830,10 @@ export function cleanup(): void {
   if (focusOutHandler) {
     document.removeEventListener('focusout', focusOutHandler, true)
     focusOutHandler = null
+  }
+  if (visibilityChangeHandler) {
+    document.removeEventListener('visibilitychange', visibilityChangeHandler)
+    visibilityChangeHandler = null
   }
 
   stopTitleRefresh()

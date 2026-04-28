@@ -41,6 +41,7 @@ let injectedStyle: HTMLElement | null = null
 let switchProtyleHandler: (() => void) | null = null
 
 let currentDocId: string | null = null
+let retryInitTimer: ReturnType<typeof setTimeout> | null = null
 let currentNotebookId: string | null = null
 let currentDocPath: string | null = null  // 当前文档的父目录路径
 
@@ -449,7 +450,7 @@ export async function init(context: DocNavContext): Promise<void> {
     }
 
     console.log(`[文档导航] init 重试第 ${count + 1} 次...`)
-    setTimeout(() => retryInit(count + 1), 1000)
+    retryInitTimer = setTimeout(() => retryInit(count + 1), 1000)
   }
 
   if (state.isVisible && !currentDocId) {
@@ -619,6 +620,10 @@ export function cleanup(): void {
   if (focusOutHandler) {
     document.removeEventListener('focusout', focusOutHandler, true)
     focusOutHandler = null
+  }
+  if (retryInitTimer) {
+    clearTimeout(retryInitTimer)
+    retryInitTimer = null
   }
 
   removeNavBar()

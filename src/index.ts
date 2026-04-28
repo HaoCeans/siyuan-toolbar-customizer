@@ -37,7 +37,9 @@ import {
   calculateButtonOverflow,
   setPluginInstance,
   setGlobalToolbarManager,
-  applyToolbarBackgroundColor
+  applyToolbarBackgroundColor,
+  insertTemplate,
+  showTemplateContextMenu
 } from './toolbarManager'
 
 import {
@@ -58,6 +60,11 @@ import { showClickSequenceSelector } from './ui/clickSequenceSelector'
 import { updateIconDisplay as updateIconDisplayUtil } from './data/icons'
 // 导入标签切换器
 import { injectTabSwitcher as injectTabSwitcherUtil, cleanupTabSwitcher } from './ui/tabs'
+// 导入手机端标签页Tab模块
+import { init as initMobileTabs, cleanup as cleanupMobileTabs } from './ui/mobileTabs'
+// 导入手机端悬浮大纲模块
+import { init as initMobileOutline, cleanup as cleanupMobileOutline } from './ui/mobileOutline'
+import { init as initMobileDocNav, cleanup as cleanupMobileDocNav } from './ui/mobileDocNav'
 // 导入字段创建工具
 import {
   updateIconDisplay,
@@ -121,6 +128,9 @@ export default class ToolbarCustomizer extends Plugin {
 
   // EventBus 事件回调引用（用于清理）
   private eventBusRefreshHandler: (() => void) | null = null
+  private eventBusContextMenuHandler: ((event: any) => void) | null = null
+  private quickNoteTextareaContextMenuHandler: ((e: MouseEvent) => void) | null = null
+  private _quickNoteTextareaDomLogged = false
 
   // 待保存的欢迎标记（延迟到用户保存设置时写入）
   private _pendingWelcomeSave = false
@@ -491,7 +501,122 @@ export default class ToolbarCustomizer extends Plugin {
     if (this.isMobile) {
       // 初始化小窗模式检测器
       initSmallWindowDetector()
+
+      // 初始化手机端标签页Tab模块
+      initMobileTabs({
+        saveData: (key, value) => this.saveData(key, value),
+        loadData: (key) => this.loadData(key),
+        eventBus: this.eventBus
+      })
+
+      // 初始化手机端悬浮大纲模块
+      initMobileOutline({
+        saveData: (key, value) => this.saveData(key, value),
+        loadData: (key) => this.loadData(key),
+        eventBus: this.eventBus
+      })
+
+      // 初始化手机端文档导航模块
+      initMobileDocNav({
+        saveData: (key, value) => this.saveData(key, value),
+        loadData: (key) => this.loadData(key),
+        eventBus: this.eventBus
+      })
     }
+
+    // ===== 初始化文本右键菜单模板注入 =====
+    // 移除旧的监听器（避免重复监听）
+    if (this.eventBusContextMenuHandler) {
+      this.eventBus.off('open-menu-content', this.eventBusContextMenuHandler)
+    }
+    this.eventBusContextMenuHandler = (event: any) => {
+      const { detail } = event
+      // 收集所有开启了「显示在右键菜单」的模板按钮（桌面端+手机端都要收集）
+      const allConfigs = [...this.desktopButtonConfigs, ...this.mobileButtonConfigs]
+      const contextMenuButtons = allConfigs.filter(
+        (btn) => btn.type === 'template' && btn.showInContextMenu && btn.template && btn.enabled !== false
+      )
+
+      if (contextMenuButtons.length === 0) return
+
+      // 直接操作顶级菜单，避免被归入"插件"子菜单
+      const menu = (window as any).siyuan?.menus?.menu
+      if (!menu?.addItem) return
+
+      // 保存 protyle 元素和选区引用，供点击时定位编辑器和恢复光标
+      const protyleElement = detail?.protyle?.element as HTMLElement | undefined
+      const savedRange = detail?.range as Range | undefined
+
+      contextMenuButtons.forEach((btn) => {
+        menu.addItem({
+          label: btn.name || '模板插入',
+          icon: 'iconEdit',
+          click: () => {
+            const editorTarget = protyleElement?.querySelector('[contenteditable="true"]') as HTMLElement | undefined
+            if (editorTarget) {
+              editorTarget.focus()
+              // 恢复右键时的选区位置
+              if (savedRange) {
+                const sel = window.getSelection()
+                if (sel) {
+                  sel.removeAllRanges()
+                  sel.addRange(savedRange)
+                }
+              }
+              insertTemplate(btn, savedRange || null, editorTarget)
+            } else {
+              insertTemplate(btn)
+            }
+          }
+        })
+      })
+    }
+    this.eventBus.on('open-menu-content', this.eventBusContextMenuHandler)
+
+    // ===== 兼容：第三方“一键记事”弹窗 textarea 的模板右键菜单 =====
+    // 第三方插件的弹窗通常使用 textarea，右键不会触发 open-menu-content（该事件仅针对 protyle 编辑器菜单）。
+    // 这里用事件委托捕获“看起来像一键记事弹窗”的 textarea 右键，并复用本插件的 showTemplateContextMenu。
+    if (this.quickNoteTextareaContextMenuHandler) {
+      document.removeEventListener('contextmenu', this.quickNoteTextareaContextMenuHandler, true)
+    }
+    this.quickNoteTextareaContextMenuHandler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null
+      if (!target) return
+      if (target.tagName !== 'TEXTAREA') return
+
+      const textarea = target as HTMLTextAreaElement
+
+      // 只对“可能是一键记事弹窗”的 textarea 生效，避免影响普通输入框
+      const wrapper = textarea.closest(
+        '#quick-note-dialog, #quick-note-dialog-desktop, [id*="quick-note"], [id*="quickNote"], [class*="quick-note"], [class*="quickNote"]'
+      )
+      if (!wrapper) {
+        // 调试：帮助定位第三方弹窗 DOM（只打印一次，避免刷屏）
+        if (!this._quickNoteTextareaDomLogged) {
+          this._quickNoteTextareaDomLogged = true
+          try {
+            const chain: string[] = []
+            let el: HTMLElement | null = textarea
+            let depth = 0
+            while (el && el !== document.body && depth < 12) {
+              const id = el.id ? `#${el.id}` : ''
+              const cls = el.className ? `.${String(el.className).trim().replace(/\s+/g, '.')}` : ''
+              chain.push(`${el.tagName.toLowerCase()}${id}${cls}`)
+              el = el.parentElement
+              depth++
+            }
+            console.warn('[QuickNote DOM] 未命中 quick-note wrapper，textarea 祖先链：', chain)
+          } catch (err) {
+            console.warn('[QuickNote DOM] 祖先链打印失败:', err)
+          }
+        }
+        return
+      }
+
+      // 如果没有启用任何“显示在右键菜单”的模板按钮，showTemplateContextMenu 会直接 return
+      showTemplateContextMenu(e, textarea)
+    }
+    document.addEventListener('contextmenu', this.quickNoteTextareaContextMenuHandler, true)
   }
 
   onunload() {
@@ -502,6 +627,15 @@ export default class ToolbarCustomizer extends Plugin {
 
     // 清理标签切换器资源
     cleanupTabSwitcher()
+
+    // 清理手机端标签页Tab资源
+    cleanupMobileTabs()
+
+    // 清理手机端悬浮大纲资源
+    cleanupMobileOutline()
+
+    // 清理手机端文档导航资源
+    cleanupMobileDocNav()
 
     // 移除动态样式
     this.removeFeatureStyles()
@@ -522,6 +656,18 @@ export default class ToolbarCustomizer extends Plugin {
       this.eventBusRefreshHandler = null
     }
 
+    // 清理右键菜单事件监听器
+    if (this.eventBusContextMenuHandler) {
+      this.eventBus.off('open-menu-content', this.eventBusContextMenuHandler)
+      this.eventBusContextMenuHandler = null
+    }
+
+    // 清理：第三方 quick note textarea 右键菜单兼容
+    if (this.quickNoteTextareaContextMenuHandler) {
+      document.removeEventListener('contextmenu', this.quickNoteTextareaContextMenuHandler, true)
+      this.quickNoteTextareaContextMenuHandler = null
+    }
+
     // 清理全局 touch 事件监听器
     if (this.touchStartHandler) {
       document.removeEventListener('touchstart', this.touchStartHandler, true)
@@ -538,11 +684,25 @@ export default class ToolbarCustomizer extends Plugin {
   }
 
   async uninstall() {
-    // 卸载时删除插件配置数据
-    await this.removeData('mobileToolbarConfig')
-    await this.removeData('desktopButtonConfigs')
-    await this.removeData('mobileButtonConfigs')
-    await this.removeData('featureConfig')
+    const shouldDelete = await showConfirmDialogModal({
+      title: '卸载思源手机端增强',
+      message: '是否同时删除所有配置数据？\n\n选择"删除数据"将清除所有按钮配置和设置。\n选择"保留数据"可在重新安装后恢复配置。',
+      confirmText: '删除数据',
+      cancelText: '保留数据'
+    })
+
+    if (shouldDelete) {
+      await this.removeData('mobileToolbarConfig')
+      await this.removeData('desktopButtonConfigs')
+      await this.removeData('mobileButtonConfigs')
+      await this.removeData('featureConfig')
+      await this.removeData('desktopFeatureConfig')
+      await this.removeData('mobileFeatureConfig')
+      await this.removeData('desktopGlobalButtonConfig')
+      await this.removeData('mobileGlobalButtonConfig')
+      await this.removeData('hasShownWelcome')
+      await this.removeData('v3MigrationAsked')
+    }
   }
 
   openSetting() {
@@ -552,7 +712,8 @@ export default class ToolbarCustomizer extends Plugin {
       desktopButtonConfigs: this.desktopButtonConfigs,
       mobileButtonConfigs: this.mobileButtonConfigs,
       desktopFeatureConfig: this.desktopFeatureConfig,
-      mobileFeatureConfig: this.mobileFeatureConfig
+      mobileFeatureConfig: this.mobileFeatureConfig,
+      mobileGlobalButtonConfig: this.mobileGlobalButtonConfig
     })
 
     const setting = new Setting({
@@ -592,7 +753,11 @@ export default class ToolbarCustomizer extends Plugin {
 
           // 重新计算所有按钮的溢出层级
           const overflowLayers = overflowBtn.layers || 1
-          const updatedButtons = calculateButtonOverflow(this.mobileButtonConfigs, overflowLayers)
+          const updatedButtons = calculateButtonOverflow(
+            this.mobileButtonConfigs,
+            overflowLayers,
+            this.mobileGlobalButtonConfig?.externalButtonsReserveWidth ?? 0
+          )
           // 更新按钮的溢出层级
           updatedButtons.forEach(btn => {
             const original = this.mobileButtonConfigs.find(b => b.id === btn.id)
@@ -611,8 +776,15 @@ export default class ToolbarCustomizer extends Plugin {
         const mobileToolbarChanged = changed('mobileToolbarConfig', this.mobileConfig)
         const desktopFeatureChanged = changed('desktopFeatureConfig', this.desktopFeatureConfig)
         const mobileFeatureChanged = changed('mobileFeatureConfig', this.mobileFeatureConfig)
+        const mobileGlobalButtonChanged = changed('mobileGlobalButtonConfig', this.mobileGlobalButtonConfig)
 
-        const hasAnyChange = desktopButtonsChanged || mobileButtonsChanged || mobileToolbarChanged || desktopFeatureChanged || mobileFeatureChanged
+        const hasAnyChange =
+          desktopButtonsChanged ||
+          mobileButtonsChanged ||
+          mobileToolbarChanged ||
+          desktopFeatureChanged ||
+          mobileFeatureChanged ||
+          mobileGlobalButtonChanged
 
         if (!hasAnyChange && !this._pendingWelcomeSave) {
           showMessage('配置无变化，未保存', 3000, 'info')
@@ -635,6 +807,9 @@ export default class ToolbarCustomizer extends Plugin {
         }
         if (mobileFeatureChanged) {
           await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
+        }
+        if (mobileGlobalButtonChanged) {
+          await this.saveData('mobileGlobalButtonConfig', this.mobileGlobalButtonConfig)
         }
 
         // 如果有待保存的欢迎标记，一并保存
@@ -670,6 +845,7 @@ export default class ToolbarCustomizer extends Plugin {
         desktopButtonConfigs: this.desktopButtonConfigs,
         mobileButtonConfigs: this.mobileButtonConfigs,
         desktopGlobalButtonConfig: this.desktopGlobalButtonConfig,
+        mobileGlobalButtonConfig: this.mobileGlobalButtonConfig,
         desktopFeatureConfig: this.desktopFeatureConfig,
         mobileFeatureConfig: this.mobileFeatureConfig,
         mobileConfig: this.mobileConfig,
@@ -741,7 +917,11 @@ export default class ToolbarCustomizer extends Plugin {
           })
         } else {
           // 重新计算所有按钮的溢出层级
-          const updatedButtons = calculateButtonOverflow(this.mobileButtonConfigs, overflowLayers)
+          const updatedButtons = calculateButtonOverflow(
+            this.mobileButtonConfigs,
+            overflowLayers,
+            this.mobileGlobalButtonConfig?.externalButtonsReserveWidth ?? 0
+          )
           updatedButtons.forEach(btn => {
             const original = this.mobileButtonConfigs.find(b => b.id === btn.id)
             if (original) {

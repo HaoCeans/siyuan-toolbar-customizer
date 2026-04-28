@@ -684,25 +684,7 @@ export default class ToolbarCustomizer extends Plugin {
   }
 
   async uninstall() {
-    const shouldDelete = await showConfirmDialogModal({
-      title: '卸载思源手机端增强',
-      message: '是否同时删除所有配置数据？\n\n选择"删除数据"将清除所有按钮配置和设置。\n选择"保留数据"可在重新安装后恢复配置。',
-      confirmText: '删除数据',
-      cancelText: '保留数据'
-    })
-
-    if (shouldDelete) {
-      await this.removeData('mobileToolbarConfig')
-      await this.removeData('desktopButtonConfigs')
-      await this.removeData('mobileButtonConfigs')
-      await this.removeData('featureConfig')
-      await this.removeData('desktopFeatureConfig')
-      await this.removeData('mobileFeatureConfig')
-      await this.removeData('desktopGlobalButtonConfig')
-      await this.removeData('mobileGlobalButtonConfig')
-      await this.removeData('hasShownWelcome')
-      await this.removeData('v3MigrationAsked')
-    }
+    // 保留用户配置数据，重装后可恢复
   }
 
   openSetting() {

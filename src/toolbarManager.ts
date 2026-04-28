@@ -410,7 +410,7 @@ let activeTimers: Set<ReturnType<typeof setTimeout> | ReturnType<typeof setInter
 let focusEventHandlers: Array<{ element: HTMLElement; focusHandler: () => void; blurHandler: () => void }> = []  // 跟踪焦点事件监听器以便清理
 let isSettingUpToolbar = false  // 防止 MutationObserver 递归调用的标志
 let currentButtonConfigs: ButtonConfig[] = []  // 保存当前按钮配置，用于重试机制
-const toolbarCheckTimers = new Map<Element, ReturnType<typeof setTimeout>>()  // 跟踪每个工具栏的检测定时器
+const toolbarCheckTimers = new Map<Element, ReturnType<typeof setTimeout>>()  // [已弃用] 保留兼容，不再写入
 
 // 导出工具栏管理器对象
 export const toolbarManager = {
@@ -855,27 +855,14 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
         }
       }
       
-      // 持续检测函数（使用定时器而不是依赖 resize 事件）
-      function startContinuousCheck() {
-        const check = () => {
-          updateToolbarPosition()
-          // 每 200ms 检查一次
-          toolbarCheckTimers.set(toolbar, safeSetTimeout(check, 200))
-        }
-        
-        check()
-      }
-      
       // 延迟初始化，让 DOM 先渲染完成
       safeSetTimeout(() => {
         updateToolbarPosition()
         // 设置初始属性（根据实际状态）
         toolbar.setAttribute('data-input-method', inputMethodOpen ? 'open' : 'close')
-        // 开始持续检测
-        startContinuousCheck()
       }, 100)
 
-      // 监听窗口大小变化
+      // 监听窗口大小变化（替代 200ms 轮询，仅在尺寸变化时检测）
       resizeHandler = updateToolbarPosition
       window.addEventListener('resize', resizeHandler)
 
@@ -5144,6 +5131,26 @@ export function cleanup() {
 
   // 移除CSS变量
   document.documentElement.style.removeProperty('--mobile-toolbar-offset')
+
+  // 清理全局变量
+  delete (window as any).__mobileToolbarConfig
+  delete (window as any).__mobileButtonConfigs
+  delete (window as any).__toolbarManager
+
+  // 清理残留的 CSS 样式元素
+  const idsToRemove = [
+    'mobile-toolbar-background-color-style',
+    'overflow-toolbar-animation',
+    'custom-button-focus-style',
+    'mobile-toolbar-dynamic-style'
+  ]
+  idsToRemove.forEach(id => {
+    const el = document.getElementById(id)
+    if (el) el.remove()
+  })
+
+  // 重置模块级变量
+  currentButtonConfigs = []
 }
 
 // ===== 快捷键执行功能 =====

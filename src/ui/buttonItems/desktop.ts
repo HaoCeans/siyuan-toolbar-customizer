@@ -478,6 +478,22 @@ export function createDesktopButtonItem(
     templateField.appendChild(notebookIdLabel)
     templateField.appendChild(notebookIdInput)
     templateField.appendChild(notebookIdHint)
+
+    // 显示在右键菜单开关
+    const contextMenuItem = document.createElement('div')
+    contextMenuItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px;'
+    const contextMenuLabel = document.createElement('label')
+    contextMenuLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
+    contextMenuLabel.textContent = '📋 显示在文本右键菜单'
+    const contextMenuSwitch = document.createElement('input')
+    contextMenuSwitch.type = 'checkbox'
+    contextMenuSwitch.className = 'b3-switch'
+    contextMenuSwitch.checked = button.showInContextMenu ?? false
+    contextMenuSwitch.onchange = () => { button.showInContextMenu = contextMenuSwitch.checked }
+    contextMenuItem.appendChild(contextMenuLabel)
+    contextMenuItem.appendChild(contextMenuSwitch)
+    templateField.appendChild(contextMenuItem)
+
     editForm.appendChild(templateField)
   }
 
@@ -498,7 +514,7 @@ export function createDesktopButtonItem(
     // 预设按钮
     const presetBtn = document.createElement('button')
     presetBtn.className = 'b3-button b3-button--outline'
-    presetBtn.textContent = '选择'
+    presetBtn.textContent = '选择模板'
     presetBtn.style.cssText = 'padding: 4px 12px; font-size: 12px; white-space: nowrap;'
     presetBtn.onclick = () => {
       showClickSequenceSelector({
@@ -529,7 +545,7 @@ export function createDesktopButtonItem(
 
     const hint = document.createElement('div')
     hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
-    hint.innerHTML = '<div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px;"><strong style="color: var(--b3-theme-primary);">🌟 社区可用代码分享（推荐）</strong><br><a href="https://ld246.com/article/1771266377449" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">https://ld246.com/article/1771266377449</a></div>💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">思源笔记常用功能 ID 速查表（GitHub）</a><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">模拟点击序列使用说明（GitHub）</a>'
+    hint.innerHTML = '<div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px;"><strong style="color: var(--b3-theme-primary);">🌟 社区可用代码分享（推荐）</strong><br><a href="https://ld246.com/article/1771266377449" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">https://ld246.com/article/1771266377449</a></div>💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong><br>• <strong>鼠标悬浮（如 *text:复制）【加*可处理鼠标悬浮自动打开的功能】</strong><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">思源笔记常用功能 ID 速查表（GitHub）</a><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">模拟点击序列使用说明（GitHub）</a>'
     clickSequenceField.appendChild(hint)
 
     editForm.appendChild(clickSequenceField)
@@ -823,9 +839,12 @@ export function createDesktopButtonItem(
       <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
       <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
       <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>⑧ 图片快捷导入日记</option>
+      <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>⑨ 手机端标签页Tab</option>
+      <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>⑩ 手机端悬浮大纲</option>
+      <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 手机端前一篇/后一篇文档</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav'
       // 刷新表单以显示/隐藏相关配置
       if ((subtypeSelect as any).refreshForm) {
         (subtypeSelect as any).refreshForm()
@@ -1581,6 +1600,15 @@ export function createDesktopButtonItem(
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
         img1UploadConfigDiv.style.display = 'flex'
+      } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav') {
+        docConfigDiv.style.display = 'none'
+        dbConfigDiv.style.display = 'none'
+        diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
+        img1UploadConfigDiv.style.display = 'none'
       } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'
@@ -2063,7 +2091,7 @@ export function populateDesktopEditForm(
     // 预设按钮
     const presetBtn = document.createElement('button')
     presetBtn.className = 'b3-button b3-button--outline'
-    presetBtn.textContent = '选择'
+    presetBtn.textContent = '选择模板'
     presetBtn.style.cssText = 'padding: 4px 12px; font-size: 12px; white-space: nowrap;'
     presetBtn.onclick = () => {
       showClickSequenceSelector({
@@ -2094,7 +2122,7 @@ export function populateDesktopEditForm(
 
     const hint = document.createElement('div')
     hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
-    hint.innerHTML = '<div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px;"><strong style="color: var(--b3-theme-primary);">🌟 社区可用代码分享（推荐）</strong><br><a href="https://ld246.com/article/1771266377449" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">https://ld246.com/article/1771266377449</a></div>💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">思源笔记常用功能 ID 速查表（GitHub）</a><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">模拟点击序列使用说明（GitHub）</a>'
+    hint.innerHTML = '<div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px;"><strong style="color: var(--b3-theme-primary);">🌟 社区可用代码分享（推荐）</strong><br><a href="https://ld246.com/article/1771266377449" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">https://ld246.com/article/1771266377449</a></div>💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong><br>• <strong>鼠标悬浮（如 *text:复制）【加*可处理鼠标悬浮自动打开的功能】</strong><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">思源笔记常用功能 ID 速查表（GitHub）</a><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">模拟点击序列使用说明（GitHub）</a>'
     clickSequenceField.appendChild(hint)
 
     form.appendChild(clickSequenceField)
@@ -2452,9 +2480,12 @@ export function populateDesktopEditForm(
       <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
       <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
       <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>⑧ 图片快捷导入日记</option>
+      <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>⑨ 手机端标签页Tab</option>
+      <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>⑩ 手机端悬浮大纲</option>
+      <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 手机端前一篇/后一篇文档</option>
     `
     subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload'
+      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav'
       ;(subtypeSelect as any).refreshForm?.()
     }
     authorToolField.appendChild(subtypeSelect)
@@ -3231,6 +3262,15 @@ export function populateDesktopEditForm(
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
         img2UploadConfigDiv.style.display = 'flex'
+      } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav') {
+        docConfigDiv.style.display = 'none'
+        dbConfigDiv.style.display = 'none'
+        diaryConfigDiv.style.display = 'none'
+        lifeLogConfigDiv.style.display = 'none'
+        popupSelectConfigDiv.style.display = 'none'
+        buttonSequenceConfigDiv.style.display = 'none'
+        scrollDocConfigDiv.style.display = 'none'
+        img2UploadConfigDiv.style.display = 'none'
       } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'

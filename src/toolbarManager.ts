@@ -104,6 +104,8 @@ export interface ButtonConfig {
   layers?: number;           // 扩展工具栏层数（1-5），仅扩展工具栏按钮使用
   overflowLevel?: number;    // 溢出层级（0=底部工具栏可见，1-N=第几层扩展工具栏）
   showName?: boolean;        // 是否在按钮上显示名称（默认false）
+  floatOpacity?: number;     // 悬浮弹窗透明度 (0~1)，默认 0.72
+  autoHideOnScroll?: boolean; // 悬浮面板：向上滚动隐藏、向下滚动显示（仅 mobile 侧相关功能）
   showInContextMenu?: boolean; // 是否显示在文本右键菜单中（仅模板类型，默认false）
 }
 
@@ -398,8 +400,6 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
 // 保存监听器引用以便清理
 let resizeHandler: (() => void) | null = null
 let mutationObserver: MutationObserver | null = null
-let pageObserver: MutationObserver | null = null  // 用于检测页面变化的观察器
-let mobileToolbarClickHandler: ((e: Event) => void) | null = null  // 专门用于移动端工具栏的点击处理
 let customButtonClickHandler: ((e: Event) => void) | null = null  // 专门用于自定义按钮的点击处理
 let overflowCloseHandler: ((e: Event) => void) | null = null  // 扩展工具栏点击外部关闭监听器
 let toolbarObserver: MutationObserver | null = null  // 用于监听工具栏渲染的观察器
@@ -407,6 +407,7 @@ let toolbarObserver: MutationObserver | null = null  // 用于监听工具栏渲
 let pendingTimer: ReturnType<typeof setTimeout> | null = null
 let toolbarStyleChangeHandler: (() => void) | null = null  // 工具栏样式变化事件处理器
 let activeTimers: Set<ReturnType<typeof setTimeout> | ReturnType<typeof setInterval>> = new Set()  // 跟踪所有活动的定时器（包括 setTimeout 和 setInterval）
+const activeObservers: Set<MutationObserver> = new Set()  // 跟踪所有活动的 MutationObserver
 let focusEventHandlers: Array<{ element: HTMLElement; focusHandler: () => void; blurHandler: () => void }> = []  // 跟踪焦点事件监听器以便清理
 let isSettingUpToolbar = false  // 防止 MutationObserver 递归调用的标志
 let currentButtonConfigs: ButtonConfig[] = []  // 保存当前按钮配置，用于重试机制
@@ -455,6 +456,8 @@ function clearAllTimers() {
     clearInterval(timerId)
   })
   activeTimers.clear()
+  activeObservers.forEach(obs => obs.disconnect())
+  activeObservers.clear()
 }
 
 /**
@@ -1239,7 +1242,6 @@ export function initCustomButtons(configs: ButtonConfig[]) {
   safeSetTimeout(() => setupEditorButtons(configs), 200)
 
   // 点击编辑器时触发按钮创建（不再使用 MutationObserver 持续监听，避免卡顿）
-  // startToolbarObserver(configs)  // 已禁用：改用点击触发
 
   // 移除旧的工具栏样式变化监听器
   if (toolbarStyleChangeHandler) {
@@ -1396,139 +1398,6 @@ export function createButtonsForEditors(editors: NodeListOf<Element>, configs: B
       readonlyBtn.insertAdjacentElement('beforebegin', button)
     })
   })
-}
-
-/**
- * 启动工具栏渲染监听
- * 监听 DOM 变化，当工具栏（锁定按钮）出现或编辑器切换时自动插入按钮
- */
-function startToolbarObserver(configs: ButtonConfig[]) {
-  // 如果观察器已存在，先断开
-  if (toolbarObserver) {
-    toolbarObserver.disconnect()
-  }
-
-  // 记录已处理的编辑器，避免重复处理
-  const processedEditors = new Set<string>()
-
-  // 节流控制：使用 debounce 避免高频触发，150ms 合并多次快速变化
-
-  // 创建观察器监听 DOM 变化
-  toolbarObserver = new MutationObserver((mutations) => {
-    // 智能过滤：检查 mutations 是否与编辑器相关
-    const hasEditorChange = mutations.some(mutation => {
-      const addedNodes = Array.from(mutation.addedNodes)
-      return addedNodes.some(node => {
-        if (node.nodeType !== Node.ELEMENT_NODE) return false
-        const el = node as Element
-        return el.classList?.contains('protyle') ||
-               el.classList?.contains('protyle-breadcrumb') ||
-               el.classList?.contains('protyle-breadcrumb__bar') ||
-               el.querySelector?.('.protyle, .protyle-breadcrumb, .protyle-breadcrumb__bar')
-      })
-    })
-
-    if (!hasEditorChange) return
-
-    // 取消之前的待执行更新，合并为一次
-    if (pendingTimer) {
-      clearTimeout(pendingTimer)
-    }
-
-    pendingTimer = setTimeout(() => {
-      pendingTimer = null
-
-      // 检查是否有新的编辑器或工具栏出现
-      const editors = document.querySelectorAll('.protyle')
-      const currentEditorIds = new Set<string>()
-      let shouldRetry = false
-
-      editors.forEach((editor, index) => {
-        // 使用编辑器的唯一标识（如果没有则使用索引）
-        const editorId = (editor as HTMLElement).dataset.nodeId || `editor-${index}`
-        currentEditorIds.add(editorId)
-
-        // 检查该编辑器是否已处理过
-        if (processedEditors.has(editorId)) {
-          // 已处理过，仍需检查按钮是否还存在（可能被思源重新渲染清除了）
-          const existingButtons = editor.querySelectorAll('[data-custom-button]')
-          if (existingButtons.length > 0) {
-            // 按钮还在，无需重建
-            return
-          }
-          // 按钮被清除了，需要重新创建
-          shouldRetry = true
-          return
-        }
-
-        // 检查工具栏是否已就绪（锁定按钮是否存在）
-        const readonlyBtn = editor.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]') ||
-                            editor.querySelector('.protyle-breadcrumb [data-type="readonly"]')
-
-        if (readonlyBtn) {
-          // 工具栏已就绪，标记为已处理
-          processedEditors.add(editorId)
-          shouldRetry = true
-        }
-      })
-
-      // 清理已关闭的编辑器记录（只保留当前存在的）
-      processedEditors.forEach(id => {
-        if (!currentEditorIds.has(id)) {
-          processedEditors.delete(id)
-        }
-      })
-
-      // 如果有新的编辑器或按钮被清除，重新创建按钮
-      if (shouldRetry) {
-        createButtonsForEditors(editors, configs)
-      }
-    })
-  })
-
-  // 开始观察编辑器容器的 DOM 变化（缩小监听范围，避免监听整个文档）
-  const editorContainer = document.querySelector('.layout__center') || document.body
-  toolbarObserver.observe(editorContainer, {
-    childList: true,  // 只监听直接子元素
-    subtree: false    // 不监听后代节点，提升性能
-  })
-
-  // 同时启动定时重试机制（作为后备方案，最多重试 10 次）
-  let retryCount = 0
-  const maxRetries = 10
-  const retryInterval = 500 // 500ms 间隔
-
-  const retryTimer = setInterval(() => {
-    retryCount++
-
-    // 获取所有编辑器
-    const editors = document.querySelectorAll('.protyle')
-    let needsCreate = false
-
-    editors.forEach(editor => {
-      const existingButtons = editor.querySelectorAll('[data-custom-button]')
-      if (existingButtons.length === 0) {
-        // 检查工具栏是否就绪
-        const readonlyBtn = editor.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]') ||
-                            editor.querySelector('.protyle-breadcrumb [data-type="readonly"]')
-        if (readonlyBtn) {
-          needsCreate = true
-        }
-      }
-    })
-
-    if (needsCreate) {
-      createButtonsForEditors(editors, configs)
-    }
-
-    // 达到最大重试次数或所有编辑器都有按钮了，停止重试
-    if (retryCount >= maxRetries || !needsCreate) {
-      clearInterval(retryTimer)
-    }
-  }, retryInterval)
-
-  // 保存定时器以便清理
-  activeTimers.add(retryTimer)
 }
 
 /**
@@ -2843,33 +2712,41 @@ async function executeClickSequence(config: ButtonConfig) {
     const selector = config.clickSequence[i].trim()
     if (!selector) continue // 跳过空选择器
 
+    // 判断是否为悬浮操作（* 前缀）
+    const isHover = selector.startsWith('*')
+    const actualSelector = isHover ? selector.substring(1).trim() : selector
+
     // 尝试执行当前步骤，最多重试2次
     let success = false
     for (let retry = 0; retry <= 2; retry++) {
       try {
         // 等待元素出现（最多5秒）
-        const element = await waitForElement(selector, 5000)
-        
+        const element = await waitForElement(actualSelector, 5000)
+
         if (!element) {
-          throw new Error(`未找到元素: ${selector}`)
+          throw new Error(`未找到元素: ${actualSelector}`)
         }
 
         // 检查元素是否可见
         if (!isVisible(element)) {
-          throw new Error(`元素不可见: ${selector}`)
+          throw new Error(`元素不可见: ${actualSelector}`)
         }
 
-        // 点击元素
-        clickElement(element)
+        // 悬浮或点击元素
+        if (isHover) {
+          hoverElement(element)
+        } else {
+          clickElement(element)
+        }
         success = true
         break // 成功后跳出重试循环
       } catch (error) {
         if (retry === 2) {
           // 最后一次重试也失败
-          Notify.showErrorClickSequenceStepFailed(i + 1, selector)
+          Notify.showErrorClickSequenceStepFailed(i + 1, actualSelector)
           return
         }
-        
+
         // 等待一小段时间后重试
         await delay(300)
       }
@@ -3278,6 +3155,7 @@ function waitForElement(selector: string, timeout: number = 5000): Promise<HTMLE
       const element = findElement()
       if (element) {
         observer.disconnect()
+        activeObservers.delete(observer)
         // 清理超时定时器
         if (activeTimers.has(timerId)) {
           clearTimeout(timerId)
@@ -3287,15 +3165,16 @@ function waitForElement(selector: string, timeout: number = 5000): Promise<HTMLE
       }
     })
 
+    activeObservers.add(observer)
     observer.observe(document.body, {
-      childList: true,   // 只监听直接子元素
-      subtree: false,    // 不监听后代节点
-      attributes: false  // 不监听属性变化，除非必要
+      childList: true,
+      subtree: true
     })
 
     // 超时处理 - 使用 tracked timeout
     const timerId = safeSetTimeout(() => {
       observer.disconnect()
+      activeObservers.delete(observer)
       resolve(null)
     }, timeout)
   })
@@ -3406,6 +3285,11 @@ function clickElement(element: HTMLElement): void {
       // 点击元素失败
     }
   }
+}
+
+function hoverElement(element: HTMLElement): void {
+  element.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, cancelable: true, view: window }))
+  element.dispatchEvent(new MouseEvent('mouseover', { bubbles: true, cancelable: true, view: window }))
 }
 
 /**
@@ -3688,7 +3572,7 @@ async function executeDiary(config: ButtonConfig) {
       confirmDialog()
     })
 
-    // 开始观察
+    activeObservers.add(observer)
     observer.observe(document.body, {
       childList: true,
       subtree: true
@@ -3698,8 +3582,9 @@ async function executeDiary(config: ButtonConfig) {
     confirmDialog()
 
     // 设置超时保护（3秒后停止观察）
-    dialogTimeout = setTimeout(() => {
+    dialogTimeout = safeSetTimeout(() => {
       observer.disconnect()
+      activeObservers.delete(observer)
 
       // 如果没找到对话框，直接开始滚动
       if (!dialogFound) {
@@ -3989,7 +3874,6 @@ async function executeImageUpload(config: ButtonConfig) {
         body: formData
       })
       const response = await httpResponse.json()
-      console.log('[图片快捷导入] 上传响应:', JSON.stringify(response))
 
       if (response.code !== 0) {
         console.error('[图片快捷导入] 上传失败:', response)
@@ -4006,7 +3890,6 @@ async function executeImageUpload(config: ButtonConfig) {
       }
 
       const uploadedPath = Object.values(succMap)[0] as string
-      console.log('[图片快捷导入] 文件路径:', uploadedPath)
 
       if (!uploadedPath) {
         Notify.showErrorCommandCannotExecute('图片上传失败: 路径为空')
@@ -4033,7 +3916,6 @@ async function executeImageUpload(config: ButtonConfig) {
         })
       })
       const appendResult = await appendResponse.json()
-      console.log('[图片快捷导入] 追加到日记响应:', JSON.stringify(appendResult))
 
       if (appendResult.code === 0) {
         if (config.showNotification) {
@@ -5075,16 +4957,6 @@ export function cleanup() {
     mutationObserver = null
   }
 
-  if (pageObserver) {
-    pageObserver.disconnect()
-    pageObserver = null
-  }
-
-  if (mobileToolbarClickHandler) {
-    document.removeEventListener('click', mobileToolbarClickHandler, true)
-    mobileToolbarClickHandler = null
-  }
-
   if (customButtonClickHandler) {
     document.removeEventListener('click', customButtonClickHandler, true)
     customButtonClickHandler = null
@@ -5139,6 +5011,9 @@ export function cleanup() {
   delete (window as any).__mobileToolbarConfig
   delete (window as any).__mobileButtonConfigs
   delete (window as any).__toolbarManager
+
+  // 重新设置全局工具栏管理器（cleanup 后可能被其他模块引用）
+  setGlobalToolbarManager()
 
   // 清理残留的 CSS 样式元素
   const idsToRemove = [
@@ -5707,6 +5582,102 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
     // 转换为思源的快捷键格式
     const siyuanHotkey = convertToSiyuanHotkey(config.shortcutKey)
 
+    // ⌘/ 是思源硬编码的块菜单快捷键，不走 keymap 也不走键盘事件模拟，直接调用内部函数
+    if (siyuanHotkey === '⌘/') {
+      try {
+        // 恢复编辑器焦点和选区
+        const editArea =
+          (lastActiveElement?.matches?.('[contenteditable="true"]') ? lastActiveElement : null) ||
+          getActiveProtyleElement()?.querySelector('[contenteditable="true"]') as HTMLElement
+        if (editArea && savedSelection) {
+          editArea.focus()
+          restoreSelection(savedSelection)
+        }
+
+        // 尝试多种方式获取 protyle 实例
+        const windowObj = window as any
+        let protyle: any = getActiveProtyle()
+
+        if (!protyle) {
+          const protyleEl = document.querySelector('.protyle:not(.fn__none)')
+          protyle = protyleEl?.['protyle'] || protyleEl?.['__protoyle']
+        }
+
+        if (!protyle) {
+          protyle = windowObj.siyuan?.editor?.protyle
+        }
+
+        if (!protyle) {
+          const layout = windowObj.siyuan?.layout?.centerLayout
+          if (layout?.children) {
+            for (const child of layout.children) {
+              if (child.model?.editor?.protyle) {
+                protyle = child.model.editor.protyle
+                break
+              }
+              if (child.children) {
+                for (const tab of child.children) {
+                  if (tab.model?.editor?.protyle) {
+                    protyle = tab.model.editor.protyle
+                    break
+                  }
+                }
+              }
+              if (protyle) break
+            }
+          }
+        }
+
+        if (protyle?.gutter && protyle?.wysiwyg?.element) {
+          const selectElements = Array.from(
+            protyle.wysiwyg.element.querySelectorAll('.protyle-wysiwyg--select')
+          )
+          let targetElement: HTMLElement | null = null
+
+          if (selectElements.length > 0) {
+            targetElement = selectElements[0] as HTMLElement
+          } else {
+            const selection = window.getSelection()
+            if (selection && selection.rangeCount > 0) {
+              const node = selection.anchorNode
+              if (node) {
+                const el = node.nodeType === Node.ELEMENT_NODE ? node as HTMLElement : node.parentElement
+                targetElement = el?.closest('[data-node-id]') as HTMLElement
+              }
+            }
+          }
+
+          if (targetElement) {
+            if (selectElements.length > 1) {
+              protyle.gutter.renderMultipleMenu(protyle, selectElements as HTMLElement[])
+            } else {
+              protyle.gutter.renderMenu(protyle, targetElement)
+            }
+            const rect = targetElement.getBoundingClientRect()
+            windowObj.siyuan?.menus?.menu?.popup({ x: rect.left, y: rect.top, isLeft: true })
+            return
+          }
+        }
+
+        // 备用方案：模拟右键菜单事件
+        const selection = window.getSelection()
+        if (selection && selection.rangeCount > 0) {
+          const node = selection.anchorNode
+          if (node) {
+            const el = node.nodeType === Node.ELEMENT_NODE ? node as HTMLElement : node.parentElement
+            const block = el?.closest('[data-node-id]') as HTMLElement
+            if (block) {
+              block.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, view: window }))
+              return
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('⌘/ 块菜单执行失败:', e)
+      }
+      return
+    }
+
     // 获取思源的快捷键配置
     const windowObj = window as any
     let command: string | null = null
@@ -5879,12 +5850,17 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
 
               // 延迟触发，确保聚焦完成
               setTimeout(() => {
-                // 恢复选区到之前的位置
-                restoreSelection(savedSelection)
+                try {
+                  // 恢复选区到之前的位置
+                  restoreSelection(savedSelection)
 
-                // 触发键盘事件
-                const eventDown = new KeyboardEvent('keydown', keyEvent)
-                editArea.dispatchEvent(eventDown)
+                  // 触发键盘事件
+                  const eventDown = new KeyboardEvent('keydown', keyEvent)
+                  editArea.dispatchEvent(eventDown)
+                } catch (e) {
+                  // 部分思源快捷键（如 Ctrl+/ 块菜单）依赖内部选区状态，无法通过模拟键盘事件触发
+                  console.warn('快捷键模拟执行失败:', config.shortcutKey, e)
+                }
               }, 50)
               return
             }
@@ -5904,12 +5880,12 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
       const keyEvent = parseHotkeyToKeyEvent(siyuanHotkey)
       if (keyEvent) {
         try {
-          // 尽量向“当前编辑器可编辑区域”派发（很多快捷键只在编辑器焦点内生效）
+          // 尽量向”当前编辑器可编辑区域”派发（很多快捷键只在编辑器焦点内生效）
           const protyleElement = getActiveProtyleElement()
           const editArea =
-            (lastActiveElement?.matches?.('[contenteditable="true"]') ? lastActiveElement : null) ||
-            (protyleElement?.querySelector?.('[contenteditable="true"]') as HTMLElement | null) ||
-            (document.activeElement?.matches?.('[contenteditable="true"]') ? (document.activeElement as HTMLElement) : null)
+            (lastActiveElement?.matches?.('[contenteditable=”true”]') ? lastActiveElement : null) ||
+            (protyleElement?.querySelector?.('[contenteditable=”true”]') as HTMLElement | null) ||
+            (document.activeElement?.matches?.('[contenteditable=”true”]') ? (document.activeElement as HTMLElement) : null)
 
           const eventDown = new KeyboardEvent('keydown', keyEvent)
           const eventUp = new KeyboardEvent('keyup', keyEvent)
@@ -6143,91 +6119,6 @@ function checkHeightChange() {
   
   // 更新最后记录的高度
   lastHeight = currentHeight;
-}
-
-/**
- * 初始化窗口检测器
- * 监听窗口高度变化，当减少100px或以上时显示提示，同时显示尺寸显示器
- */
-export function initWindowDimensionDisplay(): void {
-  // 重置状态
-  initialHeight = null;
-  lastHeight = window.innerHeight;
-  
-  // 显示初始尺寸
-  showWindowDimensions();
-  
-  // 如果已有监听器，先清除
-  if (currentResizeListener) {
-    window.removeEventListener('resize', currentResizeListener)
-    currentResizeListener = null
-  }
-
-  // 监听窗口大小变化
-  let resizeTimer: number | null = null
-  
-  currentResizeListener = () => {
-    if (resizeTimer) {
-      window.clearTimeout(resizeTimer)
-    }
-    resizeTimer = window.setTimeout(() => {
-      // 检查高度变化
-      checkHeightChange();
-    }, 100)  // 防抖处理，100ms延迟
-  }
-  
-  window.addEventListener('resize', currentResizeListener)
-  
-  // 清除可能存在的可见性变化监听器
-  if (visibilityChangeListener) {
-    document.removeEventListener('visibilitychange', visibilityChangeListener);
-    visibilityChangeListener = null;
-  }
-  
-  // 添加可见性变化监听器（用于检测前后台切换）
-  visibilityChangeListener = handleVisibilityChange;
-  document.addEventListener('visibilitychange', visibilityChangeListener);
-  
-  // 对于移动端，使用 setInterval 专门检测高度变化（小窗模式的关键指标）
-  if (isMobileDevice()) {
-    // 清除可能存在的旧定时器
-    if (dimensionCheckInterval) {
-      clearInterval(dimensionCheckInterval)
-    }
-    
-    // 开始每300毫秒检测一次高度变化
-    dimensionCheckInterval = window.setInterval(checkHeightChange, 300);
-  }
-}
-
-/**
- * 清除窗口检测器
- * 移除事件监听器和尺寸显示器
- */
-export function clearWindowDimensionDisplay(): void {
-  if (currentResizeListener) {
-    window.removeEventListener('resize', currentResizeListener)
-    currentResizeListener = null
-  }
-  
-  // 清除可见性变化监听器
-  if (visibilityChangeListener) {
-    document.removeEventListener('visibilitychange', visibilityChangeListener);
-    visibilityChangeListener = null;
-  }
-  
-  // 清除移动端的高度检查定时器
-  if (dimensionCheckInterval) {
-    clearInterval(dimensionCheckInterval)
-    dimensionCheckInterval = null
-  }
-  
-  // 清除尺寸显示器元素
-  if (dimensionDisplayElement) {
-    dimensionDisplayElement.remove()
-    dimensionDisplayElement = null
-  }
-  
 }
 
 // 导入 windowDetector 中的函数
@@ -6631,6 +6522,5 @@ function executeMobileOutline(config: ButtonConfig) {
  * ⑪手机端前一篇/后一篇文档 - 切换显示/隐藏文档导航栏
  */
 function executeMobileDocNav(config: ButtonConfig) {
-  console.log('[文档导航] executeMobileDocNav called')
   toggleMobileDocNav(config)
 }

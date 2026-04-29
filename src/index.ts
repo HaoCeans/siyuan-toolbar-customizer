@@ -22,7 +22,6 @@ import {
   initMobileToolbarAdjuster,
   initCustomButtons,
   cleanup,
-  clearWindowDimensionDisplay,
   createButtonsForEditors,
   DEFAULT_BUTTONS_CONFIG,
   DEFAULT_DESKTOP_BUTTONS,
@@ -502,25 +501,34 @@ export default class ToolbarCustomizer extends Plugin {
       // 初始化小窗模式检测器
       initSmallWindowDetector()
 
+      // 从按钮配置中查找各模块的透明度设置
+      const findFloatOpacity = (subtype: string): number | undefined => {
+        const btn = this.mobileButtonConfigs.find(b => b.type === 'author-tool' && b.authorToolSubtype === subtype)
+        return btn?.floatOpacity
+      }
+
       // 初始化手机端标签页Tab模块
       initMobileTabs({
         saveData: (key, value) => this.saveData(key, value),
         loadData: (key) => this.loadData(key),
-        eventBus: this.eventBus
+        eventBus: this.eventBus,
+        floatOpacity: findFloatOpacity('mobile-tabs')
       })
 
       // 初始化手机端悬浮大纲模块
       initMobileOutline({
         saveData: (key, value) => this.saveData(key, value),
         loadData: (key) => this.loadData(key),
-        eventBus: this.eventBus
+        eventBus: this.eventBus,
+        floatOpacity: findFloatOpacity('mobile-outline')
       })
 
       // 初始化手机端文档导航模块
       initMobileDocNav({
         saveData: (key, value) => this.saveData(key, value),
         loadData: (key) => this.loadData(key),
-        eventBus: this.eventBus
+        eventBus: this.eventBus,
+        floatOpacity: findFloatOpacity('doc-nav')
       })
     }
 
@@ -622,7 +630,6 @@ export default class ToolbarCustomizer extends Plugin {
   onunload() {
     // 清理资源
     cleanup()
-    clearWindowDimensionDisplay()
     destroy()
 
     // 清理标签切换器资源

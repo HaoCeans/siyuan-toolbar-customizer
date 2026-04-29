@@ -342,6 +342,10 @@ export function showInfoMarginRightModified(): void {
   showMessage('右边距已修改，请点击保存生效', NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
+export function showInfoExternalButtonsReserveWidthModified(): void {
+  showMessage('其他插件按钮预留宽度已修改，请点击保存生效', NOTIFICATION_DURATION.NORMAL, 'info')
+}
+
 // ===== 作者工具通知 =====
 
 /**

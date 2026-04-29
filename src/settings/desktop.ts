@@ -9,7 +9,7 @@ import type { Setting } from 'siyuan'
 import type { GlobalButtonConfig, ButtonConfig } from '../toolbarManager'
 import { createDesktopButtonItem, type DesktopButtonContext } from '../ui/buttonItems/desktop'
 import { createMobileButtonItem, type MobileButtonContext } from '../ui/buttonItems/mobile'
-import { showMessage } from 'siyuan'
+import { fetchSyncPost, showMessage } from 'siyuan'
 import * as Notify from '../notification'
 import { showButtonSelector } from '../ui/buttonSelector'
 
@@ -374,6 +374,7 @@ export interface DesktopSettingsContext {
   desktopButtonConfigs: ButtonConfig[]
   mobileButtonConfigs: ButtonConfig[]
   desktopGlobalButtonConfig: GlobalButtonConfig
+  mobileGlobalButtonConfig: GlobalButtonConfig
   desktopFeatureConfig: FeatureConfig
   mobileFeatureConfig: FeatureConfig
   mobileConfig: any
@@ -420,6 +421,48 @@ export function createDesktopSettingLayout(
       container.className = 'toolbar-customizer-content'
       container.dataset.tabGroup = 'version'
       container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--b3-theme-background); border-radius: 8px;'
+
+      // 数据迁移按钮样式（覆盖 focus 时的主题色边框/阴影）
+      if (!document.getElementById('toolbar-customizer-transfer-style')) {
+        const style = document.createElement('style')
+        style.id = 'toolbar-customizer-transfer-style'
+        style.textContent = `
+          .toolbar-customizer-transfer-btn:focus,
+          .toolbar-customizer-transfer-btn:focus-visible,
+          .toolbar-customizer-transfer-btn:active {
+            outline: none !important;
+            box-shadow: none !important;
+          }
+          .toolbar-customizer-transfer-btn:hover {
+            box-shadow: none !important;
+          }
+          .toolbar-customizer-transfer-import:focus,
+          .toolbar-customizer-transfer-import:focus-visible,
+          .toolbar-customizer-transfer-import:active {
+            border-color: #ff4d4d !important;
+          }
+          .toolbar-customizer-transfer-import {
+            border: 1px solid #ff4d4d !important;
+            border-color: #ff4d4d !important;
+            color: #ff4d4d !important;
+          }
+          .toolbar-customizer-transfer-import:hover {
+            border: 1px solid #ff4d4d !important;
+            border-color: #ff4d4d !important;
+            color: #ff4d4d !important;
+          }
+          .toolbar-customizer-transfer-export:focus,
+          .toolbar-customizer-transfer-export:focus-visible,
+          .toolbar-customizer-transfer-export:active {
+            border-color: var(--b3-theme-primary) !important;
+          }
+          .toolbar-customizer-transfer-export:hover {
+            border-color: var(--b3-theme-primary) !important;
+            color: var(--b3-theme-primary) !important;
+          }
+        `
+        document.head.appendChild(style)
+      }
 
       // 当前版本框
       const versionBox = document.createElement('div')
@@ -593,6 +636,145 @@ export function createDesktopSettingLayout(
       versionRow.appendChild(updateLink)
       
       versionBox.appendChild(versionRow)
+
+      // 导入/导出配置
+      const transferBox = document.createElement('div')
+      transferBox.style.cssText = 'padding: 12px; border: 1px solid var(--b3-border-color); border-radius: 6px; margin-bottom: 8px; overflow-x: auto;'
+
+      const transferRow = document.createElement('div')
+      transferRow.style.cssText = 'display: flex; align-items: center; gap: 12px; min-height: 34px;'
+
+      const transferLabel = document.createElement('div')
+      transferLabel.style.cssText = 'font-size: 14px; font-weight: 700; white-space: nowrap; flex: 1; min-width: 0;'
+
+      const transferTitle = document.createElement('span')
+      transferTitle.textContent = '数据迁移：'
+      transferTitle.style.cssText = 'color: var(--b3-theme-on-surface-light);'
+
+      const transferWarn = document.createElement('span')
+      transferWarn.textContent = '导入数据时，原始数据会覆盖，请先导出！'
+      transferWarn.style.cssText = 'color: #ff4d4d; margin-left: 6px;'
+
+      transferLabel.appendChild(transferTitle)
+      transferLabel.appendChild(transferWarn)
+
+      const exportBtn = document.createElement('button')
+      exportBtn.className = 'b3-button b3-button--outline'
+      exportBtn.textContent = '导出数据'
+      exportBtn.style.cssText = 'padding: 6px 12px; font-size: 13px; margin-left: auto; border-color: var(--b3-theme-primary); color: var(--b3-theme-primary);'
+      exportBtn.classList.add('toolbar-customizer-transfer-btn', 'toolbar-customizer-transfer-export')
+      exportBtn.onclick = () => {
+        try {
+          const payload = {
+            schema: 'siyuan-toolbar-customizer:full-config',
+            exportedAt: new Date().toISOString(),
+            pluginVersion: context.version || 'unknown',
+            data: {
+              mobileToolbarConfig: context.mobileConfig,
+              desktopButtonConfigs: context.desktopButtonConfigs,
+              mobileButtonConfigs: context.mobileButtonConfigs,
+              desktopFeatureConfig: context.desktopFeatureConfig,
+              mobileFeatureConfig: context.mobileFeatureConfig,
+              desktopGlobalButtonConfig: context.desktopGlobalButtonConfig,
+              mobileGlobalButtonConfig: context.mobileGlobalButtonConfig,
+            }
+          }
+          const text = JSON.stringify(payload, null, 2)
+          const blob = new Blob([text], { type: 'application/json;charset=utf-8' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          const safeVer = String(context.version || 'unknown').replace(/[^\w.-]+/g, '_')
+          a.href = url
+          a.download = `siyuan-toolbar-customizer-config_${safeVer}.json`
+          document.body.appendChild(a)
+          a.click()
+          a.remove()
+          URL.revokeObjectURL(url)
+          showMessage('已导出配置文件', 2000, 'info')
+        } catch (e) {
+          console.warn('[导出配置] 失败:', e)
+          showMessage('导出失败', 3000, 'error')
+        }
+      }
+
+      const importBtn = document.createElement('button')
+      importBtn.className = 'b3-button b3-button--outline'
+      importBtn.textContent = '导入数据'
+      importBtn.style.cssText = 'padding: 6px 12px; font-size: 13px; border: 1px solid #ff4d4d !important; border-color: #ff4d4d !important; color: #ff4d4d !important; outline: none !important; box-shadow: none !important; background: transparent;'
+      importBtn.classList.add('toolbar-customizer-transfer-btn', 'toolbar-customizer-transfer-import')
+
+      const fileInput = document.createElement('input')
+      fileInput.type = 'file'
+      fileInput.accept = 'application/json,.json'
+      fileInput.style.display = 'none'
+
+      const applyImported = async (data: any) => {
+        // 用“替换内容”的方式更新引用，避免上下文引用断开
+        if (data.mobileToolbarConfig) {
+          Object.assign(context.mobileConfig, data.mobileToolbarConfig)
+        }
+        if (Array.isArray(data.desktopButtonConfigs)) {
+          context.desktopButtonConfigs.length = 0
+          context.desktopButtonConfigs.push(...data.desktopButtonConfigs)
+        }
+        if (Array.isArray(data.mobileButtonConfigs)) {
+          context.mobileButtonConfigs.length = 0
+          context.mobileButtonConfigs.push(...data.mobileButtonConfigs)
+        }
+        if (data.desktopFeatureConfig) {
+          Object.assign(context.desktopFeatureConfig, data.desktopFeatureConfig)
+        }
+        if (data.mobileFeatureConfig) {
+          Object.assign(context.mobileFeatureConfig, data.mobileFeatureConfig)
+        }
+        if (data.desktopGlobalButtonConfig) {
+          Object.assign(context.desktopGlobalButtonConfig, data.desktopGlobalButtonConfig)
+        }
+        if (data.mobileGlobalButtonConfig) {
+          Object.assign(context.mobileGlobalButtonConfig, data.mobileGlobalButtonConfig)
+        }
+
+        // 全量写入存储，然后重载 UI
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
+        await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
+        await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
+        await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+        await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
+        await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
+
+        showMessage('导入成功，正在重载...', 2000, 'info')
+        await fetchSyncPost('/api/system/reloadUI', {})
+      }
+
+      fileInput.onchange = async () => {
+        const file = fileInput.files?.[0]
+        fileInput.value = ''
+        if (!file) return
+
+        const ok = await context.showConfirmDialog('导入将覆盖当前所有配置，是否继续？')
+        if (!ok) return
+
+        try {
+          const text = await file.text()
+          const json = JSON.parse(text)
+          const data = json?.data ?? json
+          await applyImported(data)
+        } catch (e) {
+          console.warn('[导入配置] 失败:', e)
+          showMessage('导入失败：文件格式不正确', 3000, 'error')
+        }
+      }
+
+      importBtn.onclick = () => fileInput.click()
+
+      transferRow.appendChild(transferLabel)
+      transferRow.appendChild(exportBtn)
+      transferRow.appendChild(importBtn)
+      transferRow.appendChild(fileInput)
+
+      transferBox.appendChild(transferRow)
+      container.appendChild(transferBox)
       container.appendChild(versionBox)
       
       // 问题反馈框
@@ -767,7 +949,7 @@ export function createDesktopSettingLayout(
         box-sizing: border-box;
       `
       whaleFunctionListContainer.innerHTML = `
-        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表</div>
+        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（11项）</div>
         <div style="font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>
         <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
           <thead>
@@ -815,8 +997,26 @@ export function createDesktopSettingLayout(
             </tr>
             <tr style="background: var(--b3-theme-background);">
               <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑧</td>
-              <td style="padding: 10px; font-weight: 500;">持续更新中</td>
-              <td style="padding: 10px; color: var(--b3-theme-on-surface);">更多实用功能开发中，欢迎进群提出你的定制需求</td>
+              <td style="padding: 10px; font-weight: 500;">图片快捷导入日记</td>
+              <td style="padding: 10px; color: var(--b3-theme-on-surface);">一键选择图片导入到每日笔记，自动追加到日记末尾，记录生活更便捷</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑨</td>
+              <td style="padding: 10px; font-weight: 500;">手机端标签页Tab</td>
+              <td style="padding: 10px; color: var(--b3-theme-on-surface);">手机端多文档快速切换，苹果风格悬浮Tab栏，自动管理，告别反复返回</td>
+            </tr>
+            <tr style="background: var(--b3-theme-background);">
+              <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑩</td>
+              <td style="padding: 10px; font-weight: 500;">手机端悬浮大纲</td>
+              <td style="padding: 10px; color: var(--b3-theme-on-surface);">左侧悬浮大纲面板，标题快速跳转，实时跟踪当前位置，阅读长文必备</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑪</td>
+              <td style="padding: 10px; font-weight: 500;">手机端前一篇/后一篇文档</td>
+              <td style="padding: 10px; color: var(--b3-theme-on-surface);">底部悬浮导航栏，按文件树顺序浏览文档，前后翻页，阅读笔记更流畅</td>
+            </tr>
+            <tr>
+              <td colspan="3" style="padding: 12px; text-align: center; color: var(--b3-theme-primary); font-weight: 600; font-style: italic;">持续更新中~</td>
             </tr>
           </tbody>
         </table>

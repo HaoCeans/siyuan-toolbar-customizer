@@ -599,6 +599,8 @@ export function createMobileSettingLayout(
       thumb.style.transform = 'translate(-50%, -50%) scale(1.15)';
       thumb.style.boxShadow = '0 3px 8px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2)';
       e.preventDefault();
+      // 点击轨道时立即更新一次
+      updateSlider(e.clientX);
 
       const moveHandler = (e: PointerEvent) => {
         if (isDragging) {
@@ -624,10 +626,23 @@ export function createMobileSettingLayout(
       document.addEventListener('pointercancel', upHandler);
     };
 
+    // 允许点/拖拽滑块与轨道任意位置
     thumb.addEventListener('pointerdown', handlePointerDown);
+    sliderContainer.addEventListener('pointerdown', handlePointerDown);
 
     // 触摸支持
     thumb.addEventListener('touchstart', (e: TouchEvent) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      handlePointerDown(new PointerEvent('pointerdown', {
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        bubbles: true,
+        cancelable: true
+      }));
+    });
+
+    sliderContainer.addEventListener('touchstart', (e: TouchEvent) => {
       e.preventDefault();
       const touch = e.touches[0];
       handlePointerDown(new PointerEvent('pointerdown', {
@@ -782,7 +797,11 @@ export function createMobileSettingLayout(
               const overflowBtn = context.buttonConfigs.find(btn => btn.id === 'overflow-button-mobile')
               const overflowLayers = (overflowBtn && overflowBtn.enabled !== false) ? (overflowBtn.layers || 1) : 0
               // 重新计算溢出层级
-              const updatedButtons = calculateButtonOverflow(context.buttonConfigs, overflowLayers)
+              const updatedButtons = calculateButtonOverflow(
+                context.buttonConfigs,
+                overflowLayers,
+                context.mobileGlobalButtonConfig?.externalButtonsReserveWidth ?? 0
+              )
               // 更新配置中的 overflowLevel
               updatedButtons.forEach(btn => {
                 const original = context.buttonConfigs.find(b => b.id === btn.id)
@@ -792,6 +811,7 @@ export function createMobileSettingLayout(
               })
             },
             saveData: context.saveData,
+            updateMobileToolbar: context.updateMobileToolbar,
             mobileConfig: context.mobileConfig
           }
           const item = createMobileButtonItem(button, index, renderList, context.buttonConfigs, mobileButtonContext)
@@ -838,7 +858,11 @@ export function createMobileSettingLayout(
 
         // 如果启用了扩展工具栏，重新计算溢出层级
         if (overflowLayers > 0) {
-          const updated = calculateButtonOverflow(context.buttonConfigs, overflowLayers)
+          const updated = calculateButtonOverflow(
+            context.buttonConfigs,
+            overflowLayers,
+            context.mobileGlobalButtonConfig?.externalButtonsReserveWidth ?? 0
+          )
           // 更新所有按钮的溢出层级
           updated.forEach(btn => {
             const original = context.buttonConfigs.find(b => b.id === btn.id)
@@ -1059,6 +1083,36 @@ export function createMobileSettingLayout(
         toggle.style.cursor = 'not-allowed'
       }
       return toggle
+    }
+  })
+
+  // 其他插件按钮预留宽度
+  setting.addItem({
+    title: '⑥其他插件按钮预留宽度',
+    description: '💡 仅影响主工具栏溢出计算：额外预留右侧空间给其他插件按钮（扩展工具栏不受影响）',
+    createActionElement: () => {
+      const config = context.mobileGlobalButtonConfig
+      const currentValue = config.externalButtonsReserveWidth ?? 0
+
+      const slider = createCustomSliderWithoutLabel(
+        currentValue,
+        0,
+        200,
+        'px',
+        async (value) => {
+          config.externalButtonsReserveWidth = value
+          Notify.showInfoExternalButtonsReserveWidthModified()
+          // 注意：这里不立刻保存/重载，由设置面板右下角的“保存”统一提交
+        }
+      )
+
+      // 根据全局配置启用状态设置滑杆的禁用状态
+      if (!(config.enabled ?? true)) {
+        slider.style.opacity = '0.5'
+        slider.style.pointerEvents = 'none'
+      }
+
+      return slider
     }
   })
 
@@ -3006,7 +3060,7 @@ export function createMobileSettingLayout(
         box-sizing: border-box;
       `
       container.innerHTML = `
-        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表</div>
+        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（11项）</div>
         <div style="font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>
         <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
           <thead>
@@ -3058,9 +3112,22 @@ export function createMobileSettingLayout(
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">选择图片快速导入日记，支持手动定位或自动追加，图片管理更便捷</td>
             </tr>
             <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑨</td>
-              <td style="padding: 10px; font-weight: 500;">持续更新中</td>
-              <td style="padding: 10px; color: var(--b3-theme-on-surface);">更多实用功能开发中，欢迎进群提出你的定制需求</td>
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑨</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">手机端标签页Tab</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">手机端多文档快速切换，苹果风格悬浮Tab栏，自动管理，告别反复返回</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑩</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">手机端悬浮大纲</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">左侧悬浮大纲面板，标题快速跳转，实时跟踪当前位置，阅读长文必备</td>
+            </tr>
+            <tr style="background: var(--b3-theme-background);">
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑪</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">手机端前一篇/后一篇文档</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">底部悬浮导航栏，按文件树顺序浏览文档，前后翻页，阅读笔记更流畅</td>
+            </tr>
+            <tr>
+              <td colspan="3" style="padding: 12px; text-align: center; color: var(--b3-theme-primary); font-weight: 600; font-style: italic;">持续更新中~</td>
             </tr>
           </tbody>
         </table>

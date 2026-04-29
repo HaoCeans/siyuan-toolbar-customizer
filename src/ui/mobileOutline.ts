@@ -18,6 +18,7 @@ interface OutlineContext {
   saveData: (key: string, value: any) => Promise<void>
   loadData: (key: string) => Promise<any>
   eventBus: any
+  floatOpacity?: number
 }
 
 interface MobileOutlineState {
@@ -57,6 +58,106 @@ let focusInHandler: ((e: FocusEvent) => void) | null = null
 let focusOutHandler: ((e: FocusEvent) => void) | null = null
 let visibilityChangeHandler: (() => void) | null = null
 
+// ===== 滚动隐藏/显示（向上滚动消失，下滑出现）=====
+let hiddenByScroll = false
+let autoHideOnScrollEnabled = false
+let currentFloatOpacityForAutoHide: number | undefined = undefined
+let lastScrollTopForAutoHide: number | null = null
+let lastAutoHideToggleAt = 0
+let boundScrollEl: HTMLElement | null = null
+let scrollBindRetryTimer: ReturnType<typeof setInterval> | null = null
+let scrollBindRetryCount = 0
+
+const SCROLL_HIDE_THRESHOLD_PX = 15
+const SCROLL_TOGGLE_COOLDOWN_MS = 200
+const SCROLL_FADE_MS = 160
+
+function fadeOutAndRemovePanel(): void {
+  if (!outlinePanel) {
+    removePanel()
+    return
+  }
+  const el = outlinePanel
+  el.style.transition = `opacity ${SCROLL_FADE_MS}ms ease`
+  el.style.opacity = '0'
+  window.setTimeout(() => {
+    if (outlinePanel === el) {
+      removePanel()
+    }
+  }, SCROLL_FADE_MS)
+}
+
+function ensurePanelVisibleWithFadeIn(): void {
+  if (!outlinePanel) return
+  const el = outlinePanel
+  el.style.transition = `opacity ${SCROLL_FADE_MS}ms ease`
+  el.style.opacity = '0'
+  requestAnimationFrame(() => {
+    if (outlinePanel === el) el.style.opacity = '1'
+  })
+}
+
+function getMobileContentScrollElement(): HTMLElement | null {
+  const protyle = (window as any).siyuan?.mobile?.editor?.protyle
+  return protyle?.contentElement || document.querySelector('.protyle-content')
+}
+
+function bindScrollListener(): void {
+  const el = getMobileContentScrollElement()
+  if (!el) return
+
+  if (boundScrollEl && boundScrollEl !== el) {
+    boundScrollEl.removeEventListener('scroll', handleScrollAutoHide as any)
+    boundScrollEl = null
+  }
+
+  if (boundScrollEl === el) return
+  boundScrollEl = el
+  boundScrollEl.addEventListener('scroll', handleScrollAutoHide as any, { passive: true })
+}
+
+function startScrollBindRetry(): void {
+  if (boundScrollEl) return
+  if (scrollBindRetryTimer) return
+
+  scrollBindRetryCount = 0
+  scrollBindRetryTimer = setInterval(() => {
+    scrollBindRetryCount++
+    bindScrollListener()
+    if (boundScrollEl || scrollBindRetryCount >= 30) {
+      if (scrollBindRetryTimer) clearInterval(scrollBindRetryTimer)
+      scrollBindRetryTimer = null
+    }
+  }, 200)
+}
+
+function detachInteractionListeners(): void {
+  if (boundScrollEl) {
+    boundScrollEl.removeEventListener('scroll', handleScrollAutoHide as any)
+    boundScrollEl = null
+  }
+  if (scrollBindRetryTimer) {
+    clearInterval(scrollBindRetryTimer)
+    scrollBindRetryTimer = null
+  }
+  if (vvResizeHandler) {
+    window.visualViewport?.removeEventListener('resize', vvResizeHandler)
+    vvResizeHandler = null
+  }
+  if (focusInHandler) {
+    document.removeEventListener('focusin', focusInHandler, true)
+    focusInHandler = null
+  }
+  if (focusOutHandler) {
+    document.removeEventListener('focusout', focusOutHandler, true)
+    focusOutHandler = null
+  }
+  if (visibilityChangeHandler) {
+    document.removeEventListener('visibilitychange', visibilityChangeHandler)
+    visibilityChangeHandler = null
+  }
+}
+
 function getViewportHeight(): number {
   return window.visualViewport?.height || window.innerHeight
 }
@@ -82,8 +183,47 @@ function hideForKeyboard(): void {
 function restoreAfterKeyboard(): void {
   if (!hiddenByKeyboard) return
   hiddenByKeyboard = false
-  if (state.isVisible) {
+  if (state.isVisible && !hiddenByScroll) {
     createPanel()
+    startTitleRefresh()
+    renderOutlinePanel()
+  }
+}
+
+function handleScrollAutoHide(): void {
+  if (!state.isVisible) return
+  if (!autoHideOnScrollEnabled) return
+  if (hiddenByKeyboard) return
+
+  const scrollEl = boundScrollEl || getMobileContentScrollElement()
+  if (!scrollEl) return
+
+  const now = Date.now()
+  const st = scrollEl.scrollTop
+
+  if (lastScrollTopForAutoHide == null) {
+    lastScrollTopForAutoHide = st
+    return
+  }
+
+  const delta = st - lastScrollTopForAutoHide
+  lastScrollTopForAutoHide = st
+
+  if (now - lastAutoHideToggleAt < SCROLL_TOGGLE_COOLDOWN_MS) return
+
+  // scrollTop 增加：内容向上滚（你说的“向上滚动”）=> hide
+  // scrollTop 减少：内容向下滚（你说的“下滑”）=> show
+  if (!hiddenByScroll && delta > SCROLL_HIDE_THRESHOLD_PX) {
+    hiddenByScroll = true
+    lastAutoHideToggleAt = now
+    stopTitleRefresh()
+    fadeOutAndRemovePanel()
+  } else if (hiddenByScroll && delta < -SCROLL_HIDE_THRESHOLD_PX) {
+    hiddenByScroll = false
+    lastAutoHideToggleAt = now
+    createPanel()
+    applyOpacity(outlinePanel, currentFloatOpacityForAutoHide)
+    ensurePanelVisibleWithFadeIn()
     startTitleRefresh()
     renderOutlinePanel()
   }
@@ -164,8 +304,8 @@ function trackCurrentHeading(): void {
   const wysiwyg = protyle.wysiwyg?.element
   if (!wysiwyg) return
 
-  // 获取当前可见区域中心相对于滚动容器的位置
-  const scrollEl = document.querySelector('.protyle-scroll') as HTMLElement
+  // 获取当前可见区域中心相对于滚动容器的位置（手机端滚动容器为 protyle.contentElement）
+  const scrollEl = boundScrollEl || getMobileContentScrollElement()
   if (!scrollEl) return
 
   const viewCenter = scrollEl.scrollTop + scrollEl.clientHeight / 3
@@ -359,9 +499,22 @@ function handleSwitchProtyle(): void {
   if (state.isVisible && outlinePanel) {
     renderOutlinePanel()
   }
+
+  // 确保绑定到当前文档的真实滚动容器
+  bindScrollListener()
+
+  // 切文档后重置滚动方向基准
+  const scrollEl = getMobileContentScrollElement()
+  lastScrollTopForAutoHide = scrollEl?.scrollTop ?? null
+  lastAutoHideToggleAt = 0
 }
 
 // ===== 样式 =====
+function applyOpacity(el: HTMLElement | null, opacity: number | undefined): void {
+  if (!el) return
+  el.style.background = `rgba(255,255,255,${opacity ?? 0.72})`
+}
+
 function injectStyles(): void {
   if (injectedStyle) return
   const style = document.createElement('style')
@@ -380,8 +533,6 @@ function injectStyles(): void {
       display: flex;
       flex-direction: column;
       background: rgba(255,255,255,0.72);
-      backdrop-filter: saturate(180%) blur(20px);
-      -webkit-backdrop-filter: saturate(180%) blur(20px);
       border-radius: 20px;
       box-shadow: 0 2px 20px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.04);
       transition: width 0.3s cubic-bezier(0.32,0.72,0,1), padding 0.3s cubic-bezier(0.32,0.72,0,1), border-radius 0.3s ease;
@@ -455,7 +606,7 @@ function injectStyles(): void {
       transform: scale(0.97);
     }
     .outline-item--focus {
-      background: rgba(0,122,255,0.1);
+      background: rgba(0,122,255,0.05);
     }
     .outline-item--focus .outline-text {
       color: #007AFF;
@@ -499,12 +650,12 @@ function injectStyles(): void {
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', sans-serif;
       letter-spacing: -0.3px;
     }
-    .outline-icon-h1 { background: #007AFF; }
-    .outline-icon-h2 { background: #5856D6; }
-    .outline-icon-h3 { background: #34C759; }
-    .outline-icon-h4 { background: #FF9500; }
-    .outline-icon-h5 { background: #FF2D55; }
-    .outline-icon-h6 { background: #AF52DE; }
+    .outline-icon-h1 { background: rgba(0,122,255,0.55); }
+    .outline-icon-h2 { background: rgba(88,86,214,0.55); }
+    .outline-icon-h3 { background: rgba(52,199,89,0.55); }
+    .outline-icon-h4 { background: rgba(255,149,0,0.55); }
+    .outline-icon-h5 { background: rgba(255,45,85,0.55); }
+    .outline-icon-h6 { background: rgba(175,82,222,0.55); }
     /* 标题文字 */
     .outline-text {
       flex: 1;
@@ -535,7 +686,7 @@ function injectStyles(): void {
       height: 30px;
       margin: 4px auto 2px;
       border: none;
-      background: rgba(0,0,0,0.04);
+      background: transparent;
       color: #8e8e93;
       font-size: 12px;
       font-weight: 500;
@@ -548,7 +699,7 @@ function injectStyles(): void {
       display: flex;
     }
     .outline-collapse-btn:active {
-      background: rgba(0,0,0,0.08);
+      background: rgba(0,0,0,0.04);
     }
     /* 收缩态展开手柄 */
     .outline-expand-handle {
@@ -565,7 +716,7 @@ function injectStyles(): void {
       transition: background 0.15s ease;
     }
     .outline-expand-handle:active {
-      background: rgba(0,0,0,0.06);
+      background: rgba(0,0,0,0.03);
     }
     html[data-theme-mode="dark"] .outline-expand-handle {
       color: #0A84FF;
@@ -715,7 +866,64 @@ export async function init(context: OutlineContext): Promise<void> {
   // 如果之前可见，恢复面板
   if (state.isVisible) {
     createPanel()
+    applyOpacity(outlinePanel, context.floatOpacity)
     startTitleRefresh()
+
+    // 仅在可见时才注册交互监听（滚动/键盘/前后台切换）
+    keyboardBaselineHeight = getViewportHeight()
+    vvResizeHandler = () => {
+      if (!isMobileDevice()) return
+      const vh = getViewportHeight()
+      if (keyboardBaselineHeight == null) keyboardBaselineHeight = vh
+
+      if (!isTextInputTarget(document.activeElement)) {
+        keyboardBaselineHeight = Math.max(keyboardBaselineHeight, vh)
+      }
+
+      const baseline = keyboardBaselineHeight || vh
+      const delta = baseline - vh
+      if (delta > 120 && isTextInputTarget(document.activeElement)) {
+        hideForKeyboard()
+      } else if (delta < 60) {
+        restoreAfterKeyboard()
+      }
+    }
+    window.visualViewport?.addEventListener('resize', vvResizeHandler)
+
+    focusInHandler = (e: FocusEvent) => {
+      if (!isMobileDevice()) return
+      const target = e.target as Element | null
+      if (isTextInputTarget(target)) {
+        keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
+        hideForKeyboard()
+      }
+    }
+    focusOutHandler = (e: FocusEvent) => {
+      if (!isMobileDevice()) return
+      const target = e.target as Element | null
+      if (!isTextInputTarget(target)) return
+      setTimeout(() => {
+        if (!isTextInputTarget(document.activeElement)) {
+          keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
+          restoreAfterKeyboard()
+        }
+      }, 200)
+    }
+    document.addEventListener('focusin', focusInHandler, true)
+    document.addEventListener('focusout', focusOutHandler, true)
+
+    bindScrollListener()
+    startScrollBindRetry()
+
+    visibilityChangeHandler = () => {
+      if (document.hidden) {
+        stopTitleRefresh()
+      } else if (state.isVisible) {
+        startTitleRefresh()
+        renderOutlinePanel()
+      }
+    }
+    document.addEventListener('visibilitychange', visibilityChangeHandler)
   }
 
   // 监听文档切换
@@ -723,59 +931,7 @@ export async function init(context: OutlineContext): Promise<void> {
   context.eventBus.on('switch-protyle', switchProtyleHandler)
   context.eventBus.on('loaded-protyle-dynamic', switchProtyleHandler)
 
-  // 输入法/键盘弹出时自动隐藏（仅手机端）
-  keyboardBaselineHeight = getViewportHeight()
-  vvResizeHandler = () => {
-    if (!isMobileDevice()) return
-    const vh = getViewportHeight()
-    if (keyboardBaselineHeight == null) keyboardBaselineHeight = vh
-
-    if (!isTextInputTarget(document.activeElement)) {
-      keyboardBaselineHeight = Math.max(keyboardBaselineHeight, vh)
-    }
-
-    const baseline = keyboardBaselineHeight || vh
-    const delta = baseline - vh
-    if (delta > 120 && isTextInputTarget(document.activeElement)) {
-      hideForKeyboard()
-    } else if (delta < 60) {
-      restoreAfterKeyboard()
-    }
-  }
-  window.visualViewport?.addEventListener('resize', vvResizeHandler)
-
-  focusInHandler = (e: FocusEvent) => {
-    if (!isMobileDevice()) return
-    const target = e.target as Element | null
-    if (isTextInputTarget(target)) {
-      keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
-      hideForKeyboard()
-    }
-  }
-  focusOutHandler = (e: FocusEvent) => {
-    if (!isMobileDevice()) return
-    const target = e.target as Element | null
-    if (!isTextInputTarget(target)) return
-    setTimeout(() => {
-      if (!isTextInputTarget(document.activeElement)) {
-        keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
-        restoreAfterKeyboard()
-      }
-    }, 200)
-  }
-  document.addEventListener('focusin', focusInHandler, true)
-  document.addEventListener('focusout', focusOutHandler, true)
-
-  // 前后台切换
-  visibilityChangeHandler = () => {
-    if (document.hidden) {
-      stopTitleRefresh()
-    } else if (state.isVisible) {
-      startTitleRefresh()
-      renderOutlinePanel()
-    }
-  }
-  document.addEventListener('visibilitychange', visibilityChangeHandler)
+  // 面板不可见时，不注册滚动/键盘/visibility 监听，避免无谓开销
 }
 
 export function toggleVisibility(config: ButtonConfig): void {
@@ -787,6 +943,13 @@ export function toggleVisibility(config: ButtonConfig): void {
   state.isVisible = !state.isVisible
 
   if (state.isVisible) {
+    // 更新滚动隐藏开关与用于恢复的透明度
+    autoHideOnScrollEnabled = !!config.autoHideOnScroll
+    currentFloatOpacityForAutoHide = config.floatOpacity
+    hiddenByScroll = false
+    lastScrollTopForAutoHide = null
+    lastAutoHideToggleAt = 0
+
     // 确保有当前文档
     const protyle = (window as any).siyuan?.mobile?.editor?.protyle
     if (protyle?.block?.rootID) {
@@ -794,7 +957,69 @@ export function toggleVisibility(config: ButtonConfig): void {
     }
 
     createPanel()
+    applyOpacity(outlinePanel, config.floatOpacity)
     startTitleRefresh()
+
+    if (!vvResizeHandler) {
+      keyboardBaselineHeight = getViewportHeight()
+      vvResizeHandler = () => {
+        if (!isMobileDevice()) return
+        const vh = getViewportHeight()
+        if (keyboardBaselineHeight == null) keyboardBaselineHeight = vh
+
+        if (!isTextInputTarget(document.activeElement)) {
+          keyboardBaselineHeight = Math.max(keyboardBaselineHeight, vh)
+        }
+
+        const baseline = keyboardBaselineHeight || vh
+        const delta = baseline - vh
+        if (delta > 120 && isTextInputTarget(document.activeElement)) {
+          hideForKeyboard()
+        } else if (delta < 60) {
+          restoreAfterKeyboard()
+        }
+      }
+      window.visualViewport?.addEventListener('resize', vvResizeHandler)
+    }
+
+    if (!focusInHandler) {
+      focusInHandler = (e: FocusEvent) => {
+        if (!isMobileDevice()) return
+        const target = e.target as Element | null
+        if (isTextInputTarget(target)) {
+          keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
+          hideForKeyboard()
+        }
+      }
+      focusOutHandler = (e: FocusEvent) => {
+        if (!isMobileDevice()) return
+        const target = e.target as Element | null
+        if (!isTextInputTarget(target)) return
+        setTimeout(() => {
+          if (!isTextInputTarget(document.activeElement)) {
+            keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
+            restoreAfterKeyboard()
+          }
+        }, 200)
+      }
+      document.addEventListener('focusin', focusInHandler, true)
+      document.addEventListener('focusout', focusOutHandler, true)
+    }
+
+    bindScrollListener()
+    startScrollBindRetry()
+
+    if (!visibilityChangeHandler) {
+      visibilityChangeHandler = () => {
+        if (document.hidden) {
+          stopTitleRefresh()
+        } else if (state.isVisible) {
+          startTitleRefresh()
+          renderOutlinePanel()
+        }
+      }
+      document.addEventListener('visibilitychange', visibilityChangeHandler)
+    }
 
     if (config.showNotification !== false) {
       showMessage('大纲已显示', 1500, 'info')
@@ -803,6 +1028,14 @@ export function toggleVisibility(config: ButtonConfig): void {
     removePanel()
     stopTitleRefresh()
     currentFocusId = null
+
+    // 关闭滚动隐藏，恢复初始状态
+    autoHideOnScrollEnabled = false
+    hiddenByScroll = false
+    lastScrollTopForAutoHide = null
+    currentFloatOpacityForAutoHide = undefined
+    lastAutoHideToggleAt = 0
+    detachInteractionListeners()
 
     if (config.showNotification !== false) {
       showMessage('大纲已隐藏', 1500, 'info')
@@ -819,22 +1052,7 @@ export function cleanup(): void {
     switchProtyleHandler = null
   }
 
-  if (vvResizeHandler) {
-    window.visualViewport?.removeEventListener('resize', vvResizeHandler)
-    vvResizeHandler = null
-  }
-  if (focusInHandler) {
-    document.removeEventListener('focusin', focusInHandler, true)
-    focusInHandler = null
-  }
-  if (focusOutHandler) {
-    document.removeEventListener('focusout', focusOutHandler, true)
-    focusOutHandler = null
-  }
-  if (visibilityChangeHandler) {
-    document.removeEventListener('visibilitychange', visibilityChangeHandler)
-    visibilityChangeHandler = null
-  }
+  detachInteractionListeners()
 
   stopTitleRefresh()
   removePanel()

@@ -32,6 +32,8 @@ export interface MobileButtonContext {
   mobileButtonConfigs: ButtonConfig[]
   recalculateOverflow: () => void
   saveData: (key: string, value: any) => Promise<void>
+  // 透明度等需要影响运行时按钮点击闭包时，刷新工具栏以确保使用到最新配置
+  updateMobileToolbar?: () => void
   mobileConfig: {
     enableTopToolbar?: boolean
     enableBottomToolbar?: boolean
@@ -708,7 +710,22 @@ export function createMobileButtonItem(
       notebookIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
       notebookIdHint.textContent = '💡 填写笔记本ID后，点击按钮将直接追加到该笔记本的每日笔记'
       templateContainer.appendChild(notebookIdHint)
-      
+
+      // 显示在右键菜单开关
+      const contextMenuItem = document.createElement('div')
+      contextMenuItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px;'
+      const contextMenuLabel = document.createElement('label')
+      contextMenuLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
+      contextMenuLabel.textContent = '📋 显示在文本右键菜单'
+      const contextMenuSwitch = document.createElement('input')
+      contextMenuSwitch.type = 'checkbox'
+      contextMenuSwitch.className = 'b3-switch'
+      contextMenuSwitch.checked = button.showInContextMenu ?? false
+      contextMenuSwitch.onchange = () => { button.showInContextMenu = contextMenuSwitch.checked }
+      contextMenuItem.appendChild(contextMenuLabel)
+      contextMenuItem.appendChild(contextMenuSwitch)
+      templateContainer.appendChild(contextMenuItem)
+
       typeFieldsContainer.appendChild(templateContainer)
     } else if (button.type === 'click-sequence') {
       // 点击序列配置
@@ -727,7 +744,7 @@ export function createMobileButtonItem(
       // 预设按钮
       const presetBtn = document.createElement('button')
       presetBtn.className = 'b3-button b3-button--outline'
-      presetBtn.textContent = '选择'
+      presetBtn.textContent = '选择模板'
       presetBtn.style.cssText = 'padding: 4px 12px; font-size: 12px; white-space: nowrap;'
       presetBtn.onclick = () => {
         // 根据配置数组判断当前是手机配置还是电脑配置区域
@@ -834,9 +851,12 @@ export function createMobileButtonItem(
         <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
         <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
         <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>⑧ 图片快捷导入日记</option>
+        <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>⑨ 手机端标签页Tab</option>
+        <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>⑩ 手机端悬浮大纲</option>
+        <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 手机端前一篇/后一篇文档</option>
       `
       subtypeSelect.onchange = () => {
-        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload'
+        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav'
         ;(subtypeSelect as any).refreshForm?.()
       }
       authorToolContainer.appendChild(subtypeSelect)
@@ -1291,6 +1311,107 @@ export function createMobileButtonItem(
 
       authorToolContainer.appendChild(imageUploadConfigDiv)
 
+      // 悬浮弹窗透明度配置（⑨⑩⑪）
+      const floatOpacityConfigDiv = document.createElement('div')
+      floatOpacityConfigDiv.id = 'float-opacity-config-mobile'
+      floatOpacityConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+      const opacityLabel = document.createElement('label')
+      opacityLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
+      opacityLabel.textContent = '悬浮弹窗透明度'
+      floatOpacityConfigDiv.appendChild(opacityLabel)
+
+      const opacityRow = document.createElement('div')
+      opacityRow.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+
+      const opacitySlider = document.createElement('input')
+      opacitySlider.type = 'range'
+      opacitySlider.min = '1'
+      opacitySlider.max = '100'
+      opacitySlider.value = String(Math.round((button.floatOpacity ?? 0.72) * 100))
+      opacitySlider.style.cssText = 'flex: 1; accent-color: var(--b3-theme-primary);'
+
+      let floatOpacityPersistTimer: ReturnType<typeof setTimeout> | null = null
+      const scheduleFloatOpacityPersistAndRefresh = () => {
+        if (floatOpacityPersistTimer) clearTimeout(floatOpacityPersistTimer)
+        floatOpacityPersistTimer = setTimeout(() => {
+          // 写入持久化配置，确保下一次点击/重建按钮时 floatOpacity 生效
+          // 以及通过刷新工具栏，确保按钮点击闭包使用最新配置对象。
+          void (async () => {
+            try {
+              await context.saveData('mobileButtonConfigs', context.buttonConfigs)
+              context.updateMobileToolbar?.()
+            } catch (e) {
+              console.warn('[floatOpacity] persist/refresh failed:', e)
+            }
+          })()
+        }, 250)
+      }
+
+      opacitySlider.addEventListener('input', () => {
+        const val = parseInt(opacitySlider.value)
+        button.floatOpacity = val / 100
+        opacityValue.textContent = val + '%'
+        const alpha = val / 100
+        const ids = ['mobile-tabs-bar', 'mobile-outline-panel', 'mobile-doc-nav-bar']
+        ids.forEach(id => {
+          const el = document.getElementById(id)
+          if (el) el.style.background = `rgba(255,255,255,${alpha})`
+        })
+
+        // 防止 slider 拖动过程中触发过多次初始化/保存；
+        // 由于工具栏按钮点击时使用了当时构建的配置对象，需刷新一次以确保闭包拿到最新 floatOpacity。
+        scheduleFloatOpacityPersistAndRefresh()
+      })
+
+      const opacityValue = document.createElement('span')
+      opacityValue.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface-light); min-width: 40px; text-align: right;'
+      opacityValue.textContent = Math.round((button.floatOpacity ?? 0.72) * 100) + '%'
+
+      const opacityHint = document.createElement('div')
+      opacityHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
+      opacityHint.textContent = '💡 调整悬浮弹窗背景的透明度，数值越小越透明（最小 1%）'
+
+      opacityRow.appendChild(opacitySlider)
+      opacityRow.appendChild(opacityValue)
+      floatOpacityConfigDiv.appendChild(opacityRow)
+      floatOpacityConfigDiv.appendChild(opacityHint)
+
+      // 滚动隐藏/显示开关（向上滚动消失，下滑出现）
+      const autoHideContainer = document.createElement('div')
+      autoHideContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px; margin-top: 4px;'
+
+      const autoHideRow = document.createElement('div')
+      autoHideRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
+
+      const autoHideLabel = document.createElement('label')
+      autoHideLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
+      autoHideLabel.textContent = '滚动隐藏/显示'
+
+      const autoHideSwitch = document.createElement('input')
+      autoHideSwitch.type = 'checkbox'
+      autoHideSwitch.className = 'b3-switch'
+      autoHideSwitch.checked = button.autoHideOnScroll ?? false
+
+      autoHideRow.appendChild(autoHideLabel)
+      autoHideRow.appendChild(autoHideSwitch)
+
+      const autoHideHint = document.createElement('div')
+      autoHideHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
+      autoHideHint.textContent = '向上滚动：面板消失；向下滚动：面板重新出现'
+
+      autoHideSwitch.onchange = async () => {
+        button.autoHideOnScroll = autoHideSwitch.checked
+        await context.saveData('mobileButtonConfigs', context.buttonConfigs)
+        context.updateMobileToolbar?.()
+      }
+
+      autoHideContainer.appendChild(autoHideRow)
+      autoHideContainer.appendChild(autoHideHint)
+      floatOpacityConfigDiv.appendChild(autoHideContainer)
+
+      authorToolContainer.appendChild(floatOpacityConfigDiv)
+
       // 日记顶部或底部配置区（说明 + 位置选择 + 笔记本ID + 等待时间配置）
       const diaryConfigDiv = document.createElement('div')
       diaryConfigDiv.id = 'diary-config-mobile'
@@ -1448,6 +1569,7 @@ export function createMobileButtonItem(
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'none'
           imageUploadConfigDiv.style.display = 'none'
+          floatOpacityConfigDiv.style.display = 'none'
         } else if (subtype === 'diary' || subtype === 'diary-top' || subtype === 'diary-bottom') {
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
@@ -1457,6 +1579,7 @@ export function createMobileButtonItem(
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'none'
           imageUploadConfigDiv.style.display = 'none'
+          floatOpacityConfigDiv.style.display = 'none'
           // 更新日记位置单选按钮状态
           const position = button.diaryPosition || 'top'
           if ((diaryPositionOptionsMobile as any).diaryTopRadio && (diaryPositionOptionsMobile as any).diaryBottomRadio) {
@@ -1479,6 +1602,7 @@ export function createMobileButtonItem(
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'none'
           imageUploadConfigDiv.style.display = 'none'
+          floatOpacityConfigDiv.style.display = 'none'
         } else if (subtype === 'popup-select') {
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
@@ -1488,6 +1612,7 @@ export function createMobileButtonItem(
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'none'
           imageUploadConfigDiv.style.display = 'none'
+          floatOpacityConfigDiv.style.display = 'none'
         } else if (subtype === 'button-sequence') {
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
@@ -1497,6 +1622,7 @@ export function createMobileButtonItem(
           buttonSequenceConfigDiv.style.display = 'flex'
           scrollDocConfigDiv.style.display = 'none'
           imageUploadConfigDiv.style.display = 'none'
+          floatOpacityConfigDiv.style.display = 'none'
         } else if (subtype === 'scroll-doc') {
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
@@ -1506,6 +1632,7 @@ export function createMobileButtonItem(
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'flex'
           imageUploadConfigDiv.style.display = 'none'
+          floatOpacityConfigDiv.style.display = 'none'
         } else if (subtype === 'image-upload') {
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
@@ -1515,6 +1642,17 @@ export function createMobileButtonItem(
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'none'
           imageUploadConfigDiv.style.display = 'flex'
+          floatOpacityConfigDiv.style.display = 'none'
+        } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav') {
+          docConfigDiv.style.display = 'none'
+          dbConfigDiv.style.display = 'none'
+          diaryConfigDiv.style.display = 'none'
+          lifeLogConfigDiv.style.display = 'none'
+          popupSelectConfigDiv.style.display = 'none'
+          buttonSequenceConfigDiv.style.display = 'none'
+          scrollDocConfigDiv.style.display = 'none'
+          imageUploadConfigDiv.style.display = 'none'
+          floatOpacityConfigDiv.style.display = 'flex'
         } else {
           docConfigDiv.style.display = 'flex'
           dbConfigDiv.style.display = 'none'
@@ -1524,6 +1662,7 @@ export function createMobileButtonItem(
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'none'
           imageUploadConfigDiv.style.display = 'none'
+          floatOpacityConfigDiv.style.display = 'none'
         }
       }
       ;(subtypeSelect as any).refreshForm = updateVisibility
@@ -1709,3 +1848,4 @@ export function createMobileButtonItem(
   item.appendChild(editForm)
   return item
 }
+

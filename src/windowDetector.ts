@@ -1,4 +1,4 @@
-import { isMobileDevice, pluginInstance, setPluginInstance, showPopupSelectDialog, processTemplateVariables, getToolbarAvailableWidth, getButtonWidth } from './toolbarManager';
+import { isMobileDevice, pluginInstance, setPluginInstance, showPopupSelectDialog, processTemplateVariables, getToolbarAvailableWidth, getButtonWidth, showTemplateContextMenu } from './toolbarManager';
 import * as Notify from './notification';
 import { appendBlock, prependBlock } from './api';
 
@@ -689,6 +689,21 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
 
   document.body.appendChild(dialog);
 
+  // 延后预打开扩展工具栏（隐藏状态），让弹窗先渲染出来
+  setTimeout(() => {
+    const overflowBtn = document.querySelector('[data-custom-button="overflow-button-mobile"]') as HTMLElement;
+    if (overflowBtn && document.querySelectorAll('.overflow-toolbar-layer').length === 0) {
+      overflowBtn.click();
+      document.querySelectorAll('.overflow-toolbar-layer').forEach(el => {
+        el.style.visibility = 'hidden';
+        el.style.pointerEvents = 'none';
+        el.style.animation = 'none';
+      });
+      overflowBtn.classList.remove('overflow-active');
+      overflowBtn.style.backgroundColor = 'transparent';
+    }
+  }, 100);
+
   // 电脑端特有功能：自动聚焦、Enter发送、Esc取消
   if (!isMobileDevice() && isFromButton) {
     // 使用 setTimeout 确保 DOM 已渲染
@@ -727,6 +742,16 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
   // 不自动聚焦，完全由用户手动点击编辑框来控制输入法
 }
 
+// 清理预打开的隐藏扩展工具栏
+function cleanupHiddenOverflowToolbar() {
+  document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove());
+  const overflowBtn = document.querySelector('[data-custom-button="overflow-button-mobile"]') as HTMLElement;
+  if (overflowBtn) {
+    overflowBtn.classList.remove('overflow-active');
+    overflowBtn.style.backgroundColor = 'transparent';
+  }
+}
+
 // 关闭记事弹窗的函数
 function closeNoteDialog() {
   const noteDialog = document.getElementById('quick-note-dialog');
@@ -734,7 +759,6 @@ function closeNoteDialog() {
     // 检查是否在保护期内
     const timeSinceOpen = Date.now() - dialogOpenTime;
     if (timeSinceOpen < DIALOG_PROTECTION_MS) {
-      // 保护期内不关闭，防止刚显示就被误关闭
       return;
     }
 
@@ -744,10 +768,10 @@ function closeNoteDialog() {
       const style = document.getElementById(id);
       if (style) style.remove();
     });
+    // 清理预打开的隐藏扩展工具栏
+    cleanupHiddenOverflowToolbar();
     noteDialog.remove();
-    // 标记弹窗已关闭
     isNoteDialogShowing = false;
-    // 设置冷却期（手动关闭后也需要冷却）
     lastDialogShowTime = Date.now();
   }
 }
@@ -763,10 +787,10 @@ function closeNoteDialogImmediately() {
         style.remove();
       }
     });
+    // 清理预打开的隐藏扩展工具栏
+    cleanupHiddenOverflowToolbar();
     noteDialog.remove();
-    // 标记弹窗已关闭
     isNoteDialogShowing = false;
-    // 设置冷却期（立即关闭后也需要冷却）
     lastDialogShowTime = Date.now();
   }
 }
@@ -1019,6 +1043,10 @@ async function handleButtonClick(
   originalBtn: HTMLElement | null
 ): Promise<void> {
   try {
+    // 扩展工具栏按钮在预打开的隐藏层中，直接搜索即可
+    if (!originalBtn) {
+      originalBtn = document.querySelector(`[data-custom-button="${buttonConfig.id}"]`) as HTMLElement;
+    }
     // 特殊处理：template类型按钮的行为
     if (buttonConfig.type === 'template') {
       // 获取弹窗中的textarea输入框
@@ -1096,45 +1124,15 @@ async function handleButtonClick(
       return;
     }
     
-    // 其他类型按钮：使用工具栏管理器执行按钮功能
-    const toolbarManager = (window as any).__toolbarManager;
-    if (toolbarManager && typeof toolbarManager.executeButton === 'function') {
-      // 特殊处理builtin类型：需要短暂延迟后再关闭弹窗
+    // 其他类型按钮：通过原始按钮触发
+    if (originalBtn) {
+      originalBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
       if (buttonConfig.type === 'builtin') {
-        // 执行按钮功能
-        await toolbarManager.executeButton(buttonConfig);
-        // builtin按钮需要短暂延迟确保功能执行完成
-        // 清除之前的定时器（如果存在）
-        if (dialogBuiltinCloseTimer) {
-          clearTimeout(dialogBuiltinCloseTimer);
-        }
-        dialogBuiltinCloseTimer = setTimeout(() => {
-          closeNoteDialog();
-          dialogBuiltinCloseTimer = null; // 执行完成后清空引用
-        }, 100); // 100ms延迟
-      } else if (buttonConfig.type === 'click-sequence') {
-        // 执行按钮功能并等待完成
-        await toolbarManager.executeButton(buttonConfig);
-        // click-sequence执行完成后立即关闭弹窗
-        closeNoteDialogImmediately();
+        if (dialogBuiltinCloseTimer) clearTimeout(dialogBuiltinCloseTimer);
+        dialogBuiltinCloseTimer = setTimeout(() => { closeNoteDialog(); dialogBuiltinCloseTimer = null; }, 100);
       } else {
-        // 其他类型按钮正常执行
-        await toolbarManager.executeButton(buttonConfig);
-        // 立即关闭窗口
         closeNoteDialogImmediately();
       }
-    } else {
-      // 如果工具栏管理器不可用，尝试触发原始按钮
-      if (originalBtn) {
-        const clickEvent = new MouseEvent('click', {
-          bubbles: true,
-          cancelable: true,
-          view: window
-        });
-        originalBtn.dispatchEvent(clickEvent);
-      }
-      // 立即关闭窗口
-      closeNoteDialogImmediately();
     }
     
   } catch (error) {

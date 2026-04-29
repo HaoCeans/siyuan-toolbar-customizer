@@ -43,6 +43,7 @@ export interface MobileTabsContext {
   saveData: (key: string, value: any) => Promise<void>
   loadData: (key: string) => Promise<any>
   eventBus: any
+  floatOpacity?: number
 }
 
 // ===== 模块状态 =====
@@ -63,6 +64,10 @@ let longPressTimer: ReturnType<typeof setTimeout> | null = null
 let titleRefreshTimer: ReturnType<typeof setInterval> | null = null
 let pinBtnEl: HTMLElement | null = null
 
+let boundScrollEl: HTMLElement | null = null
+let scrollBindRetryTimer: ReturnType<typeof setInterval> | null = null
+let scrollBindRetryCount = 0
+
 // ===== 输入法/键盘弹出时自动隐藏 =====
 let hiddenByKeyboard = false
 let keyboardBaselineHeight: number | null = null
@@ -70,6 +75,90 @@ let vvResizeHandler: (() => void) | null = null
 let focusInHandler: ((e: FocusEvent) => void) | null = null
 let focusOutHandler: ((e: FocusEvent) => void) | null = null
 let visibilityChangeHandler: (() => void) | null = null
+
+// ===== 滚动隐藏/显示（向上滚动消失，下滑出现）=====
+let hiddenByScroll = false
+let autoHideOnScrollEnabled = false
+let currentFloatOpacityForAutoHide: number | undefined = undefined
+let lastScrollTopForAutoHide: number | null = null
+let lastAutoHideToggleAt = 0
+
+const SCROLL_HIDE_THRESHOLD_PX = 15
+const SCROLL_TOGGLE_COOLDOWN_MS = 200
+const SCROLL_FADE_MS = 160
+
+function fadeOutAndRemoveTabBar(): void {
+  if (!tabBar) {
+    removeTabBar()
+    return
+  }
+  const el = tabBar
+  el.style.transition = `opacity ${SCROLL_FADE_MS}ms ease`
+  el.style.opacity = '0'
+  window.setTimeout(() => {
+    // 避免期间被重新创建/替换
+    if (tabBar === el) {
+      removeTabBar()
+    }
+  }, SCROLL_FADE_MS)
+}
+
+function ensureTabBarVisibleWithFadeIn(): void {
+  if (!tabBar) return
+  const el = tabBar
+  el.style.transition = `opacity ${SCROLL_FADE_MS}ms ease`
+  el.style.opacity = '0'
+  requestAnimationFrame(() => {
+    if (tabBar === el) el.style.opacity = '1'
+  })
+}
+
+function getMobileContentScrollElement(): HTMLElement | null {
+  // 手机端真正滚动发生在 protyle.contentElement 内部
+  const protyle = (window as any).siyuan?.mobile?.editor?.protyle
+  return protyle?.contentElement || document.querySelector('.protyle-content')
+}
+
+function bindScrollListener(): void {
+  const el = getMobileContentScrollElement()
+  if (!el) return
+
+  if (boundScrollEl && boundScrollEl !== el) {
+    boundScrollEl.removeEventListener('scroll', handleScroll as any)
+    boundScrollEl = null
+  }
+
+  if (boundScrollEl === el) return
+  boundScrollEl = el
+  boundScrollEl.addEventListener('scroll', handleScroll as any, { passive: true })
+}
+
+function unbindScrollListener(): void {
+  if (boundScrollEl) {
+    boundScrollEl.removeEventListener('scroll', handleScroll as any)
+    boundScrollEl = null
+  }
+  if (scrollBindRetryTimer) {
+    clearInterval(scrollBindRetryTimer)
+    scrollBindRetryTimer = null
+  }
+}
+
+function startScrollBindRetry(): void {
+  if (boundScrollEl) return
+  if (scrollBindRetryTimer) return
+
+  scrollBindRetryCount = 0
+  scrollBindRetryTimer = setInterval(() => {
+    scrollBindRetryCount++
+    bindScrollListener()
+
+    if (boundScrollEl || scrollBindRetryCount >= 30) {
+      if (scrollBindRetryTimer) clearInterval(scrollBindRetryTimer)
+      scrollBindRetryTimer = null
+    }
+  }, 200)
+}
 
 function getViewportHeight(): number {
   return window.visualViewport?.height || window.innerHeight
@@ -96,7 +185,7 @@ function hideForKeyboard(): void {
 function restoreAfterKeyboard(): void {
   if (!hiddenByKeyboard) return
   hiddenByKeyboard = false
-  if (state.isVisible && state.tabs.length > 0) {
+  if (state.isVisible && state.tabs.length > 0 && !hiddenByScroll) {
     createTabBar()
     startTitleRefresh()
   }
@@ -366,7 +455,7 @@ async function switchToTab(tabId: string): Promise<void> {
   // 保存当前 Tab 的滚动位置
   const currentTab = getActiveTab()
   if (currentTab) {
-    const scrollEl = document.querySelector('.protyle-scroll') as HTMLElement
+    const scrollEl = getMobileContentScrollElement()
     if (scrollEl) {
       currentTab.scrollPosition = scrollEl.scrollTop
     }
@@ -398,7 +487,7 @@ async function switchToTab(tabId: string): Promise<void> {
   // 延迟恢复滚动位置
   if (tab.scrollPosition > 0) {
     setTimeout(() => {
-      const scrollEl = document.querySelector('.protyle-scroll') as HTMLElement
+      const scrollEl = getMobileContentScrollElement()
       if (scrollEl) {
         scrollEl.scrollTop = tab.scrollPosition
       }
@@ -408,6 +497,9 @@ async function switchToTab(tabId: string): Promise<void> {
   renderTabList()
   updatePinButtonUI()
   debouncedPersist()
+
+  // 确保始终监听当前文档对应的真实滚动容器
+  bindScrollListener()
 }
 
 // ===== 事件处理 =====
@@ -456,14 +548,55 @@ function handleSwitchProtyle(): void {
   renderTabList()
   updatePinButtonUI()
   debouncedPersist()
+
+  // 切文档后，重置滚动方向基准，避免把上一个文档的 scrollTop 差值带入判断
+  const scrollEl = getMobileContentScrollElement()
+  lastScrollTopForAutoHide = scrollEl?.scrollTop ?? null
+  lastAutoHideToggleAt = 0
 }
 
 function handleScroll(): void {
+  // ===== 滚动隐藏/显示（向上滚动消失，下滑出现）=====
+  if (autoHideOnScrollEnabled && state.isVisible && !hiddenByKeyboard) {
+    const scrollEl = getMobileContentScrollElement()
+    if (scrollEl) {
+      const now = Date.now()
+      const st = scrollEl.scrollTop
+
+      if (lastScrollTopForAutoHide == null) {
+        lastScrollTopForAutoHide = st
+      } else {
+        const delta = st - lastScrollTopForAutoHide
+        lastScrollTopForAutoHide = st
+
+        if (now - lastAutoHideToggleAt > SCROLL_TOGGLE_COOLDOWN_MS) {
+          // scrollTop 增加：内容向上滚（你说的“向上滚动”）=> hide
+          // scrollTop 减少：内容向下滚（你说的“下滑”）=> show
+          if (!hiddenByScroll && delta > SCROLL_HIDE_THRESHOLD_PX) {
+            hiddenByScroll = true
+            lastAutoHideToggleAt = now
+            fadeOutAndRemoveTabBar()
+            stopTitleRefresh()
+          } else if (hiddenByScroll && delta < -SCROLL_HIDE_THRESHOLD_PX) {
+            hiddenByScroll = false
+            lastAutoHideToggleAt = now
+            if (state.tabs.length > 0) {
+              createTabBar()
+              applyOpacity(tabBar, currentFloatOpacityForAutoHide)
+              ensureTabBarVisibleWithFadeIn()
+              startTitleRefresh()
+            }
+          }
+        }
+      }
+    }
+  }
+
   if (scrollSaveTimer) clearTimeout(scrollSaveTimer)
   scrollSaveTimer = setTimeout(() => {
     const activeTab = getActiveTab()
     if (!activeTab) return
-    const scrollEl = document.querySelector('.protyle-scroll') as HTMLElement
+    const scrollEl = getMobileContentScrollElement()
     if (scrollEl) {
       activeTab.scrollPosition = scrollEl.scrollTop
       debouncedPersist()
@@ -472,6 +605,11 @@ function handleScroll(): void {
 }
 
 // ===== DOM 构建 =====
+function applyOpacity(el: HTMLElement | null, opacity: number | undefined): void {
+  if (!el) return
+  el.style.background = `rgba(255,255,255,${opacity ?? 0.72})`
+}
+
 function injectStyles(): void {
   if (injectedStyle) return
   const style = document.createElement('style')
@@ -487,8 +625,6 @@ function injectStyles(): void {
       display: flex;
       flex-direction: column;
       background: rgba(255,255,255,0.72);
-      backdrop-filter: saturate(180%) blur(20px);
-      -webkit-backdrop-filter: saturate(180%) blur(20px);
       border-radius: 20px;
       box-shadow: 0 2px 20px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.04);
       transition: width 0.3s cubic-bezier(0.32,0.72,0,1), padding 0.3s cubic-bezier(0.32,0.72,0,1), top 0.3s ease, transform 0.3s ease, border-radius 0.3s ease, max-height 0.3s ease;
@@ -530,7 +666,7 @@ function injectStyles(): void {
     }
     /* iOS 风格：钉住标签用“右侧短竖条 + 轻微底色”，不改数字徽章 */
     .mobile-tab-item.pinned {
-      background: rgba(0,122,255,0.06);
+      background: rgba(0,122,255,0.03);
     }
     .mobile-tab-item.pinned::before {
       content: '';
@@ -547,7 +683,7 @@ function injectStyles(): void {
       transform: scale(0.96);
     }
     .mobile-tab-item.active {
-      background: rgba(0,122,255,0.1);
+      background: rgba(0,122,255,0.05);
     }
     .mobile-tab-number {
       width: 26px;
@@ -622,7 +758,7 @@ function injectStyles(): void {
       height: 30px;
       margin: 4px auto 2px;
       border: none;
-      background: rgba(0,0,0,0.04);
+      background: transparent;
       color: #8e8e93;
       font-size: 12px;
       font-weight: 500;
@@ -635,7 +771,7 @@ function injectStyles(): void {
       display: flex;
     }
     .mobile-tab-collapse:active {
-      background: rgba(0,0,0,0.08);
+      background: rgba(0,0,0,0.04);
     }
     /* 图钉按钮 */
     .mobile-tab-pin {
@@ -661,7 +797,7 @@ function injectStyles(): void {
       margin: 0 6px 2px;
     }
     .mobile-tab-pin:active {
-      background: rgba(0,0,0,0.06);
+      background: rgba(0,0,0,0.03);
     }
     .mobile-tab-pin.pinned {
       color: #007AFF;
@@ -691,7 +827,7 @@ function injectStyles(): void {
       transition: background 0.15s ease;
     }
     .mobile-tab-expand-handle:active {
-      background: rgba(0,0,0,0.06);
+      background: rgba(0,0,0,0.03);
     }
     .expanded .mobile-tab-expand-handle {
       display: none;
@@ -809,6 +945,7 @@ function renderTabList(): void {
     number.textContent = String(index + 1)
     // 背景仍跟随笔记本颜色；钉住仅通过“更精致的描边”提示
     number.style.backgroundColor = getTabColor(tab.notebookId)
+    number.style.opacity = '0.65'
 
     const shadows: string[] = []
     if (tab.isActive) {
@@ -1036,6 +1173,9 @@ export async function init(context: MobileTabsContext): Promise<void> {
   // 如果之前可见，恢复 Tab 栏
   if (state.isVisible && state.tabs.length > 0) {
     createTabBar()
+    applyOpacity(tabBar, context.floatOpacity)
+    bindScrollListener()
+    startScrollBindRetry()
   }
 
   // 监听文档切换事件
@@ -1043,62 +1183,62 @@ export async function init(context: MobileTabsContext): Promise<void> {
   context.eventBus.on('switch-protyle', switchProtyleHandler)
   context.eventBus.on('loaded-protyle-dynamic', switchProtyleHandler)
 
-  // 监听滚动事件保存位置
-  document.addEventListener('scroll', handleScroll, true)
+  // 仅在面板可见时才需要 scroll 监听（隐藏时不保存滚动位置/不做滚动隐藏）
 
-  // 输入法/键盘弹出时自动隐藏（仅手机端）
-  keyboardBaselineHeight = getViewportHeight()
-  vvResizeHandler = () => {
-    if (!isMobileDevice()) return
-    const vh = getViewportHeight()
-    if (keyboardBaselineHeight == null) keyboardBaselineHeight = vh
+  // 交互监听仅在 Tab 栏可见时注册，避免隐藏状态下无谓开销
+  if (state.isVisible) {
+    keyboardBaselineHeight = getViewportHeight()
+    vvResizeHandler = () => {
+      if (!isMobileDevice()) return
+      const vh = getViewportHeight()
+      if (keyboardBaselineHeight == null) keyboardBaselineHeight = vh
 
-    // 非输入态：更新基线（旋转/分屏等）
-    if (!isTextInputTarget(document.activeElement)) {
-      keyboardBaselineHeight = Math.max(keyboardBaselineHeight, vh)
-    }
-
-    const baseline = keyboardBaselineHeight || vh
-    const delta = baseline - vh
-    if (delta > 120 && isTextInputTarget(document.activeElement)) {
-      hideForKeyboard()
-    } else if (delta < 60) {
-      restoreAfterKeyboard()
-    }
-  }
-  window.visualViewport?.addEventListener('resize', vvResizeHandler)
-
-  focusInHandler = (e: FocusEvent) => {
-    if (!isMobileDevice()) return
-    const target = e.target as Element | null
-    if (isTextInputTarget(target)) {
-      keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
-      hideForKeyboard()
-    }
-  }
-  focusOutHandler = (e: FocusEvent) => {
-    if (!isMobileDevice()) return
-    const target = e.target as Element | null
-    if (!isTextInputTarget(target)) return
-    setTimeout(() => {
+      // 非输入态：更新基线（旋转/分屏等）
       if (!isTextInputTarget(document.activeElement)) {
-        keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
+        keyboardBaselineHeight = Math.max(keyboardBaselineHeight, vh)
+      }
+
+      const baseline = keyboardBaselineHeight || vh
+      const delta = baseline - vh
+      if (delta > 120 && isTextInputTarget(document.activeElement)) {
+        hideForKeyboard()
+      } else if (delta < 60) {
         restoreAfterKeyboard()
       }
-    }, 200)
-  }
-  document.addEventListener('focusin', focusInHandler, true)
-  document.addEventListener('focusout', focusOutHandler, true)
-
-  // 前后台切换时暂停/恢复标题刷新
-  visibilityChangeHandler = () => {
-    if (document.hidden) {
-      stopTitleRefresh()
-    } else if (state.isVisible) {
-      startTitleRefresh()
     }
+    window.visualViewport?.addEventListener('resize', vvResizeHandler)
+
+    focusInHandler = (e: FocusEvent) => {
+      if (!isMobileDevice()) return
+      const target = e.target as Element | null
+      if (isTextInputTarget(target)) {
+        keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
+        hideForKeyboard()
+      }
+    }
+    focusOutHandler = (e: FocusEvent) => {
+      if (!isMobileDevice()) return
+      const target = e.target as Element | null
+      if (!isTextInputTarget(target)) return
+      setTimeout(() => {
+        if (!isTextInputTarget(document.activeElement)) {
+          keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
+          restoreAfterKeyboard()
+        }
+      }, 200)
+    }
+    document.addEventListener('focusin', focusInHandler, true)
+    document.addEventListener('focusout', focusOutHandler, true)
+
+    visibilityChangeHandler = () => {
+      if (document.hidden) {
+        stopTitleRefresh()
+      } else if (state.isVisible) {
+        startTitleRefresh()
+      }
+    }
+    document.addEventListener('visibilitychange', visibilityChangeHandler)
   }
-  document.addEventListener('visibilitychange', visibilityChangeHandler)
 }
 
 export function toggleVisibility(config: ButtonConfig): void {
@@ -1110,6 +1250,12 @@ export function toggleVisibility(config: ButtonConfig): void {
   state.isVisible = !state.isVisible
 
   if (state.isVisible) {
+    // 更新滚动隐藏开关配置
+    autoHideOnScrollEnabled = !!config.autoHideOnScroll
+    currentFloatOpacityForAutoHide = config.floatOpacity
+    hiddenByScroll = false
+    lastScrollTopForAutoHide = null
+
     // 确保至少有一个 Tab
     if (state.tabs.length === 0) {
       const protyle = (window as any).siyuan?.mobile?.editor?.protyle
@@ -1134,7 +1280,68 @@ export function toggleVisibility(config: ButtonConfig): void {
     }
 
     createTabBar()
+    applyOpacity(tabBar, config.floatOpacity)
     startTitleRefresh()
+    bindScrollListener()
+    startScrollBindRetry()
+
+    if (!vvResizeHandler) {
+      keyboardBaselineHeight = getViewportHeight()
+      vvResizeHandler = () => {
+        if (!isMobileDevice()) return
+        const vh = getViewportHeight()
+        if (keyboardBaselineHeight == null) keyboardBaselineHeight = vh
+
+        // 非输入态：更新基线（旋转/分屏等）
+        if (!isTextInputTarget(document.activeElement)) {
+          keyboardBaselineHeight = Math.max(keyboardBaselineHeight, vh)
+        }
+
+        const baseline = keyboardBaselineHeight || vh
+        const delta = baseline - vh
+        if (delta > 120 && isTextInputTarget(document.activeElement)) {
+          hideForKeyboard()
+        } else if (delta < 60) {
+          restoreAfterKeyboard()
+        }
+      }
+      window.visualViewport?.addEventListener('resize', vvResizeHandler)
+    }
+
+    if (!focusInHandler) {
+      focusInHandler = (e: FocusEvent) => {
+        if (!isMobileDevice()) return
+        const target = e.target as Element | null
+        if (isTextInputTarget(target)) {
+          keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
+          hideForKeyboard()
+        }
+      }
+      focusOutHandler = (e: FocusEvent) => {
+        if (!isMobileDevice()) return
+        const target = e.target as Element | null
+        if (!isTextInputTarget(target)) return
+        setTimeout(() => {
+          if (!isTextInputTarget(document.activeElement)) {
+            keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
+            restoreAfterKeyboard()
+          }
+        }, 200)
+      }
+      document.addEventListener('focusin', focusInHandler, true)
+      document.addEventListener('focusout', focusOutHandler, true)
+    }
+
+    if (!visibilityChangeHandler) {
+      visibilityChangeHandler = () => {
+        if (document.hidden) {
+          stopTitleRefresh()
+        } else if (state.isVisible) {
+          startTitleRefresh()
+        }
+      }
+      document.addEventListener('visibilitychange', visibilityChangeHandler)
+    }
 
     if (config.showNotification !== false) {
       showMessage('标签页已显示', 1500, 'info')
@@ -1143,7 +1350,7 @@ export function toggleVisibility(config: ButtonConfig): void {
     // 隐藏前保存滚动位置
     const activeTab = getActiveTab()
     if (activeTab) {
-      const scrollEl = document.querySelector('.protyle-scroll') as HTMLElement
+      const scrollEl = getMobileContentScrollElement()
       if (scrollEl) {
         activeTab.scrollPosition = scrollEl.scrollTop
       }
@@ -1151,10 +1358,33 @@ export function toggleVisibility(config: ButtonConfig): void {
 
     removeTabBar()
     stopTitleRefresh()
+    unbindScrollListener()
+    if (vvResizeHandler) {
+      window.visualViewport?.removeEventListener('resize', vvResizeHandler)
+      vvResizeHandler = null
+    }
+    if (focusInHandler) {
+      document.removeEventListener('focusin', focusInHandler, true)
+      focusInHandler = null
+    }
+    if (focusOutHandler) {
+      document.removeEventListener('focusout', focusOutHandler, true)
+      focusOutHandler = null
+    }
+    if (visibilityChangeHandler) {
+      document.removeEventListener('visibilitychange', visibilityChangeHandler)
+      visibilityChangeHandler = null
+    }
 
     if (config.showNotification !== false) {
       showMessage('标签页已隐藏', 1500, 'info')
     }
+
+    // 关闭滚动隐藏状态
+    autoHideOnScrollEnabled = false
+    hiddenByScroll = false
+    lastScrollTopForAutoHide = null
+    currentFloatOpacityForAutoHide = undefined
   }
 
   debouncedPersist()
@@ -1168,7 +1398,7 @@ export function cleanup(): void {
     switchProtyleHandler = null
   }
 
-  document.removeEventListener('scroll', handleScroll, true)
+  unbindScrollListener()
   if (vvResizeHandler) {
     window.visualViewport?.removeEventListener('resize', vvResizeHandler)
     vvResizeHandler = null

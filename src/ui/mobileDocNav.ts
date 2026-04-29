@@ -18,6 +18,7 @@ interface DocNavContext {
   saveData: (key: string, value: any) => Promise<void>
   loadData: (key: string) => Promise<any>
   eventBus: any
+  floatOpacity?: number
 }
 
 interface MobileDocNavState {
@@ -56,6 +57,42 @@ let vvResizeHandler: (() => void) | null = null
 let focusInHandler: ((e: FocusEvent) => void) | null = null
 let focusOutHandler: ((e: FocusEvent) => void) | null = null
 
+let boundScrollEl: HTMLElement | null = null
+let scrollBindRetryTimer: ReturnType<typeof setInterval> | null = null
+let scrollBindRetryCount = 0
+
+// ===== 滚动隐藏/显示（向上滚动消失，下滑出现）=====
+let hiddenByScroll = false
+let autoHideOnScrollEnabled = false
+let currentFloatOpacityForAutoHide: number | undefined = undefined
+let lastScrollTopForAutoHide: number | null = null
+let lastAutoHideToggleAt = 0
+
+const SCROLL_HIDE_THRESHOLD_PX = 15
+const SCROLL_TOGGLE_COOLDOWN_MS = 200
+const SCROLL_FADE_MS = 160
+
+function fadeOutNavBar(): void {
+  if (!navBar) return
+  const el = navBar
+  el.style.transition = `opacity ${SCROLL_FADE_MS}ms ease`
+  el.style.opacity = '0'
+  window.setTimeout(() => {
+    if (navBar === el) navBar.style.display = 'none'
+  }, SCROLL_FADE_MS)
+}
+
+function showNavBarWithFadeIn(): void {
+  if (!navBar) return
+  const el = navBar
+  el.style.display = ''
+  el.style.transition = `opacity ${SCROLL_FADE_MS}ms ease`
+  el.style.opacity = '0'
+  requestAnimationFrame(() => {
+    if (navBar === el) el.style.opacity = '1'
+  })
+}
+
 function getViewportHeight(): number {
   return window.visualViewport?.height || window.innerHeight
 }
@@ -70,6 +107,68 @@ function isTextInputTarget(el: Element | null): boolean {
   return !!parent
 }
 
+function getMobileContentScrollElement(): HTMLElement | null {
+  // 手机端真正滚动发生在 protyle.contentElement 内部
+  const protyle = (window as any).siyuan?.mobile?.editor?.protyle
+  return protyle?.contentElement || document.querySelector('.protyle-content')
+}
+
+function bindScrollListener(): void {
+  const el = getMobileContentScrollElement()
+  if (!el) return
+
+  if (boundScrollEl && boundScrollEl !== el) {
+    boundScrollEl.removeEventListener('scroll', handleScrollAutoHide as any)
+    boundScrollEl = null
+  }
+
+  if (boundScrollEl === el) return
+  boundScrollEl = el
+  boundScrollEl.addEventListener('scroll', handleScrollAutoHide as any, { passive: true })
+}
+
+function startScrollBindRetry(): void {
+  if (boundScrollEl) return
+  if (scrollBindRetryTimer) return
+
+  scrollBindRetryCount = 0
+  scrollBindRetryTimer = setInterval(() => {
+    scrollBindRetryCount++
+    bindScrollListener()
+    if (boundScrollEl || scrollBindRetryCount >= 30) {
+      if (scrollBindRetryTimer) clearInterval(scrollBindRetryTimer)
+      scrollBindRetryTimer = null
+    }
+  }, 200)
+}
+
+function detachInteractionListeners(): void {
+  if (boundScrollEl) {
+    boundScrollEl.removeEventListener('scroll', handleScrollAutoHide as any)
+    boundScrollEl = null
+  }
+  if (scrollBindRetryTimer) {
+    clearInterval(scrollBindRetryTimer)
+    scrollBindRetryTimer = null
+  }
+  if (retryInitTimer) {
+    clearTimeout(retryInitTimer)
+    retryInitTimer = null
+  }
+  if (vvResizeHandler) {
+    window.visualViewport?.removeEventListener('resize', vvResizeHandler)
+    vvResizeHandler = null
+  }
+  if (focusInHandler) {
+    document.removeEventListener('focusin', focusInHandler, true)
+    focusInHandler = null
+  }
+  if (focusOutHandler) {
+    document.removeEventListener('focusout', focusOutHandler, true)
+    focusOutHandler = null
+  }
+}
+
 function hideForKeyboard(): void {
   if (!state.isVisible) return
   if (!navBar) return
@@ -80,9 +179,52 @@ function hideForKeyboard(): void {
 function restoreAfterKeyboard(): void {
   if (!hiddenByKeyboard) return
   hiddenByKeyboard = false
-  if (state.isVisible) {
+  if (state.isVisible && !hiddenByScroll) {
     createNavBar()
     refreshAdjacentDocs()
+  }
+}
+
+function handleScrollAutoHide(): void {
+  if (!state.isVisible) return
+  if (!autoHideOnScrollEnabled) return
+  if (hiddenByKeyboard) return
+
+  const scrollEl = boundScrollEl || getMobileContentScrollElement()
+  if (!scrollEl) return
+
+  const now = Date.now()
+  const st = scrollEl.scrollTop
+
+  if (lastScrollTopForAutoHide == null) {
+    lastScrollTopForAutoHide = st
+    return
+  }
+
+  const delta = st - lastScrollTopForAutoHide
+  lastScrollTopForAutoHide = st
+
+  if (now - lastAutoHideToggleAt < SCROLL_TOGGLE_COOLDOWN_MS) return
+
+  // scrollTop 增加：内容向上滚（你说的“向上滚动”）=> hide
+  // scrollTop 减少：内容向下滚（你说的“下滑”）=> show
+  if (!hiddenByScroll && delta > SCROLL_HIDE_THRESHOLD_PX) {
+    hiddenByScroll = true
+    lastAutoHideToggleAt = now
+    fadeOutNavBar()
+  } else if (hiddenByScroll && delta < -SCROLL_HIDE_THRESHOLD_PX) {
+    hiddenByScroll = false
+    lastAutoHideToggleAt = now
+
+    if (!navBar) {
+      createNavBar()
+    } else {
+      applyOpacity(navBar, currentFloatOpacityForAutoHide)
+      updateNavButtons()
+    }
+    showNavBarWithFadeIn()
+
+    // prev/next 在普通滚动过程中不应变化；只有在重建 navBar 时才刷新。
   }
 }
 
@@ -111,7 +253,6 @@ async function fetchDocInfo(): Promise<{ notebookId: string; parentPath: string 
   }
   try {
     const response: any = await fetchSyncPost('/api/block/getBlockInfo', { id: currentDocId })
-    console.log('[文档导航] getBlockInfo 响应:', JSON.stringify(response, null, 2))
 
     if (response?.code === 0 && response.data) {
       const box = response.data.box
@@ -121,8 +262,6 @@ async function fetchDocInfo(): Promise<{ notebookId: string; parentPath: string 
       // 去掉文件名，得到父目录
       const lastSlash = docPath.lastIndexOf('/')
       const parentPath = lastSlash > 0 ? docPath.substring(0, lastSlash) : '/'
-
-      console.log('[文档导航] 文档 path:', docPath, '父目录:', parentPath)
 
       return { notebookId: box, parentPath }
     } else {
@@ -149,14 +288,11 @@ async function fetchAdjacentDocsByFiletree(
       path: parentPath,
       sort: 15  // 文件树排序规则
     })
-    console.log('[文档导航] listDocsByPath 响应:', JSON.stringify(response, null, 2))
 
     if (response?.code === 0 && response?.data) {
       const files: FiletreeDoc[] = response.data.files || []
-      console.log('[文档导航] 目录下文档列表:', files.map(f => ({ id: f.id, name: f.name })))
 
       const idx = files.findIndex(f => f.id === docId)
-      console.log('[文档导航] 当前文档在列表中的索引:', idx)
 
       if (idx === -1) {
         console.warn('[文档导航] 当前文档不在目录列表中，docId:', docId)
@@ -171,7 +307,6 @@ async function fetchAdjacentDocsByFiletree(
         next: nextFile ? { id: nextFile.id, title: nextFile.name || '未命名' } : null
       }
 
-      console.log('[文档导航] 文件树查询结果:', result)
       return result
     } else {
       console.warn('[文档导航] listDocsByPath 返回错误:', response?.msg || '未知错误')
@@ -204,14 +339,11 @@ function updateNavButtons(): void {
 }
 
 async function refreshAdjacentDocs(): Promise<void> {
-  console.log('[文档导航] refreshAdjacentDocs, currentDocId:', currentDocId)
-
   // 尝试从 protyle 回读 currentDocId
   if (!currentDocId) {
     const protyle = (window as any).siyuan?.mobile?.editor?.protyle
     if (protyle?.block?.rootID) {
       currentDocId = protyle.block.rootID
-      console.log('[文档导航] 从 protyle 回读到 currentDocId:', currentDocId)
     }
   }
   if (!currentDocId) {
@@ -233,12 +365,9 @@ async function refreshAdjacentDocs(): Promise<void> {
   currentNotebookId = docInfo.notebookId
   currentDocPath = docInfo.parentPath
 
-  console.log('[文档导航] 准备查询, notebookId:', currentNotebookId, 'parentPath:', currentDocPath)
-
   const result = await fetchAdjacentDocsByFiletree(currentNotebookId, currentDocPath, currentDocId)
   prevDoc = result.prev
   nextDoc = result.next
-  console.log('[文档导航] 最终结果:', { prevDoc, nextDoc })
 
   isLoading = false
   updateNavButtons()
@@ -247,7 +376,6 @@ async function refreshAdjacentDocs(): Promise<void> {
 // ===== 导航操作 =====
 async function navigateTo(direction: 'prev' | 'next'): Promise<void> {
   const target = direction === 'prev' ? prevDoc : nextDoc
-  console.log('[文档导航] navigateTo:', direction, 'target:', target)
   if (!target) return
 
   try {
@@ -270,7 +398,6 @@ async function handleSwitchProtyle(): Promise<void> {
   const docId = protyle.block?.rootID
   if (!docId || docId === currentDocId) return
 
-  console.log('[文档导航] 文档切换，新文档ID:', docId)
   currentDocId = docId
   currentDocPath = null
 
@@ -281,9 +408,22 @@ async function handleSwitchProtyle(): Promise<void> {
       refreshAdjacentDocs()
     }, 800)
   }
+
+  // 确保绑定到当前文档的真实滚动容器
+  bindScrollListener()
+
+  // 切文档后重置滚动方向基准
+  const scrollEl = getMobileContentScrollElement()
+  lastScrollTopForAutoHide = scrollEl?.scrollTop ?? null
+  lastAutoHideToggleAt = 0
 }
 
 // ===== 样式 =====
+function applyOpacity(el: HTMLElement | null, opacity: number | undefined): void {
+  if (!el) return
+  el.style.background = `rgba(255,255,255,${opacity ?? 0.78})`
+}
+
 function injectStyles(): void {
   if (injectedStyle) return
   const style = document.createElement('style')
@@ -302,8 +442,6 @@ function injectStyles(): void {
       justify-content: space-between;
       padding: 8px 16px;
       background: rgba(255,255,255,0.78);
-      backdrop-filter: saturate(180%) blur(20px);
-      -webkit-backdrop-filter: saturate(180%) blur(20px);
       border-radius: 20px;
       box-shadow: 0 2px 20px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.04);
       touch-action: none;
@@ -316,7 +454,8 @@ function injectStyles(): void {
       height: 28px;
       border-radius: 50%;
       border: none;
-      background: #007AFF;
+      background: rgba(0,122,255,0.45);
+      border: 1px solid rgba(255,255,255,0.35);
       color: white;
       font-size: 18px;
       display: flex;
@@ -347,7 +486,7 @@ function injectStyles(): void {
       box-shadow: 0 2px 20px rgba(0,0,0,0.3), 0 0 0 0.5px rgba(255,255,255,0.06);
     }
     html[data-theme-mode="dark"] .docnav-btn {
-      background: #0A84FF;
+      background: rgba(10,132,255,0.5);
     }
   `
   document.head.appendChild(style)
@@ -429,6 +568,7 @@ export async function init(context: DocNavContext): Promise<void> {
 
   if (state.isVisible) {
     createNavBar()
+    applyOpacity(navBar, context.floatOpacity)
   }
 
   // 首次等待文档加载后刷新（protyle 在 init 时可能还没准备好）
@@ -438,7 +578,6 @@ export async function init(context: DocNavContext): Promise<void> {
     const protyle = (window as any).siyuan?.mobile?.editor?.protyle
     if (protyle?.block?.rootID) {
       currentDocId = protyle.block.rootID
-      console.log('[文档导航] init 重试成功获取到 currentDocId:', currentDocId)
 
       // 等待一段时间确保文档加载完成
       await new Promise(resolve => setTimeout(resolve, 1500))
@@ -449,7 +588,6 @@ export async function init(context: DocNavContext): Promise<void> {
       return
     }
 
-    console.log(`[文档导航] init 重试第 ${count + 1} 次...`)
     retryInitTimer = setTimeout(() => retryInit(count + 1), 1000)
   }
 
@@ -457,51 +595,57 @@ export async function init(context: DocNavContext): Promise<void> {
     retryInit(0)
   }
 
-  switchProtyleHandler = debouncedSwitchProtyle
-  context.eventBus.on('switch-protyle', switchProtyleHandler)
-  context.eventBus.on('loaded-protyle-dynamic', switchProtyleHandler)
+  // 仅在可见状态下才注册交互监听，避免启动后无谓开销
+  if (state.isVisible) {
+    switchProtyleHandler = debouncedSwitchProtyle
+    context.eventBus.on('switch-protyle', switchProtyleHandler)
+    context.eventBus.on('loaded-protyle-dynamic', switchProtyleHandler)
 
-  keyboardBaselineHeight = getViewportHeight()
-  vvResizeHandler = () => {
-    if (!isMobileDevice()) return
-    const vh = getViewportHeight()
-    if (keyboardBaselineHeight == null) keyboardBaselineHeight = vh
-    if (!isTextInputTarget(document.activeElement)) {
-      keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, vh)
-    }
-    const baseline = keyboardBaselineHeight || vh
-    const delta = baseline - vh
-    if (delta > 120 && isTextInputTarget(document.activeElement)) {
-      hideForKeyboard()
-    } else if (delta < 60) {
-      restoreAfterKeyboard()
-    }
-  }
-  window.visualViewport?.addEventListener('resize', vvResizeHandler)
-
-  focusInHandler = (e: FocusEvent) => {
-    if (!isMobileDevice()) return
-    if (isTextInputTarget(e.target as Element)) {
-      keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
-      hideForKeyboard()
-    }
-  }
-  focusOutHandler = (e: FocusEvent) => {
-    if (!isMobileDevice()) return
-    if (!isTextInputTarget(e.target as Element)) return
-    setTimeout(() => {
+    keyboardBaselineHeight = getViewportHeight()
+    vvResizeHandler = () => {
+      if (!isMobileDevice()) return
+      const vh = getViewportHeight()
+      if (keyboardBaselineHeight == null) keyboardBaselineHeight = vh
       if (!isTextInputTarget(document.activeElement)) {
-        keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
+        keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, vh)
+      }
+      const baseline = keyboardBaselineHeight || vh
+      const delta = baseline - vh
+      if (delta > 120 && isTextInputTarget(document.activeElement)) {
+        hideForKeyboard()
+      } else if (delta < 60) {
         restoreAfterKeyboard()
       }
-    }, 200)
+    }
+    window.visualViewport?.addEventListener('resize', vvResizeHandler)
+
+    focusInHandler = (e: FocusEvent) => {
+      if (!isMobileDevice()) return
+      if (isTextInputTarget(e.target as Element)) {
+        keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
+        hideForKeyboard()
+      }
+    }
+    focusOutHandler = (e: FocusEvent) => {
+      if (!isMobileDevice()) return
+      if (!isTextInputTarget(e.target as Element)) return
+      setTimeout(() => {
+        if (!isTextInputTarget(document.activeElement)) {
+          keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
+          restoreAfterKeyboard()
+        }
+      }, 200)
+    }
+    document.addEventListener('focusin', focusInHandler, true)
+    document.addEventListener('focusout', focusOutHandler, true)
+
+    // 向上滚动消失、下滑出现（仅当按钮开关开启时才启用）
+    bindScrollListener()
+    startScrollBindRetry()
   }
-  document.addEventListener('focusin', focusInHandler, true)
-  document.addEventListener('focusout', focusOutHandler, true)
 }
 
 export function toggleVisibility(config: ButtonConfig): void {
-  console.log('[文档导航] toggleVisibility called, isMobile:', isMobileDevice(), 'currentDocId:', currentDocId)
   if (!isMobileDevice()) {
     showMessage('此功能仅支持手机端', 2000, 'info')
     return
@@ -510,6 +654,13 @@ export function toggleVisibility(config: ButtonConfig): void {
   state.isVisible = !state.isVisible
 
   if (state.isVisible) {
+    // 更新滚动隐藏开关配置与用于恢复的透明度
+    autoHideOnScrollEnabled = !!config.autoHideOnScroll
+    currentFloatOpacityForAutoHide = config.floatOpacity
+    hiddenByScroll = false
+    lastScrollTopForAutoHide = null
+    lastAutoHideToggleAt = 0
+
     const protyle = (window as any).siyuan?.mobile?.editor?.protyle
     if (protyle?.block?.rootID) currentDocId = protyle.block.rootID
     currentDocPath = null
@@ -517,6 +668,9 @@ export function toggleVisibility(config: ButtonConfig): void {
     nextDoc = null
 
     createNavBar()
+    applyOpacity(navBar, config.floatOpacity)
+    bindScrollListener()
+    startScrollBindRetry()
 
     // 重新注册事件监听
     if (!switchProtyleHandler) {
@@ -587,6 +741,7 @@ export function toggleVisibility(config: ButtonConfig): void {
       document.removeEventListener('focusout', focusOutHandler, true)
       focusOutHandler = null
     }
+    detachInteractionListeners()
 
     // 清空状态
     currentDocId = null
@@ -596,6 +751,13 @@ export function toggleVisibility(config: ButtonConfig): void {
     nextDoc = null
     hiddenByKeyboard = false
     keyboardBaselineHeight = null
+
+    // 关闭滚动隐藏
+    autoHideOnScrollEnabled = false
+    hiddenByScroll = false
+    lastScrollTopForAutoHide = null
+    currentFloatOpacityForAutoHide = undefined
+    lastAutoHideToggleAt = 0
 
     if (config.showNotification !== false) showMessage('文档导航已隐藏', 1500, 'info')
   }
@@ -609,22 +771,7 @@ export function cleanup(): void {
     ctx.eventBus.off('loaded-protyle-dynamic', switchProtyleHandler)
     switchProtyleHandler = null
   }
-  if (vvResizeHandler) {
-    window.visualViewport?.removeEventListener('resize', vvResizeHandler)
-    vvResizeHandler = null
-  }
-  if (focusInHandler) {
-    document.removeEventListener('focusin', focusInHandler, true)
-    focusInHandler = null
-  }
-  if (focusOutHandler) {
-    document.removeEventListener('focusout', focusOutHandler, true)
-    focusOutHandler = null
-  }
-  if (retryInitTimer) {
-    clearTimeout(retryInitTimer)
-    retryInitTimer = null
-  }
+  detachInteractionListeners()
 
   removeNavBar()
   ctx = null

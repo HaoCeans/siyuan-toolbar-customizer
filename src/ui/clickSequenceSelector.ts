@@ -8,6 +8,7 @@ export interface ClickSequenceOption {
   name: string
   description: string
   sequence: string[]
+  group?: string
 }
 
 export interface ClickSequenceSelectorOptions {
@@ -31,17 +32,70 @@ const PRESET_SEQUENCES: ClickSequenceOption[] = [
     sequence: ['barWorkspace', 'config', 'text:关于', 'text:打开浏览器']
   },
   // 手机端预设
+  // 一、左侧文档树等功能点击
   {
-    id: 'plugin-settings-mobile',
-    name: '①打开插件设置',
-    description: '手机端：更多 → 插件 → 思源手机端增强',
-    sequence: ['toolbarMore', 'menuPlugin', 'text:思源手机端增强']
+    id: 'sidebar-file-mobile',
+    name: '①文档树指定文档',
+    description: 'toolbarFile → 文档树 → 填写文档名',
+    sequence: ['toolbarFile', 'sidebar-file-tab', 'text:此汉字删掉填文档名'],
+    group: '一、左侧文档树等功能点击'
   },
   {
-    id: 'open-browser-mobile',
-    name: '②打开伺服浏览器',
-    description: '手机端：更多 → 关于',
-    sequence: ['toolbarMore', 'menuAbout']
+    id: 'sidebar-outline-mobile',
+    name: '②大纲',
+    description: 'toolbarFile → 大纲',
+    sequence: ['toolbarFile', 'sidebar-outline-tab'],
+    group: '一、左侧文档树等功能点击'
+  },
+  {
+    id: 'sidebar-bookmark-mobile',
+    name: '③书签',
+    description: 'toolbarFile → 书签',
+    sequence: ['toolbarFile', 'sidebar-bookmark-tab'],
+    group: '一、左侧文档树等功能点击'
+  },
+  {
+    id: 'sidebar-tag-mobile',
+    name: '④标签',
+    description: 'toolbarFile → 标签',
+    sequence: ['toolbarFile', 'sidebar-tag-tab'],
+    group: '一、左侧文档树等功能点击'
+  },
+  {
+    id: 'sidebar-backlink-mobile',
+    name: '⑤反向链接',
+    description: 'toolbarFile → 反向链接',
+    sequence: ['toolbarFile', 'sidebar-backlink-tab'],
+    group: '一、左侧文档树等功能点击'
+  },
+  {
+    id: 'sidebar-inbox-mobile',
+    name: '⑥收集箱',
+    description: 'toolbarFile → 收集箱',
+    sequence: ['toolbarFile', 'sidebar-inbox-tab'],
+    group: '一、左侧文档树等功能点击'
+  },
+  {
+    id: 'sidebar-plugin-mobile',
+    name: '⑦电脑侧边栏',
+    description: 'toolbarFile → 电脑侧边栏',
+    sequence: ['toolbarFile', 'sidebar-plugin-tab'],
+    group: '一、左侧文档树等功能点击'
+  },
+  // 二、右侧设置等功能点击
+  {
+    id: 'sync-now-mobile',
+    name: '①立即同步',
+    description: 'toolbarMore → 立即同步',
+    sequence: ['toolbarMore', 'text:立即同步'],
+    group: '二、右侧设置等功能点击'
+  },
+  {
+    id: 'plugin-settings-mobile',
+    name: '②插件设置',
+    description: 'toolbarMore → 插件 → 思源手机端增强',
+    sequence: ['toolbarMore', 'text:插件', 'text:思源手机端增强'],
+    group: '二、右侧设置等功能点击'
   }
 ]
 
@@ -91,7 +145,7 @@ export function showClickSequenceSelector(options: ClickSequenceSelectorOptions)
     justify-content: space-between;
     align-items: center;
   `
-  header.innerHTML = `<span style="font-size: 16px; font-weight: 600;">选择点击序列</span>`
+  header.innerHTML = `<span style="font-size: 16px; font-weight: 600;">选择点击模板</span>`
 
   const closeBtn = document.createElement('button')
   closeBtn.className = 'b3-button b3-button--text'
@@ -112,7 +166,25 @@ export function showClickSequenceSelector(options: ClickSequenceSelectorOptions)
   const sequenceList = document.createElement('div')
   sequenceList.style.cssText = `display: flex; flex-direction: column; gap: 8px;`
 
+  let lastGroup = ''
+
   filteredPresets.forEach(preset => {
+    // 分组标题
+    if (preset.group && preset.group !== lastGroup) {
+      lastGroup = preset.group
+      const groupHeader = document.createElement('div')
+      groupHeader.style.cssText = `
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--b3-theme-on-surface-light);
+        padding: 8px 0 4px 0;
+        border-top: 1px solid var(--b3-border-color);
+        margin-top: 4px;
+      `
+      groupHeader.textContent = preset.group
+      sequenceList.appendChild(groupHeader)
+    }
+
     const item = document.createElement('div')
     item.style.cssText = `
       display: flex;

@@ -25,6 +25,8 @@ export interface DesktopButtonContext {
   showIconPicker: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void
   buttonConfigs: ButtonConfig[]
   saveData: (key: string, value: any) => Promise<void>
+  recalculateOverflow: () => void
+  updateDesktopToolbar?: () => void
 }
 
 /**
@@ -43,17 +45,32 @@ export function createDesktopButtonItem(
   configsArray: ButtonConfig[],
   context: DesktopButtonContext
 ): HTMLElement {
+  const isOverflowButton = button.id === 'overflow-button-desktop'
   const item = document.createElement('div')
-  item.style.cssText = `
-    border: 1px solid var(--b3-border-color);
-    border-radius: 6px;
-    padding: 12px;
-    background: var(--b3-theme-surface);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    margin-bottom: 8px;
-    transition: all 0.2s ease;
-  `
-  item.draggable = true
+  if (isOverflowButton) {
+    item.style.cssText = `
+      border: 2px solid var(--b3-theme-primary);
+      border-radius: 6px;
+      padding: 12px;
+      background: linear-gradient(135deg, rgba(66, 133, 244, 0.1), rgba(102, 126, 234, 0.08));
+      box-shadow: 0 2px 8px rgba(66, 133, 244, 0.2);
+      margin-bottom: 8px;
+      position: relative;
+      transition: all 0.2s ease;
+    `
+  } else {
+    item.style.cssText = `
+      border: 1px solid var(--b3-border-color);
+      border-radius: 6px;
+      padding: 12px;
+      background: var(--b3-theme-surface);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      margin-bottom: 8px;
+      transition: all 0.2s ease;
+    `
+  }
+  // 扩展工具栏按钮不可拖动
+  item.draggable = !isOverflowButton
 
   let isExpanded = false
 
@@ -136,6 +153,7 @@ export function createDesktopButtonItem(
   const infoDiv = document.createElement('div')
   infoDiv.style.cssText = 'flex: 1; min-width: 0;'
   const typeLabels: Record<string, string> = {
+    'builtin': '扩展工具栏',
     'builtin-refresh': '①基础功能：刷新重载全屏【简单】',
     'template': '②手写模板插入【简单】',
     'shortcut': '③电脑端快捷键【简单】',
@@ -209,12 +227,17 @@ export function createDesktopButtonItem(
     item.style.opacity = '0.5'
   }
 
-  header.appendChild(dragHandle)
+  // 扩展工具栏按钮不显示拖动手柄和删除按钮
+  if (!isOverflowButton) {
+    header.appendChild(dragHandle)
+  }
   header.appendChild(iconSpan)
   header.appendChild(infoDiv)
   header.appendChild(expandIcon)
   header.appendChild(enabledToggle)
-  header.appendChild(deleteBtn)
+  if (!isOverflowButton) {
+    header.appendChild(deleteBtn)
+  }
 
   // 编辑表单
   const editForm = document.createElement('div')
@@ -235,6 +258,105 @@ export function createDesktopButtonItem(
   })
   editForm.appendChild(nameField)
 
+  // 扩展工具栏按钮：显示层数、每层按钮数量、工具栏高度配置
+  if (isOverflowButton) {
+    const overflowContainer = document.createElement('div')
+    overflowContainer.style.cssText = `
+      padding: 12px;
+      border: 2px solid var(--b3-theme-primary);
+      border-radius: 6px;
+      background: linear-gradient(135deg, rgba(66, 133, 244, 0.1), rgba(102, 126, 234, 0.08));
+      display: flex; flex-direction: column; gap: 10px;
+    `
+
+    // 层数设置
+    const layersField = createDesktopField('扩展工具栏层数', (button.layers || 1).toString(), '1-5层', (v) => {
+      let num = parseInt(v) || 1
+      if (num < 1) num = 1
+      if (num > 5) num = 5
+      button.layers = num
+      // 确保 buttonsPerLayer 长度匹配
+      if (!button.buttonsPerLayer) button.buttonsPerLayer = [8, 5, 5, 5, 5]
+      while (button.buttonsPerLayer.length < num + 1) {
+        button.buttonsPerLayer.push(5)
+      }
+      context.recalculateOverflow()
+      renderList()
+    }, 'number')
+    layersField.querySelector('input')!.min = '1'
+    layersField.querySelector('input')!.max = '5'
+    overflowContainer.appendChild(layersField)
+
+    // 每层按钮数量配置
+    const buttonsPerLayer = button.buttonsPerLayer || [8, 5, 5, 5, 5]
+    const layerCount = button.layers || 1
+    const bplContainer = document.createElement('div')
+    bplContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
+
+    const bplTitle = document.createElement('div')
+    bplTitle.style.cssText = 'font-size: 13px; font-weight: 600; color: var(--b3-theme-primary);'
+    bplTitle.textContent = '📊 每层按钮数量'
+    bplContainer.appendChild(bplTitle)
+
+    for (let i = 0; i <= layerCount; i++) {
+      const row = document.createElement('div')
+      row.style.cssText = 'display: flex; align-items: center; gap: 8px;'
+      const label = document.createElement('span')
+      label.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 80px;'
+      label.textContent = i === 0 ? '主工具栏' : `第 ${i} 层`
+      const input = document.createElement('input')
+      input.type = 'number'
+      input.className = 'b3-text-field'
+      input.value = String(buttonsPerLayer[i] ?? (i === 0 ? 8 : 5))
+      input.min = '0'
+      input.max = '30'
+      input.style.cssText = 'width: 60px; font-size: 13px; padding: 4px 8px;'
+      input.onchange = () => {
+        if (!button.buttonsPerLayer) button.buttonsPerLayer = [8, 5, 5, 5, 5]
+        const val = parseInt(input.value)
+        button.buttonsPerLayer[i] = isNaN(val) ? (i === 0 ? 8 : 5) : val
+        context.recalculateOverflow()
+        context.updateDesktopToolbar?.()
+      }
+      row.appendChild(label)
+      row.appendChild(input)
+      bplContainer.appendChild(row)
+    }
+    overflowContainer.appendChild(bplContainer)
+
+    // 扩展工具栏高度
+    const heightField = createDesktopField('扩展工具栏高度 (px)', (button.overflowToolbarHeight || 32).toString(), '32', (v) => {
+      button.overflowToolbarHeight = parseInt(v) || 32
+    }, 'number')
+    overflowContainer.appendChild(heightField)
+
+    // 扩展工具栏宽度
+    const widthField = createDesktopField('扩展工具栏宽度 (px)', (button.overflowToolbarWidth || 0).toString(), '0', (v) => {
+      button.overflowToolbarWidth = Math.min(parseInt(v) || 0, 1300)
+    }, 'number')
+    overflowContainer.appendChild(widthField)
+
+    // 说明文字
+    const descDiv = document.createElement('div')
+    descDiv.style.cssText = `
+      margin-top: 8px; padding: 10px; background: var(--b3-theme-background);
+      border-radius: 4px; font-size: 12px; line-height: 1.6; color: var(--b3-theme-on-surface);
+    `
+    descDiv.innerHTML = `
+      <div style="font-weight: 600; margin-bottom: 6px; color: var(--b3-theme-primary);">💡 扩展工具栏说明</div>
+      <div>• <strong>关闭按钮</strong>：只显示主工具栏按钮</div>
+      <div>• <strong>开启按钮</strong>：工具栏显示"⋯"按钮</div>
+      <div>• <strong>点击"⋯"</strong>：弹出扩展工具栏</div>
+      <div>• 按 sort 排序后，前 N 个在主工具栏，接下来 M 个在第1层，以此类推</div>
+      <div>• 背景颜色跟随主工具栏</div>
+    `
+    overflowContainer.appendChild(descDiv)
+
+    editForm.appendChild(overflowContainer)
+  }
+
+  // 类型选择和类型相关字段（溢出按钮跳过）
+  if (!isOverflowButton) {
   // 构建功能类型选项数组（根据激活状态决定是否显示鲸鱼定制工具箱）
   const typeOptions = [
     { value: 'builtin-refresh', label: '①基础功能：刷新重载全屏【简单】' },
@@ -299,6 +421,7 @@ export function createDesktopButtonItem(
     const typeDesc = infoDiv.querySelector('div:last-child')
     if (typeDesc) {
       const typeLabels: Record<string, string> = {
+        'builtin': '扩展工具栏',
         'builtin-refresh': '①基础功能：刷新重载全屏【简单】',
         'template': '②手写模板插入【简单】',
         'shortcut': '③电脑端快捷键【简单】',
@@ -1184,7 +1307,7 @@ export function createDesktopButtonItem(
     // 获取可选择的按钮列表（排除当前按钮自己和扩展工具栏按钮，按 sort 排序）
     const getAvailableButtons = () => {
       return context.buttonConfigs
-        .filter(btn => btn.id !== button.id && btn.id !== 'overflow-button-mobile')
+        .filter(btn => btn.id !== button.id && btn.id !== 'overflow-button-mobile' && btn.id !== 'overflow-button-desktop')
         .sort((a, b) => a.sort - b.sort)
     }
 
@@ -1625,6 +1748,7 @@ export function createDesktopButtonItem(
 
     editForm.appendChild(authorToolField)
   }
+  } // end if (!isOverflowButton)
 
   editForm.appendChild(createDesktopIconField('图标', button.icon, (v) => {
     button.icon = v
@@ -1695,7 +1819,7 @@ export function createDesktopButtonItem(
   editForm.appendChild(switchesContainer)
 
   // 在设置末尾添加排序显示（只读，排除扩展工具栏按钮）
-  if (button.id !== 'overflow-button-mobile') {
+  if (button.id !== 'overflow-button-mobile' && button.id !== 'overflow-button-desktop') {
     // 创建只读的排序显示（美化居中显示）
     const sortDisplayContainer = document.createElement('div')
     sortDisplayContainer.style.cssText = `
@@ -1858,6 +1982,7 @@ export function populateDesktopEditForm(
     const typeDesc = infoDiv.querySelector('div:last-child')
     if (typeDesc) {
       const typeLabels: Record<string, string> = {
+        'builtin': '扩展工具栏',
         'builtin-refresh': '①基础功能：刷新重载全屏【简单】',
         'template': '②手写模板插入【简单】',
         'shortcut': '③电脑端快捷键【简单】',
@@ -3002,7 +3127,7 @@ export function populateDesktopEditForm(
     // 获取可选择的按钮列表（排除当前按钮自己和扩展工具栏按钮，按 sort 排序）
     const getAvailableButtons2 = () => {
       return context.buttonConfigs
-        .filter(btn => btn.id !== button.id && btn.id !== 'overflow-button-mobile')
+        .filter(btn => btn.id !== button.id && btn.id !== 'overflow-button-mobile' && btn.id !== 'overflow-button-desktop')
         .sort((a, b) => a.sort - b.sort)
     }
 
@@ -3356,7 +3481,7 @@ export function populateDesktopEditForm(
   form.appendChild(switchesContainer)
 
   // 在设置末尾添加排序显示（只读，排除扩展工具栏按钮）
-  if (button.id !== 'overflow-button-mobile') {
+  if (button.id !== 'overflow-button-mobile' && button.id !== 'overflow-button-desktop') {
     // 创建只读的排序显示（美化居中显示）
     const sortDisplayContainer2 = document.createElement('div')
     sortDisplayContainer2.style.cssText = `

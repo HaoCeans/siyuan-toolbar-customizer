@@ -107,6 +107,9 @@ export interface ButtonConfig {
   floatOpacity?: number;     // 悬浮弹窗透明度 (0~1)，默认 0.72
   autoHideOnScroll?: boolean; // 悬浮面板：向上滚动隐藏、向下滚动显示（仅 mobile 侧相关功能）
   showInContextMenu?: boolean; // 是否显示在文本右键菜单中（仅模板类型，默认false）
+  buttonsPerLayer?: number[];  // 桌面端扩展工具栏：每层按钮数量，如 [8, 5, 5, 5, 5]（仅 overflow-button-desktop 使用）
+  overflowToolbarHeight?: number;  // 桌面端扩展工具栏高度(px)，默认 32（仅 overflow-button-desktop 使用）
+  overflowToolbarWidth?: number;   // 桌面端扩展工具栏宽度(px)，默认 0 表示与主工具栏同宽，最大 1300
 }
 
 // 全局按钮配置（用于批量设置所有按钮的默认值）
@@ -166,8 +169,26 @@ export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
 
 export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = []
 
-// 桌面端默认按钮（7个）
+// 桌面端默认按钮（9个，包含扩展工具栏按钮）
 export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
+  {
+    id: 'overflow-button-desktop',
+    name: '扩展工具栏',
+    type: 'builtin',
+    builtinId: 'overflow',
+    icon: '⋯',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 0,
+    platform: 'desktop',
+    showNotification: false,
+    enabled: false,
+    layers: 1,
+    buttonsPerLayer: [6, 6, 6, 6, 6],
+    overflowToolbarHeight: 30,
+    overflowToolbarWidth: 300
+  },
   {
     id: 'more-desktop',
     name: '更多',
@@ -396,6 +417,14 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
   }
 ]
 
+// ===== 扩展工具栏辅助常量 =====
+const OVERFLOW_BUTTON_ID_MOBILE = 'overflow-button-mobile'
+const OVERFLOW_BUTTON_ID_DESKTOP = 'overflow-button-desktop'
+
+function isOverflowButton(id: string): boolean {
+  return id === OVERFLOW_BUTTON_ID_MOBILE || id === OVERFLOW_BUTTON_ID_DESKTOP
+}
+
 // ===== 工具函数 =====
 // 保存监听器引用以便清理
 let resizeHandler: (() => void) | null = null
@@ -537,11 +566,11 @@ export function calculateButtonOverflow(
   const enabledButtons = buttons.filter(btn =>
     btn.enabled !== false &&
     (btn.platform === 'mobile' || btn.platform === 'both') &&
-    btn.id !== 'overflow-button-mobile'
+    !isOverflowButton(btn.id)
   ).sort((a, b) => a.sort - b.sort)
 
   // 获取扩展工具栏按钮（⋯）
-  const overflowButton = buttons.find(btn => btn.id === 'overflow-button-mobile')
+  const overflowButton = buttons.find(btn => isOverflowButton(btn.id))
 
   // 获取可用宽度
   const toolbarAvailableWidth = getToolbarAvailableWidth()
@@ -602,7 +631,7 @@ export function calculateButtonOverflow(
 
   // 更新所有按钮的 overflowLevel
   const result = buttons.map(btn => {
-    if (btn.id === 'overflow-button-mobile') {
+    if (isOverflowButton(btn.id)) {
       return { ...btn, overflowLevel: 0 }
     }
 
@@ -685,7 +714,7 @@ function isInputOrEditable(element: HTMLElement): boolean {
  */
 function shouldShowInMainToolbar(button: ButtonConfig): boolean {
   // 扩展工具栏按钮：启用时显示，禁用时隐藏
-  if (button.id === 'overflow-button-mobile') {
+  if (isOverflowButton(button.id)) {
     return button.enabled !== false
   }
 
@@ -1189,10 +1218,10 @@ export function initCustomButtons(configs: ButtonConfig[]) {
     focusStyle.id = 'custom-button-focus-style'
     focusStyle.textContent = `
       /* 移除主工具栏自定义按钮的 focus 状态样式（包括阴影） */
-      .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus,
-      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus,
-      .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus-visible,
-      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):focus-visible {
+      .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):not([data-custom-button="overflow-button-desktop"]):focus,
+      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):not([data-custom-button="overflow-button-desktop"]):focus,
+      .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):not([data-custom-button="overflow-button-desktop"]):focus-visible,
+      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):not([data-custom-button="overflow-button-desktop"]):focus-visible {
         background-color: transparent !important;
         background: transparent !important;
         box-shadow: none !important;
@@ -1205,8 +1234,8 @@ export function initCustomButtons(configs: ButtonConfig[]) {
         opacity: 1 !important;
       }
       /* 移除主工具栏自定义按钮的 active 状态阴影（点击时） */
-      .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):active,
-      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):active {
+      .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):not([data-custom-button="overflow-button-desktop"]):active,
+      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):not([data-custom-button="overflow-button-desktop"]):active {
         background-color: transparent !important;
         background: transparent !important;
         box-shadow: none !important;
@@ -1217,8 +1246,8 @@ export function initCustomButtons(configs: ButtonConfig[]) {
         filter: none !important;
       }
       /* 保留主工具栏自定义按钮的 hover 状态背景（桌面端） */
-      .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):hover,
-      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):hover {
+      .protyle-breadcrumb__bar [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):not([data-custom-button="overflow-button-desktop"]):hover,
+      .protyle-breadcrumb [data-custom-button]:not([data-custom-button="overflow-button-mobile"]):not([data-custom-button="overflow-button-desktop"]):hover {
         /* 允许 JavaScript 控制悬停效果 */
       }
             
@@ -1297,7 +1326,7 @@ function setupEditorButtons(configs: ButtonConfig[]) {
   (window as any).__mobileButtonConfigs = configs
 
   // 找到扩展工具栏按钮，获取层数配置
-  const overflowBtn = configs.find(btn => btn.id === 'overflow-button-mobile')
+  const overflowBtn = configs.find(btn => btn.id === OVERFLOW_BUTTON_ID_MOBILE)
   const overflowLayers = (overflowBtn && overflowBtn.enabled !== false) ? (overflowBtn.layers || 1) : 0
 
   // 使用 requestAnimationFrame 确保工具栏已经渲染完成后再计算溢出
@@ -1341,6 +1370,22 @@ export function createButtonsForEditors(editors: NodeListOf<Element>, configs: B
   const toolbarStyle = featureConfig?.toolbarStyle || 'default'
   const disableCustomButtons = featureConfig?.disableCustomButtons || false
   const useDivider = !disableCustomButtons && toolbarStyle === 'divider'
+
+  // 桌面端：先关闭所有已打开的扩展工具栏（防止标签切换后残留）
+  if (!isMobile) {
+    document.querySelectorAll('.desktop-overflow-toolbar-layer').forEach(el => el.remove())
+  }
+
+  // 桌面端：根据 buttonsPerLayer 计算溢出层级
+  let effectiveConfigs = configs
+  if (!isMobile) {
+    const updated = calculateDesktopOverflow(configs)
+    // 同步 overflowLevel 回原数组
+    updated.forEach(btn => {
+      const original = configs.find(b => b.id === btn.id)
+      if (original) original.overflowLevel = btn.overflowLevel
+    })
+  }
 
   editors.forEach(editor => {
     // 找到锁定编辑按钮
@@ -1422,7 +1467,7 @@ function getButtonBaseStyle(config: ButtonConfig): string {
     /* 外观样式：与思源原生按钮一致（无边框、透明背景） */
     border: none !important;
     border-radius: 4px !important;
-    background-color: transparent !important;
+    background-color: rgba(0, 0, 0, 0) !important;
     color: var(--b3-theme-on-surface) !important;
     cursor: pointer !important;
     user-select: none !important;
@@ -1431,8 +1476,8 @@ function getButtonBaseStyle(config: ButtonConfig): string {
     outline: none !important;
     box-shadow: none !important;
 
-    /* 过渡效果 */
-    transition: all 0.2s ease !important;
+    /* 过渡效果：仅过渡 opacity 和 transform，不过渡 background-color 避免暗黑模式闪白 */
+    transition: opacity 0.15s ease, transform 0.15s ease !important;
 
     /* Flexbox 相关 */
     flex-shrink: 0 !important;
@@ -1452,7 +1497,7 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
   button.setAttribute('aria-label', config.name)
 
   // 扩展工具栏按钮：设置 tabindex="-1" 阻止通过 Tab 键获得焦点
-  if (config.id === 'overflow-button-mobile') {
+  if (isOverflowButton(config.id)) {
     button.setAttribute('tabindex', '-1')
   }
 
@@ -1570,7 +1615,7 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
   let isTouchEvent = false
 
   // 扩展工具栏按钮的特殊处理：阻止焦点转移
-  if (config.id === 'overflow-button-mobile') {
+  if (isOverflowButton(config.id)) {
     // 使用 pointerdown 事件（在鼠标/触摸按下时触发，早于 mousedown/touchstart）
     // 设置 pointer-events: none 可以完全阻止焦点转移，但也会阻止点击
     // 所以我们用另一种方法：阻止按钮成为默认焦点目标
@@ -1622,14 +1667,16 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     e.stopPropagation()
 
     // 扩展工具栏按钮特殊处理（toggle 扩展工具栏）
-    if (config.id === 'overflow-button-mobile') {
-      // 扩展工具栏按钮：立即移除焦点并恢复输入框焦点，保持输入法状态
-      button.blur() // 立即移除按钮焦点
-      // 如果之前有输入框焦点，立即恢复（preventScroll 防止滚动）
+    if (isOverflowButton(config.id)) {
+      button.blur()
       if (lastActiveElement && isInputOrEditable(lastActiveElement)) {
         lastActiveElement.focus({ preventScroll: true })
       }
-      showOverflowToolbar(config)
+      if (config.id === OVERFLOW_BUTTON_ID_MOBILE) {
+        showOverflowToolbar(config)
+      } else if (config.id === OVERFLOW_BUTTON_ID_DESKTOP) {
+        showDesktopOverflowToolbar(config, button)
+      }
       return
     }
 
@@ -1645,11 +1692,11 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     }
     
     // 如果扩展工具栏已打开，先关闭它（其他按钮点击会关闭扩展工具栏）
-    const existingLayers = document.querySelectorAll('.overflow-toolbar-layer')
+    const existingLayers = document.querySelectorAll('.overflow-toolbar-layer, .desktop-overflow-toolbar-layer')
     if (existingLayers.length > 0) {
       existingLayers.forEach(el => el.remove())
       // 移除扩展工具栏按钮的激活状态
-      const overflowButton = document.querySelector('[data-custom-button="overflow-button-mobile"]') as HTMLElement
+      const overflowButton = document.querySelector('[data-custom-button="overflow-button-mobile"], [data-custom-button="overflow-button-desktop"]') as HTMLElement
       if (overflowButton) {
         overflowButton.classList.remove('overflow-active')
         overflowButton.style.backgroundColor = 'transparent'
@@ -1742,7 +1789,7 @@ function showOverflowToolbar(config: ButtonConfig) {
   const enabledButtons = allButtons.filter((btn: ButtonConfig) =>
     btn.enabled !== false &&
     (btn.platform === 'mobile' || btn.platform === 'both') &&
-    btn.id !== 'overflow-button-mobile'
+    btn.id !== OVERFLOW_BUTTON_ID_MOBILE
   )
 
   // 获取工具栏样式配置（根据当前平台读取对应配置）
@@ -2110,7 +2157,297 @@ function showOverflowToolbar(config: ButtonConfig) {
   }, 100)
 }
 
-async function handleButtonClick(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null, clickedButton: HTMLElement | null = null) {
+/**
+ * 桌面端扩展工具栏：按 buttonsPerLayer 手动分配溢出层级
+ * 按 sort 排序后，前 buttonsPerLayer[0] 个 → 主工具栏，接下来 buttonsPerLayer[1] 个 → 第1层，以此类推
+ */
+export function calculateDesktopOverflow(buttons: ButtonConfig[]): ButtonConfig[] {
+  const overflowBtn = buttons.find(btn => btn.id === OVERFLOW_BUTTON_ID_DESKTOP)
+  if (!overflowBtn || overflowBtn.enabled === false) {
+    // 扩展工具栏未启用，所有按钮都在主工具栏
+    return buttons.map(btn => ({ ...btn, overflowLevel: 0 }))
+  }
+
+  const buttonsPerLayer = overflowBtn.buttonsPerLayer || [8, 5, 5, 5, 5]
+  const layers = overflowBtn.layers || 1
+
+  // 按 sort 排序的普通按钮（排除溢出按钮本身）
+  const normalButtons = buttons
+    .filter(btn => !isOverflowButton(btn.id) && btn.enabled !== false)
+    .sort((a, b) => a.sort - b.sort)
+
+  // 分配层级
+  const overflowMap = new Map<string, number>()
+  let idx = 0
+  for (let layer = 0; layer <= layers; layer++) {
+    const count = buttonsPerLayer[layer] ?? (layer === 0 ? 8 : 5)
+    // count === 0 时跳过该层，按钮不会被分配到这层
+    for (let i = 0; i < count && idx < normalButtons.length; i++, idx++) {
+      overflowMap.set(normalButtons[idx].id, layer)
+    }
+  }
+  // 剩余的按钮分配到最后一层之后（隐藏）
+  while (idx < normalButtons.length) {
+    overflowMap.set(normalButtons[idx].id, layers + 1)
+    idx++
+  }
+
+  return buttons.map(btn => {
+    if (isOverflowButton(btn.id)) return { ...btn, overflowLevel: 0 }
+    const newLevel = overflowMap.get(btn.id)
+    if (newLevel !== undefined) return { ...btn, overflowLevel: newLevel }
+    return { ...btn, overflowLevel: btn.overflowLevel ?? 0 }
+  })
+}
+
+// 存储桌面端溢出工具栏的点击外部关闭处理器
+let desktopOverflowCloseHandlers = new WeakMap<HTMLElement, (e: MouseEvent) => void>()
+
+/**
+ * 关闭指定面包屑栏的桌面端扩展工具栏
+ */
+function closeDesktopOverflowToolbar(breadcrumbBar: HTMLElement, overflowButton: HTMLElement) {
+  breadcrumbBar.querySelectorAll('.desktop-overflow-toolbar-layer').forEach(el => el.remove())
+  // 恢复面包屑栏原始 overflow 和 position
+  breadcrumbBar.style.removeProperty('overflow')
+  breadcrumbBar.style.removeProperty('position')
+  // 恢复父容器 overflow
+  const breadcrumb = breadcrumbBar.closest('.protyle-breadcrumb') as HTMLElement
+  if (breadcrumb) {
+    breadcrumb.style.removeProperty('overflow')
+  }
+  overflowButton.classList.remove('overflow-active')
+  overflowButton.style.setProperty('background-color', 'rgba(0, 0, 0, 0)', 'important')
+  overflowButton.blur()
+  // 移除外部点击处理器
+  const handler = desktopOverflowCloseHandlers.get(breadcrumbBar)
+  if (handler) {
+    document.removeEventListener('click', handler)
+    desktopOverflowCloseHandlers.delete(breadcrumbBar)
+  }
+}
+
+/**
+ * 桌面端：显示/隐藏扩展工具栏弹窗
+ * 与手机端不同，使用 absolute 定位相对于面包屑栏，自然支持多编辑器
+ */
+function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLElement) {
+  // 桌面端有两种面包屑容器：.protyle-breadcrumb__bar 和 .protyle-breadcrumb
+  const breadcrumbBar = clickedButton.closest('.protyle-breadcrumb__bar') as HTMLElement
+    || clickedButton.closest('.protyle-breadcrumb:not(.protyle-breadcrumb__bar)') as HTMLElement
+  if (!breadcrumbBar) return
+
+  // 检查此编辑器的溢出是否已打开
+  const existingLayers = breadcrumbBar.querySelectorAll('.desktop-overflow-toolbar-layer')
+  if (existingLayers.length > 0) {
+    closeDesktopOverflowToolbar(breadcrumbBar, clickedButton)
+    return
+  }
+
+  // 设置面包屑栏支持 absolute 定位的子元素
+  breadcrumbBar.style.position = 'relative'
+  breadcrumbBar.style.overflow = 'visible'
+  // 确保父容器也不裁剪
+  const breadcrumb = breadcrumbBar.closest('.protyle-breadcrumb') as HTMLElement
+  if (breadcrumb) {
+    breadcrumb.style.overflow = 'visible'
+  }
+
+  // 添加按钮的激活状态
+  clickedButton.classList.add('overflow-active')
+  clickedButton.style.backgroundColor = 'color-mix(in srgb, var(--b3-theme-on-surface) 10%, transparent)'
+
+  const layers = config.layers || 1
+  const toolbarHeight = config.overflowToolbarHeight || 32
+  const toolbarWidthPx = Math.min(config.overflowToolbarWidth || 0, 1300)
+
+  // 获取桌面端按钮配置
+  const allButtons = pluginInstance?.desktopButtonConfigs || []
+  const enabledButtons = allButtons.filter((btn: ButtonConfig) =>
+    btn.enabled !== false &&
+    (btn.platform === 'desktop' || btn.platform === 'both') &&
+    btn.id !== OVERFLOW_BUTTON_ID_DESKTOP
+  )
+
+  // 添加动画样式
+  let animationStyle = document.getElementById('desktop-overflow-toolbar-animation')
+  if (!animationStyle) {
+    animationStyle = document.createElement('style')
+    animationStyle.id = 'desktop-overflow-toolbar-animation'
+    animationStyle.textContent = `
+      @keyframes desktopOverflowSpring {
+        0% { opacity: 0; transform: translateY(-6px) scale(0.97); }
+        60% { opacity: 1; transform: translateY(1px) scale(1.005); }
+        100% { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      .desktop-overflow-toolbar-layer {
+        animation: desktopOverflowSpring 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      .desktop-overflow-toolbar-layer button:focus {
+        background-color: transparent !important;
+        box-shadow: none !important;
+        outline: none !important;
+      }
+    `
+    document.head.appendChild(animationStyle)
+  }
+
+  // 按层创建工具栏
+  for (let i = 0; i < layers; i++) {
+    const layerNum = i + 1
+    const layerButtons = enabledButtons
+      .filter((btn: ButtonConfig) => (btn.overflowLevel ?? 0) === layerNum)
+      .sort((a: ButtonConfig, b: ButtonConfig) => b.sort - a.sort) // 降序
+
+    if (layerButtons.length === 0) continue
+
+    const toolbar = document.createElement('div')
+    toolbar.className = 'desktop-overflow-toolbar-layer'
+    toolbar.dataset.overflowLayer = String(layerNum)
+    toolbar.style.cssText = `
+      position: absolute;
+      top: calc(100% + ${i * (toolbarHeight + 6)}px);
+      right: 0;
+      ${toolbarWidthPx > 0 ? `width: ${toolbarWidthPx}px;` : 'left: 0;'}
+      height: ${toolbarHeight}px;
+      background: color-mix(in srgb, var(--b3-theme-background) 72%, transparent);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid var(--b3-theme-primary);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0 6px;
+      z-index: ${1000 + i};
+      box-shadow:
+        0 0 0 0.5px color-mix(in srgb, var(--b3-border-color) 30%, transparent),
+        0 2px 8px rgba(0, 0, 0, 0.06),
+        0 8px 24px rgba(0, 0, 0, 0.08);
+    `
+
+    // 添加该层的按钮
+    layerButtons.forEach((btn: ButtonConfig) => {
+      const layerBtn = document.createElement('button')
+      layerBtn.className = 'fn__flex-center ariaLabel'
+      layerBtn.style.cssText = getButtonBaseStyle(btn)
+      layerBtn.setAttribute('aria-label', btn.name)
+      layerBtn.dataset.customButton = btn.id
+
+      // 渲染图标
+      if (btn.icon.startsWith('icon')) {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+        svg.setAttribute('width', `${btn.iconSize}`)
+        svg.setAttribute('height', `${btn.iconSize}`)
+        svg.style.cssText = 'flex-shrink: 0; display: block;'
+        const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
+        use.setAttribute('href', `#${btn.icon}`)
+        svg.appendChild(use)
+        layerBtn.appendChild(svg)
+      } else {
+        const iconSpan = document.createElement('span')
+        iconSpan.style.fontSize = `${btn.iconSize}px`
+        iconSpan.style.lineHeight = '1'
+        iconSpan.textContent = btn.icon
+        layerBtn.appendChild(iconSpan)
+      }
+
+      // 显示名称
+      if (btn.showName) {
+        const displayName = btn.name?.length > 4 ? btn.name.slice(0, 4) : btn.name
+        layerBtn.innerHTML = ''
+        const nameSpan = document.createElement('span')
+        nameSpan.textContent = displayName
+        const displayLength = displayName?.length || 0
+        let fontSize = 18
+        if (displayLength === 1) fontSize = 22
+        else if (displayLength === 2) fontSize = 20
+        else if (displayLength === 3) fontSize = 18
+        else if (displayLength >= 4) fontSize = 16
+        nameSpan.style.cssText = `font-size: ${fontSize}px; width: 100%; text-align: center;`
+        layerBtn.appendChild(nameSpan)
+      }
+
+      // hover 效果 — 苹果风格柔和过渡
+      layerBtn.style.transition = 'background-color 0.15s ease, transform 0.15s ease'
+      layerBtn.style.borderRadius = '6px'
+      layerBtn.addEventListener('mouseenter', () => {
+        layerBtn.style.backgroundColor = 'color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent)'
+      })
+      layerBtn.addEventListener('mouseleave', () => {
+        layerBtn.style.backgroundColor = 'transparent'
+      })
+
+      // 保存选区
+      let savedSelection: Range | null = null
+      let lastActiveElement: HTMLElement | null = null
+      layerBtn.addEventListener('mousedown', () => {
+        const selection = window.getSelection()
+        if (selection && selection.rangeCount > 0) {
+          savedSelection = selection.getRangeAt(0).cloneRange()
+        }
+        lastActiveElement = document.activeElement as HTMLElement
+      })
+
+      // 点击执行功能
+      layerBtn.addEventListener('click', async (e) => {
+        e.stopPropagation()
+        e.preventDefault()
+
+        // 关闭扩展工具栏
+        closeDesktopOverflowToolbar(breadcrumbBar, clickedButton)
+
+        await handleButtonClick(btn, savedSelection, lastActiveElement)
+
+        if (btn.type !== 'builtin' && lastActiveElement && lastActiveElement !== document.activeElement) {
+          ;(lastActiveElement as HTMLElement).focus({ preventScroll: true })
+        }
+        setTimeout(() => layerBtn.blur(), 0)
+      })
+
+      toolbar.appendChild(layerBtn)
+    })
+
+    breadcrumbBar.appendChild(toolbar)
+  }
+
+  // 检查是否实际创建了任何层
+  const createdLayers = breadcrumbBar.querySelectorAll('.desktop-overflow-toolbar-layer')
+  if (createdLayers.length === 0) {
+    // 没有溢出按钮可显示，恢复状态并提示
+    breadcrumbBar.style.removeProperty('overflow')
+    breadcrumbBar.style.removeProperty('position')
+    const breadcrumb = breadcrumbBar.closest('.protyle-breadcrumb') as HTMLElement
+    if (breadcrumb) breadcrumb.style.removeProperty('overflow')
+    clickedButton.classList.remove('overflow-active')
+    clickedButton.style.removeProperty('background-color')
+    showMessage('扩展工具栏中没有按钮，请在设置中调整「每层按钮数量」配置', 3000, 'info')
+    return
+  }
+
+  Notify.showOverflowToolbarOpened(layers, config.showNotification !== false)
+
+  // 点击外部关闭
+  const closeHandler = (e: MouseEvent) => {
+    const target = e.target as HTMLElement
+    if (!target.closest('.desktop-overflow-toolbar-layer') &&
+        !target.closest(`[data-custom-button="${OVERFLOW_BUTTON_ID_DESKTOP}"]`)) {
+      closeDesktopOverflowToolbar(breadcrumbBar, clickedButton)
+    }
+  }
+  desktopOverflowCloseHandlers.set(breadcrumbBar, closeHandler)
+  setTimeout(() => document.addEventListener('click', closeHandler), 50)
+}
+
+/**
+ * 处理按钮点击
+ */
+async function handleButtonClick(
+  config: ButtonConfig,
+  savedSelection: Range | null,
+  lastActiveElement: HTMLElement | null,
+  clickedButton: HTMLElement | null
+) {
   // 如果开启了右上角提示，显示消息
   const notificationEnabled = config.showNotification !== false
   Notify.showButtonExecNotification(config.name, notificationEnabled)
@@ -3002,9 +3339,9 @@ async function executeButtonSequence(config: ButtonConfig) {
   }
 }
 
-// 查找扩展工具栏按钮
+// 查找扩展工具栏按钮（手机端或桌面端）
 function findOverflowButton(): HTMLElement | null {
-  return document.querySelector('[data-custom-button="overflow-button-mobile"]') as HTMLElement
+  return document.querySelector('[data-custom-button="overflow-button-mobile"], [data-custom-button="overflow-button-desktop"]') as HTMLElement
 }
 
 /**
@@ -5002,9 +5339,7 @@ export function cleanup() {
   })
 
   // 清理扩展工具栏弹出层 DOM
-  document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove())
-
-  // 移除CSS变量
+  document.querySelectorAll('.overflow-toolbar-layer, .desktop-overflow-toolbar-layer').forEach(el => el.remove())
   document.documentElement.style.removeProperty('--mobile-toolbar-offset')
 
   // 清理全局变量
@@ -5019,6 +5354,7 @@ export function cleanup() {
   const idsToRemove = [
     'mobile-toolbar-background-color-style',
     'overflow-toolbar-animation',
+    'desktop-overflow-toolbar-animation',
     'custom-button-focus-style',
     'mobile-toolbar-dynamic-style',
     'popup-select-scrollbar-style'

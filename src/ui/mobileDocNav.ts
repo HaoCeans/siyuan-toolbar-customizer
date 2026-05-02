@@ -7,6 +7,7 @@
 import { fetchSyncPost, openMobileFileById, showMessage } from "siyuan";
 import { isMobileDevice, pluginInstance } from "../toolbarManager";
 import type { ButtonConfig } from "../toolbarManager";
+import { applyFloatPanelBackground, observeSiYuanThemeMode } from "./floatPanelBackground";
 
 // ===== 常量 =====
 const PERSIST_KEY = 'mobileDocNavState'
@@ -19,6 +20,7 @@ interface DocNavContext {
   loadData: (key: string) => Promise<any>
   eventBus: any
   floatOpacity?: number
+  autoHideOnScroll?: boolean
 }
 
 interface MobileDocNavState {
@@ -49,6 +51,9 @@ let currentDocPath: string | null = null  // 当前文档的父目录路径
 let prevDoc: { id: string; title: string } | null = null
 let nextDoc: { id: string; title: string } | null = null
 let isLoading = false
+
+let lastDocNavFloatOpacity: number | undefined
+let themeModeUnsubscribe: (() => void) | null = null
 
 // ===== 输入法/键盘弹出时自动隐藏 =====
 let hiddenByKeyboard = false
@@ -140,6 +145,11 @@ function startScrollBindRetry(): void {
       scrollBindRetryTimer = null
     }
   }, 200)
+}
+
+function ensureScrollListenerBound(): void {
+  bindScrollListener()
+  if (!boundScrollEl) startScrollBindRetry()
 }
 
 function detachInteractionListeners(): void {
@@ -410,7 +420,7 @@ async function handleSwitchProtyle(): Promise<void> {
   }
 
   // 确保绑定到当前文档的真实滚动容器
-  bindScrollListener()
+  ensureScrollListenerBound()
 
   // 切文档后重置滚动方向基准
   const scrollEl = getMobileContentScrollElement()
@@ -420,8 +430,13 @@ async function handleSwitchProtyle(): Promise<void> {
 
 // ===== 样式 =====
 function applyOpacity(el: HTMLElement | null, opacity: number | undefined): void {
-  if (!el) return
-  el.style.background = `rgba(255,255,255,${opacity ?? 0.78})`
+  lastDocNavFloatOpacity = opacity
+  applyFloatPanelBackground(el, opacity, 0.78)
+}
+
+function refreshDocNavFloatBackground(): void {
+  if (!navBar || !state.isVisible) return
+  applyFloatPanelBackground(navBar, lastDocNavFloatOpacity, 0.78)
 }
 
 function injectStyles(): void {
@@ -481,7 +496,7 @@ function injectStyles(): void {
     }
     /* 暗黑模式 */
     html[data-theme-mode="dark"] #mobile-doc-nav-bar {
-      background: rgba(44,44,46,0.78);
+      background: rgba(0,0,0,0.78);
       border-color: rgba(255,255,255,0.08);
       box-shadow: 0 2px 20px rgba(0,0,0,0.3), 0 0 0 0.5px rgba(255,255,255,0.06);
     }
@@ -561,7 +576,19 @@ async function loadState(): Promise<void> {
 export async function init(context: DocNavContext): Promise<void> {
   ctx = context
 
+  if (!themeModeUnsubscribe) {
+    themeModeUnsubscribe = observeSiYuanThemeMode(() => {
+      refreshDocNavFloatBackground()
+    })
+  }
+
   await loadState()
+
+  autoHideOnScrollEnabled = !!context.autoHideOnScroll
+  currentFloatOpacityForAutoHide = context.floatOpacity
+  hiddenByScroll = false
+  lastScrollTopForAutoHide = null
+  lastAutoHideToggleAt = 0
 
   const protyle = (window as any).siyuan?.mobile?.editor?.protyle
   if (protyle?.block?.rootID) currentDocId = protyle.block.rootID
@@ -640,8 +667,7 @@ export async function init(context: DocNavContext): Promise<void> {
     document.addEventListener('focusout', focusOutHandler, true)
 
     // 向上滚动消失、下滑出现（仅当按钮开关开启时才启用）
-    bindScrollListener()
-    startScrollBindRetry()
+    ensureScrollListenerBound()
   }
 }
 
@@ -669,8 +695,7 @@ export function toggleVisibility(config: ButtonConfig): void {
 
     createNavBar()
     applyOpacity(navBar, config.floatOpacity)
-    bindScrollListener()
-    startScrollBindRetry()
+    ensureScrollListenerBound()
 
     // 重新注册事件监听
     if (!switchProtyleHandler) {
@@ -774,5 +799,11 @@ export function cleanup(): void {
   detachInteractionListeners()
 
   removeNavBar()
+
+  if (themeModeUnsubscribe) {
+    themeModeUnsubscribe()
+    themeModeUnsubscribe = null
+  }
+
   ctx = null
 }

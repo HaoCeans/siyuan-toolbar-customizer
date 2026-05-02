@@ -64,6 +64,10 @@ import { init as initMobileTabs, cleanup as cleanupMobileTabs } from './ui/mobil
 // 导入手机端悬浮大纲模块
 import { init as initMobileOutline, cleanup as cleanupMobileOutline } from './ui/mobileOutline'
 import { init as initMobileDocNav, cleanup as cleanupMobileDocNav } from './ui/mobileDocNav'
+import {
+  syncMobileTopLineBreakButton,
+  destroyMobileTopLineBreakButton
+} from './ui/mobileTopLineBreak'
 // 导入字段创建工具
 import {
   updateIconDisplay,
@@ -170,6 +174,7 @@ export default class ToolbarCustomizer extends Plugin {
     hideMoreButton: true,       // 更多按钮隐藏
     disableCustomButtons: false,// 禁用所有自定义按钮
     disableMobileSwipe: true,   // 手机端禁止左右滑动弹出
+    showMobileLineBreakButton: false, // 顶部工具栏云同步左侧显示 H 换行按钮
     disableFileTree: true,      // 禁止右滑弹出文档树
     disableSettingMenu: true,   // 禁止左滑弹出设置菜单
     showAllNotifications: true, // 一键开启所有按钮右上角提示
@@ -247,6 +252,32 @@ export default class ToolbarCustomizer extends Plugin {
           clickSequence: btn.clickSequence || [],
           diaryPosition: btn.diaryPosition || 'bottom'  // 确保日记位置属性被正确加载
         }))
+        // 检查是否有桌面端扩展工具栏按钮，没有则添加
+        const hasDesktopOverflow = this.desktopButtonConfigs.some(btn => btn.id === 'overflow-button-desktop')
+        if (!hasDesktopOverflow) {
+          this.desktopButtonConfigs.unshift({
+            id: 'overflow-button-desktop',
+            name: '扩展工具栏',
+            type: 'builtin',
+            builtinId: 'overflow',
+            icon: '⋯',
+            iconSize: 18,
+            minWidth: 32,
+            marginRight: 8,
+            sort: 0,
+            platform: 'desktop',
+            showNotification: false,
+            enabled: false,
+            layers: 1,
+            buttonsPerLayer: [6, 6, 6, 6, 6],
+            overflowToolbarHeight: 30,
+            overflowToolbarWidth: 300
+          })
+          // 重新分配排序值
+          this.desktopButtonConfigs.forEach((btn, idx) => {
+            btn.sort = idx
+          })
+        }
       } else {
         // 配置不存在或格式错误，使用默认配置（首次加载时不保存，等用户修改时再保存）
         this.desktopButtonConfigs = DEFAULT_DESKTOP_BUTTONS.map(btn => ({...btn}))
@@ -440,6 +471,11 @@ export default class ToolbarCustomizer extends Plugin {
       setTimeout(() => {
         this.applyMobileToolbarStyle()
       }, 500)
+      syncMobileTopLineBreakButton(
+        true,
+        this.mobileFeatureConfig.showMobileLineBreakButton === true,
+        this.mobileFeatureConfig.disableCustomButtons
+      )
     }
   }
 
@@ -501,18 +537,26 @@ export default class ToolbarCustomizer extends Plugin {
       // 初始化小窗模式检测器
       initSmallWindowDetector()
 
-      // 从按钮配置中查找各模块的透明度设置
-      const findFloatOpacity = (subtype: string): number | undefined => {
+      // 从按钮配置中查找各模块的透明度、滚动隐藏（与 toggleVisibility 一致，避免重载后仅恢复可见态却丢失开关）
+      const findAuthorToolFloatOptions = (subtype: string): { floatOpacity?: number; autoHideOnScroll?: boolean } => {
         const btn = this.mobileButtonConfigs.find(b => b.type === 'author-tool' && b.authorToolSubtype === subtype)
-        return btn?.floatOpacity
+        return {
+          floatOpacity: btn?.floatOpacity,
+          autoHideOnScroll: btn?.autoHideOnScroll
+        }
       }
+
+      const tabsOpts = findAuthorToolFloatOptions('mobile-tabs')
+      const outlineOpts = findAuthorToolFloatOptions('mobile-outline')
+      const docNavOpts = findAuthorToolFloatOptions('doc-nav')
 
       // 初始化手机端标签页Tab模块
       initMobileTabs({
         saveData: (key, value) => this.saveData(key, value),
         loadData: (key) => this.loadData(key),
         eventBus: this.eventBus,
-        floatOpacity: findFloatOpacity('mobile-tabs')
+        floatOpacity: tabsOpts.floatOpacity,
+        autoHideOnScroll: tabsOpts.autoHideOnScroll
       })
 
       // 初始化手机端悬浮大纲模块
@@ -520,7 +564,8 @@ export default class ToolbarCustomizer extends Plugin {
         saveData: (key, value) => this.saveData(key, value),
         loadData: (key) => this.loadData(key),
         eventBus: this.eventBus,
-        floatOpacity: findFloatOpacity('mobile-outline')
+        floatOpacity: outlineOpts.floatOpacity,
+        autoHideOnScroll: outlineOpts.autoHideOnScroll
       })
 
       // 初始化手机端文档导航模块
@@ -528,7 +573,8 @@ export default class ToolbarCustomizer extends Plugin {
         saveData: (key, value) => this.saveData(key, value),
         loadData: (key) => this.loadData(key),
         eventBus: this.eventBus,
-        floatOpacity: findFloatOpacity('doc-nav')
+        floatOpacity: docNavOpts.floatOpacity,
+        autoHideOnScroll: docNavOpts.autoHideOnScroll
       })
     }
 
@@ -643,6 +689,8 @@ export default class ToolbarCustomizer extends Plugin {
 
     // 清理手机端文档导航资源
     cleanupMobileDocNav()
+
+    destroyMobileTopLineBreakButton()
 
     // 移除动态样式
     this.removeFeatureStyles()
@@ -1065,6 +1113,22 @@ export default class ToolbarCustomizer extends Plugin {
       `
     }
 
+    // ⑥换行按钮开启时隐藏顶部云同步图标（与 H 同区域，避免干扰）
+    if (this.isMobile && this.mobileFeatureConfig.showMobileLineBreakButton === true && !disableCustomButtons) {
+      styleContent += `
+        #toolbarSync {
+          display: none !important;
+          visibility: hidden !important;
+          width: 0 !important;
+          height: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          overflow: hidden !important;
+          pointer-events: none !important;
+        }
+      `
+    }
+
     // 禁用自定义按钮（恢复思源原始状态）
     // 前面的所有修改CSS都已跳过，这里只需要隐藏自定义按钮
     if (disableCustomButtons) {
@@ -1121,6 +1185,12 @@ export default class ToolbarCustomizer extends Plugin {
       style.textContent = styleContent
       document.head.appendChild(style)
     }
+
+    syncMobileTopLineBreakButton(
+      this.isMobile,
+      this.mobileFeatureConfig.showMobileLineBreakButton === true,
+      disableCustomButtons
+    )
   }
 
   // 手机端滑动禁用的状态变量

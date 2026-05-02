@@ -50,6 +50,8 @@ export interface MobileFeatureConfig {
   hideReadonlyButton: boolean
   hideDocMenuButton: boolean
   hideMoreButton: boolean
+  /** 顶部工具栏云同步位置左侧显示 H，点击硬换行 */
+  showMobileLineBreakButton?: boolean
   disableCustomButtons: boolean
   disableMobileSwipe?: boolean
   authorCode?: string
@@ -2867,6 +2869,24 @@ export function createMobileSettingLayout(
       toggle.style.cssText = 'transform: scale(1.2);'
       toggle.onchange = async () => {
         context.mobileFeatureConfig.disableMobileSwipe = toggle.checked
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+        context.applyFeatures()
+      }
+      return toggle
+    }
+  })
+
+  setting.addItem({
+    title: '⑥换行按钮',
+    description: '💡在顶部工具栏原云同步位置左侧显示 H，并隐藏云同步图标；点击 H 在正文中分段换行（与编辑区内按 Enter 相同）',
+    createActionElement: () => {
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'b3-switch'
+      toggle.checked = context.mobileFeatureConfig.showMobileLineBreakButton === true
+      toggle.style.cssText = 'transform: scale(1.2);'
+      toggle.onchange = async () => {
+        context.mobileFeatureConfig.showMobileLineBreakButton = toggle.checked
         await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
         context.applyFeatures()
       }

@@ -1220,7 +1220,9 @@ export function createDesktopSettingLayout(
             showConfirmDialog: context.showConfirmDialog,
             showIconPicker: context.showIconPicker,
             buttonConfigs: context.desktopButtonConfigs,
-            saveData: context.saveData
+            saveData: context.saveData,
+            recalculateOverflow: () => { context.refreshButtons() },
+            updateDesktopToolbar: () => { context.refreshButtons() }
           }
           const item = createDesktopButtonItem(button, index, renderList, context.desktopButtonConfigs, buttonContext)
           listContainer.appendChild(item)

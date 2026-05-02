@@ -6,6 +6,7 @@
 import { fetchSyncPost, openMobileFileById, showMessage } from "siyuan";
 import { isMobileDevice, pluginInstance } from "../toolbarManager";
 import type { ButtonConfig } from "../toolbarManager";
+import { applyFloatPanelBackground, observeSiYuanThemeMode } from "./floatPanelBackground";
 
 // ===== 常量 =====
 const MAX_TABS = 10
@@ -44,6 +45,8 @@ export interface MobileTabsContext {
   loadData: (key: string) => Promise<any>
   eventBus: any
   floatOpacity?: number
+  /** 与对应鲸鱼按钮「滚动隐藏/显示」一致；init 恢复可见时必须带上，否则重载后检测不生效 */
+  autoHideOnScroll?: boolean
 }
 
 // ===== 模块状态 =====
@@ -63,6 +66,10 @@ let contextMenuOverlay: HTMLElement | null = null
 let longPressTimer: ReturnType<typeof setTimeout> | null = null
 let titleRefreshTimer: ReturnType<typeof setInterval> | null = null
 let pinBtnEl: HTMLElement | null = null
+
+/** 最近一次应用到标签栏的透明度（用于思源内切换亮/暗后重算背景） */
+let lastTabsFloatOpacity: number | undefined
+let themeModeUnsubscribe: (() => void) | null = null
 
 let boundScrollEl: HTMLElement | null = null
 let scrollBindRetryTimer: ReturnType<typeof setInterval> | null = null
@@ -119,6 +126,31 @@ function getMobileContentScrollElement(): HTMLElement | null {
   return protyle?.contentElement || document.querySelector('.protyle-content')
 }
 
+/** 当前手机编辑器打开的文档根 ID（与 Tab 的 docId 对齐） */
+function getMobileEditorRootDocId(): string | undefined {
+  const protyle = (window as any).siyuan?.mobile?.editor?.protyle
+  return protyle?.block?.rootID
+}
+
+/** 用思源 API 打开该 Tab 对应文档，并恢复滚动、绑定滚动监听 */
+function navigateEditorToTab(tab: TabItem): void {
+  try {
+    openMobileFileById(pluginInstance?.app, tab.docId)
+  } catch (err) {
+    console.error('[手机端标签页Tab] 打开文档失败:', err)
+    showMessage('打开文档失败', 3000, 'error')
+  }
+  if (tab.scrollPosition > 0) {
+    setTimeout(() => {
+      const scrollEl = getMobileContentScrollElement()
+      if (scrollEl) {
+        scrollEl.scrollTop = tab.scrollPosition
+      }
+    }, 300)
+  }
+  ensureScrollListenerBound()
+}
+
 function bindScrollListener(): void {
   const el = getMobileContentScrollElement()
   if (!el) return
@@ -158,6 +190,12 @@ function startScrollBindRetry(): void {
       scrollBindRetryTimer = null
     }
   }, 200)
+}
+
+/** protyle 晚于插件 init 出现时，补绑滚动容器 */
+function ensureScrollListenerBound(): void {
+  bindScrollListener()
+  if (!boundScrollEl) startScrollBindRetry()
 }
 
 function getViewportHeight(): number {
@@ -376,10 +414,12 @@ function removeTab(tabId: string): TabItem[] {
   state.tabs = state.tabs.filter(t => t.id !== tabId)
 
   if (wasActive && state.tabs.length > 0) {
-    // 切换到最近的 Tab
+    // 切换到最近的 Tab，并立即打开对应文档（否则仅剩 1 个 Tab 时 isActive 已为 true，点击不会再触发 switchToTab）
     const newest = state.tabs[state.tabs.length - 1]
     newest.isActive = true
     state.activeTabId = newest.id
+    navigateEditorToTab(newest)
+    debouncedPersist()
   } else if (state.tabs.length === 0) {
     state.activeTabId = null
   }
@@ -391,6 +431,11 @@ function closeOtherTabs(keepTabId: string): TabItem[] {
   state.tabs = state.tabs.filter(t => t.id === keepTabId)
   state.tabs.forEach(t => { t.isActive = t.id === keepTabId })
   state.activeTabId = keepTabId
+  const kept = state.tabs[0]
+  if (kept) {
+    navigateEditorToTab(kept)
+    debouncedPersist()
+  }
   return state.tabs
 }
 
@@ -450,14 +495,22 @@ async function loadState(): Promise<void> {
 // ===== 文档切换 =====
 async function switchToTab(tabId: string): Promise<void> {
   const tab = state.tabs.find(t => t.id === tabId)
-  if (!tab || tab.isActive) return
+  if (!tab) return
+  // 仅当「已是活动 Tab 且编辑器正在显示该文档」时跳过；否则须重新打开（例如删到只剩 1 个 Tab 后状态与编辑器不一致）
+  const editorDocId = getMobileEditorRootDocId()
+  if (tab.isActive && editorDocId === tab.docId) return
 
-  // 保存当前 Tab 的滚动位置
+  // 保存当前 Tab 的滚动位置（若状态与编辑器不一致，勿把当前视图的滚动误记到目标 Tab 上）
   const currentTab = getActiveTab()
   if (currentTab) {
     const scrollEl = getMobileContentScrollElement()
     if (scrollEl) {
-      currentTab.scrollPosition = scrollEl.scrollTop
+      if (currentTab.id !== tab.id) {
+        currentTab.scrollPosition = scrollEl.scrollTop
+      } else if (editorDocId && editorDocId !== tab.docId) {
+        const tabMatchEditor = state.tabs.find(t => t.docId === editorDocId)
+        if (tabMatchEditor) tabMatchEditor.scrollPosition = scrollEl.scrollTop
+      }
     }
     currentTab.isActive = false
   }
@@ -476,30 +529,11 @@ async function switchToTab(tabId: string): Promise<void> {
     })
   }
 
-  // 使用 openMobileFileById 加载目标文档
-  try {
-    openMobileFileById(pluginInstance?.app, tab.docId)
-  } catch (err) {
-    console.error('[手机端标签页Tab] 打开文档失败:', err)
-    showMessage('打开文档失败', 3000, 'error')
-  }
-
-  // 延迟恢复滚动位置
-  if (tab.scrollPosition > 0) {
-    setTimeout(() => {
-      const scrollEl = getMobileContentScrollElement()
-      if (scrollEl) {
-        scrollEl.scrollTop = tab.scrollPosition
-      }
-    }, 300)
-  }
+  navigateEditorToTab(tab)
 
   renderTabList()
   updatePinButtonUI()
   debouncedPersist()
-
-  // 确保始终监听当前文档对应的真实滚动容器
-  bindScrollListener()
 }
 
 // ===== 事件处理 =====
@@ -553,6 +587,10 @@ function handleSwitchProtyle(): void {
   const scrollEl = getMobileContentScrollElement()
   lastScrollTopForAutoHide = scrollEl?.scrollTop ?? null
   lastAutoHideToggleAt = 0
+
+  if (state.isVisible) {
+    ensureScrollListenerBound()
+  }
 }
 
 function handleScroll(): void {
@@ -606,8 +644,13 @@ function handleScroll(): void {
 
 // ===== DOM 构建 =====
 function applyOpacity(el: HTMLElement | null, opacity: number | undefined): void {
-  if (!el) return
-  el.style.background = `rgba(255,255,255,${opacity ?? 0.72})`
+  lastTabsFloatOpacity = opacity
+  applyFloatPanelBackground(el, opacity, 0.72)
+}
+
+function refreshTabsBarFloatBackground(): void {
+  if (!tabBar || !state.isVisible) return
+  applyFloatPanelBackground(tabBar, lastTabsFloatOpacity, 0.72)
 }
 
 function injectStyles(): void {
@@ -869,7 +912,7 @@ function injectStyles(): void {
     /* 暗黑模式适配 */
     html[data-theme-mode="dark"] #mobile-tabs-bar,
     #mobile-tabs-bar.dark {
-      background: rgba(44,44,46,0.72);
+      background: rgba(0,0,0,0.72);
       border-color: rgba(255,255,255,0.08);
       box-shadow: 0 2px 20px rgba(0,0,0,0.3), 0 0 0 0.5px rgba(255,255,255,0.06);
     }
@@ -907,7 +950,7 @@ function injectStyles(): void {
       background: rgba(255,255,255,0.08);
     }
     html[data-theme-mode="dark"] #mobile-tabs-context-menu {
-      background: rgba(44,44,46,0.85);
+      background: rgba(0,0,0,0.85);
       border-color: rgba(255,255,255,0.08);
       box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 0 0.5px rgba(255,255,255,0.08);
     }
@@ -1168,14 +1211,25 @@ function startTitleRefresh(): void {
 export async function init(context: MobileTabsContext): Promise<void> {
   ctx = context
 
+  if (!themeModeUnsubscribe) {
+    themeModeUnsubscribe = observeSiYuanThemeMode(() => {
+      refreshTabsBarFloatBackground()
+    })
+  }
+
   await loadState()
+
+  autoHideOnScrollEnabled = !!context.autoHideOnScroll
+  currentFloatOpacityForAutoHide = context.floatOpacity
+  hiddenByScroll = false
+  lastScrollTopForAutoHide = null
+  lastAutoHideToggleAt = 0
 
   // 如果之前可见，恢复 Tab 栏
   if (state.isVisible && state.tabs.length > 0) {
     createTabBar()
     applyOpacity(tabBar, context.floatOpacity)
-    bindScrollListener()
-    startScrollBindRetry()
+    ensureScrollListenerBound()
   }
 
   // 监听文档切换事件
@@ -1282,8 +1336,7 @@ export function toggleVisibility(config: ButtonConfig): void {
     createTabBar()
     applyOpacity(tabBar, config.floatOpacity)
     startTitleRefresh()
-    bindScrollListener()
-    startScrollBindRetry()
+    ensureScrollListenerBound()
 
     if (!vvResizeHandler) {
       keyboardBaselineHeight = getViewportHeight()
@@ -1430,6 +1483,11 @@ export function cleanup(): void {
 
   // 移除 DOM
   removeTabBar()
+
+  if (themeModeUnsubscribe) {
+    themeModeUnsubscribe()
+    themeModeUnsubscribe = null
+  }
 
   // 重置
   ctx = null

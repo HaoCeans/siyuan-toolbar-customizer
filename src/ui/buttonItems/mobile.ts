@@ -385,7 +385,7 @@ export function createMobileButtonItem(
     'click-sequence': '⑤自动化模拟点击【难】',
     'author-tool': '⑥鲸鱼定制工具箱'
   }
-  const typeLabel = typeLabels[button.type] || button.type
+  const typeLabel = (button.id === 'overflow-button-mobile') ? '扩展工具栏' : (typeLabels[button.type] || button.type)
 
   // 获取溢出层级信息
   const overflowLevel = button.overflowLevel ?? 0

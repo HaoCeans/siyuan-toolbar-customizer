@@ -7,6 +7,7 @@
 import { fetchSyncPost, openMobileFileById, showMessage } from "siyuan";
 import { isMobileDevice, pluginInstance } from "../toolbarManager";
 import type { ButtonConfig } from "../toolbarManager";
+import { applyFloatPanelBackground, observeSiYuanThemeMode } from "./floatPanelBackground";
 
 // ===== 常量 =====
 const PERSIST_KEY = 'mobileOutlineState'
@@ -19,6 +20,7 @@ interface OutlineContext {
   loadData: (key: string) => Promise<any>
   eventBus: any
   floatOpacity?: number
+  autoHideOnScroll?: boolean
 }
 
 interface MobileOutlineState {
@@ -50,6 +52,9 @@ let currentFocusId: string | null = null
 let titleRefreshTimer: ReturnType<typeof setInterval> | null = null
 let renderSeq = 0  // 渲染序号，避免切文档时异步返回乱序
 
+let lastOutlineFloatOpacity: number | undefined
+let themeModeUnsubscribe: (() => void) | null = null
+
 // ===== 输入法/键盘弹出时自动隐藏 =====
 let hiddenByKeyboard = false
 let keyboardBaselineHeight: number | null = null
@@ -72,24 +77,24 @@ const SCROLL_HIDE_THRESHOLD_PX = 15
 const SCROLL_TOGGLE_COOLDOWN_MS = 200
 const SCROLL_FADE_MS = 160
 
-function fadeOutAndRemovePanel(): void {
-  if (!outlinePanel) {
-    removePanel()
-    return
-  }
+/** 滚动隐藏：仅淡出并不可见，不移除 DOM，避免下滑再出现时的整页重绘/闪烁 */
+function fadeOutPanelForScrollHide(): void {
+  if (!outlinePanel) return
   const el = outlinePanel
   el.style.transition = `opacity ${SCROLL_FADE_MS}ms ease`
   el.style.opacity = '0'
   window.setTimeout(() => {
-    if (outlinePanel === el) {
-      removePanel()
-    }
+    if (outlinePanel !== el) return
+    el.style.visibility = 'hidden'
+    el.style.pointerEvents = 'none'
   }, SCROLL_FADE_MS)
 }
 
 function ensurePanelVisibleWithFadeIn(): void {
   if (!outlinePanel) return
   const el = outlinePanel
+  el.style.visibility = 'visible'
+  el.style.pointerEvents = ''
   el.style.transition = `opacity ${SCROLL_FADE_MS}ms ease`
   el.style.opacity = '0'
   requestAnimationFrame(() => {
@@ -129,6 +134,11 @@ function startScrollBindRetry(): void {
       scrollBindRetryTimer = null
     }
   }, 200)
+}
+
+function ensureScrollListenerBound(): void {
+  bindScrollListener()
+  if (!boundScrollEl) startScrollBindRetry()
 }
 
 function detachInteractionListeners(): void {
@@ -217,15 +227,22 @@ function handleScrollAutoHide(): void {
     hiddenByScroll = true
     lastAutoHideToggleAt = now
     stopTitleRefresh()
-    fadeOutAndRemovePanel()
+    fadeOutPanelForScrollHide()
   } else if (hiddenByScroll && delta < -SCROLL_HIDE_THRESHOLD_PX) {
     hiddenByScroll = false
     lastAutoHideToggleAt = now
-    createPanel()
-    applyOpacity(outlinePanel, currentFloatOpacityForAutoHide)
-    ensurePanelVisibleWithFadeIn()
-    startTitleRefresh()
-    renderOutlinePanel()
+    if (outlinePanel) {
+      applyOpacity(outlinePanel, currentFloatOpacityForAutoHide)
+      ensurePanelVisibleWithFadeIn()
+      startTitleRefresh()
+      updateFocusHighlight()
+    } else {
+      createPanel()
+      applyOpacity(outlinePanel, currentFloatOpacityForAutoHide)
+      ensurePanelVisibleWithFadeIn()
+      startTitleRefresh()
+      renderOutlinePanel()
+    }
   }
 }
 
@@ -500,8 +517,8 @@ function handleSwitchProtyle(): void {
     renderOutlinePanel()
   }
 
-  // 确保绑定到当前文档的真实滚动容器
-  bindScrollListener()
+  // 确保绑定到当前文档的真实滚动容器（init 过早时可能未绑上，需与 switch 时补绑）
+  ensureScrollListenerBound()
 
   // 切文档后重置滚动方向基准
   const scrollEl = getMobileContentScrollElement()
@@ -511,8 +528,13 @@ function handleSwitchProtyle(): void {
 
 // ===== 样式 =====
 function applyOpacity(el: HTMLElement | null, opacity: number | undefined): void {
-  if (!el) return
-  el.style.background = `rgba(255,255,255,${opacity ?? 0.72})`
+  lastOutlineFloatOpacity = opacity
+  applyFloatPanelBackground(el, opacity, 0.72)
+}
+
+function refreshOutlinePanelFloatBackground(): void {
+  if (!outlinePanel || !state.isVisible) return
+  applyFloatPanelBackground(outlinePanel, lastOutlineFloatOpacity, 0.72)
 }
 
 function injectStyles(): void {
@@ -727,7 +749,7 @@ function injectStyles(): void {
     /* 暗黑模式适配 */
     html[data-theme-mode="dark"] #mobile-outline-panel,
     #mobile-outline-panel.dark {
-      background: rgba(44,44,46,0.72);
+      background: rgba(0,0,0,0.72);
       border-color: rgba(255,255,255,0.08);
       box-shadow: 0 2px 20px rgba(0,0,0,0.3), 0 0 0 0.5px rgba(255,255,255,0.06);
     }
@@ -855,7 +877,19 @@ function stopTitleRefresh(): void {
 export async function init(context: OutlineContext): Promise<void> {
   ctx = context
 
+  if (!themeModeUnsubscribe) {
+    themeModeUnsubscribe = observeSiYuanThemeMode(() => {
+      refreshOutlinePanelFloatBackground()
+    })
+  }
+
   await loadState()
+
+  autoHideOnScrollEnabled = !!context.autoHideOnScroll
+  currentFloatOpacityForAutoHide = context.floatOpacity
+  hiddenByScroll = false
+  lastScrollTopForAutoHide = null
+  lastAutoHideToggleAt = 0
 
   // 初始化时获取当前文档ID
   const protyle = (window as any).siyuan?.mobile?.editor?.protyle
@@ -912,8 +946,7 @@ export async function init(context: OutlineContext): Promise<void> {
     document.addEventListener('focusin', focusInHandler, true)
     document.addEventListener('focusout', focusOutHandler, true)
 
-    bindScrollListener()
-    startScrollBindRetry()
+    ensureScrollListenerBound()
 
     visibilityChangeHandler = () => {
       if (document.hidden) {
@@ -1006,8 +1039,7 @@ export function toggleVisibility(config: ButtonConfig): void {
       document.addEventListener('focusout', focusOutHandler, true)
     }
 
-    bindScrollListener()
-    startScrollBindRetry()
+    ensureScrollListenerBound()
 
     if (!visibilityChangeHandler) {
       visibilityChangeHandler = () => {
@@ -1056,6 +1088,11 @@ export function cleanup(): void {
 
   stopTitleRefresh()
   removePanel()
+
+  if (themeModeUnsubscribe) {
+    themeModeUnsubscribe()
+    themeModeUnsubscribe = null
+  }
 
   ctx = null
 }

@@ -4,6 +4,7 @@
  */
 
 import { ButtonConfig } from '../../toolbarManager'
+import { updateMaxVisibleTabs } from '../../ui/mobileTabs'
 import { showClickSequenceSelector } from '../clickSequenceSelector'
 import { showButtonSelector, ButtonInfo } from '../buttonSelector'
 import {
@@ -1410,6 +1411,47 @@ export function createMobileButtonItem(
       autoHideContainer.appendChild(autoHideHint)
       floatOpacityConfigDiv.appendChild(autoHideContainer)
 
+      // 最大可见标签数（仅 mobile-tabs 类型显示）
+      const maxVisibleTabsContainer = document.createElement('div')
+      maxVisibleTabsContainer.id = 'max-visible-tabs-config-mobile'
+      maxVisibleTabsContainer.style.cssText = 'display: none; flex-direction: column; gap: 6px; margin-top: 4px;'
+
+      const maxVisibleRow = document.createElement('div')
+      maxVisibleRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
+
+      const maxVisibleLabel = document.createElement('label')
+      maxVisibleLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
+      maxVisibleLabel.textContent = '最大可见标签数'
+
+      const maxVisibleInput = document.createElement('input')
+      maxVisibleInput.type = 'number'
+      maxVisibleInput.min = '1'
+      maxVisibleInput.max = '10'
+      maxVisibleInput.value = String(button.maxVisibleTabs ?? 10)
+      maxVisibleInput.style.cssText = 'width: 60px; text-align: center; font-size: 13px; padding: 4px 6px; border-radius: 4px; border: 1px solid var(--b3-theme-surface-lighter); background: var(--b3-theme-surface); color: var(--b3-theme-on-background);'
+
+      maxVisibleRow.appendChild(maxVisibleLabel)
+      maxVisibleRow.appendChild(maxVisibleInput)
+
+      const maxVisibleHint = document.createElement('div')
+      maxVisibleHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
+      maxVisibleHint.textContent = '超出此数量的标签页可手动向下滚动查看（1~10，默认 10）'
+
+      maxVisibleInput.addEventListener('change', async () => {
+        let val = parseInt(maxVisibleInput.value)
+        if (isNaN(val) || val < 1) val = 1
+        if (val > 10) val = 10
+        maxVisibleInput.value = String(val)
+        button.maxVisibleTabs = val
+        updateMaxVisibleTabs(val)
+        await context.saveData('mobileButtonConfigs', context.buttonConfigs)
+        context.updateMobileToolbar?.()
+      })
+
+      maxVisibleTabsContainer.appendChild(maxVisibleRow)
+      maxVisibleTabsContainer.appendChild(maxVisibleHint)
+      floatOpacityConfigDiv.appendChild(maxVisibleTabsContainer)
+
       authorToolContainer.appendChild(floatOpacityConfigDiv)
 
       // 日记顶部或底部配置区（说明 + 位置选择 + 笔记本ID + 等待时间配置）
@@ -1653,6 +1695,8 @@ export function createMobileButtonItem(
           scrollDocConfigDiv.style.display = 'none'
           imageUploadConfigDiv.style.display = 'none'
           floatOpacityConfigDiv.style.display = 'flex'
+          // 最大可见标签数仅 mobile-tabs 类型显示
+          maxVisibleTabsContainer.style.display = subtype === 'mobile-tabs' ? 'flex' : 'none'
         } else {
           docConfigDiv.style.display = 'flex'
           dbConfigDiv.style.display = 'none'

@@ -965,6 +965,11 @@ export async function init(context: OutlineContext): Promise<void> {
   context.eventBus.on('loaded-protyle-dynamic', switchProtyleHandler)
 
   // 面板不可见时，不注册滚动/键盘/visibility 监听，避免无谓开销
+
+  // 兜底：插件重载后 protyle 可能已就绪但事件已错过，主动同步一次
+  if (state.isVisible) {
+    setTimeout(() => { handleSwitchProtyle() }, 100)
+  }
 }
 
 export function toggleVisibility(config: ButtonConfig): void {
@@ -1075,6 +1080,21 @@ export function toggleVisibility(config: ButtonConfig): void {
   }
 
   debouncedPersist()
+}
+
+/** 思源同步覆盖存储后调用，从磁盘重新加载状态并刷新 UI */
+export async function reloadState(): Promise<void> {
+  if (!ctx) return
+  await loadState()
+  if (state.isVisible) {
+    createPanel()
+    applyOpacity(outlinePanel, lastOutlineFloatOpacity)
+    startTitleRefresh()
+    ensureScrollListenerBound()
+  } else if (outlinePanel) {
+    removePanel()
+    stopTitleRefresh()
+  }
 }
 
 export function cleanup(): void {

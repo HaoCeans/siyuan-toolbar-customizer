@@ -47,6 +47,8 @@ export interface MobileTabsContext {
   floatOpacity?: number
   /** 与对应鲸鱼按钮「滚动隐藏/显示」一致；init 恢复可见时必须带上，否则重载后检测不生效 */
   autoHideOnScroll?: boolean
+  /** 最大可见标签数 (1~10)，超出后可滚动，默认 10 */
+  maxVisibleTabs?: number
 }
 
 // ===== 模块状态 =====
@@ -81,6 +83,10 @@ let keyboardBaselineHeight: number | null = null
 let vvResizeHandler: (() => void) | null = null
 let focusInHandler: ((e: FocusEvent) => void) | null = null
 let focusOutHandler: ((e: FocusEvent) => void) | null = null
+
+// ===== 标题 DOM 变化监听（即时响应重命名）=====
+let titleObserver: MutationObserver | null = null
+let titleObserverTimer: ReturnType<typeof setTimeout> | null = null
 let visibilityChangeHandler: (() => void) | null = null
 
 // ===== 滚动隐藏/显示（向上滚动消失，下滑出现）=====
@@ -89,6 +95,9 @@ let autoHideOnScrollEnabled = false
 let currentFloatOpacityForAutoHide: number | undefined = undefined
 let lastScrollTopForAutoHide: number | null = null
 let lastAutoHideToggleAt = 0
+
+// ===== 最大可见标签数 =====
+let currentMaxVisibleTabs: number = MAX_TABS
 
 const SCROLL_HIDE_THRESHOLD_PX = 15
 const SCROLL_TOGGLE_COOLDOWN_MS = 200
@@ -133,7 +142,23 @@ function getMobileEditorRootDocId(): string | undefined {
 }
 
 /** 用思源 API 打开该 Tab 对应文档，并恢复滚动、绑定滚动监听 */
-function navigateEditorToTab(tab: TabItem): void {
+async function navigateEditorToTab(tab: TabItem): Promise<void> {
+  // 先验证文档是否仍存在（同步删除后 docId 可能失效）
+  try {
+    const info: any = await fetchSyncPost('/api/block/getBlockInfo', { id: tab.docId })
+    if (info?.code === 3 || !info?.data) {
+      showMessage(`文档已被删除，已移除该标签页`, 2500, 'info')
+      removeTab(tab.id)
+      renderTabList()
+      debouncedPersist()
+      if (state.tabs.length === 0) {
+        removeTabBar()
+        state.isVisible = false
+      }
+      return
+    }
+  } catch { /* 验证失败不阻塞，尝试打开 */ }
+
   try {
     openMobileFileById(pluginInstance?.app, tab.docId)
   } catch (err) {
@@ -141,12 +166,19 @@ function navigateEditorToTab(tab: TabItem): void {
     showMessage('打开文档失败', 3000, 'error')
   }
   if (tab.scrollPosition > 0) {
-    setTimeout(() => {
+    // 轮询等待文档内容加载完成后再恢复滚动位置（大文档加载可能超过 300ms）
+    const targetPos = tab.scrollPosition
+    let attempts = 0
+    const tryRestore = () => {
       const scrollEl = getMobileContentScrollElement()
-      if (scrollEl) {
-        scrollEl.scrollTop = tab.scrollPosition
+      if (scrollEl && scrollEl.scrollHeight > targetPos) {
+        scrollEl.scrollTop = targetPos
+      } else if (attempts < 10) {
+        attempts++
+        setTimeout(tryRestore, 200)
       }
-    }, 300)
+    }
+    setTimeout(tryRestore, 300)
   }
   ensureScrollListenerBound()
 }
@@ -196,6 +228,104 @@ function startScrollBindRetry(): void {
 function ensureScrollListenerBound(): void {
   bindScrollListener()
   if (!boundScrollEl) startScrollBindRetry()
+  bindTitleObserver()
+}
+
+/** 标题变化时同步到活动标签页 */
+function onTitleChange(text: string): void {
+  const protyle = (window as any).siyuan?.mobile?.editor?.protyle
+  const docId = protyle?.block?.rootID
+  if (!text || !docId) return
+  const activeTab = getActiveTab()
+  if (activeTab && activeTab.docId === docId && activeTab.title !== text) {
+    activeTab.title = text
+    titleCache[docId] = text
+    renderTabList()
+    debouncedPersist()
+  }
+}
+
+/** 监听标题变化，即时同步到活动标签页（兼容 titleShowTop 模式） */
+function bindTitleObserver(): void {
+  if (titleObserver) return
+  const protyle = (window as any).siyuan?.mobile?.editor?.protyle
+
+  // 桌面端 / titleShowTop:false：监听 editElement 的 DOM 变化
+  const editEl = protyle?.title?.editElement as HTMLElement | undefined
+  if (editEl) {
+    titleObserver = new MutationObserver(() => {
+      const text = editEl.textContent?.trim()
+      if (text) onTitleChange(text)
+    })
+    titleObserver.observe(editEl, { childList: true, characterData: true, subtree: true })
+    return
+  }
+
+  // 手机端 titleShowTop:true：监听 #toolbarName（<input>）的 input 事件
+  // input.value 变化不触发 MutationObserver，必须用事件监听
+  const toolbarName = document.getElementById("toolbarName") as HTMLInputElement | null
+  if (toolbarName) {
+    const handler = () => {
+      const text = toolbarName.value?.trim()
+      if (text) onTitleChange(text)
+    }
+    toolbarName.addEventListener("input", handler)
+    // 用一个伪 observer 记录引用，cleanup 时统一移除
+    titleObserver = {
+      disconnect() { toolbarName.removeEventListener("input", handler) },
+    } as unknown as MutationObserver
+    return
+  }
+
+  // 二级 fallback：监听 #drag 元素的 DOM 变化
+  const drag = document.getElementById("drag")
+  if (drag) {
+    titleObserver = new MutationObserver(() => {
+      const text = (drag.getAttribute("title") || drag.textContent)?.trim()
+      if (text) onTitleChange(text)
+    })
+    titleObserver.observe(drag, { childList: true, characterData: true, subtree: true, attributes: true })
+    return
+  }
+
+  // 都没找到，延迟重试
+  if (!titleObserverTimer) {
+    titleObserverTimer = setTimeout(() => {
+      titleObserverTimer = null
+      bindTitleObserver()
+    }, 500)
+  }
+}
+
+function unbindTitleObserver(): void {
+  if (titleObserver) {
+    titleObserver.disconnect()
+    titleObserver = null
+  }
+  if (titleObserverTimer) {
+    clearTimeout(titleObserverTimer)
+    titleObserverTimer = null
+  }
+}
+
+/** 获取当前 protyle 的文档标题（兼容 titleShowTop 模式） */
+function getProtyleTitle(): string | undefined {
+  const protyle = (window as any).siyuan?.mobile?.editor?.protyle
+  if (!protyle) return undefined
+  // 桌面端 / titleShowTop:false：从 editElement 读取
+  if (protyle.title?.editElement) {
+    return protyle.title.editElement.textContent?.trim() || undefined
+  }
+  // 手机端 titleShowTop:true：标题在 #toolbarName（<input>）的 value 中
+  const toolbarName = document.getElementById("toolbarName") as HTMLInputElement | null
+  if (toolbarName?.value?.trim()) {
+    return toolbarName.value.trim()
+  }
+  // 二级 fallback：#drag 元素的 title 属性
+  const drag = document.getElementById("drag")
+  const dragTitle = drag?.getAttribute("title")?.trim()
+  if (dragTitle) return dragTitle
+  return undefined
 }
 
 function getViewportHeight(): number {
@@ -242,32 +372,18 @@ async function getDocTitle(docId: string): Promise<string> {
   // 策略1：从当前编辑器的 protyle 读取（仅限当前文档）
   const protyle = (window as any).siyuan?.mobile?.editor?.protyle
   if (protyle?.block?.rootID === docId) {
-    const title = protyle.title?.editElement?.textContent?.trim()
+    const title = getProtyleTitle()
     if (title) {
       titleCache[docId] = title
       return title
     }
   }
 
-  // 策略2：API 获取
+  // 策略2：轻量 API 获取（只返回块元数据，不加载文档内容）
   try {
-    const response: any = await fetchSyncPost('/api/filetree/getDoc', { id: docId })
-    if (response?.code === 0 && response?.data?.name) {
-      const title = response.data.name.trim()
-      if (title) {
-        titleCache[docId] = title
-        return title
-      }
-    }
-  } catch {}
-
-  // 策略3：SQL 查询
-  try {
-    const response: any = await fetchSyncPost('/api/query/sql', {
-      stmt: `SELECT content FROM blocks WHERE id = '${docId}' AND type = 'd'`
-    })
-    if (response?.code === 0 && response?.data?.[0]?.content) {
-      const title = response.data[0].content.trim()
+    const response: any = await fetchSyncPost('/api/block/getBlockInfo', { id: docId })
+    if (response?.code === 0 && response?.data?.rootTitle) {
+      const title = response.data.rootTitle.trim()
       if (title) {
         titleCache[docId] = title
         return title
@@ -278,7 +394,7 @@ async function getDocTitle(docId: string): Promise<string> {
   return '未命名'
 }
 
-// 更新当前文档 Tab 的标题（从 DOM 或 API）
+// 更新当前文档 Tab 的标题（从 DOM 或 API），同时清除缓存让非活动标签下次也能获取最新标题
 async function refreshActiveTabTitle(): Promise<void> {
   const protyle = (window as any).siyuan?.mobile?.editor?.protyle
   if (!protyle) return
@@ -286,17 +402,35 @@ async function refreshActiveTabTitle(): Promise<void> {
   const docId = protyle.block?.rootID
   if (!docId) return
 
+  // 清除当前文档的标题缓存，确保重新获取
+  delete titleCache[docId]
+
   const activeTab = getActiveTab()
   if (!activeTab || activeTab.docId !== docId) return
 
-  // 从 DOM 读取（最实时，包含用户正在编辑的标题）
-  const domTitle = protyle.title?.editElement?.textContent?.trim()
+  // 优先从 DOM 读取（最实时，包含用户正在编辑的标题）
+  const domTitle = getProtyleTitle()
   if (domTitle) {
     activeTab.title = domTitle
     titleCache[docId] = domTitle
     renderTabList()
     debouncedPersist()
+    return
   }
+
+  // DOM 读取失败时 fallback 到 API
+  try {
+    const response: any = await fetchSyncPost('/api/block/getBlockInfo', { id: docId })
+    if (response?.code === 0 && response?.data?.rootTitle) {
+      const apiTitle = response.data.rootTitle.trim()
+      if (apiTitle && apiTitle !== activeTab.title) {
+        activeTab.title = apiTitle
+        titleCache[docId] = apiTitle
+        renderTabList()
+        debouncedPersist()
+      }
+    }
+  } catch {}
 }
 
 // ===== 工具函数 =====
@@ -554,15 +688,21 @@ function handleSwitchProtyle(): void {
   const notebookId = protyle.notebookId || ''
 
   const existing = findTabByDocId(docId)
+  // 从当前 protyle DOM 读取最新标题（处理重命名场景）
+  const domTitle = getProtyleTitle()
+
   if (existing) {
-    // 切换到已有 Tab
+    // 切换到已有 Tab，刷新标题（用户可能已重命名）
     if (activeTab) activeTab.isActive = false
     existing.isActive = true
     existing.notebookId = notebookId
     state.activeTabId = existing.id
+    if (domTitle && domTitle !== existing.title) {
+      existing.title = domTitle
+      titleCache[docId] = domTitle
+    }
   } else {
     // 自动新建 Tab，先尝试 DOM，否则异步用 API 更新标题
-    const domTitle = protyle.title?.editElement?.textContent?.trim()
     addTab(docId, domTitle || '加载中...', notebookId, 0)
     // 异步获取真实标题
     if (!domTitle) {
@@ -630,16 +770,17 @@ function handleScroll(): void {
     }
   }
 
-  if (scrollSaveTimer) clearTimeout(scrollSaveTimer)
-  scrollSaveTimer = setTimeout(() => {
-    const activeTab = getActiveTab()
-    if (!activeTab) return
+  // 立即捕获当前 tab 和滚动位置，避免 setTimeout 期间 protyle 切换导致写错 tab
+  const activeTab = getActiveTab()
+  if (activeTab) {
     const scrollEl = getMobileContentScrollElement()
     if (scrollEl) {
       activeTab.scrollPosition = scrollEl.scrollTop
-      debouncedPersist()
     }
-  }, SCROLL_SAVE_THROTTLE)
+  }
+  // 仅对持久化做节流
+  if (scrollSaveTimer) clearTimeout(scrollSaveTimer)
+  scrollSaveTimer = setTimeout(() => { debouncedPersist() }, SCROLL_SAVE_THROTTLE)
 }
 
 // ===== DOM 构建 =====
@@ -1060,6 +1201,21 @@ function renderTabList(): void {
     listEl.appendChild(item)
   })
 }
+/** 渲染后动态测量 tab 项高度，设置列表最大可见高度 */
+function applyMaxVisibleTabs(): void {
+  const list = tabBar?.querySelector('#mobile-tabs-list') as HTMLElement | null
+  if (!list || currentMaxVisibleTabs >= MAX_TABS) return
+
+  const firstItem = list.querySelector('.mobile-tab-item') as HTMLElement | null
+  if (firstItem) {
+    const style = window.getComputedStyle(firstItem)
+    const itemH = firstItem.offsetHeight
+      + parseFloat(style.marginTop)
+      + parseFloat(style.marginBottom)
+    list.style.maxHeight = Math.ceil(currentMaxVisibleTabs * itemH) + 'px'
+  }
+  list.style.overflowY = 'auto'
+}
 
 function createTabBar(): void {
   if (tabBar) return
@@ -1114,6 +1270,9 @@ function createTabBar(): void {
   renderTabList()
   updatePinButtonUI()
   document.body.appendChild(tabBar)
+
+  // 渲染并挂载到 DOM 后，动态测量实际 tab 高度再设 max-height
+  applyMaxVisibleTabs()
 }
 
 function removeTabBar(): void {
@@ -1221,6 +1380,7 @@ export async function init(context: MobileTabsContext): Promise<void> {
 
   autoHideOnScrollEnabled = !!context.autoHideOnScroll
   currentFloatOpacityForAutoHide = context.floatOpacity
+  currentMaxVisibleTabs = Math.max(1, Math.min(MAX_TABS, context.maxVisibleTabs ?? MAX_TABS))
   hiddenByScroll = false
   lastScrollTopForAutoHide = null
   lastAutoHideToggleAt = 0
@@ -1230,6 +1390,7 @@ export async function init(context: MobileTabsContext): Promise<void> {
     createTabBar()
     applyOpacity(tabBar, context.floatOpacity)
     ensureScrollListenerBound()
+    startTitleRefresh()
   }
 
   // 监听文档切换事件
@@ -1293,6 +1454,12 @@ export async function init(context: MobileTabsContext): Promise<void> {
     }
     document.addEventListener('visibilitychange', visibilityChangeHandler)
   }
+
+  // 兜底：插件重载后 protyle 可能已就绪但 switch-protyle 事件已错过，
+  // 主动同步一次当前编辑器文档到标签页
+  if (state.isVisible) {
+    setTimeout(() => { handleSwitchProtyle() }, 100)
+  }
 }
 
 export function toggleVisibility(config: ButtonConfig): void {
@@ -1307,6 +1474,7 @@ export function toggleVisibility(config: ButtonConfig): void {
     // 更新滚动隐藏开关配置
     autoHideOnScrollEnabled = !!config.autoHideOnScroll
     currentFloatOpacityForAutoHide = config.floatOpacity
+    currentMaxVisibleTabs = Math.max(1, Math.min(MAX_TABS, config.maxVisibleTabs ?? MAX_TABS))
     hiddenByScroll = false
     lastScrollTopForAutoHide = null
 
@@ -1317,7 +1485,7 @@ export function toggleVisibility(config: ButtonConfig): void {
         const docId = protyle.block?.rootID
         const notebookId = protyle.notebookId || ''
         if (docId) {
-          const domTitle = protyle.title?.editElement?.textContent?.trim()
+          const domTitle = getProtyleTitle()
           addTab(docId, domTitle || '加载中...', notebookId, 0)
           if (!domTitle) {
             getDocTitle(docId).then(title => {
@@ -1443,6 +1611,28 @@ export function toggleVisibility(config: ButtonConfig): void {
   debouncedPersist()
 }
 
+/** 思源同步覆盖存储后调用，从磁盘重新加载状态并刷新 UI */
+/** 运行时更新最大可见标签数（设置面板实时生效） */
+export function updateMaxVisibleTabs(count: number): void {
+  currentMaxVisibleTabs = Math.max(1, Math.min(MAX_TABS, count ?? MAX_TABS))
+  applyMaxVisibleTabs()
+}
+
+export async function reloadState(): Promise<void> {
+  if (!ctx) return
+  await loadState()
+  if (state.isVisible && state.tabs.length > 0) {
+    createTabBar()
+    applyOpacity(tabBar, lastTabsFloatOpacity)
+    renderTabList()
+    ensureScrollListenerBound()
+    startTitleRefresh()
+  } else if (!state.isVisible && tabBar) {
+    removeTabBar()
+    stopTitleRefresh()
+  }
+}
+
 export function cleanup(): void {
   // 移除事件监听
   if (ctx && switchProtyleHandler) {
@@ -1452,6 +1642,7 @@ export function cleanup(): void {
   }
 
   unbindScrollListener()
+  unbindTitleObserver()
   if (vvResizeHandler) {
     window.visualViewport?.removeEventListener('resize', vvResizeHandler)
     vvResizeHandler = null

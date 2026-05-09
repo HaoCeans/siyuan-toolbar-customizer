@@ -618,6 +618,7 @@ export async function init(context: DocNavContext): Promise<void> {
     retryInitTimer = setTimeout(() => retryInit(count + 1), 1000)
   }
 
+  // 兜底：插件重载后 protyle 可能已就绪但事件已错过，主动同步一次
   if (state.isVisible && !currentDocId) {
     retryInit(0)
   }
@@ -788,6 +789,18 @@ export function toggleVisibility(config: ButtonConfig): void {
   }
 
   debouncedPersist()
+}
+
+/** 思源同步覆盖存储后调用，从磁盘重新加载状态并刷新 UI */
+export async function reloadState(): Promise<void> {
+  if (!ctx) return
+  await loadState()
+  if (state.isVisible) {
+    createNavBar()
+    ensureScrollListenerBound()
+  } else if (navBar) {
+    removeNavBar()
+  }
 }
 
 export function cleanup(): void {

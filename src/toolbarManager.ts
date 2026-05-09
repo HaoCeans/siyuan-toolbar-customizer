@@ -106,6 +106,7 @@ export interface ButtonConfig {
   showName?: boolean;        // 是否在按钮上显示名称（默认false）
   floatOpacity?: number;     // 悬浮弹窗透明度 (0~1)，默认 0.72
   autoHideOnScroll?: boolean; // 悬浮面板：向上滚动隐藏、向下滚动显示（仅 mobile 侧相关功能）
+  maxVisibleTabs?: number;   // 手机端标签页：最大可见标签数 (1~10)，超出后可滚动，默认 10
   showInContextMenu?: boolean; // 是否显示在文本右键菜单中（仅模板类型，默认false）
   buttonsPerLayer?: number[];  // 桌面端扩展工具栏：每层按钮数量，如 [8, 5, 5, 5, 5]（仅 overflow-button-desktop 使用）
   overflowToolbarHeight?: number;  // 桌面端扩展工具栏高度(px)，默认 32（仅 overflow-button-desktop 使用）
@@ -3185,7 +3186,7 @@ function getContentElementFromDOM(): HTMLElement | null {
   const contentEl = activeProtyle.querySelector('.protyle-content') as HTMLElement
   if (contentEl) return contentEl
 
-  // 备选：查找 .protyle-scroll
+  // 备选：查找 .protyle-scroll（仅作为最后手段，实际应使用 .protyle-content）
   const scrollEl = activeProtyle.querySelector('.protyle-scroll') as HTMLElement
   if (scrollEl) return scrollEl
 
@@ -3212,9 +3213,10 @@ function executeScrollDoc(config: ButtonConfig) {
     return
   }
 
-  // 手机端：直接操作 scrollTop 实现滚动
+  // 手机端：直接操作 .protyle-content 的 scrollTop 实现滚动
+  // 注意：不能用 .protyle-scroll（那是导航箭头UI组件，不是滚动容器）
   if (isMobileDevice()) {
-    const scrollEl = (activeProtyle.querySelector('.protyle-scroll') || activeProtyle.querySelector('.protyle-content')) as HTMLElement
+    const scrollEl = activeProtyle.querySelector('.protyle-content') as HTMLElement
     if (scrollEl) {
       scrollEl.scrollTop = direction === 'top' ? 0 : scrollEl.scrollHeight
     }
@@ -3222,7 +3224,8 @@ function executeScrollDoc(config: ButtonConfig) {
   }
 
   // 电脑端：先尝试键盘事件，若滚动未生效则回退到 scrollIntoView
-  const scrollEl = (activeProtyle.querySelector('.protyle-scroll') || activeProtyle.querySelector('.protyle-content')) as HTMLElement
+  // 注意：.protyle-scroll 是导航箭头UI组件（position: absolute），不能用来检测滚动
+  const scrollEl = activeProtyle.querySelector('.protyle-content') as HTMLElement
   const scrollTopBefore = scrollEl ? scrollEl.scrollTop : 0
 
   const key = direction === 'top' ? 'Home' : 'End'
@@ -3990,8 +3993,9 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
       if (selectedCategory) {
         // 保存当前焦点元素和滚动位置（在弹出输入框之前）
         const activeElementBeforeInput = document.activeElement as HTMLElement
-        // 查找思源实际的滚动容器（.protyle-scroll 或 .layout__center）
-        const scrollContainer = (document.querySelector('.protyle-scroll') || document.querySelector('.layout__center')) as HTMLElement | null
+        // 查找思源实际的滚动容器（优先活动 protyle 内的 .protyle-content）
+        const activeProtyle = document.querySelector('.protyle:not(.fn__hidden):not(.fn__none)')
+        const scrollContainer = (activeProtyle?.querySelector('.protyle-content') || document.querySelector('.layout__center')) as HTMLElement | null
         const scrollPositionBefore = scrollContainer
           ? scrollContainer.scrollTop
           : (window.pageYOffset || document.documentElement.scrollTop)
@@ -4032,8 +4036,9 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
 
               // 延迟恢复滚动位置（等待思源完成跳转）
               setTimeout(() => {
-                // 恢复滚动位置到思源的实际滚动容器
-                const currentScrollContainer = (document.querySelector('.protyle-scroll') || document.querySelector('.layout__center')) as HTMLElement | null
+                // 恢复滚动位置到思源的实际滚动容器（优先活动 protyle）
+                const activeProtyleNow = document.querySelector('.protyle:not(.fn__hidden):not(.fn__none)')
+                const currentScrollContainer = (activeProtyleNow?.querySelector('.protyle-content') || document.querySelector('.layout__center')) as HTMLElement | null
                 if (currentScrollContainer) {
                   currentScrollContainer.scrollTop = scrollPositionBefore
                 } else {

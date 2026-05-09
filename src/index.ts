@@ -60,10 +60,10 @@ import { updateIconDisplay as updateIconDisplayUtil } from './data/icons'
 // 导入标签切换器
 import { injectTabSwitcher as injectTabSwitcherUtil, cleanupTabSwitcher } from './ui/tabs'
 // 导入手机端标签页Tab模块
-import { init as initMobileTabs, cleanup as cleanupMobileTabs } from './ui/mobileTabs'
+import { init as initMobileTabs, cleanup as cleanupMobileTabs, reloadState as reloadMobileTabsState, updateMaxVisibleTabs } from './ui/mobileTabs'
 // 导入手机端悬浮大纲模块
-import { init as initMobileOutline, cleanup as cleanupMobileOutline } from './ui/mobileOutline'
-import { init as initMobileDocNav, cleanup as cleanupMobileDocNav } from './ui/mobileDocNav'
+import { init as initMobileOutline, cleanup as cleanupMobileOutline, reloadState as reloadMobileOutlineState } from './ui/mobileOutline'
+import { init as initMobileDocNav, cleanup as cleanupMobileDocNav, reloadState as reloadMobileDocNavState } from './ui/mobileDocNav'
 import {
   syncMobileTopLineBreakButton,
   destroyMobileTopLineBreakButton
@@ -463,7 +463,7 @@ export default class ToolbarCustomizer extends Plugin {
 
   // 布局就绪后初始化（确保 DOM 完全加载）
   onLayoutReady() {
-    this.initPluginFunctions()
+    this.initPluginFunctions()  // initPluginFunctions 是 async，不阻塞后续代码
     
     // ===== 应用手机端工具栏样式 =====
     if (this.isMobile) {
@@ -480,7 +480,7 @@ export default class ToolbarCustomizer extends Plugin {
   }
 
   // 初始化插件功能
-  private initPluginFunctions() {
+  private async initPluginFunctions() {
     // 清理旧的功能
     cleanup()
   
@@ -538,11 +538,12 @@ export default class ToolbarCustomizer extends Plugin {
       initSmallWindowDetector()
 
       // 从按钮配置中查找各模块的透明度、滚动隐藏（与 toggleVisibility 一致，避免重载后仅恢复可见态却丢失开关）
-      const findAuthorToolFloatOptions = (subtype: string): { floatOpacity?: number; autoHideOnScroll?: boolean } => {
+      const findAuthorToolFloatOptions = (subtype: string): { floatOpacity?: number; autoHideOnScroll?: boolean; maxVisibleTabs?: number } => {
         const btn = this.mobileButtonConfigs.find(b => b.type === 'author-tool' && b.authorToolSubtype === subtype)
         return {
           floatOpacity: btn?.floatOpacity,
-          autoHideOnScroll: btn?.autoHideOnScroll
+          autoHideOnScroll: btn?.autoHideOnScroll,
+          maxVisibleTabs: btn?.maxVisibleTabs
         }
       }
 
@@ -550,17 +551,18 @@ export default class ToolbarCustomizer extends Plugin {
       const outlineOpts = findAuthorToolFloatOptions('mobile-outline')
       const docNavOpts = findAuthorToolFloatOptions('doc-nav')
 
-      // 初始化手机端标签页Tab模块
-      initMobileTabs({
+      // 初始化手机端标签页Tab模块（await 确保 switch-protyle handler 在 loadState 完成后才注册）
+      await initMobileTabs({
         saveData: (key, value) => this.saveData(key, value),
         loadData: (key) => this.loadData(key),
         eventBus: this.eventBus,
         floatOpacity: tabsOpts.floatOpacity,
-        autoHideOnScroll: tabsOpts.autoHideOnScroll
+        autoHideOnScroll: tabsOpts.autoHideOnScroll,
+        maxVisibleTabs: tabsOpts.maxVisibleTabs
       })
 
       // 初始化手机端悬浮大纲模块
-      initMobileOutline({
+      await initMobileOutline({
         saveData: (key, value) => this.saveData(key, value),
         loadData: (key) => this.loadData(key),
         eventBus: this.eventBus,
@@ -569,7 +571,7 @@ export default class ToolbarCustomizer extends Plugin {
       })
 
       // 初始化手机端文档导航模块
-      initMobileDocNav({
+      await initMobileDocNav({
         saveData: (key, value) => this.saveData(key, value),
         loadData: (key) => this.loadData(key),
         eventBus: this.eventBus,
@@ -671,6 +673,28 @@ export default class ToolbarCustomizer extends Plugin {
       showTemplateContextMenu(e, textarea)
     }
     document.addEventListener('contextmenu', this.quickNoteTextareaContextMenuHandler, true)
+  }
+
+  /** 思源同步仅变更插件存储数据（dataChangePlugins）时调用，不会触发 onunload/onload */
+  async onDataChanged() {
+    // 重新加载按钮配置
+    const savedMobileButtons = await this.loadData('mobileButtonConfigs')
+    if (Array.isArray(savedMobileButtons)) {
+      this.mobileButtonConfigs = savedMobileButtons.map((btn: any) => ({...btn}))
+    }
+    const savedDesktopButtons = await this.loadData('desktopButtonConfigs')
+    if (Array.isArray(savedDesktopButtons)) {
+      this.desktopButtonConfigs = savedDesktopButtons.map((btn: any) => ({...btn}))
+    }
+
+    // 重新加载浮窗模块状态（同步可能覆盖了存储数据）
+    if (this.isMobile) {
+      await Promise.all([
+        reloadMobileTabsState(),
+        reloadMobileOutlineState(),
+        reloadMobileDocNavState()
+      ])
+    }
   }
 
   onunload() {

@@ -1114,5 +1114,19 @@ export function cleanup(): void {
     themeModeUnsubscribe = null
   }
 
+  // Reset module-level state to defaults
+  state = { isVisible: false, isExpanded: false, currentDocId: null }
+  currentFocusId = null
+  renderSeq = 0
+  lastOutlineFloatOpacity = undefined
+  hiddenByKeyboard = false
+  keyboardBaselineHeight = null
+  hiddenByScroll = false
+  autoHideOnScrollEnabled = false
+  currentFloatOpacityForAutoHide = undefined
+  lastScrollTopForAutoHide = null
+  lastAutoHideToggleAt = 0
+  scrollBindRetryCount = 0
+
   ctx = null
 }

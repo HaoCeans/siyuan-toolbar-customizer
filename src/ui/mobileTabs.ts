@@ -402,23 +402,25 @@ async function refreshActiveTabTitle(): Promise<void> {
   const docId = protyle.block?.rootID
   if (!docId) return
 
-  // 清除当前文档的标题缓存，确保重新获取
-  delete titleCache[docId]
-
   const activeTab = getActiveTab()
   if (!activeTab || activeTab.docId !== docId) return
 
   // 优先从 DOM 读取（最实时，包含用户正在编辑的标题）
   const domTitle = getProtyleTitle()
-  if (domTitle) {
+  if (domTitle && domTitle !== activeTab.title) {
     activeTab.title = domTitle
     titleCache[docId] = domTitle
     renderTabList()
     debouncedPersist()
     return
   }
+  if (domTitle) {
+    titleCache[docId] = domTitle
+    return
+  }
 
   // DOM 读取失败时 fallback 到 API
+  delete titleCache[docId]
   try {
     const response: any = await fetchSyncPost('/api/block/getBlockInfo', { id: docId })
     if (response?.code === 0 && response?.data?.rootTitle) {
@@ -686,13 +688,12 @@ function handleSwitchProtyle(): void {
   if (activeTab && activeTab.docId === docId) return
 
   const notebookId = protyle.notebookId || ''
+  let dirty = false
 
   const existing = findTabByDocId(docId)
-  // 从当前 protyle DOM 读取最新标题（处理重命名场景）
   const domTitle = getProtyleTitle()
 
   if (existing) {
-    // 切换到已有 Tab，刷新标题（用户可能已重命名）
     if (activeTab) activeTab.isActive = false
     existing.isActive = true
     existing.notebookId = notebookId
@@ -700,11 +701,12 @@ function handleSwitchProtyle(): void {
     if (domTitle && domTitle !== existing.title) {
       existing.title = domTitle
       titleCache[docId] = domTitle
+      dirty = true
     }
+    dirty = true // 活动标签变了，需要持久化
   } else {
-    // 自动新建 Tab，先尝试 DOM，否则异步用 API 更新标题
     addTab(docId, domTitle || '加载中...', notebookId, 0)
-    // 异步获取真实标题
+    dirty = true
     if (!domTitle) {
       getDocTitle(docId).then(title => {
         if (title !== '未命名' && title !== '加载中...') {
@@ -721,7 +723,7 @@ function handleSwitchProtyle(): void {
 
   renderTabList()
   updatePinButtonUI()
-  debouncedPersist()
+  if (dirty) debouncedPersist()
 
   // 切文档后，重置滚动方向基准，避免把上一个文档的 scrollTop 差值带入判断
   const scrollEl = getMobileContentScrollElement()
@@ -1680,6 +1682,18 @@ export function cleanup(): void {
     themeModeUnsubscribe = null
   }
 
-  // 重置
+  // 重置所有模块状态，确保下次 init 从干净状态开始
   ctx = null
+  state = { tabs: [], isVisible: false, isExpanded: false, activeTabId: null }
+  Object.keys(titleCache).forEach(k => delete titleCache[k])
+  hiddenByKeyboard = false
+  keyboardBaselineHeight = null
+  hiddenByScroll = false
+  autoHideOnScrollEnabled = false
+  currentFloatOpacityForAutoHide = undefined
+  lastTabsFloatOpacity = undefined
+  lastScrollTopForAutoHide = null
+  lastAutoHideToggleAt = 0
+  currentMaxVisibleTabs = MAX_TABS
+  scrollBindRetryCount = 0
 }

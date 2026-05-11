@@ -803,7 +803,7 @@ export function createDesktopSettingLayout(
       contactText.appendChild(contactSuffix)
       
       const qqLink = document.createElement('a')
-      qqLink.href = 'https://qm.qq.com/cgi-bin/qm/qr?k=1018010924&jump_from=webapi'
+      qqLink.href = 'https://qm.qq.com/q/nz9tUYofYY'
       qqLink.target = '_blank'
       qqLink.style.cssText = 'display: flex; align-items: center; gap: 4px; color: var(--b3-theme-primary); text-decoration: none; margin-left: auto;'
       

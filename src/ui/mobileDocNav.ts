@@ -818,5 +818,23 @@ export function cleanup(): void {
     themeModeUnsubscribe = null
   }
 
+  // 重置所有模块状态
+  state = { isVisible: false }
+  currentDocId = null
+  currentNotebookId = null
+  currentDocPath = null
+  prevDoc = null
+  nextDoc = null
+  isLoading = false
+  lastDocNavFloatOpacity = undefined
+  hiddenByKeyboard = false
+  keyboardBaselineHeight = null
+  hiddenByScroll = false
+  autoHideOnScrollEnabled = false
+  currentFloatOpacityForAutoHide = undefined
+  lastScrollTopForAutoHide = null
+  lastAutoHideToggleAt = 0
+  scrollBindRetryCount = 0
+
   ctx = null
 }

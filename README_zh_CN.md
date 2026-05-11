@@ -1,6 +1,82 @@
 > **📢 声明：本插件参考叶归的一键记事，深度针对手机端适配；电脑端一键记事，强烈推荐叶归，可快捷键全局调用，纵享丝滑！**
 
-> **📖 插件使用说明：** https://ld246.com/article/1773594214158
+<div style="display: flex; gap: 20px; align-items: center; justify-content: flex-start; margin: 1.5em 0;">
+  <!-- 按钮1：蓝色 -->
+  <a href="https://ld246.com/article/1773594214158"
+      style="display: inline-flex;
+              align-items: center;
+              padding: 10px 20px;
+              background: #2d8cf0;
+              color: white;
+              border-radius: 6px;
+              text-decoration: none;
+              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+              transform: translateY(0);
+              box-shadow: 0 4px 6px rgba(45,140,240,0.1);
+              border: 1px solid rgba(45,140,240,0.2);">
+      📖 详细使用教程
+  </a>
+  <!-- 按钮2：绿色 -->
+  <a href="https://qm.qq.com/q/Tm94tR1ys8"
+      style="display: inline-flex;
+              align-items: center;
+              padding: 10px 20px;
+              background: #19be6b;
+              color: white;
+              border-radius: 6px;
+              text-decoration: none;
+              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+              transform: translateY(0);
+              box-shadow: 0 4px 6px rgba(25,190,107,0.1);
+              border: 1px solid rgba(25,190,107,0.2);">
+      💬 加入用户交流群
+  </a>
+  <!-- 按钮3：橙色/琥珀色 -->
+  <a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/issues"
+      style="display: inline-flex;
+              align-items: center;
+              padding: 10px 20px;
+              background: #ff9900;
+              color: white;
+              border-radius: 6px;
+              text-decoration: none;
+              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+              transform: translateY(0);
+              box-shadow: 0 4px 6px rgba(255,153,0,0.1);
+              border: 1px solid rgba(255,153,0,0.2);">
+      💌 插件建议反馈
+  </a>
+  <!-- 按钮4：激活码方案与权益 -->
+  <a href="https://ld246.com/article/1773594214158#-%E6%B0%B8%E4%B9%85%E6%BF%80%E6%B4%BB%E7%A0%81-%E9%99%90%E6%97%B6%E4%BC%98%E6%83%A0"
+      style="display: inline-flex;
+              align-items: center;
+              padding: 10px 20px;
+              background: #E11D48;
+              color: white;
+              border-radius: 6px;
+              text-decoration: none;
+              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+              transform: translateY(0);
+              box-shadow: 0 4px 6px rgba(225,29,72,0.1);
+              border: 1px solid rgba(225,29,72,0.2);">
+      🐋 激活码方案与权益
+  </a>
+  <!-- 按钮5：打赏支持 -->
+  <a href="https://ld246.com/article/1773594214158#--%E6%89%93%E8%B5%8F%E6%94%AF%E6%8C%81"
+      style="display: inline-flex;
+              align-items: center;
+              padding: 10px 20px;
+              background: #7C3AED;
+              color: white;
+              border-radius: 6px;
+              text-decoration: none;
+              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+              transform: translateY(0);
+              box-shadow: 0 4px 6px rgba(124,58,237,0.1);
+              border: 1px solid rgba(124,58,237,0.2);">
+      ❤️ 打赏支持
+  </a>
+</div>
 
 # ✨ 核心功能亮点
 
@@ -42,6 +118,7 @@
 
 | 链接 | 说明 |
 |------|------|
+| [V3.3.3 手机端：图片快速插入 - 悬浮大纲 - 悬浮 tab - 前后文档](https://ld246.com/article/1777382296918) | 手机端悬浮功能介绍 |
 | [V3.3.0《思源手机端增强》：移动端一键记事方案](https://ld246.com/article/1772466276457) | 一键记事弹窗 |
 | [V3.0.0《手机端强化插件》扩展工具栏](https://ld246.com/article/1769539683129) | 功能介绍 |
 | [V2.0.0《思源手机端增强》简化重构：小白易用](https://ld246.com/article/1768938149464) | 重构思路 / 新手向说明 |

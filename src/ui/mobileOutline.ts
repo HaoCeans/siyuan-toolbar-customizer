@@ -72,6 +72,7 @@ let lastAutoHideToggleAt = 0
 let boundScrollEl: HTMLElement | null = null
 let scrollBindRetryTimer: ReturnType<typeof setInterval> | null = null
 let scrollBindRetryCount = 0
+let initSwitchTimer: ReturnType<typeof setTimeout> | null = null
 
 const SCROLL_HIDE_THRESHOLD_PX = 15
 const SCROLL_TOGGLE_COOLDOWN_MS = 200
@@ -202,6 +203,10 @@ function restoreAfterKeyboard(): void {
 
 function handleScrollAutoHide(): void {
   if (!state.isVisible) return
+
+  // 滚动时追踪当前标题位置（throttle 300ms）
+  throttledTrackHeading()
+
   if (!autoHideOnScrollEnabled) return
   if (hiddenByKeyboard) return
 
@@ -857,16 +862,27 @@ async function loadState(): Promise<void> {
 }
 
 // ===== 标题刷新（滚动跟踪） =====
-function startTitleRefresh(): void {
-  if (titleRefreshTimer) return
-  titleRefreshTimer = setInterval(() => {
+let headingTrackThrottleTimer: ReturnType<typeof setTimeout> | null = null
+
+function throttledTrackHeading(): void {
+  if (headingTrackThrottleTimer) return
+  headingTrackThrottleTimer = setTimeout(() => {
+    headingTrackThrottleTimer = null
     if (state.isVisible && state.currentDocId && !document.hidden) {
       trackCurrentHeading()
     }
-  }, 800)
+  }, 300)
+}
+
+function startTitleRefresh(): void {
+  // 标题跟踪已改为由滚动事件驱动（throttledTrackHeading），此处仅保留空函数以兼容调用
 }
 
 function stopTitleRefresh(): void {
+  if (headingTrackThrottleTimer) {
+    clearTimeout(headingTrackThrottleTimer)
+    headingTrackThrottleTimer = null
+  }
   if (titleRefreshTimer) {
     clearInterval(titleRefreshTimer)
     titleRefreshTimer = null
@@ -968,7 +984,10 @@ export async function init(context: OutlineContext): Promise<void> {
 
   // 兜底：插件重载后 protyle 可能已就绪但事件已错过，主动同步一次
   if (state.isVisible) {
-    setTimeout(() => { handleSwitchProtyle() }, 100)
+    initSwitchTimer = setTimeout(() => {
+      initSwitchTimer = null
+      if (ctx) handleSwitchProtyle()
+    }, 100)
   }
 }
 
@@ -1112,6 +1131,11 @@ export function cleanup(): void {
   if (themeModeUnsubscribe) {
     themeModeUnsubscribe()
     themeModeUnsubscribe = null
+  }
+
+  if (initSwitchTimer) {
+    clearTimeout(initSwitchTimer)
+    initSwitchTimer = null
   }
 
   // Reset module-level state to defaults

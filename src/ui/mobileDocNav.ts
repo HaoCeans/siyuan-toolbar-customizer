@@ -811,6 +811,11 @@ export function cleanup(): void {
   }
   detachInteractionListeners()
 
+  if (retryInitTimer) {
+    clearTimeout(retryInitTimer)
+    retryInitTimer = null
+  }
+
   removeNavBar()
 
   if (themeModeUnsubscribe) {

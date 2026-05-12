@@ -547,6 +547,8 @@ function removeTab(tabId: string): TabItem[] {
   if (!tab) return state.tabs
 
   const wasActive = tab.isActive
+  // 清理已关闭标签页的标题缓存
+  delete titleCache[tab.docId]
   state.tabs = state.tabs.filter(t => t.id !== tabId)
 
   if (wasActive && state.tabs.length > 0) {
@@ -1365,7 +1367,7 @@ function startTitleRefresh(): void {
     if (state.isVisible && state.tabs.length > 0 && !document.hidden) {
       refreshActiveTabTitle()
     }
-  }, 5000)
+  }, 30000)
 }
 
 // ===== 公开 API =====

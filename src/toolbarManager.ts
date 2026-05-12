@@ -5372,6 +5372,7 @@ export function cleanup() {
   // 重置模块级变量
   currentButtonConfigs = []
   isSettingUpToolbar = false
+  pluginInstance = null
 }
 
 // ===== 快捷键执行功能 =====

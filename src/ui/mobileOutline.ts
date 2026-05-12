@@ -252,12 +252,14 @@ function handleScrollAutoHide(): void {
 }
 
 // ===== 工具函数 =====
-function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): T {
+function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): T & { cancel: () => void } {
   let timer: ReturnType<typeof setTimeout> | null = null
-  return ((...args: any[]) => {
+  const debounced = ((...args: any[]) => {
     if (timer) clearTimeout(timer)
-    timer = setTimeout(() => fn(...args), delay)
-  }) as T
+    timer = setTimeout(() => { timer = null; fn(...args) }, delay)
+  }) as T & { cancel: () => void }
+  debounced.cancel = () => { if (timer) { clearTimeout(timer); timer = null } }
+  return debounced
 }
 
 // ===== 大纲数据获取 =====
@@ -1126,6 +1128,8 @@ export function cleanup(): void {
   detachInteractionListeners()
 
   stopTitleRefresh()
+  debouncedSwitchProtyle.cancel()
+  debouncedPersist.cancel()
   removePanel()
 
   if (themeModeUnsubscribe) {

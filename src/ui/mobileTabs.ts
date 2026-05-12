@@ -440,12 +440,14 @@ function generateId(): string {
   return 'mtab-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 9)
 }
 
-function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): T {
+function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): T & { cancel: () => void } {
   let timer: ReturnType<typeof setTimeout> | null = null
-  return ((...args: any[]) => {
+  const debounced = ((...args: any[]) => {
     if (timer) clearTimeout(timer)
-    timer = setTimeout(() => fn(...args), delay)
-  }) as T
+    timer = setTimeout(() => { timer = null; fn(...args) }, delay)
+  }) as T & { cancel: () => void }
+  debounced.cancel = () => { if (timer) { clearTimeout(timer); timer = null } }
+  return debounced
 }
 
 function getTabColor(notebookId: string): string {
@@ -1675,6 +1677,10 @@ export function cleanup(): void {
   }
 
   stopTitleRefresh()
+
+  // 取消 debounce 待执行定时器
+  debouncedPersist.cancel()
+  debouncedSwitchProtyle.cancel()
 
   // 移除 DOM
   removeTabBar()

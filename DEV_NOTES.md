@@ -1,0 +1,184 @@
+# 开发注意事项
+
+本文档记录开发中踩过的坑和容易出错的地方，修改相关代码前务必阅读对应条目。
+(你先阅读下DEV_NOTES.md再修复，同时，修复时要检查是否引入新bug)
+
+---
+
+## 1. `cleanup()` 与 `pluginInstance` 的生命周期
+
+**相关文件**: `src/toolbarManager.ts`（`cleanup()`）、`src/index.ts`（`initPluginFunctions()`、`onunload()`）
+
+**历史 bug**: 在 `cleanup()` 中加了 `pluginInstance = null`，导致插件初始化时 `pluginInstance` 被清空，后续所有依赖它的代码（平台判断、按钮配置读取）全部失效。
+
+**原因**: `cleanup()` 不只在插件卸载时调用，还在 `initPluginFunctions()` 重初始化时调用。调用链：
+
+```
+onload() → setPluginInstance(this)         ← 设置
+onLayoutReady() → initPluginFunctions()
+                  → cleanup()              ← 不能在这里清除！
+                  → initCustomButtons()    ← 后续代码依赖 pluginInstance
+```
+
+**规则**:
+- `cleanup()` 中**不要**设置 `pluginInstance = null`
+- `pluginInstance = null` 只在 `onunload()` 中通过 `setPluginInstance(null)` 清除
+- `cleanup()` 中清理的其他模块级变量（`currentButtonConfigs`、`isSettingUpToolbar` 等）是安全的，因为它们是 toolbarManager 内部状态，会在后续初始化中重建
+
+---
+
+## 2. `dataset` 属性名与 HTML 属性名的映射
+
+**相关文件**: `src/toolbarManager.ts`（`createButtonsForEditors()`、`createButtonElement()`）
+
+**历史 bug**: 按钮创建时设置 `button.dataset.customButton = id`（对应 HTML 属性 `data-custom-button`），但匹配检查时读取 `dataset.customButtonId`（对应 HTML 属性 `data-custom-button-id`），导致按钮跳过重建的优化永远不生效。
+
+**规则**:
+- `dataset.customButton` → HTML `data-custom-button`（正确）
+- `dataset.customButtonId` → HTML `data-custom-button-id`（不同的属性！）
+- 设置和读取必须使用相同的 `dataset` 属性名
+- 添加新的 `dataset` 属性时，先确认 HTML 属性名是否符合预期
+
+---
+
+## 3. 溢出工具栏图标渲染必须与主工具栏保持一致
+
+**相关文件**: `src/toolbarManager.ts`（`createButtonElement()`、`showOverflowToolbar()`、`showDesktopOverflowToolbar()`）
+
+**历史 bug**: 桌面端溢出工具栏只处理了 `icon` 前缀的思源图标，SVG 路径图标被当纯文本显示。
+
+**规则**: 图标渲染有 4 个分支，**所有**创建按钮的地方都必须包含完整 4 分支：
+
+1. `icon.startsWith('icon')` → 思源内置图标（SVG `<use>`）
+2. `icon.startsWith('lucide:')` → Lucide 图标（`require('lucide')`）
+3. `/\.(png|jpg|jpeg|gif|svg)$/i` → 图片路径（`<img>` 标签）
+4. 其他 → Emoji/文本（`<span>`）
+
+涉及位置：
+- `createButtonElement()` — 主工具栏按钮
+- `showOverflowToolbar()` — 手机端溢出工具栏按钮
+- `showDesktopOverflowToolbar()` — 桌面端溢出工具栏按钮
+
+**新增图标类型时**，必须同时更新这 3 处。
+
+---
+
+## 4. `isSettingUpToolbar` 必须用 try-finally 保护
+
+**相关文件**: `src/toolbarManager.ts`（`initMobileToolbarAdjuster()`）
+
+**潜在风险**: `isSettingUpToolbar` 标志用于防止 MutationObserver 递归调用，但如果 `setupToolbarForElement()` 内部抛异常，标志会永远保持 `true`，导致工具栏完全失效。
+
+**规则**: 使用标志位时必须 try-finally：
+
+```typescript
+isSettingUpToolbar = true
+try {
+  setupToolbarForElement(breadcrumb)
+} finally {
+  isSettingUpToolbar = false
+}
+```
+
+---
+
+## 5. 模块级全局变量的清理时机
+
+**相关文件**: `src/toolbarManager.ts`
+
+`toolbarManager.ts` 使用大量模块级变量来跟踪状态：
+
+| 变量 | 类型 | 清理位置 |
+|------|------|----------|
+| `resizeHandler` | 事件处理器 | `cleanup()` |
+| `mutationObserver` | MutationObserver | `cleanup()` |
+| `customButtonClickHandler` | 事件处理器 | `cleanup()` |
+| `overflowCloseHandler` | 事件处理器 | `cleanup()` / toggle 关闭 |
+| `toolbarObserver` | MutationObserver | `initCustomButtons()` / `cleanup()` |
+| `activeTimers` | Set | `cleanup()` (clearAllTimers) |
+| `activeObservers` | Set | `cleanup()` (clearAllTimers) |
+| `focusEventHandlers` | Array | `cleanup()` |
+| `currentButtonConfigs` | 数组 | `cleanup()` |
+| `pluginInstance` | 插件实例 | **仅 `onunload()`** |
+
+**规则**:
+- 新增模块级变量时，必须在 `cleanup()` 中添加对应的清理逻辑
+- **不要**在 `cleanup()` 中清除 `pluginInstance`
+- 事件监听器必须同时 `removeEventListener`，不能只断开 Observer
+- 定时器必须通过 `safeSetTimeout` 创建（自动加入 `activeTimers`），不要直接用 `setTimeout`
+
+---
+
+## 6. EventBus 事件监听器的注册与清理
+
+**相关文件**: `src/index.ts`（`initPluginFunctions()`、`onunload()`）
+
+**规则**:
+- EventBus 监听器（`loaded-protyle-dynamic`、`switch-protyle`、`loaded-protyle-static`）在 `initPluginFunctions()` 中注册，在 `onunload()` 中移除
+- 注册前必须先移除旧的监听器（防止重复注册）：
+  ```typescript
+  if (this.eventBusRefreshHandler) {
+    this.eventBus.off('loaded-protyle-dynamic', this.eventBusRefreshHandler)
+    // ...
+  }
+  ```
+- `onunload()` 中必须移除所有已注册的 EventBus 监听器
+
+---
+
+## 7. 手机端关闭外部监听器需要同时处理 touchend
+
+**相关文件**: `src/toolbarManager.ts`（`showOverflowToolbar()`）
+
+**规则**: 手机端扩展工具栏的"点击外部关闭"监听器需要同时注册 `click` 和 `touchend`：
+- `click` 事件在手机端有 ~300ms 延迟
+- `touchend` 响应更快，体验更好
+- 清理时必须同时 `removeEventListener` 两个事件
+
+---
+
+## 8. 桌面端扩展工具栏在 `createButtonsForEditors` 中会被强制关闭
+
+**相关文件**: `src/toolbarManager.ts`（`createButtonsForEditors()`）
+
+**行为**: 每次调用 `createButtonsForEditors()` 时，桌面端会先移除所有 `.desktop-overflow-toolbar-layer`（防止标签切换后残留）。这是预期行为，但需要注意：
+- 这意味着 EventBus 触发 `switch-protyle` 时，桌面端扩展工具栏会被关闭
+- 这是设计如此（标签切换后工具栏应该关闭），不是 bug
+- 手机端不受影响（手机端溢出层是 `.overflow-toolbar-layer`，不是 `.desktop-overflow-toolbar-layer`）
+
+---
+
+## 9. 写入 `mobileToolbarConfig` 的长度类字段必须带合法 CSS 单位
+
+**相关文件**: `src/settings/mobile.ts`（「①工具栏自身高度」滑杆）、`src/index.ts`（加载 `mobileToolbarConfig` 后）
+
+**历史问题**: 「①工具栏自身高度」曾使用 `value.toString()` 写入 `toolbarHeight`，得到纯数字字符串（如 `"45"`）。`applyMobileToolbarStyle()` 生成的规则为：
+
+```css
+height: 45 !important;
+min-height: 45 !important;
+```
+
+在 CSS 中，除 `0` 外**无单位数字对 `height` / `min-height` 无效**，浏览器会丢弃整条声明，表现为「调了设置主工具栏高度完全不变」；有时仍显示旧值，是因为 `#mobile-toolbar-custom-style` 里上一次合法的 `40px` 仍在生效。
+
+**已做修复**:
+- 滑杆保存改为 `value + 'px'`（与其它滑杆一致）
+- `onload` 合并配置后：对一组长度字段若值为纯数字串（`/^\d+$/`），自动补成 `NNpx`（含 `toolbarHeight`、`closeInputOffset`、`openInputOffset`、`topToolbarOffset`、`topToolbarPaddingLeft`、扩展工具栏距离/高度等），兼容历史错误存档
+
+**规则**:
+- 凡是要拼进 `style` / `<style>` 文本里的长度，保存到配置时一律使用带单位的字符串（优先 `px`），不要只存数字
+- 新增滑杆写入 `mobileConfig` 时，对照已有项使用 `value + 'px'` 或明确单位，避免再踩同类坑
+
+---
+
+## 10. 滑杆初始值不要用 `parseInt(x) || 默认值`（0 会被吃掉）
+
+**相关文件**: `src/settings/mobile.ts`
+
+**问题**: 多处曾写 `parseInt(currentValueStr) || 8`（或 `|| 40`）。当用户把「④扩展工具栏距离」等设为 **`0px`** 时，`parseInt('0px')` 为 `0`，在 JavaScript 里 **`0 || 8` 等于 `8`**，滑杆打开时显示错误，保存逻辑也会让人困惑。
+
+**已做修复**: 增加 `parseLengthSliderInt(raw, fallback)`：`Number.isNaN(n) ? fallback : n`，**保留合法的 0**。
+
+**规则**:
+- 凡「最小值可为 0」的滑杆，初始值解析一律用 `parseLengthSliderInt` 或等价的 `Number.isNaN` 判断，禁止 `parseInt(...) || fallback`
+- 计数类（重试毫秒等）若最小值为 0，同样注意不要用 `||` 吞掉 0

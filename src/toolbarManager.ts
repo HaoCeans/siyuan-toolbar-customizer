@@ -841,8 +841,11 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
       }
 
       isSettingUpToolbar = true
-      setupToolbarForElement(breadcrumb)
-      isSettingUpToolbar = false
+      try {
+        setupToolbarForElement(breadcrumb)
+      } finally {
+        isSettingUpToolbar = false
+      }
       return true
     }
 
@@ -1015,9 +1018,12 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
       observerTimer = safeSetTimeout(() => {
         // 设置标志，防止递归
         isSettingUpToolbar = true
-        setupToolbar()
-        updateToolbarVisibility()
-        isSettingUpToolbar = false
+        try {
+          setupToolbar()
+          updateToolbarVisibility()
+        } finally {
+          isSettingUpToolbar = false
+        }
         observerTimer = null
       }, 100)
     }
@@ -1026,6 +1032,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
     const toolbarContainer = document.querySelector('.layout__center') ||
                             document.querySelector('.fn__flex-1.fn__flex-column') ||
                             document.body
+    if (mutationObserver) mutationObserver.disconnect()
     mutationObserver = new MutationObserver(handleMutation)
     mutationObserver.observe(toolbarContainer, {
       childList: true,  // 只监听直接子元素
@@ -1402,7 +1409,7 @@ export function createButtonsForEditors(editors: NodeListOf<Element>, configs: B
     // 检查现有按钮是否与配置匹配，如果完全匹配则跳过重建
     const existingButtons = editor.querySelectorAll('[data-custom-button]')
     if (existingButtons.length > 0 && existingButtons.length === buttonsToAdd.length) {
-      const existingIds = new Set(Array.from(existingButtons).map(btn => (btn as HTMLElement).dataset.customButtonId))
+      const existingIds = new Set(Array.from(existingButtons).map(btn => (btn as HTMLElement).dataset.customButton))
       const allMatch = buttonsToAdd.every(b => existingIds.has(b.id))
       if (allMatch) return // 按钮已存在且配置匹配，跳过
     }
@@ -1740,6 +1747,12 @@ function showOverflowToolbar(config: ButtonConfig) {
       overflowButton.style.backgroundColor = 'transparent'
       overflowButton.blur()
     }
+    // 清理点击外部关闭监听器
+    if (overflowCloseHandler) {
+      document.removeEventListener('click', overflowCloseHandler)
+      document.removeEventListener('touchend', overflowCloseHandler)
+      overflowCloseHandler = null
+    }
     Notify.showOverflowToolbarClosed(config.showNotification !== false)
     return
   }
@@ -1767,20 +1780,26 @@ function showOverflowToolbar(config: ButtonConfig) {
 
   // 顶部工具栏和底部工具栏的不同偏移
   // 顶部模式：计算 = topToolbarOffset + 主工具栏高度 + overflowToolbarDistanceTop
-  let topOffset = 100  // 默认值
-  if (mobileConfig?.topToolbarOffset) {
-    const topOffsetNum = parseInt(mobileConfig.topToolbarOffset) || 50
-    const distanceNum = parseInt(mobileConfig.overflowToolbarDistanceTop || '') || 8
-    const mainToolbarHeight = parseInt(mobileConfig.toolbarHeight) || 40
-    topOffset = topOffsetNum + mainToolbarHeight + distanceNum
+  let topOffset = 100  // 默认值（无 mobileConfig 时的兜底）
+  if (mobileConfig) {
+    const topOffsetNum = parseInt(String(mobileConfig.topToolbarOffset ?? '50'), 10)
+    const safeTop = Number.isNaN(topOffsetNum) ? 50 : topOffsetNum
+    const _distanceTop = parseInt(String(mobileConfig.overflowToolbarDistanceTop ?? ''), 10)
+    const distanceTopNum = Number.isNaN(_distanceTop) ? 8 : _distanceTop
+    const mainToolbarHeightTop = parseInt(String(mobileConfig.toolbarHeight ?? '40'), 10) || 40
+    topOffset = safeTop + mainToolbarHeightTop + distanceTopNum
   }
   // 底部模式：计算 = closeInputOffset + 主工具栏高度 + overflowToolbarDistanceBottom
-  let bottomOffset = 60   // 默认值
-  if (mobileConfig?.closeInputOffset) {
-    const bottomOffsetNum = parseInt(mobileConfig.closeInputOffset) || 0
-    const distanceNum = parseInt(mobileConfig.overflowToolbarDistanceBottom || '') || 8
-    const mainToolbarHeight = parseInt(mobileConfig.toolbarHeight) || 40
-    bottomOffset = bottomOffsetNum + mainToolbarHeight + distanceNum
+  // 注意：不能用 if (mobileConfig?.closeInputOffset) —— 持久化里可能是数字 0、null、""，会误判为假，
+  // 从而整段不执行、bottomOffset 恒为 60，导致 overflowToolbarDistanceBottom 永远不生效。
+  let bottomOffset = 60
+  if (mobileConfig) {
+    const bottomOffsetNum = parseInt(String(mobileConfig.closeInputOffset ?? '0'), 10)
+    const safeBottom = Number.isNaN(bottomOffsetNum) ? 0 : bottomOffsetNum
+    const _distanceBottom = parseInt(String(mobileConfig.overflowToolbarDistanceBottom ?? ''), 10)
+    const distanceBottomNum = Number.isNaN(_distanceBottom) ? 8 : _distanceBottom
+    const mainToolbarHeightBottom = parseInt(String(mobileConfig.toolbarHeight ?? '40'), 10) || 40
+    bottomOffset = safeBottom + mainToolbarHeightBottom + distanceBottomNum
   }
 
   // 获取所有按钮配置
@@ -2127,33 +2146,42 @@ function showOverflowToolbar(config: ButtonConfig) {
       toolbar.appendChild(layerBtn)
     })
 
+    // 阻止触摸事件冒泡到 document，防止被其他 handler 意外关闭
+    toolbar.addEventListener('touchstart', (e) => {
+      e.stopPropagation()
+    }, { passive: true })
+
     document.body.appendChild(toolbar)
   }
 
   Notify.showOverflowToolbarOpened(layers, config.showNotification !== false)
 
-  // 点击外部关闭
-  const closeOnClickOutside = (e: MouseEvent) => {
+  // 点击/触摸外部关闭
+  const closeOnOutside = (e: Event) => {
     const target = e.target as HTMLElement
     const overflowButton = document.querySelector(`[data-custom-button="${config.id}"]`) as HTMLElement
     const hasToolbar = document.querySelector('.overflow-toolbar-layer')
 
     if (hasToolbar && !target.closest('.overflow-toolbar-layer') && (!overflowButton || !overflowButton.contains(target))) {
       document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove())
-      // 移除溢出按钮的焦点
+      // 移除溢出按钮的焦点和激活状态
       if (overflowButton) {
+        overflowButton.classList.remove('overflow-active')
+        overflowButton.style.backgroundColor = 'transparent'
         overflowButton.blur()
       }
       if (overflowCloseHandler) {
         document.removeEventListener('click', overflowCloseHandler)
+        document.removeEventListener('touchend', overflowCloseHandler)
         overflowCloseHandler = null
       }
     }
   }
-  overflowCloseHandler = closeOnClickOutside
+  overflowCloseHandler = closeOnOutside
   setTimeout(() => {
     if (overflowCloseHandler) {
       document.addEventListener('click', overflowCloseHandler)
+      document.addEventListener('touchend', overflowCloseHandler)
     }
   }, 100)
 }
@@ -2276,13 +2304,12 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
     animationStyle = document.createElement('style')
     animationStyle.id = 'desktop-overflow-toolbar-animation'
     animationStyle.textContent = `
-      @keyframes desktopOverflowSpring {
-        0% { opacity: 0; transform: translateY(-6px) scale(0.97); }
-        60% { opacity: 1; transform: translateY(1px) scale(1.005); }
-        100% { opacity: 1; transform: translateY(0) scale(1); }
+      @keyframes desktopOverflowSlideDown {
+        from { opacity: 0; transform: translateY(-6px); }
+        to { opacity: 1; transform: translateY(0); }
       }
       .desktop-overflow-toolbar-layer {
-        animation: desktopOverflowSpring 0.32s cubic-bezier(0.34, 1.56, 0.64, 1);
+        animation: desktopOverflowSlideDown 0.2s ease-out;
       }
       .desktop-overflow-toolbar-layer button:focus {
         background-color: transparent !important;
@@ -2320,7 +2347,7 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
       align-items: center;
       justify-content: flex-end;
       padding: 0 6px;
-      z-index: ${1000 + i};
+      z-index: ${10000 + i};
       box-shadow:
         0 0 0 0.5px color-mix(in srgb, var(--b3-border-color) 30%, transparent),
         0 2px 8px rgba(0, 0, 0, 0.06),
@@ -2335,7 +2362,7 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
       layerBtn.setAttribute('aria-label', btn.name)
       layerBtn.dataset.customButton = btn.id
 
-      // 渲染图标
+      // 渲染图标（与主工具栏保持一致的完整分支）
       if (btn.icon.startsWith('icon')) {
         const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
         svg.setAttribute('width', `${btn.iconSize}`)
@@ -2345,6 +2372,42 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
         use.setAttribute('href', `#${btn.icon}`)
         svg.appendChild(use)
         layerBtn.appendChild(svg)
+      } else if (btn.icon.startsWith('lucide:')) {
+        const iconName = btn.icon.substring(7)
+        try {
+          const lucideIcons = require('lucide')
+          const IconComponent = lucideIcons[iconName]
+          if (IconComponent) {
+            const svgString = IconComponent.toSvg({
+              width: btn.iconSize,
+              height: btn.iconSize
+            })
+            layerBtn.innerHTML = svgString
+            const svg = layerBtn.querySelector('svg')
+            if (svg) {
+              svg.style.cssText = 'flex-shrink: 0; display: block;'
+            }
+          } else {
+            layerBtn.textContent = btn.icon
+            layerBtn.style.fontSize = `${btn.iconSize}px`
+          }
+        } catch (e) {
+          layerBtn.textContent = btn.icon
+          layerBtn.style.fontSize = `${btn.iconSize}px`
+        }
+      } else if (/\.(png|jpg|jpeg|gif|svg)$/i.test(btn.icon)) {
+        const pluginName = 'siyuan-toolbar-customizer'
+        const imagePath = btn.icon.startsWith('/plugins/') ? btn.icon : `/plugins/${pluginName}/${btn.icon}`
+        const img = document.createElement('img')
+        img.src = imagePath
+        img.style.cssText = `
+          width: ${btn.iconSize}px;
+          height: ${btn.iconSize}px;
+          object-fit: contain;
+          flex-shrink: 0;
+          display: block;
+        `
+        layerBtn.appendChild(img)
       } else {
         const iconSpan = document.createElement('span')
         iconSpan.style.fontSize = `${btn.iconSize}px`
@@ -2437,7 +2500,7 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
     }
   }
   desktopOverflowCloseHandlers.set(breadcrumbBar, closeHandler)
-  setTimeout(() => document.addEventListener('click', closeHandler), 50)
+  safeSetTimeout(() => document.addEventListener('click', closeHandler), 50)
 }
 
 /**
@@ -4199,9 +4262,8 @@ async function executeImageUpload(config: ButtonConfig) {
   document.body.appendChild(fileInput)
 
   fileInput.onchange = async () => {
-    document.body.removeChild(fileInput)
-
     const file = fileInput.files?.[0]
+    document.body.removeChild(fileInput)
     if (!file) return
 
     try {
@@ -4346,7 +4408,7 @@ async function showCategorySelectionDialog(categories: string[], options?: { res
       `
       button.onclick = () => {
         // 先移除对话框，稍后插入内容以避免输入法冲突
-        document.body.removeChild(overlay)
+        if (overlay.parentNode) document.body.removeChild(overlay)
         // 添加短暂延迟以确保对话框完全移除后再插入内容
         setTimeout(() => {
           // 恢复焦点到原始元素（仅在需要时）
@@ -4377,7 +4439,7 @@ async function showCategorySelectionDialog(categories: string[], options?: { res
       margin-top: 12px;
     `
     cancelButton.onclick = () => {
-      document.body.removeChild(overlay)
+      if (overlay.parentNode) document.body.removeChild(overlay)
       setTimeout(() => {
         // 恢复焦点到原始元素（仅在需要时）
         if (restoreFocus && activeElement && document.contains(activeElement)) {
@@ -4429,7 +4491,7 @@ async function showCategorySelectionDialog(categories: string[], options?: { res
     // 点击遮罩关闭
     overlay.onclick = (e) => {
       if (e.target === overlay) {
-        document.body.removeChild(overlay)
+        if (overlay.parentNode) document.body.removeChild(overlay)
         setTimeout(() => {
           // 恢复焦点到原始元素
           if (activeElement && document.contains(activeElement)) {
@@ -4538,7 +4600,7 @@ async function showTextInputDialog(prompt: string, placeholder?: string): Promis
       cursor: pointer;
     `;
     cancelButton.onclick = () => {
-      document.body.removeChild(overlay);
+      if (overlay.parentNode) document.body.removeChild(overlay);
       setTimeout(() => {
         // 恢复焦点到原始元素
         if (activeElement && document.contains(activeElement)) {
@@ -4567,7 +4629,7 @@ async function showTextInputDialog(prompt: string, placeholder?: string): Promis
       cursor: pointer;
     `;
     confirmButton.onclick = () => {
-      document.body.removeChild(overlay);
+      if (overlay.parentNode) document.body.removeChild(overlay);
       setTimeout(() => {
         // 恢复焦点到原始元素
         if (activeElement && document.contains(activeElement)) {
@@ -5306,6 +5368,7 @@ export function cleanup() {
 
   if (overflowCloseHandler) {
     document.removeEventListener('click', overflowCloseHandler)
+    document.removeEventListener('touchend', overflowCloseHandler)
     overflowCloseHandler = null
   }
 
@@ -5358,6 +5421,8 @@ export function cleanup() {
   // 清理残留的 CSS 样式元素
   const idsToRemove = [
     'mobile-toolbar-background-color-style',
+    'mobile-toolbar-custom-style',
+    'top-toolbar-custom-style',
     'overflow-toolbar-animation',
     'desktop-overflow-toolbar-animation',
     'custom-button-focus-style',
@@ -5372,7 +5437,12 @@ export function cleanup() {
   // 重置模块级变量
   currentButtonConfigs = []
   isSettingUpToolbar = false
-  pluginInstance = null
+  // 注意：不要在这里设置 pluginInstance = null
+  // cleanup() 在重初始化时也会被调用（initPluginFunctions → cleanup → initCustomButtons）
+  // 如果设为 null，后续异步代码读取 pluginInstance 会拿到 null，导致：
+  //   - pluginInstance?.isMobile 为 undefined（平台判断错误）
+  //   - pluginInstance?.desktopButtonConfigs 为 []（扩展工具栏无按钮）
+  // pluginInstance 只应在 onunload 时清除
 }
 
 // ===== 快捷键执行功能 =====

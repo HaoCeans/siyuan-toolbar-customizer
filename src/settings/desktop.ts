@@ -735,13 +735,19 @@ export function createDesktopSettingLayout(
         }
 
         // 全量写入存储，然后重载 UI
-        await context.saveData('mobileToolbarConfig', context.mobileConfig)
-        await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
-        await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
-        await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
-        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
-        await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
-        await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
+        try {
+          await context.saveData('mobileToolbarConfig', context.mobileConfig)
+          await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
+          await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
+          await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+          await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
+          await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
+        } catch (e) {
+          console.warn('[导入配置] 保存失败:', e)
+          showMessage('导入保存时部分失败，建议重载后检查配置', 3000, 'error')
+          return
+        }
 
         showMessage('导入成功，正在重载...', 2000, 'info')
         await fetchSyncPost('/api/system/reloadUI', {})

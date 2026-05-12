@@ -8,12 +8,18 @@ let injectedStyle: HTMLStyleElement | null = null
 // 递归调用计数器，防止无限循环
 let tabSwitcherAttempts = 0
 const MAX_TAB_SWITCHER_ATTEMPTS = 50  // 最多尝试 50 次（5秒）
+// 跟踪待执行的定时器
+let pendingTimer: ReturnType<typeof setTimeout> | null = null
 
 /**
  * 清理标签切换器资源
  */
 export function cleanupTabSwitcher(): void {
   tabSwitcherAttempts = 0
+  if (pendingTimer) {
+    clearTimeout(pendingTimer)
+    pendingTimer = null
+  }
   if (injectedStyle && injectedStyle.parentNode) {
     injectedStyle.parentNode.removeChild(injectedStyle)
     injectedStyle = null
@@ -26,7 +32,8 @@ export function cleanupTabSwitcher(): void {
  */
 export function injectTabSwitcher(): void {
   // 等待对话框渲染完成，使用更长的延迟确保设置项都已创建
-  setTimeout(() => {
+  pendingTimer = setTimeout(() => {
+    pendingTimer = null
     const dialogContent = document.querySelector('.b3-dialog__content')
     if (!dialogContent) return
 
@@ -36,7 +43,7 @@ export function injectTabSwitcher(): void {
       // 设置项还没创建，再等待一段时间（有最大重试次数限制）
       tabSwitcherAttempts++
       if (tabSwitcherAttempts < MAX_TAB_SWITCHER_ATTEMPTS) {
-        setTimeout(() => injectTabSwitcher(), 100)
+        pendingTimer = setTimeout(() => { pendingTimer = null; injectTabSwitcher() }, 100)
       }
       return
     }

@@ -310,6 +310,9 @@ export function cleanupStressThreshold(plugin: any) {
     // 移除按钮元素
     button.remove();
   });
+
+  // 清理可能残留的弹窗
+  document.querySelectorAll('[data-stress-threshold-popup]').forEach(el => el.remove());
 }
 
 /**
@@ -783,6 +786,7 @@ function showCardsPopup(processedData: any, config: StressThresholdConfig, plugi
   const positionStyle = getPopupPositionStyle(config);
   
   const popup = document.createElement('div');
+  popup.dataset.stressThresholdPopup = 'true';
   popup.style.cssText = `
     position: fixed;
     top: ${positionStyle.top || '50%'};

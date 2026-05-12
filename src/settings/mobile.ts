@@ -14,6 +14,14 @@ import { createMobileButtonItem, type MobileButtonContext } from '../ui/buttonIt
 import { calculateButtonOverflow, getToolbarAvailableWidth, getButtonWidth } from '../toolbarManager'
 
 /**
+ * 从 "12px" / "12" 解析滑杆初始整数值。0 为合法值，禁止写成 parseInt(x) || fallback（会把 0 当成缺省）。
+ */
+function parseLengthSliderInt(raw: unknown, fallback: number): number {
+  const n = parseInt(String(raw ?? '').trim(), 10)
+  return Number.isNaN(n) ? fallback : n
+}
+
+/**
  * 手机端工具栏配置接口
  */
 export interface MobileToolbarConfig {
@@ -465,7 +473,11 @@ export function createMobileSettingLayout(
           thumb.style.cursor = 'grab';
           thumb.style.transform = 'translate(-50%, -50%)';
           thumb.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15)';
-          await onSave(currentValue);
+          try {
+            await onSave(currentValue);
+          } catch (e) {
+            console.warn('[Slider] onSave failed:', e);
+          }
         }
         document.removeEventListener('pointermove', moveHandler);
         document.removeEventListener('pointerup', upHandler);
@@ -616,7 +628,11 @@ export function createMobileSettingLayout(
           thumb.style.cursor = 'grab';
           thumb.style.transform = 'translate(-50%, -50%)';
           thumb.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15)';
-          await onSave(currentValue);
+          try {
+            await onSave(currentValue);
+          } catch (e) {
+            console.warn('[Slider] onSave failed:', e);
+          }
         }
         document.removeEventListener('pointermove', moveHandler);
         document.removeEventListener('pointerup', upHandler);
@@ -1103,8 +1119,9 @@ export function createMobileSettingLayout(
         'px',
         async (value) => {
           config.externalButtonsReserveWidth = value
+          await context.saveData('mobileGlobalButtonConfig', config)
+          context.recalculateOverflow()
           Notify.showInfoExternalButtonsReserveWidthModified()
-          // 注意：这里不立刻保存/重载，由设置面板右下角的“保存”统一提交
         }
       )
 
@@ -1132,7 +1149,7 @@ export function createMobileSettingLayout(
     description: '💡设置工具栏自身的高度',
     createActionElement: () => {
       // 解析当前值，如果当前值不是数字则使用默认值
-      const currentValue = parseInt(context.mobileConfig.toolbarHeight) || 40;
+      const currentValue = parseLengthSliderInt(context.mobileConfig.toolbarHeight, 40)
       
       const slider = createCustomSliderWithoutLabel(
         currentValue,
@@ -1140,7 +1157,8 @@ export function createMobileSettingLayout(
         100,  // 最大值，按要求设置为100px
         'px',
         async (value) => {
-          context.mobileConfig.toolbarHeight = value.toString();
+          // 必须带 CSS 长度单位；纯数字如 "45" 会导致 height/min-height 声明被浏览器忽略
+          context.mobileConfig.toolbarHeight = value + 'px';
           await context.saveData('mobileToolbarConfig', context.mobileConfig);
           context.applyMobileToolbarStyle();
         }
@@ -1595,7 +1613,7 @@ export function createMobileSettingLayout(
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValueStr = context.mobileConfig.topToolbarOffset ?? '50px';
-      const currentValue = parseInt(currentValueStr) || 50;
+      const currentValue = parseLengthSliderInt(currentValueStr, 50);
       
       const slider = createCustomSliderWithoutLabel(
         currentValue,
@@ -1628,7 +1646,7 @@ export function createMobileSettingLayout(
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValueStr = context.mobileConfig.overflowToolbarDistanceTop ?? '8px';
-      const currentValue = parseInt(currentValueStr) || 8;
+      const currentValue = parseLengthSliderInt(currentValueStr, 8);
       
       const slider = createCustomSliderWithoutLabel(
         currentValue,
@@ -1638,6 +1656,7 @@ export function createMobileSettingLayout(
         async (value) => {
           context.mobileConfig.overflowToolbarDistanceTop = value + 'px';
           await context.saveData('mobileToolbarConfig', context.mobileConfig);
+          context.updateMobileToolbar();
         }
       );
       
@@ -1660,7 +1679,7 @@ export function createMobileSettingLayout(
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValueStr = context.mobileConfig.overflowToolbarHeightTop ?? '40px';
-      const currentValue = parseInt(currentValueStr) || 40;
+      const currentValue = parseLengthSliderInt(currentValueStr, 40);
       
       const slider = createCustomSliderWithoutLabel(
         currentValue,
@@ -1670,6 +1689,7 @@ export function createMobileSettingLayout(
         async (value) => {
           context.mobileConfig.overflowToolbarHeightTop = value + 'px';
           await context.saveData('mobileToolbarConfig', context.mobileConfig);
+          context.updateMobileToolbar();
         }
       );
       
@@ -1840,16 +1860,17 @@ export function createMobileSettingLayout(
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValueStr = context.mobileConfig.overflowToolbarDistanceBottom ?? '8px';
-      const currentValue = parseInt(currentValueStr) || 8;
+      const currentValue = parseLengthSliderInt(currentValueStr, 8);
         
       const slider = createCustomSliderWithoutLabel(
         currentValue,
         0,    // 最小值
-        20,   // 最大值，按要求设置为 20px
+        50,   // 最大值 50px
         'px',
         async (value) => {
           context.mobileConfig.overflowToolbarDistanceBottom = value + 'px';
           await context.saveData('mobileToolbarConfig', context.mobileConfig);
+          context.updateMobileToolbar();
         }
       );
         
@@ -1872,7 +1893,7 @@ export function createMobileSettingLayout(
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValueStr = context.mobileConfig.overflowToolbarHeightBottom ?? '40px';
-      const currentValue = parseInt(currentValueStr) || 40;
+      const currentValue = parseLengthSliderInt(currentValueStr, 40);
       
       const slider = createCustomSliderWithoutLabel(
         currentValue,
@@ -1882,6 +1903,7 @@ export function createMobileSettingLayout(
         async (value) => {
           context.mobileConfig.overflowToolbarHeightBottom = value + 'px';
           await context.saveData('mobileToolbarConfig', context.mobileConfig);
+          context.updateMobileToolbar();
         }
       );
       

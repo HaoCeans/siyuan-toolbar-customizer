@@ -1503,6 +1503,7 @@ export function clearSmallWindowDetector(): void {
   // 重置状态变量
   lastDialogShowTime = 0;
   dialogOpenTime = 0;
+  isNoteDialogShowing = false;
 }
 
 /**

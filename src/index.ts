@@ -240,6 +240,26 @@ export default class ToolbarCustomizer extends Plugin {
           ...savedMobileConfig
         }
       }
+      // 历史：长度类字段若存成无单位纯数字串（如 "45"），写入 CSS 会无效；统一补 px
+      const mobileLenKeys: (keyof MobileToolbarConfig)[] = [
+        'toolbarHeight',
+        'closeInputOffset',
+        'openInputOffset',
+        'topToolbarOffset',
+        'topToolbarPaddingLeft',
+        'overflowToolbarDistanceBottom',
+        'overflowToolbarDistanceTop',
+        'overflowToolbarHeightBottom',
+        'overflowToolbarHeightTop',
+      ]
+      const cfg = this.mobileConfig as Record<string, unknown>
+      for (const key of mobileLenKeys) {
+        const raw = cfg[key]
+        const s = raw != null ? String(raw).trim() : ''
+        if (s && /^\d+$/.test(s)) {
+          cfg[key] = `${s}px`
+        }
+      }
 
       // 加载电脑端按钮配置
       const savedDesktopButtons = await this.loadData('desktopButtonConfigs')
@@ -700,6 +720,8 @@ export default class ToolbarCustomizer extends Plugin {
   onunload() {
     // 清理资源
     cleanup()
+    // 插件卸载时清除 pluginInstance（cleanup 中不再清除，因为重初始化时也会调用 cleanup）
+    setPluginInstance(null)
     destroy()
 
     // 清理标签切换器资源
@@ -718,6 +740,10 @@ export default class ToolbarCustomizer extends Plugin {
 
     // 移除动态样式
     this.removeFeatureStyles()
+    const dynamicStyle = document.getElementById('mobile-toolbar-dynamic-style')
+    if (dynamicStyle) dynamicStyle.remove()
+    const bgStyle = document.getElementById('mobile-toolbar-background-color-style')
+    if (bgStyle) bgStyle.remove()
 
     // 清理小窗模式检测器资源
     if (typeof clearSmallWindowDetector === 'function') {

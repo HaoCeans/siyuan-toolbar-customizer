@@ -558,12 +558,13 @@ export default class ToolbarCustomizer extends Plugin {
       initSmallWindowDetector()
 
       // 从按钮配置中查找各模块的透明度、滚动隐藏（与 toggleVisibility 一致，避免重载后仅恢复可见态却丢失开关）
-      const findAuthorToolFloatOptions = (subtype: string): { floatOpacity?: number; autoHideOnScroll?: boolean; maxVisibleTabs?: number } => {
+      const findAuthorToolFloatOptions = (subtype: string): { floatOpacity?: number; autoHideOnScroll?: boolean; maxVisibleTabs?: number; floatPanelPosition?: string } => {
         const btn = this.mobileButtonConfigs.find(b => b.type === 'author-tool' && b.authorToolSubtype === subtype)
         return {
           floatOpacity: btn?.floatOpacity,
           autoHideOnScroll: btn?.autoHideOnScroll,
-          maxVisibleTabs: btn?.maxVisibleTabs
+          maxVisibleTabs: btn?.maxVisibleTabs,
+          floatPanelPosition: btn?.floatPanelPosition
         }
       }
 
@@ -578,7 +579,8 @@ export default class ToolbarCustomizer extends Plugin {
         eventBus: this.eventBus,
         floatOpacity: tabsOpts.floatOpacity,
         autoHideOnScroll: tabsOpts.autoHideOnScroll,
-        maxVisibleTabs: tabsOpts.maxVisibleTabs
+        maxVisibleTabs: tabsOpts.maxVisibleTabs,
+        floatPanelPosition: tabsOpts.floatPanelPosition
       })
 
       // 初始化手机端悬浮大纲模块
@@ -587,7 +589,8 @@ export default class ToolbarCustomizer extends Plugin {
         loadData: (key) => this.loadData(key),
         eventBus: this.eventBus,
         floatOpacity: outlineOpts.floatOpacity,
-        autoHideOnScroll: outlineOpts.autoHideOnScroll
+        autoHideOnScroll: outlineOpts.autoHideOnScroll,
+        floatPanelPosition: outlineOpts.floatPanelPosition
       })
 
       // 初始化手机端文档导航模块

@@ -106,6 +106,7 @@ export interface ButtonConfig {
   showName?: boolean;        // 是否在按钮上显示名称（默认false）
   floatOpacity?: number;     // 悬浮弹窗透明度 (0~1)，默认 0.72
   autoHideOnScroll?: boolean; // 悬浮面板：向上滚动隐藏、向下滚动显示（仅 mobile 侧相关功能）
+  floatPanelPosition?: 'top' | 'center' | 'bottom'; // 悬浮弹窗垂直位置：top=顶部, center=居中(默认), bottom=底部
   maxVisibleTabs?: number;   // 手机端标签页：最大可见标签数 (1~10)，超出后可滚动，默认 10
   showInContextMenu?: boolean; // 是否显示在文本右键菜单中（仅模板类型，默认false）
   buttonsPerLayer?: number[];  // 桌面端扩展工具栏：每层按钮数量，如 [8, 5, 5, 5, 5]（仅 overflow-button-desktop 使用）
@@ -5628,8 +5629,8 @@ function convertToSiyuanHotkey(shortcut: string): string {
   result = parts.join('')
 
   // 排序修饰键以匹配思源格式
-  // 思源修饰键顺序: ⇧ (Shift) 在前，⌘ (Command) 在后
-  // 例如: Ctrl+Shift+K -> ⇧⌘K，而不是 ⌘⇧K
+  // 思源 _getKeymapString() 顺序: ⌃(Mac Ctrl) → ⌥(Alt) → ⇧(Shift) → ⌘(Win Ctrl/Cmd)
+  // 例如: Ctrl+Shift+Alt+K -> ⌥⇧⌘K
   const modifiers: string[] = []
   let mainKey = ''
 
@@ -5641,8 +5642,8 @@ function convertToSiyuanHotkey(shortcut: string): string {
     else mainKey += char
   }
 
-  // 思源修饰键顺序: ⇧ ⌃ ⌥ ⌘ (Shift, Ctrl, Alt, Command)
-  const sortOrder = { '⇧': 0, '⌃': 1, '⌥': 2, '⌘': 3 }
+  // 思源 _getKeymapString() 拼接顺序: ⌃(Mac Ctrl) → ⌥(Alt) → ⇧(Shift) → ⌘(Win Ctrl/Cmd)
+  const sortOrder = { '⌃': 0, '⌥': 1, '⇧': 2, '⌘': 3 }
   modifiers.sort((a, b) => sortOrder[a] - sortOrder[b])
 
   result = modifiers.join('') + mainKey
@@ -5701,14 +5702,33 @@ function getActiveProtyle(): any | null {
     return windowObj.siyuan.mobile.editor.protyle
   }
 
-  // 桌面端：尝试从 layout 的 children 中查找
+  // 桌面端：优先通过活动标签页获取（和思源 getActiveTab 同一逻辑）
+  const activeTabElement = document.querySelector('.layout__wnd--active .item--focus')
+  if (activeTabElement) {
+    const activeId = activeTabElement.getAttribute('data-id')
+    if (activeId && windowObj.siyuan?.layout?.centerLayout?.children) {
+      const children = windowObj.siyuan.layout.centerLayout.children
+      for (const child of children) {
+        if (child.children && child.children.length > 0) {
+          for (const tab of child.children) {
+            if (tab.id === activeId && tab.model?.editor?.protyle) {
+              return tab.model.editor.protyle
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 备用1：遍历 layout children 查找可见的 protyle
   if (windowObj.siyuan?.layout?.centerLayout?.children) {
     const children = windowObj.siyuan.layout.centerLayout.children
     for (const child of children) {
       if (child.children && child.children.length > 0) {
-        // 找到当前活动的 tab
         for (const tab of child.children) {
-          // 尝试从 panelElement 获取
+          if (tab.model?.editor?.protyle) {
+            return tab.model.editor.protyle
+          }
           if (tab.panelElement) {
             const protyleDiv = tab.panelElement.querySelector('.protyle')
             if (protyleDiv && (protyleDiv as any).protyle) {
@@ -5717,10 +5737,13 @@ function getActiveProtyle(): any | null {
           }
         }
       }
+      if (child.model?.editor?.protyle) {
+        return child.model.editor.protyle
+      }
     }
   }
 
-  // 尝试从所有 .protyle 元素中查找
+  // 备用2：从所有 .protyle 元素中查找
   const protyleElements = document.querySelectorAll('.protyle')
   for (const element of Array.from(protyleElements)) {
     if ((element as any).protyle) {
@@ -6088,6 +6111,73 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
         console.warn('⌘/ 块菜单执行失败:', e)
       }
       return
+    }
+
+    // 优先通过 app.plugins 直接查找并执行插件命令（避免 dispatchEvent keyCode 不可靠的问题）
+    const app = pluginInstance?.app
+    if (app?.plugins) {
+      let matchedCmd: any = null
+
+      for (const plugin of app.plugins) {
+        if (!plugin.commands) continue
+        for (const cmd of plugin.commands) {
+          if (cmd.customHotkey === siyuanHotkey) {
+            matchedCmd = cmd
+            break
+          }
+        }
+        if (matchedCmd) break
+      }
+
+      if (matchedCmd) {
+        const cmd = matchedCmd
+        const hasEditorCallback = !!cmd.editorCallback
+
+        // 恢复编辑器焦点和选区（editorCallback 需要正确的光标位置）
+        if (hasEditorCallback && savedSelection) {
+          const editArea =
+            (lastActiveElement?.matches?.('[contenteditable="true"]') ? lastActiveElement : null) ||
+            getActiveProtyleElement()?.querySelector('[contenteditable="true"]') as HTMLElement
+
+          if (editArea) {
+            editArea.focus()
+            setTimeout(() => {
+              restoreSelection(savedSelection)
+              try {
+                const protyle = getActiveProtyle()
+                if (protyle) {
+                  cmd.editorCallback(protyle)
+                } else if (cmd.callback) {
+                  cmd.callback()
+                }
+              } catch (e) {
+                console.warn('插件命令 editorCallback 执行失败:', e)
+              }
+            }, 50)
+            return
+          }
+        }
+
+        // 非 editorCallback 或无保存选区，直接调用
+        try {
+          if (cmd.callback) {
+            cmd.callback()
+          } else if (cmd.editorCallback) {
+            const protyle = getActiveProtyle()
+            if (protyle) cmd.editorCallback(protyle)
+          } else if (cmd.fileTreeCallback) {
+            cmd.fileTreeCallback()
+          } else if (cmd.dockCallback) {
+            const el = document.querySelector('.layout__tab--active')
+            if (el) cmd.dockCallback(el)
+          } else if (cmd.globalCallback) {
+            cmd.globalCallback()
+          }
+        } catch (e) {
+          console.warn('插件命令回调执行失败:', e)
+        }
+        return
+      }
     }
 
     // 获取思源的快捷键配置

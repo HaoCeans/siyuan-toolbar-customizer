@@ -1411,6 +1411,59 @@ export function createMobileButtonItem(
       autoHideContainer.appendChild(autoHideHint)
       floatOpacityConfigDiv.appendChild(autoHideContainer)
 
+      // 弹窗位置选择（⑨⑩⑪ 共用）
+      const positionContainer = document.createElement('div')
+      positionContainer.id = 'float-panel-position-config-mobile'
+      positionContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px; margin-top: 4px;'
+
+      const positionLabel = document.createElement('label')
+      positionLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
+      positionLabel.textContent = '弹窗位置'
+      positionContainer.appendChild(positionLabel)
+
+      const positionOptionsWrap = document.createElement('div')
+      positionOptionsWrap.style.cssText = 'display: flex; flex-direction: column; gap: 8px; padding: 8px; background: rgba(66, 133, 244, 0.06); border-radius: 6px; border: 1px solid rgba(66, 133, 244, 0.15);'
+
+      const currentPositionValue = button.floatPanelPosition || 'center'
+
+      const positionItems = [
+        { value: 'top', label: '⬆️ 顶部' },
+        { value: 'center', label: '⏺ 居中（默认）' },
+        { value: 'bottom', label: '⬇️ 底部' },
+      ]
+
+      positionItems.forEach(item => {
+        const radioWrap = document.createElement('label')
+        radioWrap.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 500; padding: 6px 10px; border-radius: 6px; transition: background 0.2s;'
+        radioWrap.addEventListener('mouseenter', () => { radioWrap.style.background = 'rgba(66, 133, 244, 0.08)' })
+        radioWrap.addEventListener('mouseleave', () => { radioWrap.style.background = 'transparent' })
+
+        const radio = document.createElement('input')
+        radio.type = 'radio'
+        radio.name = 'float-panel-position-mobile-' + button.id
+        radio.value = item.value
+        radio.checked = currentPositionValue === item.value
+        radio.style.cssText = 'cursor: pointer; width: 16px; height: 16px; accent-color: var(--b3-theme-primary);'
+
+        radio.addEventListener('click', async () => {
+          button.floatPanelPosition = item.value as 'top' | 'center' | 'bottom'
+          await context.saveData('mobileButtonConfigs', context.buttonConfigs)
+          context.updateMobileToolbar?.()
+        })
+
+        radioWrap.appendChild(radio)
+        radioWrap.appendChild(document.createTextNode(item.label))
+        positionOptionsWrap.appendChild(radioWrap)
+      })
+
+      const positionHint = document.createElement('div')
+      positionHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); opacity: 0.7; margin-top: 2px;'
+      positionHint.textContent = '💡 选择悬浮弹窗的垂直位置'
+
+      positionContainer.appendChild(positionOptionsWrap)
+      positionContainer.appendChild(positionHint)
+      floatOpacityConfigDiv.appendChild(positionContainer)
+
       // 最大可见标签数（仅 mobile-tabs 类型显示）
       const maxVisibleTabsContainer = document.createElement('div')
       maxVisibleTabsContainer.id = 'max-visible-tabs-config-mobile'
@@ -1697,6 +1750,8 @@ export function createMobileButtonItem(
           floatOpacityConfigDiv.style.display = 'flex'
           // 最大可见标签数仅 mobile-tabs 类型显示
           maxVisibleTabsContainer.style.display = subtype === 'mobile-tabs' ? 'flex' : 'none'
+          // 弹窗位置仅 mobile-tabs 和 mobile-outline 显示
+          positionContainer.style.display = (subtype === 'mobile-tabs' || subtype === 'mobile-outline') ? 'flex' : 'none'
         } else {
           docConfigDiv.style.display = 'flex'
           dbConfigDiv.style.display = 'none'

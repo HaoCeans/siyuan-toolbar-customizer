@@ -49,6 +49,8 @@ export interface MobileTabsContext {
   autoHideOnScroll?: boolean
   /** 最大可见标签数 (1~10)，超出后可滚动，默认 10 */
   maxVisibleTabs?: number
+  /** 悬浮弹窗垂直位置 */
+  floatPanelPosition?: string
 }
 
 // ===== 模块状态 =====
@@ -1223,6 +1225,25 @@ function applyMaxVisibleTabs(): void {
   list.style.overflowY = 'auto'
 }
 
+function applyPosition(el: HTMLElement, position?: string): void {
+  const pos = position || 'center'
+  el.style.left = ''
+  el.style.right = '6px'
+  if (pos === 'top') {
+    el.style.top = '4px'
+    el.style.bottom = 'auto'
+    el.style.transform = 'none'
+  } else if (pos === 'bottom') {
+    el.style.top = 'auto'
+    el.style.bottom = '4px'
+    el.style.transform = 'none'
+  } else {
+    el.style.top = '50%'
+    el.style.bottom = 'auto'
+    el.style.transform = 'translateY(-50%)'
+  }
+}
+
 function createTabBar(): void {
   if (tabBar) return
 
@@ -1275,6 +1296,7 @@ function createTabBar(): void {
 
   renderTabList()
   updatePinButtonUI()
+  applyPosition(tabBar, ctx?.floatPanelPosition)
   document.body.appendChild(tabBar)
 
   // 渲染并挂载到 DOM 后，动态测量实际 tab 高度再设 max-height
@@ -1508,6 +1530,7 @@ export function toggleVisibility(config: ButtonConfig): void {
     }
 
     createTabBar()
+    applyPosition(tabBar, config.floatPanelPosition)
     applyOpacity(tabBar, config.floatOpacity)
     startTitleRefresh()
     ensureScrollListenerBound()

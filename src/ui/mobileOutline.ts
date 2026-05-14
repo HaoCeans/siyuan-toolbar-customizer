@@ -21,6 +21,7 @@ interface OutlineContext {
   eventBus: any
   floatOpacity?: number
   autoHideOnScroll?: boolean
+  floatPanelPosition?: string
 }
 
 interface MobileOutlineState {
@@ -792,6 +793,26 @@ function removeStyles(): void {
 }
 
 // ===== DOM 构建 =====
+
+function applyPosition(el: HTMLElement, position?: string): void {
+  const pos = position || 'center'
+  el.style.right = ''
+  el.style.left = '2px'
+  if (pos === 'top') {
+    el.style.top = '4px'
+    el.style.bottom = 'auto'
+    el.style.transform = 'none'
+  } else if (pos === 'bottom') {
+    el.style.top = 'auto'
+    el.style.bottom = '4px'
+    el.style.transform = 'none'
+  } else {
+    el.style.top = '50%'
+    el.style.bottom = 'auto'
+    el.style.transform = 'translateY(-50%)'
+  }
+}
+
 function createPanel(): void {
   if (outlinePanel) return
 
@@ -821,6 +842,7 @@ function createPanel(): void {
   outlinePanel.appendChild(expandHandle)
 
   renderOutlinePanel()
+  applyPosition(outlinePanel, ctx?.floatPanelPosition)
   document.body.appendChild(outlinePanel)
 }
 
@@ -1016,6 +1038,7 @@ export function toggleVisibility(config: ButtonConfig): void {
     }
 
     createPanel()
+    applyPosition(outlinePanel, config.floatPanelPosition)
     applyOpacity(outlinePanel, config.floatOpacity)
     startTitleRefresh()
 

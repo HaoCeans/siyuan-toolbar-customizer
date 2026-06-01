@@ -12,6 +12,7 @@ import { createMobileButtonItem, type MobileButtonContext } from '../ui/buttonIt
 import { fetchSyncPost, showMessage } from 'siyuan'
 import * as Notify from '../notification'
 import { showButtonSelector } from '../ui/buttonSelector'
+import { createDesktopQuickNoteSettingsSection } from '../ui/desktopQuickNoteSettings'
 
 /**
  * 创建电脑端全局按钮配置
@@ -155,6 +156,10 @@ export interface FeatureConfig {
   disableCustomButtons: boolean
   authorCode?: string
   authorActivated?: boolean
+  quickNoteGlobalCaptureEnabled?: boolean
+  quickNoteMinimizeAfterSend?: boolean
+  quickNotePasteClipboardOnOpen?: boolean
+  quickNoteOverflowToolbarEnabled?: boolean
 }
 
 /**
@@ -1732,6 +1737,15 @@ export function createDesktopSettingLayout(
       }))
 
       container.appendChild(featureBox)
+
+      container.appendChild(createDesktopQuickNoteSettingsSection({
+        mobileFeatureConfig: context.mobileFeatureConfig as Record<string, unknown>,
+        desktopFeatureConfig: context.desktopFeatureConfig,
+        isAuthorToolActivated: context.isAuthorToolActivated,
+        saveMobileConfig: () => context.saveData('mobileFeatureConfig', context.mobileFeatureConfig),
+        saveDesktopConfig: () => context.saveData('desktopFeatureConfig', context.desktopFeatureConfig),
+        createSwitchItem,
+      }))
 
       // ⚠️ 特殊醒目样式：禁用自定义按钮
       const dangerItem = document.createElement('div')

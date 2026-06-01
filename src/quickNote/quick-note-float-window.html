@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>快速记事</title>
+  <meta name="quick-note-float" content="toolbar-customizer" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: transparent;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    :root {
+      color-scheme: light dark;
+      --panel-bg: rgba(255, 255, 255, 0.97);
+      --panel-border: rgba(0, 0, 0, 0.08);
+      --text: #1f2937;
+      --muted: #6b7280;
+      --input-bg: #f9fafb;
+      --input-border: #e5e7eb;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --ghost-bg: rgba(0, 0, 0, 0.05);
+      --qnote-action-font-size: 14px;
+    }
+    html[data-theme-mode="dark"] {
+      --panel-bg: rgba(30, 30, 36, 0.96);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --input-bg: #111827;
+      --input-border: #374151;
+      --primary: #2E7BBF;
+      --primary-hover: #3b82f6;
+      --ghost-bg: rgba(255, 255, 255, 0.08);
+    }
+    #app {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      align-items: stretch;
+      justify-content: stretch;
+      padding: 0;
+    }
+    .qnote-panel {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .qnote-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 8px 4px;
+      -webkit-app-region: drag;
+      cursor: move;
+      user-select: none;
+    }
+    .qnote-title {
+      font-size: var(--qnote-action-font-size);
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .qnote-close {
+      width: 20px;
+      height: 20px;
+      border: none;
+      border-radius: 6px;
+      background: var(--ghost-bg);
+      color: var(--muted);
+      cursor: pointer;
+      -webkit-app-region: no-drag;
+      font-size: 14px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    .qnote-close:hover { color: var(--text); }
+    .qnote-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 0 8px 4px;
+      min-height: 0;
+      -webkit-app-region: no-drag;
+    }
+    textarea {
+      flex: 1;
+      width: 100%;
+      min-height: 48px;
+      resize: none;
+      border: 1px solid var(--input-border);
+      border-radius: 6px;
+      background: var(--input-bg);
+      color: var(--text);
+      padding: 6px 8px;
+      font-size: var(--qnote-font-size, 12px);
+      line-height: 1.4;
+      outline: none;
+    }
+    textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+    }
+    .qnote-hint {
+      display: none;
+    }
+    .qnote-actions {
+      display: flex;
+      gap: 6px;
+      padding: 0 8px 8px;
+      -webkit-app-region: no-drag;
+    }
+    button.action {
+      flex: 1;
+      height: 24px;
+      border-radius: 6px;
+      border: none;
+      font-size: var(--qnote-action-font-size);
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .btn-cancel {
+      background: var(--ghost-bg);
+      color: var(--text);
+    }
+    .btn-save {
+      background: var(--primary);
+      color: #fff;
+    }
+    .btn-save:hover { background: var(--primary-hover); }
+    .status {
+      min-height: 0;
+      padding: 0 8px 2px;
+      font-size: 10px;
+      color: var(--muted);
+      text-align: center;
+      -webkit-app-region: no-drag;
+    }
+    .status:empty {
+      display: none;
+      padding: 0;
+    }
+    .status.ok { color: #16a34a; }
+    .status.err { color: #dc2626; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="qnote-panel">
+      <div class="qnote-header">
+        <div class="qnote-title" id="title">⚡ 记事</div>
+        <button class="qnote-close" id="closeBtn" title="关闭">×</button>
+      </div>
+      <div class="qnote-body">
+        <textarea id="input" placeholder="记一笔…"></textarea>
+        <div class="qnote-hint"><kbd>Shift+Enter</kbd> 发送 · <kbd>Esc</kbd> 取消</div>
+      </div>
+      <div class="status" id="status"></div>
+      <div class="qnote-actions">
+        <button class="action btn-cancel" id="cancelBtn">取消</button>
+        <button class="action btn-save" id="saveBtn">发送</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function() {
+      const MAIN_WINDOW_ID = (typeof __MAIN_WINDOW_ID__ !== 'undefined') ? __MAIN_WINDOW_ID__ : 0;
+      const titleEl = document.getElementById('title');
+      const inputEl = document.getElementById('input');
+      const statusEl = document.getElementById('status');
+      const saveBtn = document.getElementById('saveBtn');
+      const cancelBtn = document.getElementById('cancelBtn');
+      const closeBtn = document.getElementById('closeBtn');
+      let floatSelfWindow = null;
+
+      try {
+        const remote = require('@electron/remote');
+        floatSelfWindow = remote && remote.getCurrentWindow ? remote.getCurrentWindow() : null;
+      } catch (e) {}
+
+      function setTheme(isDark) {
+        document.documentElement.setAttribute('data-theme-mode', isDark ? 'dark' : 'light');
+      }
+
+      window.__setQuickNoteFloatTheme = setTheme;
+
+      window.__setQuickNoteFloatState = function(payload) {
+        if (!payload) return;
+        if (typeof payload.isDark === 'boolean') setTheme(payload.isDark);
+        if (payload.title) titleEl.textContent = payload.title;
+        if (payload.placeholder) inputEl.placeholder = payload.placeholder;
+        if (typeof payload.fontSize === 'number' && payload.fontSize > 0) {
+          document.documentElement.style.setProperty('--qnote-font-size', payload.fontSize + 'px');
+          inputEl.style.fontSize = payload.fontSize + 'px';
+        }
+        if (payload.initialText) {
+          inputEl.value = payload.initialText;
+        } else if (payload.clear) {
+          inputEl.value = '';
+        }
+        if (payload.status) {
+          statusEl.textContent = payload.status.text || '';
+          statusEl.className = 'status' + (payload.status.type ? (' ' + payload.status.type) : '');
+        } else {
+          statusEl.textContent = '';
+          statusEl.className = 'status';
+        }
+        if (payload.focus !== false) {
+          inputEl.focus();
+          const len = inputEl.value.length;
+          inputEl.setSelectionRange(len, len);
+        }
+      };
+
+      function sendToMain(cmd, data) {
+        try {
+          const remote = require('@electron/remote');
+          const BrowserWindow = remote.BrowserWindow;
+          let mainWindow = null;
+          if (MAIN_WINDOW_ID) {
+            try { mainWindow = BrowserWindow.fromId(MAIN_WINDOW_ID); } catch (e) {}
+          }
+          if (!mainWindow) {
+            const all = BrowserWindow.getAllWindows ? BrowserWindow.getAllWindows() : [];
+            const selfId = remote.getCurrentWindow()?.id;
+            mainWindow = all.find(function(w) { return w && w.id !== selfId; }) || null;
+          }
+          if (!mainWindow || !mainWindow.webContents) return;
+          const encoded = data ? encodeURIComponent(JSON.stringify(data)) : '';
+          const code = encoded
+            ? 'window.__quickNoteFloatCommand && window.__quickNoteFloatCommand("' + cmd + '", decodeURIComponent("' + encoded + '"))'
+            : 'window.__quickNoteFloatCommand && window.__quickNoteFloatCommand("' + cmd + '")';
+          mainWindow.webContents.executeJavaScript(code).catch(function() {});
+        } catch (e) {}
+      }
+
+      function closeSelf() {
+        sendToMain('cancel');
+        try {
+          if (floatSelfWindow) floatSelfWindow.close();
+        } catch (e) {}
+      }
+
+      saveBtn.addEventListener('click', function() {
+        const text = (inputEl.value || '').trim();
+        if (!text) {
+          statusEl.textContent = '请输入内容';
+          statusEl.className = 'status err';
+          inputEl.focus();
+          return;
+        }
+        saveBtn.disabled = true;
+        statusEl.textContent = '发送中…';
+        statusEl.className = 'status';
+        sendToMain('save', { text: text });
+        window.setTimeout(function() { saveBtn.disabled = false; }, 800);
+      });
+
+      cancelBtn.addEventListener('click', closeSelf);
+      closeBtn.addEventListener('click', closeSelf);
+
+      inputEl.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          closeSelf();
+        } else if (e.key === 'Enter' && e.shiftKey) {
+          e.preventDefault();
+          saveBtn.click();
+        }
+      });
+
+      // 主窗口退出时自动关闭
+      try {
+        const remote = require('@electron/remote');
+        const BrowserWindow = remote.BrowserWindow;
+        if (BrowserWindow && floatSelfWindow) {
+          window.setInterval(function() {
+            try {
+              if (MAIN_WINDOW_ID > 0) {
+                const w = BrowserWindow.fromId(MAIN_WINDOW_ID);
+                if (!w || (w.isDestroyed && w.isDestroyed())) {
+                  try { floatSelfWindow.destroy ? floatSelfWindow.destroy() : floatSelfWindow.close(); } catch (e2) {}
+                }
+              }
+            } catch (e) {
+              try { floatSelfWindow.destroy ? floatSelfWindow.destroy() : floatSelfWindow.close(); } catch (e2) {}
+            }
+          }, 1200);
+        }
+      } catch (e) {}
+
+      sendToMain('ready');
+      inputEl.focus();
+    })();
+  </script>
+</body>
+</html>

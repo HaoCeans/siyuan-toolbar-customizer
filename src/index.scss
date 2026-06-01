@@ -1,79 +1,103 @@
-.toolbar-customizer-app {
-  pointer-events: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100dvh;
-  z-index: 4;
-}
+// 一键记事弹窗 - 块格式 Protyle 内嵌样式
+#quick-note-dialog,
+#quick-note-dialog-desktop {
+  .buttons-container {
+    position: relative;
+    z-index: 20;
+    flex-shrink: 0;
+  }
 
-// 自定义按钮样式增强
-[data-custom-button] {
-  transition: all 0.2s ease;
-  border-radius: 4px;
-  padding: 4px;
-  min-width: 32px;
-  min-height: 32px;
-  display: inline-flex !important;
-  align-items: center;
-  justify-content: center;
-  margin: 0 4px;
-  
-  &:hover {
-    background-color: var(--b3-theme-hover);
-    transform: translateY(-1px);
-  }
-  
-  &:active {
-    transform: translateY(0);
-  }
-  
-  &.custom-button-hover {
-    background-color: var(--b3-list-hover);
-    color: var(--b3-theme-on-background);
-  }
-  
-  svg {
-    display: block;
-    margin: 0 auto;
-  }
-}
+  // 外层：唯一可见边框 + 高度约束（不滚动）
+  .toolbar-customizer-qnote-input--block {
+    flex: 1;
+    min-height: 0;
+    max-height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 
-// 移动端工具栏过渡动画
-.protyle-breadcrumb,
-.protyle-breadcrumb__bar {
-  transition: bottom 0.3s ease !important;
-}
+    // 内层 Protyle：相对定位容器，高度与外层一致
+    > .toolbar-customizer-qnote-protyle {
+      position: relative;
+      flex: 1 1 0%;
+      min-height: 0 !important;
+      height: 100%;
+      max-height: 100%;
+      width: 100%;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: none !important;
+      box-shadow: none !important;
+      background: transparent !important;
 
-// 移动端设置对话框按钮区域放在右下角
-@media (max-width: 768px) {
-  // 只针对插件设置对话框
-  .b3-dialog[data-plugin-dialog="toolbar-customizer"] .b3-dialog__action {
-    position: fixed !important;
-    bottom: 20px !important;
-    right: 20px !important;
-    top: auto !important;
-    left: auto !important;
-    padding: 0 !important;
-    border: none !important;
-    background: transparent !important;
-    flex-direction: row-reverse !important;
-    gap: 8px !important;
-    z-index: 10 !important;
-    
-    .b3-button {
-      margin: 0 !important;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+      &.protyle {
+        min-height: 0 !important;
+        max-height: 100%;
+      }
+
+      > .protyle-preview,
+      > .protyle-upload,
+      > .protyle-gutters,
+      > .protyle-hint,
+      > .protyle-select,
+      > .protyle-toolbar,
+      > .protyle-util,
+      > style {
+        display: none !important;
+        pointer-events: none !important;
+      }
+
+      .protyle-toolbar,
+      .protyle-select {
+        display: none !important;
+        pointer-events: none !important;
+      }
+
+      .protyle-breadcrumb,
+      .protyle-gutter,
+      .protyle-title,
+      .protyle-hint,
+      .protyle-attr,
+      .code-block .protyle-action,
+      .img .protyle-action,
+      .protyle-action__drag,
+      .protyle-action__language,
+      .protyle-action__copy,
+      .protyle-action__menu {
+        display: none !important;
+      }
+
+      .li > .protyle-action {
+        display: flex !important;
+      }
+
+      // 铺满 .protyle 四边，与父级等高；内容在内部滚动
+      > .protyle-content {
+        position: absolute !important;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        flex: none !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        overflow-x: hidden;
+        overflow-y: auto;
+      }
+
+      .protyle-wysiwyg {
+        min-height: 100% !important;
+        height: auto !important;
+        max-height: none !important;
+        padding: 8px 12px 8px 16px !important;
+        box-sizing: border-box;
+        overflow: visible !important;
+        font-size: var(--qnote-protyle-font-size, 16px) !important;
+      }
     }
-  }
-}
-
-// 移动端优化
-@media (max-width: 768px) {
-  [data-custom-button] {
-    min-width: 40px !important;
-    min-height: 40px !important;
-    padding: 8px !important;
   }
 }

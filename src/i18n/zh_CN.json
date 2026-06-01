@@ -1,3 +1,4 @@
 {
-  "addTopBarIcon": "PluginSampleViteVue"
+  "addTopBarIcon": "PluginSampleViteVue",
+  "quickNoteGlobalCapture": "一键记事（全局捕获）"
 }

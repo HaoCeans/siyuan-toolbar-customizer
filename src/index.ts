@@ -43,8 +43,18 @@ import {
 
 import {
   initSmallWindowDetector,
-  clearSmallWindowDetector
+  clearSmallWindowDetector,
+  triggerDesktopQuickNoteGlobalCapture,
+  saveQuickNotePlainTextFromFloat,
+  getQuickNoteFloatTitle,
+  getQuickNoteFloatPlaceholder,
 } from './windowDetector'
+import {
+  initQuickNoteFloatWindow,
+  destroyQuickNoteFloatWindow,
+  handleQuickNoteFloatCommand,
+  isQuickNoteFloatSaveFromButton,
+} from './quickNote/quickNoteFloatWindow'
 
 // 导入 StressThreshold 清理函数
 import {
@@ -163,7 +173,11 @@ export default class ToolbarCustomizer extends Plugin {
     disableCustomButtons: false,// 禁用所有自定义按钮（恢复思源原始状态，仅桌面端）
     showAllNotifications: true, // 一键开启所有按钮右上角提示
     authorActivated: false,     // 鲸鱼定制工具箱是否已激活
-    authorCode: ''              // 鲸鱼定制工具箱激活码
+    authorCode: '',              // 鲸鱼定制工具箱激活码
+    quickNoteGlobalCaptureEnabled: true,  // 电脑端：全局快捷键唤起一键记事
+    quickNoteMinimizeAfterSend: false,    // 电脑端：发送后最小化思源
+    quickNotePasteClipboardOnOpen: false, // 电脑端：打开捕获窗时粘贴剪贴板
+    quickNoteOverflowToolbarEnabled: false, // 电脑端：记事弹窗内显示插件扩展工具栏
   }
 
   // 手机端小功能配置
@@ -479,6 +493,32 @@ export default class ToolbarCustomizer extends Plugin {
     
     // ===== 应用小功能 =====
     this.applyFeatures()
+
+    // 电脑端：独立 Electron 悬浮窗 + 全局快捷键
+    if (this.isElectron && !this.isMobile) {
+      initQuickNoteFloatWindow({
+        isElectron: () => this.isElectron,
+        isMobile: () => this.isMobile,
+        isDarkMode: () => document.documentElement.getAttribute('data-theme-mode')?.toLowerCase() === 'dark',
+        getFloatTitle: () => getQuickNoteFloatTitle(isQuickNoteFloatSaveFromButton()),
+        getPlaceholder: () => getQuickNoteFloatPlaceholder(isQuickNoteFloatSaveFromButton()),
+        onSave: saveQuickNotePlainTextFromFloat,
+      })
+      ;(window as any).__quickNoteFloatCommand = (cmd: string, payload?: string) => {
+        void handleQuickNoteFloatCommand(cmd, payload)
+      }
+    }
+
+    if (!this.isMobile) {
+      this.addCommand({
+        langKey: 'quickNoteGlobalCapture',
+        langText: '一键记事（全局捕获）',
+        hotkey: '⌥⇧N',
+        globalCallback: () => {
+          void triggerDesktopQuickNoteGlobalCapture()
+        },
+      })
+    }
   }
 
   // 布局就绪后初始化（确保 DOM 完全加载）
@@ -721,6 +761,9 @@ export default class ToolbarCustomizer extends Plugin {
   }
 
   onunload() {
+    destroyQuickNoteFloatWindow()
+    try { delete (window as any).__quickNoteFloatCommand } catch { /* ignore */ }
+
     // 清理资源
     cleanup()
     // 插件卸载时清除 pluginInstance（cleanup 中不再清除，因为重初始化时也会调用 cleanup）

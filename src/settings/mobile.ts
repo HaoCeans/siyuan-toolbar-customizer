@@ -11,6 +11,7 @@ import type { ButtonConfig } from '../toolbarManager'
 import { showMessage } from 'siyuan'
 import * as Notify from '../notification'
 import { createMobileButtonItem, type MobileButtonContext } from '../ui/buttonItems/mobile'
+import { createMobileQuickNoteFormatField } from '../ui/quickNoteFormatField'
 import { calculateButtonOverflow, getToolbarAvailableWidth, getButtonWidth } from '../toolbarManager'
 
 /**
@@ -68,6 +69,7 @@ export interface MobileFeatureConfig {
   quickNoteNotebookId?: string
   quickNoteDocumentId?: string  // 新增：一键记事目标文档ID
   quickNoteInsertPosition?: 'top' | 'bottom'  // 一键记事插入位置：顶部/底部
+  quickNoteInputFormat?: 'plain' | 'block'  // 一键记事输入格式：plain=纯文本, block=思源块格式
   // 一键记事按钮样式配置
   useCustomButtonStyle?: boolean    // 是否使用自定义按钮样式
   quickNoteButtonMinWidth?: number  // 按钮自身宽度
@@ -1980,6 +1982,32 @@ export function createMobileSettingLayout(
       `;
       
       container.textContent = '📝 请先选择触发方式，再配置笔记本或文档 ID，选择插入位置，进行弹窗细化设置。';
+      wrapper.appendChild(container);
+      return wrapper;
+    }
+  });
+
+  // === 输入格式选择（纯文本 / 思源块格式）===
+  setting.addItem({
+    title: '',
+    description: '',
+    createActionElement: () => {
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = `
+        margin: 0 -16px;
+        width: calc(100% + 32px);
+      `;
+
+      const container = document.createElement('div');
+      container.style.cssText =
+        'padding: 16px; background: var(--b3-theme-background); border: 1px solid var(--b3-border-color); border-radius: 8px;';
+
+      container.appendChild(createMobileQuickNoteFormatField({
+        mobileFeatureConfig: context.mobileFeatureConfig,
+        isAuthorToolActivated: context.isAuthorToolActivated,
+        saveData: context.saveData,
+      }));
+
       wrapper.appendChild(container);
       return wrapper;
     }

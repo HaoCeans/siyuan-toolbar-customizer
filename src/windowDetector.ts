@@ -1,6 +1,28 @@
 import { isMobileDevice, pluginInstance, setPluginInstance, showPopupSelectDialog, processTemplateVariables, getToolbarAvailableWidth, getButtonWidth, showTemplateContextMenu } from './toolbarManager';
 import * as Notify from './notification';
-import { appendBlock, prependBlock } from './api';
+import { createQuickNoteInputArea, insertTextIntoQuickNoteDialog, type QuickNoteInputHandle } from './quickNote/inputArea';
+import { resolveQuickNoteInputFormat } from './quickNote/resolveFormat';
+import { getQuickNoteFontSize } from './quickNote/fontSize';
+import { saveQuickNoteContent } from './quickNote/saveContent';
+import { destroyActiveQuickNoteInput, getActiveQuickNoteInput, setActiveQuickNoteInput } from './quickNote/session';
+import {
+  getDesktopQuickNoteCaptureSettings,
+  isDesktopQuickNoteOverflowToolbarEnabled,
+  minimizeSiyuanMainWindow,
+  pasteClipboardIntoQuickNoteInput,
+} from './quickNote/desktopCapture';
+import {
+  shouldUseQuickNoteFloatWindow,
+  toggleQuickNoteFloatWindow,
+  type QuickNoteFloatSaveResult,
+} from './quickNote/quickNoteFloatWindow';
+import {
+  openDesktopQuickNoteBlockWindow,
+  shouldUseDesktopQuickNoteBlockWindow,
+  toggleDesktopQuickNoteBlockWindow,
+} from './quickNote/quickNoteBlockWindow';
+
+export type QuickNoteOpenSource = 'auto' | 'button' | 'globalHotkey';
 
 // 存储当前的事件监听器，以便可以移除
 let visibilityChangeListener: (() => void) | null = null;
@@ -23,9 +45,92 @@ const DIALOG_PROTECTION_MS = 500;
 
 // 记录弹窗当前是否正在显示（防止重复弹出）
 let isNoteDialogShowing = false;
+let isQuickNoteDialogMinimized = false;
+// 弹窗正在异步创建中（createQuickNoteInputArea 完成前 DOM 尚未挂载）
+let isNoteDialogOpening = false;
+// 记录切后台时输入框是否正有焦点（用于切回前台时决定是否恢复输入法）
+let wasQuickNoteInputFocused = false;
+// 自动触发时弹窗在后台创建，标记需要初始聚焦（等切回前台时执行）
+let needsInitialFocus = false;
 
 // 高度变化检测定时器 ID（已弃用，保留用于向后兼容清理）
 let heightCheckTimer: ReturnType<typeof setInterval> | null = null;
+
+function isQuickNoteToggleSource(source: QuickNoteOpenSource): boolean {
+  return source === 'button' || source === 'globalHotkey';
+}
+
+function resolveQuickNoteTargetConfig(isFromButton: boolean): {
+  notebookId: string;
+  documentId: string;
+  saveType: 'daily' | 'document';
+  insertPosition: 'top' | 'bottom';
+} {
+  const tempPlugin = (window as any).__pluginInstance;
+  let notebookId = '';
+  let documentId = '';
+  let saveType: 'daily' | 'document' = 'daily';
+  let insertPosition: 'top' | 'bottom' = 'bottom';
+
+  if (isFromButton && tempPlugin?.mobileFeatureConfig) {
+    const config = tempPlugin.mobileFeatureConfig;
+    saveType = config.quickNoteSaveType || 'daily';
+    insertPosition = config.quickNoteInsertPosition || 'bottom';
+    if (saveType === 'document') {
+      documentId = config.quickNoteDocumentId || '';
+    } else {
+      notebookId = config.quickNoteNotebookId || '';
+    }
+  } else {
+    const config = pluginInstance?.mobileFeatureConfig;
+    saveType = config?.quickNoteSaveType || 'daily';
+    insertPosition = config?.quickNoteInsertPosition || 'bottom';
+    if (saveType === 'document') {
+      documentId = config?.quickNoteDocumentId || '';
+    } else {
+      notebookId = config?.quickNoteNotebookId || '';
+    }
+  }
+
+  return { notebookId, documentId, saveType, insertPosition };
+}
+
+function setupDesktopCaptureInteraction(
+  dialog: HTMLElement,
+  inputHandle: QuickNoteInputHandle,
+  saveBtn: HTMLButtonElement,
+  cancelBtn: HTMLButtonElement,
+): void {
+  const focusInput = () => inputHandle.focus();
+  if (dialogFocusTimer) {
+    clearTimeout(dialogFocusTimer);
+  }
+  dialogFocusTimer = setTimeout(() => {
+    focusInput();
+    dialogFocusTimer = null;
+  }, 100);
+
+  dialog.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelBtn.click();
+    }
+  });
+
+  if (inputHandle.isPlainTextarea()) {
+    const textarea = inputHandle.element.querySelector('textarea') as HTMLTextAreaElement | null;
+    if (!textarea) return;
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && e.shiftKey) {
+        e.preventDefault();
+        saveBtn.click();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelBtn.click();
+      }
+    });
+  }
+}
 
 /**
  * 检测思源当前是否为暗黑模式
@@ -85,79 +190,199 @@ async function showSmallWindowTip() {
   }
 
   // 优先使用临时配置（按钮触发时设置的），否则使用全局配置
-  let notebookId = '';
-  let documentId = '';
-  let saveType: 'daily' | 'document' = 'daily';
-  let insertPosition: 'top' | 'bottom' = 'bottom';  // 默认插入到底部
-  let isFromButton = false; // 标记是否来自按钮触发
+  const isFromButton = !!(tempPlugin?.mobileFeatureConfig?.__quickNoteButtonTrigger);
+  const { notebookId, documentId, saveType, insertPosition } = resolveQuickNoteTargetConfig(isFromButton);
 
-  // 检查是否有临时配置
-  if (tempPlugin?.mobileFeatureConfig) {
-    const config = tempPlugin.mobileFeatureConfig;
-    saveType = config.quickNoteSaveType || 'daily';
-    insertPosition = config.quickNoteInsertPosition || 'bottom';
-    if (saveType === 'document') {
-      documentId = config.quickNoteDocumentId || '';
-    } else {
-      notebookId = config.quickNoteNotebookId || '';
+  await showSiyuanEditorDialog(
+    notebookId,
+    documentId,
+    saveType,
+    insertPosition,
+    isFromButton ? 'button' : 'auto',
+  );
+}
+
+async function toggleMinimizeQuickNoteDialog(dialog: HTMLElement): Promise<void> {
+  if (isQuickNoteDialogMinimized) {
+    dialog.style.display = '';
+    isQuickNoteDialogMinimized = false;
+    isNoteDialogShowing = true;
+    try {
+      getActiveQuickNoteInput()?.focus();
+    } catch {
+      // ignore
     }
-    isFromButton = true; // 有临时配置，说明是按钮触发
-  } else {
-    // 使用全局配置
-    const config = pluginInstance?.mobileFeatureConfig;
-    saveType = config?.quickNoteSaveType || 'daily';
-    insertPosition = config?.quickNoteInsertPosition || 'bottom';
-    // 根据保存类型只读取对应的ID
-    if (saveType === 'document') {
-      documentId = config?.quickNoteDocumentId || '';
-    } else {
-      notebookId = config?.quickNoteNotebookId || '';
-    }
+    return;
   }
+  dialog.style.display = 'none';
+  isQuickNoteDialogMinimized = true;
+}
 
-  // 显示思源原生编辑器弹窗，传递文档ID、保存类型、插入位置和触发来源
-  showSiyuanEditorDialog(notebookId, documentId, saveType, insertPosition, isFromButton);
+async function toggleCloseQuickNoteDialog(dialog: HTMLElement): Promise<void> {
+  const isMobileDialog = dialog.id === 'quick-note-dialog';
+  await teardownQuickNoteDialog(dialog, isMobileDialog);
+  lastDialogShowTime = Date.now();
 }
 
 // 思源原生编辑器弹窗（路由函数）
-function showSiyuanEditorDialog(notebookId: string, documentId?: string, saveType: 'daily' | 'document' = 'daily', insertPosition: 'top' | 'bottom' = 'bottom', isFromButton: boolean = false) {
-  // 根据平台调用不同的弹窗函数
-  if (isMobileDevice()) {
-    // 移动端专用的弹窗
-    showNoteInputDialogMobile(notebookId, documentId, saveType, insertPosition, isFromButton);
-  } else {
-    // 电脑端专用的弹窗
-    showNoteInputDialogDesktop(notebookId, documentId, saveType, insertPosition, isFromButton);
+async function showSiyuanEditorDialog(
+  notebookId: string,
+  documentId?: string,
+  saveType: 'daily' | 'document' = 'daily',
+  insertPosition: 'top' | 'bottom' = 'bottom',
+  source: QuickNoteOpenSource = 'auto',
+) {
+  const existingDialog = getQuickNoteDialogElement();
+  if (existingDialog) {
+    if (isQuickNoteToggleSource(source)) {
+      await toggleMinimizeQuickNoteDialog(existingDialog);
+    }
+    return;
+  }
+
+  if (isNoteDialogOpening) {
+    return;
+  }
+
+  isNoteDialogOpening = true;
+  try {
+    if (isMobileDevice()) {
+      const isFromButton = source === 'button';
+      await showNoteInputDialogMobile(notebookId, documentId, saveType, insertPosition, isFromButton);
+    } else {
+      await showNoteInputDialogDesktop(notebookId, documentId, saveType, insertPosition, source);
+    }
+  } finally {
+    isNoteDialogOpening = false;
   }
 }
 
-// === 电脑端专用弹窗 ===
-function showNoteInputDialogDesktop(notebookId: string, documentId?: string, saveType: 'daily' | 'document' = 'daily', insertPosition: 'top' | 'bottom' = 'bottom', isFromButton: boolean = false) {
-  // 检查是否已有弹窗存在，防止重复创建
-  const existingDialog = document.getElementById('quick-note-dialog-desktop');
-  if (existingDialog) {
-    // 如果弹窗已存在，直接返回，不创建新弹窗
-    return;
+async function runQuickNoteSave(
+  inputHandle: QuickNoteInputHandle,
+  notebookId: string,
+  documentId: string | undefined,
+  saveType: 'daily' | 'document',
+  insertPosition: 'top' | 'bottom',
+  isFromButton: boolean,
+): Promise<boolean> {
+  const payload = await inputHandle.getContent();
+  if (!payload) return false;
+
+  if (saveType === 'document' && !documentId) {
+    const tipPrefix = isFromButton ? '【按钮】' : '【自启动一键记事】';
+    alert(`⚠️ 请先在${tipPrefix}设置中，配置文档ID`);
+    return false;
   }
+  if (saveType === 'daily' && !notebookId) {
+    const tipPrefix = isFromButton ? '【按钮】' : '【自启动一键记事】';
+    alert(`⚠️ 请先在${tipPrefix}设置中，配置笔记本ID`);
+    return false;
+  }
+
+  try {
+    let ok = false;
+    if (payload.format === 'block' && inputHandle.saveToTarget) {
+      ok = await inputHandle.saveToTarget();
+    } else {
+      ok = await saveQuickNoteContent(payload, {
+        saveType,
+        notebookId,
+        documentId,
+        insertPosition,
+      });
+    }
+    if (!ok) {
+      alert('保存失败，请重试');
+    }
+    return ok;
+  } catch {
+    alert('记事保存失败，请重试');
+    return false;
+  }
+}
+
+async function cancelQuickNoteDialog(inputHandle: QuickNoteInputHandle | null): Promise<void> {
+  if (inputHandle?.cancelDraft) {
+    await inputHandle.cancelDraft();
+  }
+}
+
+function getQuickNoteDialogElement(): HTMLElement | null {
+  return document.getElementById('quick-note-dialog')
+    ?? document.getElementById('quick-note-dialog-desktop');
+}
+
+function cleanupQuickNoteDialogStyles(): void {
+  const styleIds = ['quick-note-textarea-scrollbar-style', 'quick-note-buttons-scrollbar-style'];
+  styleIds.forEach((id) => {
+    document.getElementById(id)?.remove();
+  });
+}
+
+async function teardownQuickNoteDialog(dialog: HTMLElement, closeMobile: boolean): Promise<void> {
+  try {
+    await cancelQuickNoteDialog(getActiveQuickNoteInput());
+  } catch {
+    // 确保弹窗 DOM 仍能被移除
+  }
+  try {
+    destroyActiveQuickNoteInput();
+  } catch {
+    // 确保弹窗 DOM 仍能被移除
+  }
+  if (closeMobile) {
+    cleanupQuickNoteDialogStyles();
+  }
+  if (closeMobile || dialog.id === 'quick-note-dialog-desktop') {
+    cleanupQuickNoteOverflowToolbarLayers();
+  }
+  dialog.remove();
+  isNoteDialogShowing = false;
+  isQuickNoteDialogMinimized = false;
+  needsInitialFocus = false;
+  wasQuickNoteInputFocused = false;
+}
+
+// === 电脑端专用弹窗 ===
+async function showNoteInputDialogDesktop(
+  notebookId: string,
+  documentId?: string,
+  saveType: 'daily' | 'document' = 'daily',
+  insertPosition: 'top' | 'bottom' = 'bottom',
+  source: QuickNoteOpenSource = 'auto',
+) {
+  const isFromButton = source === 'button';
+  const inputFormat = resolveQuickNoteInputFormat(isFromButton);
+  // 块格式需思源内 Protyle，不用居中捕获小窗（高度不足）；纯文本按钮仍用捕获居中 UI
+  const captureMode = (source === 'button' || source === 'globalHotkey') && inputFormat !== 'block';
+  const captureSettings = getDesktopQuickNoteCaptureSettings();
+  const useQuickNoteOverflowSplit = !captureMode && isDesktopQuickNoteOverflowToolbarEnabled();
+  const showQuickNoteToolbar = !captureMode;
 
   // 检查是否在防抖时间内
   const timeSinceLastShow = Date.now() - lastDialogShowTime;
-  if (timeSinceLastShow < DIALOG_SHOW_DEBOUNCE_MS && !isFromButton) {
-    // 自启动模式下，如果在防抖时间内，不显示新弹窗
+  if (timeSinceLastShow < DIALOG_SHOW_DEBOUNCE_MS && source === 'auto') {
     return;
   }
 
-  // 标记弹窗正在显示
   isNoteDialogShowing = true;
   lastDialogShowTime = Date.now();
 
-  // 检测暗黑模式
   const isDark = isSiyuanDarkMode();
 
-  // 创建电脑端专用弹窗
   const dialog = document.createElement('div');
   dialog.id = 'quick-note-dialog-desktop';
-  dialog.style.cssText = `
+  dialog.tabIndex = -1;
+  dialog.style.cssText = captureMode ? `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.48);
+    z-index: 100000;
+    pointer-events: auto;
+  ` : `
     position: fixed;
     top: 0;
     left: 0;
@@ -169,7 +394,26 @@ function showNoteInputDialogDesktop(notebookId: string, documentId?: string, sav
   `;
 
   const content = document.createElement('div');
-  content.style.cssText = `
+  content.tabIndex = -1;
+  content.style.cssText = captureMode ? `
+    background: ${isDark ? '#1e1e1e' : 'white'};
+    border-radius: 12px;
+    padding: 10px 10px 8px;
+    width: min(200px, 92vw);
+    max-width: 200px;
+    height: auto;
+    max-height: min(200px, 42vh);
+    box-shadow: ${isDark ? '0 16px 48px rgba(0, 0, 0, 0.55)' : '0 16px 48px rgba(0, 0, 0, 0.18)'};
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: fixed;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+    border: 1px solid ${isDark ? '#404040' : 'rgba(0, 0, 0, 0.08)'};
+  ` : `
     background: ${isDark ? '#1e1e1e' : 'white'};
     border-radius: 12px;
     padding: 24px;
@@ -189,8 +433,16 @@ function showNoteInputDialogDesktop(notebookId: string, documentId?: string, sav
   `;
 
   const title = document.createElement('h2');
-  title.textContent = documentId ? '📒 文档记事' : '📒 日记记事';
-  title.style.cssText = `
+  title.textContent = captureMode
+    ? (documentId ? '⚡ 追加' : '⚡ 记事')
+    : (documentId ? '📒 文档记事' : '📒 日记记事');
+  title.style.cssText = captureMode ? `
+    margin: 0 0 6px 0;
+    color: ${isDark ? '#e0e0e0' : '#333'};
+    font-size: 13px;
+    text-align: center;
+    font-weight: 600;
+  ` : `
     margin: 0 0 20px 0;
     color: ${isDark ? '#e0e0e0' : '#333'};
     font-size: 20px;
@@ -198,32 +450,28 @@ function showNoteInputDialogDesktop(notebookId: string, documentId?: string, sav
     font-weight: 600;
   `;
 
-  const textarea = document.createElement('textarea');
-  textarea.placeholder = documentId ? '请输入要追加到文档的内容...' : '请输入您的日记内容...';
-  const fontSize = pluginInstance?.mobileFeatureConfig?.quickNoteFontSize || 16;
-  textarea.style.cssText = `
-    flex: 1;
-    min-height: 300px;
-    max-height: calc(80vh - 160px);
-    padding: 16px;
-    border: 2px solid ${isDark ? '#404040' : '#e0e0e0'};
-    border-radius: 8px;
-    background: ${isDark ? '#2a2a2a' : 'white'};
-    color: ${isDark ? '#e0e0e0' : '#333'};
-    font-size: ${fontSize}px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    resize: none;
-    overflow-y: auto;
-    overflow-x: hidden;
-    word-wrap: break-word;
-    line-height: 1.6;
-  `;
-  textarea.addEventListener('focus', () => {
-    textarea.style.borderColor = isDark ? '#2E7BBF' : '#3b82f6';
+  const fontSize = getQuickNoteFontSize();
+
+  const noteSection = document.createElement('div');
+  noteSection.style.cssText = captureMode
+    ? 'flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 72px; max-height: calc(52vh - 120px);'
+    : inputFormat === 'block'
+      ? 'flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 240px;'
+      : 'flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 32px;';
+
+  const inputHandle = await createQuickNoteInputArea({
+    format: inputFormat,
+    isMobile: false,
+    isDark,
+    compact: captureMode,
+    fontSize,
+    placeholder: documentId ? '请输入要追加到文档的内容...' : '请输入您的日记内容...',
+    saveTarget: inputFormat === 'block'
+      ? { saveType, notebookId, documentId, insertPosition }
+      : undefined,
   });
-  textarea.addEventListener('blur', () => {
-    textarea.style.borderColor = isDark ? '#404040' : '#e0e0e0';
-  });
+  setActiveQuickNoteInput(inputHandle);
+  noteSection.appendChild(inputHandle.element);
 
   const hint = document.createElement('div');
   hint.style.cssText = `
@@ -232,11 +480,30 @@ function showNoteInputDialogDesktop(notebookId: string, documentId?: string, sav
     margin-top: 8px;
     text-align: center;
   `;
-  hint.innerHTML = '💡 <kbd>Shift+Enter</kbd> 发送 · <kbd>Enter</kbd> 换行 · <kbd>Esc</kbd> 取消';
+  if (inputHandle.isPlainTextarea()) {
+    hint.innerHTML = captureMode
+      ? ''
+      : '💡 <kbd>Shift+Enter</kbd> 发送 · <kbd>Enter</kbd> 换行 · <kbd>Esc</kbd> 取消';
+  } else {
+    hint.innerHTML = captureMode
+      ? ''
+      : '';
+    if (!captureMode) {
+      hint.style.display = 'none';
+    }
+  }
+  if (captureMode) {
+    hint.style.display = 'none';
+  }
 
   const buttonContainer = document.createElement('div');
   buttonContainer.className = 'buttons-container';
-  buttonContainer.style.cssText = `
+  buttonContainer.style.cssText = captureMode ? `
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+    margin-top: 8px;
+  ` : `
     display: flex;
     gap: 12px;
     justify-content: center;
@@ -246,21 +513,35 @@ function showNoteInputDialogDesktop(notebookId: string, documentId?: string, sav
   const cancelBtn = document.createElement('button');
   cancelBtn.textContent = '取消';
   cancelBtn.className = 'b3-button b3-button--outline';
-  cancelBtn.style.cssText = `
+  cancelBtn.style.cssText = captureMode ? `
+    flex: 1;
+    padding: 5px 8px;
+    font-size: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+  ` : `
     padding: 10px 24px;
     font-size: 14px;
     border-radius: 6px;
     cursor: pointer;
   `;
-  cancelBtn.onclick = () => {
-    dialog.remove();
-    isNoteDialogShowing = false;
+  cancelBtn.onclick = async () => {
+    await teardownQuickNoteDialog(dialog, false);
   };
 
   const saveBtn = document.createElement('button');
   saveBtn.textContent = '发送';
   saveBtn.className = 'b3-button b3-button--primary';
-  saveBtn.style.cssText = `
+  saveBtn.style.cssText = captureMode ? `
+    flex: 1;
+    padding: 5px 8px;
+    font-size: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    background: ${isDark ? '#2E7BBF' : '#3b82f6'};
+    color: white;
+    border: none;
+  ` : `
     padding: 10px 24px;
     font-size: 14px;
     border-radius: 6px;
@@ -270,46 +551,25 @@ function showNoteInputDialogDesktop(notebookId: string, documentId?: string, sav
     border: none;
   `;
   saveBtn.onclick = async () => {
-    const content = textarea.value.trim();
-    if (content) {
-      // 校验ID是否已配置
-      if (saveType === 'document' && !documentId) {
-        alert('⚠️ 请先在【按钮】设置中，配置文档ID');
-        return;
-      }
-      if (saveType === 'daily' && !notebookId) {
-        alert('⚠️ 请先在【按钮】设置中，配置笔记本ID');
-        return;
-      }
-
-      try {
-        let success = false;
-        if (saveType === 'document' && documentId) {
-          success = await appendToSpecificDocument(documentId, content, insertPosition);
-        } else {
-          const response = await fetch('/api/block/appendDailyNoteBlock', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              data: content + '\n',
-              dataType: 'markdown',
-              notebook: notebookId || undefined
-            })
-          });
-          const result = await response.json();
-          success = result.code === 0;
+    try {
+      const success = await runQuickNoteSave(
+        inputHandle,
+        notebookId,
+        documentId,
+        saveType,
+        insertPosition,
+        isFromButton,
+      );
+      if (success) {
+        await Promise.resolve(inputHandle.clearAfterSave());
+        inputHandle.focus();
+        showSuccessMessage(saveType === 'document' ? '✅ 内容已追加到文档' : '✅ 记事已保存');
+        if (captureMode && captureSettings.minimizeAfterSend) {
+          minimizeSiyuanMainWindow();
         }
-
-        if (success) {
-          textarea.value = '';
-          textarea.focus();
-          showSuccessMessage(saveType === 'document' ? '✅ 内容已追加到文档' : '✅ 记事已保存');
-        } else {
-          alert('保存失败，请重试');
-        }
-      } catch (error) {
-        alert('记事保存失败，请重试');
       }
+    } catch {
+      alert('记事保存失败，请重试');
     }
   };
 
@@ -317,48 +577,74 @@ function showNoteInputDialogDesktop(notebookId: string, documentId?: string, sav
   buttonContainer.appendChild(saveBtn);
 
   content.appendChild(title);
-  content.appendChild(textarea);
+  content.appendChild(noteSection);
+  if (showQuickNoteToolbar) {
+    const toolbarSection = document.createElement('div');
+    toolbarSection.className = 'quick-note-desktop-toolbar-section';
+    toolbarSection.style.cssText = `
+      min-height: 36px;
+      max-height: 28vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      margin-top: 8px;
+    `;
+    copyDesktopQuickNoteToolbarButtons(toolbarSection, useQuickNoteOverflowSplit);
+    content.appendChild(toolbarSection);
+  }
   content.appendChild(hint);
   content.appendChild(buttonContainer);
   dialog.appendChild(content);
   document.body.appendChild(dialog);
 
-  // 记录弹窗打开时间
+  if (useQuickNoteOverflowSplit) {
+    setTimeout(() => preOpenHiddenQuickNoteOverflowToolbar('desktop'), 100);
+  }
+
+  if (captureMode) {
+    dialog.addEventListener('click', (e) => {
+      if (e.target === dialog) {
+        void teardownQuickNoteDialog(dialog, false);
+      }
+    });
+    content.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+  }
+
   dialogOpenTime = Date.now();
   lastDialogShowTime = Date.now();
 
-  // 自动聚焦到 textarea
-  // 清除之前的定时器（如果存在）
-  if (dialogFocusTimer) {
-    clearTimeout(dialogFocusTimer);
-  }
-  dialogFocusTimer = setTimeout(() => {
-    textarea.focus();
-
-    // 绑定键盘事件
-    textarea.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && e.shiftKey) {
-        // Shift+Enter 键发送
-        e.preventDefault();
-        saveBtn.click();
-      } else if (e.key === 'Escape') {
-        // Esc 键取消
-        e.preventDefault();
-        cancelBtn.click();
+  if (captureMode) {
+    setupDesktopCaptureInteraction(dialog, inputHandle, saveBtn, cancelBtn);
+    if (captureSettings.pasteClipboardOnOpen) {
+      await pasteClipboardIntoQuickNoteInput(inputHandle);
+      inputHandle.focus();
+    }
+  } else if (isFromButton && inputHandle.isPlainTextarea()) {
+    const textarea = inputHandle.element.querySelector('textarea') as HTMLTextAreaElement | null;
+    if (textarea) {
+      if (dialogFocusTimer) {
+        clearTimeout(dialogFocusTimer);
       }
-    });
-    dialogFocusTimer = null; // 执行完成后清空引用
-  }, 100);
+      dialogFocusTimer = setTimeout(() => {
+        textarea.focus();
+        textarea.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && e.shiftKey) {
+            e.preventDefault();
+            saveBtn.click();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelBtn.click();
+          }
+        });
+        dialogFocusTimer = null;
+      }, 100);
+    }
+  }
 }
 
 // === 移动端专用弹窗 ===
-function showNoteInputDialogMobile(notebookId: string, documentId?: string, saveType: 'daily' | 'document' = 'daily', insertPosition: 'top' | 'bottom' = 'bottom', isFromButton: boolean = false) {
-  // 检查是否已有弹窗存在（防止重复创建）
-  const existingDialog = document.getElementById('quick-note-dialog');
-  if (existingDialog) {
-    return;
-  }
-
+async function showNoteInputDialogMobile(notebookId: string, documentId?: string, saveType: 'daily' | 'document' = 'daily', insertPosition: 'top' | 'bottom' = 'bottom', isFromButton: boolean = false) {
   // 注意：防抖检查已在 handleVisibilityChange() 中完成，这里不需要重复检查
 
   // 标记弹窗正在显示
@@ -458,78 +744,50 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
     min-height: 32px;  /* 至少保留一行输入空间 */
   `;
 
-  const textarea = document.createElement('textarea');
+  const inputFormat = resolveQuickNoteInputFormat(isFromButton);
+  const fontSize = getQuickNoteFontSize();
+  const placeholder = documentId
+    ? (isAppleStyle ? '追加到文档' : '请输入要追加到文档的内容...')
+    : (isAppleStyle ? '写日记' : '请输入您的日记内容...');
 
-  // 根据配置显示不同的 placeholder
-  textarea.placeholder = documentId ? (isAppleStyle ? '追加到文档' : '请输入要追加到文档的内容...') : (isAppleStyle ? '写日记' : '请输入您的日记内容...');
+  const inputHandle = await createQuickNoteInputArea({
+    format: inputFormat,
+    isMobile: true,
+    isDark,
+    isAppleStyle,
+    fontSize,
+    placeholder,
+    saveTarget: inputFormat === 'block'
+      ? { saveType, notebookId, documentId, insertPosition }
+      : undefined,
+  });
+  setActiveQuickNoteInput(inputHandle);
+  noteSection.appendChild(inputHandle.element);
 
-  // 获取字体大小配置
-  const fontSize = pluginInstance?.mobileFeatureConfig?.quickNoteFontSize || (isAppleStyle ? 17 : 16);
-  
-  textarea.style.cssText = isAppleStyle ? `
-    flex: 1;
-    padding: 12px 16px;
-    border: none;
-    background: ${isDark ? '#2a2a2a' : '#f2f2f7'};
-    border-radius: 10px;
-    color: ${isDark ? '#e0e0e0' : '#000'};
-    font-size: ${fontSize}px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    resize: none;
-    overflow-y: auto;
-    overflow-x: hidden;
-    word-wrap: break-word;
-    line-height: 1.4;
-    letter-spacing: -0.2px;
-    -webkit-overflow-scrolling: touch;
-    -ms-overflow-style: scrollbar;
-    scrollbar-width: thin;
-    scrollbar-color: ${isDark ? '#555 #2a2a2a' : '#888 #f1f1f1'};
-  ` : `
-    flex: 1;
-    padding: 16px;
-    border: 2px solid ${isDark ? '#404040' : '#e0e0e0'};
-    border-radius: 8px;
-    background: ${isDark ? '#2a2a2a' : 'white'};
-    color: ${isDark ? '#e0e0e0' : '#333'};
-    font-size: ${fontSize}px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    resize: none;
-    overflow-y: auto;
-    overflow-x: hidden;
-    word-wrap: break-word;
-    line-height: 1.5;
-    -webkit-overflow-scrolling: touch;
-    -ms-overflow-style: scrollbar;
-    scrollbar-width: thin;
-    scrollbar-color: ${isDark ? '#555 #2a2a2a' : '#888 #f1f1f1'};
-  `;
-
-  // 为Webkit浏览器添加滚动条样式（避免重复注入）
-  const textareaStyleId = 'quick-note-textarea-scrollbar-style';
-  if (!document.getElementById(textareaStyleId)) {
-    const scrollbarStyle = document.createElement('style');
-    scrollbarStyle.id = textareaStyleId;
-    scrollbarStyle.textContent = `
-      #quick-note-dialog textarea::-webkit-scrollbar {
-        width: 8px;
-      }
-      #quick-note-dialog textarea::-webkit-scrollbar-track {
-        background: ${isDark ? '#2a2a2a' : '#f1f1f1'};
-        border-radius: 4px;
-      }
-      #quick-note-dialog textarea::-webkit-scrollbar-thumb {
-        background: ${isDark ? '#555' : '#888'};
-        border-radius: 4px;
-      }
-      #quick-note-dialog textarea::-webkit-scrollbar-thumb:hover {
-        background: ${isDark ? '#777' : '#555'};
-      }
-    `;
-    document.head.appendChild(scrollbarStyle);
+  if (inputHandle.isPlainTextarea()) {
+    const textareaStyleId = 'quick-note-textarea-scrollbar-style';
+    if (!document.getElementById(textareaStyleId)) {
+      const scrollbarStyle = document.createElement('style');
+      scrollbarStyle.id = textareaStyleId;
+      scrollbarStyle.textContent = `
+        #quick-note-dialog textarea::-webkit-scrollbar {
+          width: 8px;
+        }
+        #quick-note-dialog textarea::-webkit-scrollbar-track {
+          background: ${isDark ? '#2a2a2a' : '#f1f1f1'};
+          border-radius: 4px;
+        }
+        #quick-note-dialog textarea::-webkit-scrollbar-thumb {
+          background: ${isDark ? '#555' : '#888'};
+          border-radius: 4px;
+        }
+        #quick-note-dialog textarea::-webkit-scrollbar-thumb:hover {
+          background: ${isDark ? '#777' : '#555'};
+        }
+      `;
+      document.head.appendChild(scrollbarStyle);
+    }
   }
-
-  noteSection.appendChild(textarea);
 
   // 下半部分：工具栏按钮区域
   const toolbarSection = document.createElement('div');
@@ -595,62 +853,21 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
     e.preventDefault();
   });
   saveBtn.onclick = async () => {
-    const content = textarea.value.trim();
-    if (content) {
-      // 校验ID是否已配置（根据保存类型和触发来源给出精确提示）
-      if (saveType === 'document' && !documentId) {
-        const tipPrefix = isFromButton ? '【按钮】' : '【自启动一键记事】';
-        alert(`⚠️ 请先在${tipPrefix}设置中，配置文档ID`);
-        return;
+    try {
+      const success = await runQuickNoteSave(
+        inputHandle,
+        notebookId,
+        documentId,
+        saveType,
+        insertPosition,
+        isFromButton,
+      );
+      if (success) {
+        showSuccessMessage(saveType === 'document' ? '✅ 内容已追加到文档' : '✅ 记事已保存');
+        await teardownQuickNoteDialog(dialog, true);
       }
-      if (saveType === 'daily' && !notebookId) {
-        const tipPrefix = isFromButton ? '【按钮】' : '【自启动一键记事】';
-        alert(`⚠️ 请先在${tipPrefix}设置中，配置笔记本ID`);
-        return;
-      }
-
-      try {
-        let success = false;
-
-        // 根据保存类型选择对应的API
-        if (saveType === 'document' && documentId) {
-          // 文档模式：使用 prependBlock 或 appendBlock API 插入到指定文档
-          success = await appendToSpecificDocument(documentId, content, insertPosition);
-        } else {
-          // 日记模式：使用日记API
-          const response = await fetch('/api/block/appendDailyNoteBlock', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              data: content + '\n',
-              dataType: 'markdown',
-              notebook: notebookId || undefined
-            })
-          });
-
-          const result = await response.json();
-          success = result.code === 0;
-        }
-
-        if (success) {
-          showSuccessMessage(saveType === 'document' ? '✅ 内容已追加到文档' : '✅ 记事已保存');
-          // 清理滚动条样式
-          const styleIds = ['quick-note-textarea-scrollbar-style', 'quick-note-buttons-scrollbar-style'];
-          styleIds.forEach(id => {
-            const style = document.getElementById(id);
-            if (style) style.remove();
-          });
-          dialog.remove();
-          // 标记弹窗已关闭
-          isNoteDialogShowing = false;
-        } else {
-          alert('保存失败，请重试');
-        }
-      } catch (error) {
-        alert('记事保存失败，请重试');
-      }
+    } catch {
+      alert('记事保存失败，请重试');
     }
   };
 
@@ -673,10 +890,8 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
   cancelBtn.addEventListener('mousedown', (e) => {
     e.preventDefault();
   });
-  cancelBtn.onclick = () => {
-    dialog.remove();
-    // 标记弹窗已关闭
-    isNoteDialogShowing = false;
+  cancelBtn.onclick = async () => {
+    await teardownQuickNoteDialog(dialog, true);
   };
 
   buttonContainer.appendChild(cancelBtn);
@@ -690,45 +905,29 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
   document.body.appendChild(dialog);
 
   // 延后预打开扩展工具栏（隐藏状态），让弹窗先渲染出来
-  setTimeout(() => {
-    const overflowBtn = document.querySelector('[data-custom-button="overflow-button-mobile"]') as HTMLElement;
-    if (overflowBtn && document.querySelectorAll('.overflow-toolbar-layer').length === 0) {
-      overflowBtn.click();
-      document.querySelectorAll('.overflow-toolbar-layer').forEach(el => {
-        el.style.visibility = 'hidden';
-        el.style.pointerEvents = 'none';
-        el.style.animation = 'none';
-      });
-      overflowBtn.classList.remove('overflow-active');
-      overflowBtn.style.backgroundColor = 'transparent';
-    }
-  }, 100);
+  setTimeout(() => preOpenHiddenQuickNoteOverflowToolbar('mobile'), 100);
 
-  // 电脑端特有功能：自动聚焦、Enter发送、Esc取消
-  if (!isMobileDevice() && isFromButton) {
-    // 使用 setTimeout 确保 DOM 已渲染
-    // 清除之前的定时器（如果存在）
-    if (dialogFocusTimer) {
-      clearTimeout(dialogFocusTimer);
+  // 电脑端特有功能：自动聚焦、Enter发送、Esc取消（仅纯文本）
+  if (!isMobileDevice() && isFromButton && inputHandle.isPlainTextarea()) {
+    const textarea = inputHandle.element.querySelector('textarea') as HTMLTextAreaElement | null;
+    if (textarea) {
+      if (dialogFocusTimer) {
+        clearTimeout(dialogFocusTimer);
+      }
+      dialogFocusTimer = setTimeout(() => {
+        textarea.focus();
+        textarea.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            saveBtn.click();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelBtn.click();
+          }
+        });
+        dialogFocusTimer = null;
+      }, 100);
     }
-    dialogFocusTimer = setTimeout(() => {
-      // 自动聚焦到 textarea
-      textarea.focus();
-
-      // 监听键盘事件
-      textarea.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          // Enter 键（未按 Shift）发送
-          e.preventDefault();
-          saveBtn.click();
-        } else if (e.key === 'Escape') {
-          // Esc 键取消
-          e.preventDefault();
-          cancelBtn.click();
-        }
-      });
-      dialogFocusTimer = null; // 执行完成后清空引用
-    }, 100);
   }
 
   // 记录弹窗打开时间，用于保护期机制
@@ -739,58 +938,67 @@ function showNoteInputDialogMobile(notebookId: string, documentId?: string, save
     lastDialogShowTime = Date.now();
   }
 
-  // 不自动聚焦，完全由用户手动点击编辑框来控制输入法
-}
-
-// 清理预打开的隐藏扩展工具栏
-function cleanupHiddenOverflowToolbar() {
-  document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove());
-  const overflowBtn = document.querySelector('[data-custom-button="overflow-button-mobile"]') as HTMLElement;
-  if (overflowBtn) {
-    overflowBtn.classList.remove('overflow-active');
-    overflowBtn.style.backgroundColor = 'transparent';
+  // 移动端：自动聚焦输入框，弹出输入法
+  if (isMobileDevice()) {
+    if (isFromButton) {
+      // 按钮触发：App在前台，直接聚焦
+      setTimeout(() => {
+        inputHandle.focus();
+      }, 300);
+    } else {
+      // 自动触发：App在后台，focus() 无效，标记等切回前台时聚焦
+      needsInitialFocus = true;
+    }
   }
 }
 
-// 关闭记事弹窗的函数
-function closeNoteDialog() {
-  const noteDialog = document.getElementById('quick-note-dialog');
+// 清理预打开的隐藏扩展工具栏（手机端 + 电脑端记事弹窗）
+function cleanupQuickNoteOverflowToolbarLayers() {
+  document.querySelectorAll('.overflow-toolbar-layer, .desktop-overflow-toolbar-layer').forEach(el => el.remove());
+  document.querySelectorAll('[data-custom-button="overflow-button-mobile"], [data-custom-button="overflow-button-desktop"]').forEach((btn) => {
+    const overflowBtn = btn as HTMLElement;
+    overflowBtn.classList.remove('overflow-active');
+    overflowBtn.style.backgroundColor = 'transparent';
+  });
+}
+
+function preOpenHiddenQuickNoteOverflowToolbar(platform: 'mobile' | 'desktop'): void {
+  const overflowId = platform === 'desktop' ? 'overflow-button-desktop' : 'overflow-button-mobile';
+  const layerSelector = platform === 'desktop' ? '.desktop-overflow-toolbar-layer' : '.overflow-toolbar-layer';
+  const overflowBtn = document.querySelector(`[data-custom-button="${overflowId}"]`) as HTMLElement | null;
+  if (!overflowBtn || document.querySelectorAll(layerSelector).length > 0) {
+    return;
+  }
+  overflowBtn.click();
+  document.querySelectorAll(layerSelector).forEach(el => {
+    (el as HTMLElement).style.visibility = 'hidden';
+    (el as HTMLElement).style.pointerEvents = 'none';
+    (el as HTMLElement).style.animation = 'none';
+  });
+  overflowBtn.classList.remove('overflow-active');
+  overflowBtn.style.backgroundColor = 'transparent';
+}
+
+// 关闭记事弹窗的函数（兼容移动端 / 电脑端 id）
+async function closeNoteDialog() {
+  const noteDialog = getQuickNoteDialogElement();
   if (noteDialog) {
-    // 检查是否在保护期内
     const timeSinceOpen = Date.now() - dialogOpenTime;
     if (timeSinceOpen < DIALOG_PROTECTION_MS) {
       return;
     }
-
-    // 清理滚动条样式
-    const styleIds = ['quick-note-textarea-scrollbar-style', 'quick-note-buttons-scrollbar-style'];
-    styleIds.forEach(id => {
-      const style = document.getElementById(id);
-      if (style) style.remove();
-    });
-    // 清理预打开的隐藏扩展工具栏
-    cleanupHiddenOverflowToolbar();
-    noteDialog.remove();
-    isNoteDialogShowing = false;
+    const isMobileDialog = noteDialog.id === 'quick-note-dialog';
+    await teardownQuickNoteDialog(noteDialog, isMobileDialog);
     lastDialogShowTime = Date.now();
   }
 }
 
 // 立即关闭记事弹窗的函数（无延迟）
-function closeNoteDialogImmediately() {
-  const noteDialog = document.getElementById('quick-note-dialog');
+async function closeNoteDialogImmediately() {
+  const noteDialog = getQuickNoteDialogElement();
   if (noteDialog) {
-    // 清理滚动条样式
-    const scrollbarStyles = document.querySelectorAll('style');
-    scrollbarStyles.forEach(style => {
-      if (style.textContent && style.textContent.includes('quick-note-dialog')) {
-        style.remove();
-      }
-    });
-    // 清理预打开的隐藏扩展工具栏
-    cleanupHiddenOverflowToolbar();
-    noteDialog.remove();
-    isNoteDialogShowing = false;
+    const isMobileDialog = noteDialog.id === 'quick-note-dialog';
+    await teardownQuickNoteDialog(noteDialog, isMobileDialog);
     lastDialogShowTime = Date.now();
   }
 }
@@ -941,97 +1149,145 @@ function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null, 
 
 /**
  * 渲染按钮列表
- * 根据排序方法渲染按钮
+ * @param overflowMode all=弹窗内平铺全部按钮；split=主栏+⋯扩展层
  */
 function renderButtons(
   container: HTMLElement,
   buttonConfigs: any[],
   sortMethod: string,
-  isDark: boolean
+  isDark: boolean,
+  overflowButtonId = 'overflow-button-mobile',
+  overflowMode: 'all' | 'split' = 'all',
 ): void {
-  // 创建按钮容器
-  const buttonsContainer = document.createElement('div');
-  buttonsContainer.className = 'buttons-container';
+  const enabledConfigs = buttonConfigs.filter(btn => btn.enabled !== false)
 
-  // 获取配置的按钮间距
-  const useCustomStyle = pluginInstance?.mobileFeatureConfig?.useCustomButtonStyle || false;
+  let configsToRender: any[]
+  let overflowConfigs: any[] = []
+  let overflowBtnConfig: any | null = null
+
+  if (overflowMode === 'split') {
+    overflowBtnConfig = enabledConfigs.find(btn => btn.id === overflowButtonId) ?? null
+    configsToRender = enabledConfigs.filter(
+      btn => btn.id !== overflowButtonId && (btn.overflowLevel ?? 0) === 0,
+    )
+    overflowConfigs = enabledConfigs.filter(
+      btn => btn.id !== overflowButtonId && (btn.overflowLevel ?? 0) > 0,
+    )
+    if (overflowBtnConfig && overflowConfigs.length > 0) {
+      configsToRender = [...configsToRender, overflowBtnConfig]
+    } else if (overflowConfigs.length > 0) {
+      // 无 ⋯ 按钮时，扩展层按钮仍平铺显示
+      configsToRender = [...configsToRender, ...overflowConfigs]
+      overflowConfigs = []
+      overflowBtnConfig = null
+    } else {
+      overflowBtnConfig = null
+    }
+  } else {
+    configsToRender = enabledConfigs.filter(btn => btn.id !== overflowButtonId)
+  }
+
+  const wrapper = document.createElement('div')
+  wrapper.className = 'quick-note-toolbar-wrapper'
+  wrapper.style.cssText = 'width: 100%;'
+
+  const buttonsContainer = document.createElement('div')
+  buttonsContainer.className = 'buttons-container'
+
+  const useCustomStyle = pluginInstance?.mobileFeatureConfig?.useCustomButtonStyle || false
   const buttonGap = useCustomStyle
     ? (pluginInstance?.mobileFeatureConfig?.quickNoteButtonGap || 6)
-    : 6;  // 默认配置
+    : 6
 
-  // 先过滤掉扩展工具栏按钮和未启用的按钮
-  const filteredConfigs = buttonConfigs.filter(btn => btn.id !== 'overflow-button-mobile' && btn.enabled !== false);
-
-  // 根据排序方法设置样式和排序
-  let sortedConfigs: any[];
+  let sortedConfigs: any[]
+  const flexBase = `
+      display: flex;
+      flex-wrap: wrap;
+      gap: ${buttonGap}px;
+      align-content: flex-start;
+      padding: 6px 0;
+      width: 100%;
+    `
 
   if (sortMethod === 'topToolbar') {
-    // 顶部工具栏排序：每行从右往左，sort小的在右，sort大的在左，居中
-    // 使用 row-reverse + 升序 + center
-    buttonsContainer.style.cssText = `
-      display: flex;
-      flex-wrap: wrap;
-      gap: ${buttonGap}px;
-      flex-direction: row-reverse;
-      justify-content: center;
-      align-content: flex-start;
-      padding: 6px 0;
-      width: 100%;
-    `;
-    // 升序排列：sort小的在前，配合row-reverse会显示在右边
-    sortedConfigs = [...filteredConfigs].sort((a, b) => a.sort - b.sort);
+    buttonsContainer.style.cssText = `${flexBase} flex-direction: row-reverse; justify-content: center;`
+    sortedConfigs = [...configsToRender].sort((a, b) => a.sort - b.sort)
   } else {
-    // 底部工具栏排序：最新按钮在左上，居中显示
-    // 效果：按行填充，从左到右，不满行居中
-
-    // 降序排列：sort大的在前（新按钮优先）
-    sortedConfigs = [...filteredConfigs].sort((a, b) => b.sort - a.sort);
-
-    buttonsContainer.style.cssText = `
-      display: flex;
-      flex-wrap: wrap;
-      gap: ${buttonGap}px;
-      flex-direction: row;
-      justify-content: center;
-      align-content: flex-start;
-      padding: 6px 0;
-      width: 100%;
-    `;
+    buttonsContainer.style.cssText = `${flexBase} flex-direction: row; justify-content: center;`
+    sortedConfigs = [...configsToRender].sort((a, b) => b.sort - a.sort)
   }
-  
-  // 渲染按钮（使用排序后的配置）
+
+  const overflowPanel = document.createElement('div')
+  overflowPanel.className = 'quick-note-overflow-panel buttons-container'
+  overflowPanel.style.cssText = `
+    display: none;
+    flex-wrap: wrap;
+    gap: ${buttonGap}px;
+    justify-content: center;
+    padding: 4px 0 2px;
+    width: 100%;
+    border-top: 1px dashed ${isDark ? '#404040' : '#e0e0e0'};
+    margin-top: 4px;
+  `
+
+  const mountButton = (target: HTMLElement, buttonConfig: any, isOverflowToggle = false) => {
+    const originalBtn = document.querySelector(`[data-custom-button="${buttonConfig.id}"]`) as HTMLElement
+    const clonedBtn = createClonedButton(buttonConfig, originalBtn, isDark)
+
+    if (isOverflowToggle) {
+      clonedBtn.addEventListener('click', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        const opening = overflowPanel.style.display === 'none'
+        overflowPanel.style.display = opening ? 'flex' : 'none'
+        clonedBtn.classList.toggle('overflow-active', opening)
+        clonedBtn.style.backgroundColor = opening
+          ? 'color-mix(in srgb, var(--b3-theme-on-surface) 10%, transparent)'
+          : (isDark ? '#2a2a2a' : 'white')
+      })
+    } else {
+      clonedBtn.addEventListener('click', async (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        await handleButtonClick(buttonConfig, originalBtn)
+      })
+    }
+
+    target.appendChild(clonedBtn)
+  }
+
   sortedConfigs.forEach((buttonConfig) => {
-    // 查找对应的DOM按钮元素
-    const originalBtn = document.querySelector(`[data-custom-button="${buttonConfig.id}"]`) as HTMLElement;
-    
-    // 创建按钮副本
-    const clonedBtn = createClonedButton(buttonConfig, originalBtn, isDark);
-    
-    // 添加点击事件
-    clonedBtn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      await handleButtonClick(buttonConfig, originalBtn);
-    });
-    
-    buttonsContainer.appendChild(clonedBtn);
-  });
-  
-  // 如果没有创建任何按钮，显示提示
-  if (buttonsContainer.children.length === 0) {
-    const noButtonsMsg = document.createElement('div');
-    noButtonsMsg.textContent = '暂无可用按钮';
+    const isOverflowToggle = overflowMode === 'split'
+      && overflowBtnConfig != null
+      && buttonConfig.id === overflowButtonId
+    mountButton(buttonsContainer, buttonConfig, isOverflowToggle)
+  })
+
+  if (overflowMode === 'split' && overflowConfigs.length > 0) {
+    const sortedOverflow = sortMethod === 'topToolbar'
+      ? [...overflowConfigs].sort((a, b) => a.sort - b.sort)
+      : [...overflowConfigs].sort((a, b) => b.sort - a.sort)
+    sortedOverflow.forEach((buttonConfig) => mountButton(overflowPanel, buttonConfig))
+  }
+
+  if (buttonsContainer.children.length === 0 && overflowPanel.children.length === 0) {
+    const noButtonsMsg = document.createElement('div')
+    noButtonsMsg.textContent = '暂无可用按钮'
     noButtonsMsg.style.cssText = `
       font-size: 12px;
       color: #999;
       text-align: center;
       padding: 20px;
-    `;
-    container.appendChild(noButtonsMsg);
-    return;
+    `
+    container.appendChild(noButtonsMsg)
+    return
   }
 
-  container.appendChild(buttonsContainer);
+  wrapper.appendChild(buttonsContainer)
+  if (overflowMode === 'split' && overflowConfigs.length > 0) {
+    wrapper.appendChild(overflowPanel)
+  }
+  container.appendChild(wrapper)
 }
 
 /**
@@ -1049,16 +1305,10 @@ async function handleButtonClick(
     }
     // 特殊处理：template类型按钮的行为
     if (buttonConfig.type === 'template') {
-      // 获取弹窗中的textarea输入框
-      const noteDialog = document.getElementById('quick-note-dialog');
-      const textarea = noteDialog?.querySelector('textarea');
-      
-      if (textarea && buttonConfig.template) {
-        // 处理模板变量
+      const noteDialog = document.getElementById('quick-note-dialog') || document.getElementById('quick-note-dialog-desktop');
+      if (noteDialog && buttonConfig.template) {
         let templateContent = buttonConfig.template;
         const now = new Date();
-        
-        // 替换模板变量
         templateContent = templateContent
           .replace(/{{date}}/g, now.toISOString().split('T')[0])
           .replace(/{{time}}/g, now.toTimeString().split(' ')[0])
@@ -1070,26 +1320,10 @@ async function handleButtonClick(
           .replace(/{{minute}}/g, String(now.getMinutes()).padStart(2, '0'))
           .replace(/{{second}}/g, String(now.getSeconds()).padStart(2, '0'))
           .replace(/{{week}}/g, ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][now.getDay()]);
-        
-        // 插入到输入框光标位置
-        const input = textarea as HTMLTextAreaElement;
-        const startPos = input.selectionStart || input.value.length;
-        const endPos = input.selectionEnd || input.value.length;
-        
-        input.value = input.value.substring(0, startPos) + templateContent + input.value.substring(endPos);
-        
-        // 设置新的光标位置
-        const newCursorPos = startPos + templateContent.length;
-        input.setSelectionRange(newCursorPos, newCursorPos);
-        
-        // 聚焦到输入框
-        input.focus();
-        
-        // 根据按钮配置决定是否显示插入成功提示
+
+        insertTextIntoQuickNoteDialog(templateContent);
         Notify.showInfoTemplateInserted(buttonConfig.showNotification !== false);
       }
-      
-      // template类型按钮不关闭弹窗，直接返回
       return;
     }
     
@@ -1103,21 +1337,8 @@ async function handleButtonClick(
       const selectedTemplate = await showPopupSelectDialog(templates);
       
       if (selectedTemplate) {
-        const noteDialog = document.getElementById('quick-note-dialog');
-        const textarea = noteDialog?.querySelector('textarea');
-        
-        if (textarea) {
-          const processedContent = processTemplateVariables(selectedTemplate.content);
-          const input = textarea as HTMLTextAreaElement;
-          const startPos = input.selectionStart || input.value.length;
-          const endPos = input.selectionEnd || input.value.length;
-          
-          input.value = input.value.substring(0, startPos) + processedContent + input.value.substring(endPos);
-          
-          const newCursorPos = startPos + processedContent.length;
-          input.setSelectionRange(newCursorPos, newCursorPos);
-          input.focus();
-        }
+        const processedContent = processTemplateVariables(selectedTemplate.content);
+        insertTextIntoQuickNoteDialog(processedContent);
       }
       
       // 不关闭弹窗，直接返回
@@ -1129,9 +1350,9 @@ async function handleButtonClick(
       originalBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
       if (buttonConfig.type === 'builtin') {
         if (dialogBuiltinCloseTimer) clearTimeout(dialogBuiltinCloseTimer);
-        dialogBuiltinCloseTimer = setTimeout(() => { closeNoteDialog(); dialogBuiltinCloseTimer = null; }, 100);
+        dialogBuiltinCloseTimer = setTimeout(() => { void closeNoteDialog(); dialogBuiltinCloseTimer = null; }, 100);
       } else {
-        closeNoteDialogImmediately();
+        void closeNoteDialogImmediately();
       }
     }
     
@@ -1146,7 +1367,6 @@ async function handleButtonClick(
  */
 function copyBottomToolbarButtons(container: HTMLElement) {
   try {
-    // 获取所有按钮配置
     const buttonConfigs = (window as any).__mobileButtonConfigs || [];
     
     if (buttonConfigs.length === 0) {
@@ -1175,18 +1395,22 @@ function copyBottomToolbarButtons(container: HTMLElement) {
       const scrollbarStyle = document.createElement('style');
       scrollbarStyle.id = styleId;
       scrollbarStyle.textContent = `
-        #quick-note-dialog .buttons-container::-webkit-scrollbar {
+        #quick-note-dialog .buttons-container::-webkit-scrollbar,
+        #quick-note-dialog-desktop .buttons-container::-webkit-scrollbar {
           width: 6px;
         }
-        #quick-note-dialog .buttons-container::-webkit-scrollbar-track {
+        #quick-note-dialog .buttons-container::-webkit-scrollbar-track,
+        #quick-note-dialog-desktop .buttons-container::-webkit-scrollbar-track {
           background: ${isDark ? '#2a2a2a' : '#f1f1f1'};
           border-radius: 3px;
         }
-        #quick-note-dialog .buttons-container::-webkit-scrollbar-thumb {
+        #quick-note-dialog .buttons-container::-webkit-scrollbar-thumb,
+        #quick-note-dialog-desktop .buttons-container::-webkit-scrollbar-thumb {
           background: ${isDark ? '#555' : '#888'};
           border-radius: 3px;
         }
-        #quick-note-dialog .buttons-container::-webkit-scrollbar-thumb:hover {
+        #quick-note-dialog .buttons-container::-webkit-scrollbar-thumb:hover,
+        #quick-note-dialog-desktop .buttons-container::-webkit-scrollbar-thumb:hover {
           background: ${isDark ? '#777' : '#555'};
         }
       `;
@@ -1194,7 +1418,7 @@ function copyBottomToolbarButtons(container: HTMLElement) {
     }
 
     // 根据排序方法调用渲染函数
-    renderButtons(container, buttonConfigs, sortMethod, isDark);
+    renderButtons(container, buttonConfigs, sortMethod, isDark, 'overflow-button-mobile');
 
   } catch (error) {
     const errorMsg = document.createElement('div');
@@ -1209,20 +1433,32 @@ function copyBottomToolbarButtons(container: HTMLElement) {
   }
 }
 
-// 新增：根据文档ID追加内容的函数
-async function appendToSpecificDocument(documentId: string, content: string, insertPosition: 'top' | 'bottom' = 'bottom'): Promise<boolean> {
+function copyDesktopQuickNoteToolbarButtons(container: HTMLElement, useOverflowSplit = false) {
   try {
-    let result;
-    if (insertPosition === 'top') {
-      // 插入到文档顶部
-      result = await prependBlock('markdown', content + '\n', documentId);
-    } else {
-      // 追加到文档底部
-      result = await appendBlock('markdown', content + '\n', documentId);
+    const buttonConfigs = pluginInstance?.desktopButtonConfigs || [];
+    if (buttonConfigs.length === 0) {
+      const noButtonsMsg = document.createElement('div');
+      noButtonsMsg.textContent = '暂无电脑端按钮配置';
+      noButtonsMsg.style.cssText = 'font-size: 12px; color: #999; text-align: center; padding: 12px;';
+      container.appendChild(noButtonsMsg);
+      return;
     }
-    return result && result.length > 0;
-  } catch (error) {
-    return false;
+
+    const sortMethod = pluginInstance?.mobileFeatureConfig?.quickNoteSortMethod || 'bottomToolbar';
+    const isDark = isSiyuanDarkMode();
+    renderButtons(
+      container,
+      buttonConfigs,
+      sortMethod,
+      isDark,
+      'overflow-button-desktop',
+      useOverflowSplit ? 'split' : 'all',
+    );
+  } catch {
+    const errorMsg = document.createElement('div');
+    errorMsg.textContent = '按钮加载失败';
+    errorMsg.style.cssText = 'font-size: 12px; color: #ff6b6b; text-align: center; padding: 12px;';
+    container.appendChild(errorMsg);
   }
 }
 
@@ -1254,15 +1490,23 @@ function showSuccessMessage(message: string) {
  * @returns {boolean} 如果有内容返回true，否则返回false
  */
 function hasNoteDialogContent(): boolean {
-  const noteDialog = document.getElementById('quick-note-dialog');
+  const noteDialog = document.getElementById('quick-note-dialog') || document.getElementById('quick-note-dialog-desktop');
   if (!noteDialog) {
     return false;
   }
-  const textarea = noteDialog.querySelector('textarea') as HTMLTextAreaElement;
-  if (!textarea) {
-    return false;
+
+  const handle = getActiveQuickNoteInput();
+  if (handle) {
+    if (handle.isPlainTextarea()) {
+      const textarea = handle.element.querySelector('textarea') as HTMLTextAreaElement | null;
+      return !!(textarea?.value.trim());
+    }
+    const editEl = noteDialog.querySelector('.toolbar-customizer-qnote-protyle [contenteditable="true"]') as HTMLElement | null;
+    return !!(editEl?.textContent?.replace(/\u200b/g, '').trim());
   }
-  return textarea.value.trim().length > 0;
+
+  const textarea = noteDialog.querySelector('textarea') as HTMLTextAreaElement | null;
+  return !!(textarea?.value.trim());
 }
 
 /**
@@ -1332,11 +1576,20 @@ function handleVisibilityChange() {
     return;
   }
 
+  // 图片选择器激活期间，跳过一键记事弹窗（防止选择图片切回时误触发）
+  if ((window as any).__imagePickerActive) {
+    return;
+  }
+
   // 获取弹窗配置
   const popupConfig = pluginInstance.mobileFeatureConfig?.popupConfig || 'bothModes';
 
   // ========== 切后台时：弹出弹窗 ==========
   if (document.hidden) {
+    // 记录弹窗输入框是否正有焦点（切回前台时据此决定是否恢复输入法）
+    wasQuickNoteInputFocused = isNoteDialogShowing &&
+      !!getActiveQuickNoteInput()?.element?.contains(document.activeElement);
+
     // 根据配置调用不同的处理函数
     if (popupConfig === 'smallWindowOnly') {
       // ②只在小窗模式：使用小窗模式专用函数
@@ -1349,17 +1602,27 @@ function handleVisibilityChange() {
     return;
   }
 
-  // ========== 切前台时：检测是否是小窗 ==========
-  if (!document.hidden && popupConfig === 'smallWindowOnly') {
-    // 延迟检测，等待窗口调整完成
-    setTimeout(() => {
-      // 检测当前是否是小窗模式
-      const isSmallWindow = checkIsSmallWindowMode();
-      if (isSmallWindow) {
-        // 是小窗模式，弹出弹窗
-        handleSmallWindowOnlyMode();
-      }
-    }, 400);
+  // ========== 切前台时 ==========
+  if (!document.hidden) {
+    // 弹窗正在显示时，恢复输入框焦点（让输入法重新弹出）
+    // 两种情况需要恢复：切后台前输入框有焦点，或新弹窗待初始聚焦
+    if (isNoteDialogShowing && (wasQuickNoteInputFocused || needsInitialFocus)) {
+      wasQuickNoteInputFocused = false;
+      needsInitialFocus = false;
+      setTimeout(() => {
+        getActiveQuickNoteInput()?.focus();
+      }, 300);
+    }
+
+    // 小窗模式：延迟检测是否需要弹窗
+    if (popupConfig === 'smallWindowOnly') {
+      setTimeout(() => {
+        const isSmallWindow = checkIsSmallWindowMode();
+        if (isSmallWindow) {
+          handleSmallWindowOnlyMode();
+        }
+      }, 400);
+    }
   }
 }
 
@@ -1474,15 +1737,23 @@ export function clearSmallWindowDetector(): void {
     visibilityChangeListener = null;
   }
 
-  // 清理残留的弹窗DOM元素
-  const mobileDialog = document.getElementById('quick-note-dialog');
-  if (mobileDialog) {
-    mobileDialog.remove();
-  }
-  const desktopDialog = document.getElementById('quick-note-dialog-desktop');
-  if (desktopDialog) {
-    desktopDialog.remove();
-  }
+  // 清理残留的弹窗 DOM（块格式须先 cancelDraft 再 destroy）
+  void (async () => {
+    try {
+      await cancelQuickNoteDialog(getActiveQuickNoteInput());
+    } catch {
+      // ignore
+    }
+    try {
+      destroyActiveQuickNoteInput();
+    } catch {
+      // ignore
+    }
+    document.getElementById('quick-note-dialog')?.remove();
+    document.getElementById('quick-note-dialog-desktop')?.remove();
+    isNoteDialogShowing = false;
+    isQuickNoteDialogMinimized = false;
+  })();
 
   // 清理残留的滚动条样式元素
   const textareaScrollbarStyle = document.getElementById('quick-note-textarea-scrollbar-style');
@@ -1504,6 +1775,7 @@ export function clearSmallWindowDetector(): void {
   lastDialogShowTime = 0;
   dialogOpenTime = 0;
   isNoteDialogShowing = false;
+  isQuickNoteDialogMinimized = false;
 }
 
 /**
@@ -1544,4 +1816,87 @@ function useApiFallback(notebookId: string, siyuan: any) {
 }
 
 // 导出函数供其他模块使用
-export { showSmallWindowTip, showSiyuanEditorDialog };
+export { showSmallWindowTip, showSiyuanEditorDialog, shouldUseQuickNoteFloatWindow };
+
+/** 电脑端：全局快捷键 / 按钮 — 纯文本悬浮窗 或 块格式 openWindow */
+export async function triggerDesktopQuickNoteCapture(isFromButton = false): Promise<void> {
+  if (isMobileDevice()) return;
+  if (pluginInstance?.desktopFeatureConfig?.disableCustomButtons) return;
+
+  const captureSettings = getDesktopQuickNoteCaptureSettings();
+  if (!captureSettings.globalCaptureEnabled && !isFromButton) return;
+
+  if (shouldUseDesktopQuickNoteBlockWindow(isFromButton)) {
+    await toggleDesktopQuickNoteBlockWindow(isFromButton);
+    return;
+  }
+
+  const source = isFromButton ? 'button' : 'globalHotkey';
+  if (!shouldUseQuickNoteFloatWindow(source)) {
+    if (isFromButton) {
+      await showSmallWindowTip();
+    }
+    return;
+  }
+  toggleQuickNoteFloatWindow(isFromButton);
+}
+
+/** 电脑端：全局快捷键唤起一键记事（思源可处于后台，进程需保持运行） */
+export async function triggerDesktopQuickNoteGlobalCapture(): Promise<void> {
+  await triggerDesktopQuickNoteCapture(false);
+}
+
+/** 悬浮窗保存：纯文本写入日记/文档（块格式在独立窗中不适用） */
+export async function saveQuickNotePlainTextFromFloat(
+  text: string,
+  isFromButton: boolean,
+): Promise<QuickNoteFloatSaveResult> {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return { ok: false, message: '请输入内容' };
+  }
+
+  const { notebookId, documentId, saveType, insertPosition } = resolveQuickNoteTargetConfig(isFromButton);
+
+  if (saveType === 'document' && !documentId) {
+    return { ok: false, message: '请先在设置中配置文档 ID' };
+  }
+  if (saveType === 'daily' && !notebookId) {
+    return { ok: false, message: '请先在设置中配置笔记本 ID' };
+  }
+
+  try {
+    const ok = await saveQuickNoteContent(
+      { format: 'plain', markdown: trimmed },
+      { saveType, notebookId, documentId, insertPosition },
+    );
+    if (!ok) {
+      return { ok: false, message: '保存失败，请重试' };
+    }
+
+    const captureSettings = getDesktopQuickNoteCaptureSettings();
+    if (captureSettings.minimizeAfterSend) {
+      minimizeSiyuanMainWindow();
+    }
+
+    return {
+      ok: true,
+      message: saveType === 'document' ? '✅ 内容已追加到文档' : '✅ 记事已保存',
+      clear: true,
+    };
+  } catch {
+    return { ok: false, message: '保存失败，请重试' };
+  }
+}
+
+export function getQuickNoteFloatTitle(isFromButton: boolean): string {
+  const { documentId, saveType } = resolveQuickNoteTargetConfig(isFromButton);
+  if (saveType === 'document' && documentId) return '⚡ 快速追加到文档';
+  return '⚡ 快速记事';
+}
+
+export function getQuickNoteFloatPlaceholder(isFromButton: boolean): string {
+  const { documentId, saveType } = resolveQuickNoteTargetConfig(isFromButton);
+  if (saveType === 'document' && documentId) return '请输入要追加到文档的内容…';
+  return '记一笔…';
+}

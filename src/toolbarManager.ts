@@ -88,6 +88,7 @@ export interface ButtonConfig {
   quickNoteDocumentId?: string; // 一键记事：目标文档ID
   quickNoteSaveType?: 'daily' | 'document'; // 一键记事：保存方式（新增）
   quickNoteInsertPosition?: 'top' | 'bottom'; // 一键记事：插入位置（顶部/底部）
+  quickNoteInputFormat?: 'plain' | 'block'; // 一键记事：输入格式（plain=纯文本, block=思源块格式）
   // 弹窗选择输入配置
   popupSelectTemplates?: { name: string; content: string }[]; // 弹窗选择：模板列表
   // 连续点击自定义按钮配置
@@ -4263,6 +4264,8 @@ async function executeImageUpload(config: ButtonConfig) {
   document.body.appendChild(fileInput)
 
   fileInput.onchange = async () => {
+    // 清除图片选择器标记，恢复一键记事弹窗的正常触发
+    ;(window as any).__imagePickerActive = false
     const file = fileInput.files?.[0]
     document.body.removeChild(fileInput)
     if (!file) return
@@ -4335,7 +4338,16 @@ async function executeImageUpload(config: ButtonConfig) {
     }
   }
 
+  // 标记图片选择器激活，防止切后台时触发一键记事弹窗
+  ;(window as any).__imagePickerActive = true
+  // 兼容：部分浏览器支持 cancel 事件（用户取消选择时清除标记）
+  fileInput.addEventListener('cancel', () => {
+    ;(window as any).__imagePickerActive = false
+    try { document.body.removeChild(fileInput) } catch { /* ignore */ }
+  })
   fileInput.click()
+  // 安全兜底：30秒后自动清除标记（防止 onchange/cancel 均不触发的极端情况）
+  setTimeout(() => { ;(window as any).__imagePickerActive = false }, 30000)
 }
 
 /**
@@ -6624,68 +6636,32 @@ function checkHeightChange() {
 }
 
 // 导入 windowDetector 中的函数
-import { showSmallWindowTip as showSmallWindowTipFromDetector } from './windowDetector';
+import {
+  showSmallWindowTip as showSmallWindowTipFromDetector,
+  triggerDesktopQuickNoteCapture,
+} from './windowDetector';
 
 // 一键记事执行函数
-async function executeQuickNote(config: ButtonConfig) {
+async function executeQuickNote(_config: ButtonConfig) {
   try {
-    // 获取配置参数（优先使用按钮自身的配置）
-    let notebookId = '';
-    let documentId = '';
-    let saveType = 'daily'; // 默认保存到日记
-    let insertPosition: 'top' | 'bottom' = 'bottom'; // 默认插入到底部
-
-    // 优先使用按钮自身的配置
-    if (config.quickNoteSaveType) {
-      saveType = config.quickNoteSaveType;
-      if (saveType === 'document') {
-        documentId = config.quickNoteDocumentId || '';
-      } else {
-        notebookId = config.quickNoteNotebookId || '';
-      }
-      // 获取按钮的插入位置配置
-      if (config.quickNoteInsertPosition) {
-        insertPosition = config.quickNoteInsertPosition;
-      } else {
-        // 回退到全局配置
-        insertPosition = pluginInstance?.mobileFeatureConfig?.quickNoteInsertPosition || 'bottom';
-      }
-    } else {
-      // 如果按钮没有配置，回退到全局配置
-      if (pluginInstance?.mobileFeatureConfig?.quickNoteSaveType) {
-        saveType = pluginInstance.mobileFeatureConfig.quickNoteSaveType;
-        if (saveType === 'document') {
-          documentId = pluginInstance.mobileFeatureConfig.quickNoteDocumentId || '';
-        } else {
-          notebookId = pluginInstance.mobileFeatureConfig.quickNoteNotebookId || '';
-        }
-        insertPosition = pluginInstance.mobileFeatureConfig.quickNoteInsertPosition || 'bottom';
-      } else {
-        // 兼容旧的配置方式
-        notebookId = config.quickNoteNotebookId || '';
-        documentId = config.quickNoteDocumentId || '';
-        insertPosition = pluginInstance?.mobileFeatureConfig?.quickNoteInsertPosition || 'bottom';
-      }
-    }
-
-    // 直接调用现有的记事检测功能
-    // 临时设置插件实例的配置（保留原有配置，只覆盖需要的字段）
-    const existingConfig = (window as any).__pluginInstance?.mobileFeatureConfig || {};
     const tempPlugin = {
       mobileFeatureConfig: {
-        ...existingConfig,
-        quickNoteNotebookId: notebookId,
-        quickNoteDocumentId: documentId,
-        quickNoteSaveType: saveType,
-        quickNoteInsertPosition: insertPosition
-      }
+        ...(pluginInstance?.mobileFeatureConfig || {}),
+        __quickNoteButtonTrigger: true,
+      },
     };
     (window as any).__pluginInstance = tempPlugin;
-    showSmallWindowTipFromDetector();
+
+    if (!isMobileDevice()) {
+      await triggerDesktopQuickNoteCapture(true);
+      return;
+    }
+
+    await showSmallWindowTipFromDetector();
 
   } catch (error) {
     console.error('一键记事执行失败:', error);
-    const message = `按钮 "${config.name}" 的一键记事功能执行失败`;
+    const message = `按钮 "${_config.name}" 的一键记事功能执行失败`;
     showMessage(message, 3000, 'error');
   }
 }

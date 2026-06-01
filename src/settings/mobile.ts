@@ -76,6 +76,7 @@ export interface MobileFeatureConfig {
   quickNoteButtonMargin?: number    // 按钮自身外边距
   quickNoteButtonPadding?: number   // 按钮内容的内边距
   quickNoteButtonGap?: number       // 按钮之间的间距
+  quickNoteButtonIds?: string[]     // 一键记事弹窗显示的按钮ID（空或undefined=显示全部）
   // 工具栏样式配置
   toolbarStyle?: 'default' | 'divider'  // 工具栏样式：默认或带分割线
 }
@@ -2580,9 +2581,161 @@ export function createMobileSettingLayout(
     }
   })
 
+  // ===弹窗按钮选择 ===
+  setting.addItem({
+    title: '⑤弹窗按钮选择',
+    description: '💡 选择哪些按钮显示在一键记事弹窗中（不选则显示全部）',
+    createActionElement: () => {
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = `
+        margin: 0 -16px;
+        width: calc(100% + 32px);
+      `;
+
+      const container = document.createElement('div');
+      container.style.cssText = 'display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--b3-theme-background); border: 1px solid var(--b3-border-color); border-radius: 8px;';
+
+      const config = context.mobileFeatureConfig as any;
+      const currentIds: string[] = config.quickNoteButtonIds || [];
+      // 获取所有已启用的移动端按钮（排除溢出按钮）
+      const allButtons = context.mobileButtonConfigs
+        .filter((btn: any) => btn.enabled !== false && btn.id !== 'overflow-button-mobile');
+
+      if (allButtons.length === 0) {
+        const emptyMsg = document.createElement('div');
+        emptyMsg.textContent = '暂无可选按钮，请先在「②手机端按钮」中添加按钮';
+        emptyMsg.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface-light); text-align: center; padding: 16px;';
+        container.appendChild(emptyMsg);
+        wrapper.appendChild(container);
+        return wrapper;
+      }
+
+      // 「全选/取消全选」切换行
+      const toggleRow = document.createElement('div');
+      toggleRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--b3-theme-primary-lightest, rgba(59,130,246,0.08)); border-radius: 6px; margin-bottom: 4px;';
+
+      const toggleLabel = document.createElement('span');
+      toggleLabel.textContent = `全部按钮（${allButtons.length} 个）`;
+      toggleLabel.style.cssText = 'font-size: 14px; font-weight: 500;';
+
+      const toggleBtn = document.createElement('button');
+      toggleBtn.className = 'b3-button b3-button--text';
+      toggleBtn.style.cssText = 'font-size: 13px; padding: 4px 12px;';
+
+      const isAllSelected = currentIds.length === 0 || currentIds.length === allButtons.length;
+      toggleBtn.textContent = isAllSelected ? '取消全选' : '全选';
+
+      toggleRow.appendChild(toggleLabel);
+      toggleRow.appendChild(toggleBtn);
+      container.appendChild(toggleRow);
+
+      // 按钮列表
+      const checkboxList = document.createElement('div');
+      checkboxList.style.cssText = 'display: flex; flex-direction: column; gap: 6px;';
+
+      const rows: HTMLDivElement[] = [];
+      const checkboxes: HTMLInputElement[] = [];
+
+      allButtons.forEach((btn: any) => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--b3-border-color); border-radius: 6px; cursor: pointer;';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = currentIds.length === 0 || currentIds.includes(btn.id);
+        checkbox.style.cssText = 'transform: scale(1.2); flex-shrink: 0;';
+
+        // 图标
+        const iconSpan = document.createElement('span');
+        iconSpan.style.cssText = 'width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;';
+        if (btn.icon) {
+          if (btn.icon.startsWith('icon')) {
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('width', '16');
+            svg.setAttribute('height', '16');
+            svg.style.cssText = 'display: block;';
+            const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+            use.setAttribute('href', `#${btn.icon}`);
+            svg.appendChild(use);
+            iconSpan.appendChild(svg);
+          } else if (btn.icon.startsWith('lucide:')) {
+            iconSpan.textContent = btn.icon.substring(7).substring(0, 2);
+            iconSpan.style.fontSize = '12px';
+          } else if (/\.(png|jpg|jpeg|gif|svg)$/i.test(btn.icon)) {
+            const img = document.createElement('img');
+            const pluginName = 'siyuan-toolbar-customizer';
+            img.src = btn.icon.startsWith('/plugins/') ? btn.icon : `/plugins/${pluginName}/${btn.icon}`;
+            img.style.cssText = 'width: 16px; height: 16px; object-fit: contain; display: block;';
+            iconSpan.appendChild(img);
+          } else {
+            iconSpan.textContent = btn.icon;
+            iconSpan.style.fontSize = '16px';
+          }
+        }
+
+        // 名称
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = btn.name || btn.id;
+        nameSpan.style.cssText = 'font-size: 14px; flex: 1;';
+
+        row.appendChild(checkbox);
+        row.appendChild(iconSpan);
+        row.appendChild(nameSpan);
+
+        // 点击行切换（checkbox 本身阻止冒泡，避免双次切换）
+        checkbox.addEventListener('click', (e) => {
+          e.stopPropagation();
+          void saveSelection();
+        });
+        row.onclick = async () => {
+          checkbox.checked = !checkbox.checked;
+          await saveSelection();
+        };
+
+        checkboxList.appendChild(row);
+        rows.push(row);
+        checkboxes.push(checkbox);
+      });
+
+      container.appendChild(checkboxList);
+
+      // 保存函数
+      const saveSelection = async () => {
+        const selectedIds: string[] = [];
+        checkboxes.forEach((cb, index) => {
+          if (cb.checked && allButtons[index]) {
+            selectedIds.push(allButtons[index].id);
+          }
+        });
+
+        // 全选时存空数组（向后兼容 = 显示全部）
+        if (selectedIds.length === allButtons.length) {
+          config.quickNoteButtonIds = [];
+        } else {
+          config.quickNoteButtonIds = selectedIds;
+        }
+
+        // 更新切换按钮文本
+        toggleBtn.textContent = selectedIds.length === allButtons.length ? '取消全选' : '全选';
+
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+      };
+
+      // 全选/取消全选
+      toggleBtn.onclick = async () => {
+        const allCurrentlyChecked = checkboxes.every(cb => cb.checked);
+        checkboxes.forEach(cb => { cb.checked = !allCurrentlyChecked; });
+        await saveSelection();
+      };
+
+      wrapper.appendChild(container);
+      return wrapper;
+    }
+  })
+
   // ===弹窗输入框字体大小 ===
   setting.addItem({
-    title: '⑤弹窗输入框字体大小',
+    title: '⑥弹窗输入框字体大小',  // 原⑤，因插入按钮选择器后顺延
     description: '💡 调节一键记事弹窗中输入框的字体大小',
     createActionElement: () => {
       const config = context.mobileFeatureConfig as any;
@@ -2604,7 +2757,7 @@ export function createMobileSettingLayout(
 
   // 按钮样式配置模式切换
   setting.addItem({
-    title: '⑥按钮样式配置',
+    title: '⑦按钮样式配置',
     description: '💡 选择使用默认配置或自定义配置按钮样式',
     createActionElement: () => {
       const wrapper = document.createElement('div');

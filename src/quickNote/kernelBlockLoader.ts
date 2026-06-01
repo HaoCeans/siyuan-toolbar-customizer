@@ -141,7 +141,7 @@ export function installKernelProtyleGuards(
   let recovering = false
 
   const recoverIfEmpty = () => {
-    if (recovering || !state.loadSettled) return
+    if (recovering || !state.loadSettled || state.isDestroying) return
     const tops = getLiveWysiwygTopBlocks(editor.protyle.wysiwyg.element)
     if (tops.length > 0) return
     recovering = true

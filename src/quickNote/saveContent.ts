@@ -1,3 +1,4 @@
+import { fetchSyncPost } from 'siyuan'
 import type { QuickNoteContent } from './inputArea'
 import { insertQuickNoteBlockAtPosition } from './kernelBlock'
 
@@ -33,16 +34,12 @@ export async function saveQuickNoteContent(
       return appendToSpecificDocument(options.documentId, content, options.insertPosition, 'markdown')
     }
 
-    const response = await fetch('/api/block/appendDailyNoteBlock', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        data: `${content}\n`,
-        dataType: 'markdown',
-        notebook: options.notebookId || undefined,
-      }),
+    // 使用 fetchSyncPost 让内核广播更新通知，主编辑器能立即看到新内容
+    const result = await fetchSyncPost('/api/block/appendDailyNoteBlock', {
+      data: `${content}\n`,
+      dataType: 'markdown',
+      notebook: options.notebookId || undefined,
     })
-    const result = await response.json()
     return result.code === 0
   }
 
@@ -53,15 +50,11 @@ export async function saveQuickNoteContent(
     return appendToSpecificDocument(options.documentId, dom, options.insertPosition, 'dom')
   }
 
-  const response = await fetch('/api/block/appendDailyNoteBlock', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      data: dom,
-      dataType: 'dom',
-      notebook: options.notebookId || undefined,
-    }),
+  // 使用 fetchSyncPost 让内核广播更新通知，主编辑器能立即看到新内容
+  const result = await fetchSyncPost('/api/block/appendDailyNoteBlock', {
+    data: dom,
+    dataType: 'dom',
+    notebook: options.notebookId || undefined,
   })
-  const result = await response.json()
   return result.code === 0
 }

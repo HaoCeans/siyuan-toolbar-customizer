@@ -1367,8 +1367,14 @@ async function handleButtonClick(
  */
 function copyBottomToolbarButtons(container: HTMLElement) {
   try {
-    const buttonConfigs = (window as any).__mobileButtonConfigs || [];
-    
+    let buttonConfigs = (window as any).__mobileButtonConfigs || [];
+
+    // 按配置过滤弹窗按钮（空或undefined则显示全部）
+    const quickNoteButtonIds = pluginInstance?.mobileFeatureConfig?.quickNoteButtonIds;
+    if (quickNoteButtonIds && quickNoteButtonIds.length > 0) {
+      buttonConfigs = buttonConfigs.filter((btn: any) => quickNoteButtonIds.includes(btn.id));
+    }
+
     if (buttonConfigs.length === 0) {
       // 如果没有按钮配置，显示提示信息
       const noButtonsMsg = document.createElement('div');

@@ -165,7 +165,11 @@ export async function createBlockInputHandle(
     },
     cancelDraft: async () => {
       if (savedToKernel) return
+      // 标记正在销毁，阻止 recoverIfEmpty 创建新草稿块
+      state.isDestroying = true
       await waitForProtyleTransactionsIdle(800, 40)
+      // 额外等待，确保正在执行中的 resetDraftBlock 完成并更新 state.rootBlockId
+      await new Promise<void>(r => setTimeout(r, 150))
       const tops = getLiveWysiwygTopBlocks(editor.protyle.wysiwyg.element)
       const ids = new Set<string>()
       for (const el of tops) {
@@ -190,7 +194,14 @@ export async function createBlockInputHandle(
       try {
         document.execCommand('insertText', false, text)
       } catch {
-        editEl.textContent = (editEl.textContent ?? '') + text
+        // execCommand 不可用时，用 Selection API 降级（避免直接替换 textContent 丢失格式）
+        const sel = window.getSelection()
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0)
+          range.deleteContents()
+          range.insertNode(document.createTextNode(text))
+          range.collapse(false)
+        }
       }
     },
     focus: () => {

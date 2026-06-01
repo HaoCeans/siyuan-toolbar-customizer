@@ -6,6 +6,8 @@ export interface QuickNoteRootState {
   rootBlockId: string
   docRootId: string
   loadSettled: boolean
+  /** 正在销毁/取消中，阻止 recoverIfEmpty 创建新块 */
+  isDestroying?: boolean
 }
 
 export function createQuickNoteRootState(rootBlockId: string, docRootId?: string): QuickNoteRootState {

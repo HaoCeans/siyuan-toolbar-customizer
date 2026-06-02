@@ -469,7 +469,10 @@ function closeFloatWindow(opts?: { force?: boolean }): void {
       // 强制销毁：先移除 close 拦截器，再 destroy
       try {
         const interceptor = (win as any).__qnCloseInterceptor
-        if (interceptor) win.removeListener?.('close', interceptor)
+        if (interceptor) {
+          win.removeListener?.('close', interceptor)
+          delete (win as any).__qnCloseInterceptor
+        }
       } catch { /* ignore */ }
       if (!win.closed && typeof win.destroy === 'function') {
         win.destroy()

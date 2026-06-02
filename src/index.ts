@@ -853,6 +853,7 @@ export default class ToolbarCustomizer extends Plugin {
       mobileButtonConfigs: this.mobileButtonConfigs,
       desktopFeatureConfig: this.desktopFeatureConfig,
       mobileFeatureConfig: this.mobileFeatureConfig,
+      desktopGlobalButtonConfig: this.desktopGlobalButtonConfig,
       mobileGlobalButtonConfig: this.mobileGlobalButtonConfig
     })
 
@@ -916,6 +917,7 @@ export default class ToolbarCustomizer extends Plugin {
         const mobileToolbarChanged = changed('mobileToolbarConfig', this.mobileConfig)
         const desktopFeatureChanged = changed('desktopFeatureConfig', this.desktopFeatureConfig)
         const mobileFeatureChanged = changed('mobileFeatureConfig', this.mobileFeatureConfig)
+        const desktopGlobalButtonChanged = changed('desktopGlobalButtonConfig', this.desktopGlobalButtonConfig)
         const mobileGlobalButtonChanged = changed('mobileGlobalButtonConfig', this.mobileGlobalButtonConfig)
 
         const hasAnyChange =
@@ -924,6 +926,7 @@ export default class ToolbarCustomizer extends Plugin {
           mobileToolbarChanged ||
           desktopFeatureChanged ||
           mobileFeatureChanged ||
+          desktopGlobalButtonChanged ||
           mobileGlobalButtonChanged
 
         if (!hasAnyChange && !this._pendingWelcomeSave) {
@@ -944,6 +947,9 @@ export default class ToolbarCustomizer extends Plugin {
         }
         if (!this.isMobile && desktopFeatureChanged) {
           await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
+        }
+        if (!this.isMobile && desktopGlobalButtonChanged) {
+          await this.saveData('desktopGlobalButtonConfig', this.desktopGlobalButtonConfig)
         }
         if (mobileFeatureChanged) {
           await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
@@ -1105,6 +1111,8 @@ export default class ToolbarCustomizer extends Plugin {
     await this.removeData('mobileFeatureConfig')
     await this.removeData('mobileToolbarConfig')
     await this.removeData('featureConfig')  // 旧版配置
+    await this.removeData('buttonConfigs')  // 旧版错误 key
+    await this.removeData('mobileConfig')   // 旧版错误 key
     // 注意：不删除 hasShownWelcome 和 v3MigrationAsked
   }
 

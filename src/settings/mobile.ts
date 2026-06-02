@@ -2883,9 +2883,10 @@ export function createMobileSettingLayout(
 
       const config = context.mobileFeatureConfig as any;
       const currentIds: string[] = config.quickNoteButtonIds || [];
-      // 获取所有已启用的移动端按钮（排除溢出按钮）
+      // 获取所有已启用的移动端按钮（排除溢出按钮），按 sort 排序
       const allButtons = context.mobileButtonConfigs
-        .filter((btn: any) => btn.enabled !== false && btn.id !== 'overflow-button-mobile');
+        .filter((btn: any) => btn.enabled !== false && btn.id !== 'overflow-button-mobile')
+        .sort((a: any, b: any) => (a.sort ?? 0) - (b.sort ?? 0));
 
       if (allButtons.length === 0) {
         const emptyMsg = document.createElement('div');
@@ -3359,66 +3360,71 @@ export function createMobileSettingLayout(
           </thead>
           <tbody>
             <tr>
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⓪</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">一键记事弹窗块格式</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键记事弹窗支持思源块格式输入，富文本编辑，插入标题、列表、代码块等<br/><a href="javascript:void(0)" onclick="(function(){var el=document.getElementById('quick-note-format-section');if(!el)return;el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('jump-highlight');void el.offsetWidth;el.classList.add('jump-highlight');setTimeout(function(){el.classList.remove('jump-highlight')},2000)})()" style="color: var(--b3-theme-primary); font-size: 12px; text-decoration: underline;">👉 点击跳转到设置项</a></td>
+            </tr>
+            <tr style="background: var(--b3-theme-background);">
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">①</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">连续点击自定义按钮</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键自动执行多个按钮操作，告别重复点击，工作流自动化</td>
             </tr>
-            <tr style="background: var(--b3-theme-background);">
+            <tr>
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">②</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">打开指定ID块</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">瞬间跳转到任意文档任意位置，精准定位，省时省力</td>
             </tr>
-            <tr>
+            <tr style="background: var(--b3-theme-background);">
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">③</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">数据库悬浮弹窗</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">悬浮窗口快速查看数据库，无需切换页面，数据触手可及</td>
             </tr>
-            <tr style="background: var(--b3-theme-background);">
+            <tr>
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">④</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">日记底部</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键直达日记末尾，快速追加内容，记录生活点滴</td>
             </tr>
-            <tr>
+            <tr style="background: var(--b3-theme-background);">
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑤</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">叶归LifeLog适配</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">与LifeLog插件深度整合，时间记录更智能，生活管理更高效</td>
             </tr>
-            <tr style="background: var(--b3-theme-background);">
+            <tr>
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑥</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">弹窗框模板选择</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">弹出式模板选择器，快速插入常用内容，写作效率倍增</td>
             </tr>
-            <tr>
+            <tr style="background: var(--b3-theme-background);">
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑦</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">滚动文档顶部或底部</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键直达文档首尾，长文档浏览更轻松，阅读体验升级</td>
             </tr>
-            <tr style="background: var(--b3-theme-background);">
+            <tr>
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑧</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">图片快捷导入日记</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">选择图片快速导入日记，支持手动定位或自动追加，图片管理更便捷</td>
             </tr>
-            <tr>
+            <tr style="background: var(--b3-theme-background);">
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑨</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">手机端标签页Tab</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">手机端多文档快速切换，苹果风格悬浮Tab栏，自动管理，告别反复返回</td>
             </tr>
-            <tr style="background: var(--b3-theme-background);">
+            <tr>
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑩</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">手机端悬浮大纲</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">左侧悬浮大纲面板，标题快速跳转，实时跟踪当前位置，阅读长文必备</td>
             </tr>
-            <tr>
+            <tr style="background: var(--b3-theme-background);">
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑪</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">手机端前一篇/后一篇文档</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">底部悬浮导航栏，按文件树顺序浏览文档，前后翻页，阅读笔记更流畅</td>
             </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑫</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">一键记事弹窗块格式</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键记事弹窗支持思源块格式输入，富文本编辑，插入标题、列表、代码块等<br/><a href="javascript:void(0)" onclick="(function(){var el=document.getElementById('quick-note-format-section');if(!el)return;el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('jump-highlight');void el.offsetWidth;el.classList.add('jump-highlight');setTimeout(function(){el.classList.remove('jump-highlight')},2000)})()" style="color: var(--b3-theme-primary); font-size: 12px; text-decoration: underline;">👉 点击跳转到设置项</a></td>
-            </tr>
             <tr>
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑫</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">滑动快速批注</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键开启/关闭鲸鱼快速批注插件的滑动批注模式，手指滑动即可标注文字👉需要先下载鲸鱼快速批注插件</td>
+            </tr>
+            <tr style="background: var(--b3-theme-background);">
               <td colspan="3" style="padding: 12px; text-align: center; color: var(--b3-theme-primary); font-weight: 600; font-style: italic;">持续更新中~</td>
             </tr>
           </tbody>

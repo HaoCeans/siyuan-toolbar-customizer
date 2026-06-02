@@ -64,7 +64,7 @@ export interface ButtonConfig {
   targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
   mobileTargetDocId?: string; // 打开指定ID块：目标块ID（移动端），支持文档ID或块ID
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
-  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary=日记, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮, scroll-doc=滚动文档顶部或底部, image-upload=图片快捷导入日记, mobile-tabs=手机端标签页Tab, mobile-outline=手机端悬浮大纲, doc-nav=手机端前一篇/后一篇文档
+  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary=日记, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮, scroll-doc=滚动文档顶部或底部, image-upload=图片快捷导入日记, mobile-tabs=手机端标签页Tab, mobile-outline=手机端悬浮大纲, doc-nav=手机端前一篇/后一篇文档, slide-comment=滑动快速批注
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
   viewName?: string;         // 视图名称
@@ -4187,6 +4187,25 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
   // ⑪手机端前一篇/后一篇文档
   if (subtype === 'doc-nav') {
     executeMobileDocNav(config)
+    return
+  }
+
+  // ⑫滑动快速批注（调用鲸鱼快速批注插件的 toggleSlideCommentMode）
+  if (subtype === 'slide-comment') {
+    const app = pluginInstance?.app
+    if (app?.plugins) {
+      const commentPlugin = app.plugins.find((p: any) => {
+        return typeof p.toggleSlideCommentMode === 'function'
+      })
+      if (commentPlugin) {
+        const isActive = (commentPlugin as any).toggleSlideCommentMode()
+        if (config.showNotification) {
+          showMessage(isActive ? '✅ 滑动快速批注已开启' : '❌ 滑动快速批注已关闭')
+        }
+      } else {
+        Notify.showErrorCommandCannotExecute('未找到鲸鱼快速批注插件，请先安装并启用')
+      }
+    }
     return
   }
 

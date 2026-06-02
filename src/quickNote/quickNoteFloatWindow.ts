@@ -35,6 +35,8 @@ let themeObserver: MutationObserver | null = null
 let floatSaveIsFromButton = false
 let floatWindowAllowAutoShow = true
 let floatWindowWantsVisible = true
+// 预创建定时器 ID（插件卸载时需清除）
+let preCreateTimer: ReturnType<typeof setTimeout> | null = null
 // 防止全局快捷键与 in-app hotkey 连续触发导致 minimize → immediately restore
 let lastFloatToggleTime = 0
 const FLOAT_TOGGLE_COOLDOWN_MS = 500
@@ -154,7 +156,8 @@ export function initQuickNoteFloatWindow(d: QuickNoteFloatWindowDeps): void {
   })
 
   // 延迟 2 秒预创建悬浮窗（隐藏状态），首次快捷键触发时可直接 show，免去创建延迟
-  setTimeout(() => {
+  preCreateTimer = setTimeout(() => {
+    preCreateTimer = null
     if (!canUseFloatWindow()) return
     if (resolveFloatWindow()) return  // 已存在则跳过
     floatWindowWantsVisible = false
@@ -164,6 +167,10 @@ export function initQuickNoteFloatWindow(d: QuickNoteFloatWindowDeps): void {
 }
 
 export function destroyQuickNoteFloatWindow(): void {
+  if (preCreateTimer) {
+    clearTimeout(preCreateTimer)
+    preCreateTimer = null
+  }
   closeFloatWindow({ force: true })
   themeObserver?.disconnect()
   themeObserver = null

@@ -280,21 +280,32 @@
         }
       });
 
-      // 主窗口退出时自动关闭
+      // 主窗口退出时自动关闭（有限次数检测，避免无限轮询浪费资源）
       try {
         const remote = require('@electron/remote');
         const BrowserWindow = remote.BrowserWindow;
         if (BrowserWindow && floatSelfWindow) {
-          window.setInterval(function() {
+          var mainWinCheckCount = 0;
+          var mainWinCheckTimer = window.setInterval(function() {
+            mainWinCheckCount++;
             try {
               if (MAIN_WINDOW_ID > 0) {
-                const w = BrowserWindow.fromId(MAIN_WINDOW_ID);
+                var w = BrowserWindow.fromId(MAIN_WINDOW_ID);
                 if (!w || (w.isDestroyed && w.isDestroyed())) {
                   try { floatSelfWindow.destroy ? floatSelfWindow.destroy() : floatSelfWindow.close(); } catch (e2) {}
+                  clearInterval(mainWinCheckTimer);
+                  return;
                 }
               }
             } catch (e) {
               try { floatSelfWindow.destroy ? floatSelfWindow.destroy() : floatSelfWindow.close(); } catch (e2) {}
+              clearInterval(mainWinCheckTimer);
+              return;
+            }
+            // 最多检测 300 次（约 6 分钟），之后停止轮询
+            // 主进程 destroy() 是更可靠的生命周期管理方式
+            if (mainWinCheckCount >= 300) {
+              clearInterval(mainWinCheckTimer);
             }
           }, 1200);
         }

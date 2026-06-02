@@ -171,7 +171,9 @@ export async function createQuickNoteDraftBlock(target: QuickNoteSaveTarget): Pr
 
 export async function deleteQuickNoteDraftBlock(blockId: string | null | undefined): Promise<void> {
   if (!blockId) return
-  if (!(await blockExistsInKernel(blockId))) return
+  // 直接尝试 API 删除，不先查 blockExistsInKernel：
+  // 刚创建的块可能还未被 SQL 索引，导致 blockExistsInKernel 返回 false 而跳过删除，
+  // 进而在 recoverIfEmpty 循环中不断创建新块却不删旧块，造成空块累积。
   const ok = await deleteBlockSilent(blockId)
   if (ok) return
   try {

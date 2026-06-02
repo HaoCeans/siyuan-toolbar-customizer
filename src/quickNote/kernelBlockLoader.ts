@@ -139,11 +139,20 @@ export function installKernelProtyleGuards(
   isolateQuickNoteProtyleWs(editor)
 
   let recovering = false
+  // 防止 recoverIfEmpty 无限循环创建草稿块（每次恢复都新建块）
+  const MAX_RECOVERY_ATTEMPTS = 2
+  let recoveryAttempts = 0
 
   const recoverIfEmpty = () => {
     if (recovering || !state.loadSettled || state.isDestroying) return
+    if (recoveryAttempts >= MAX_RECOVERY_ATTEMPTS) return
     const tops = getLiveWysiwygTopBlocks(editor.protyle.wysiwyg.element)
-    if (tops.length > 0) return
+    if (tops.length > 0) {
+      // 内容已恢复，重置计数
+      recoveryAttempts = 0
+      return
+    }
+    recoveryAttempts++
     recovering = true
     void Promise.resolve(onEmptyContent?.() ?? reloadBlock())
       .finally(() => {

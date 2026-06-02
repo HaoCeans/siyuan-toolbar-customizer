@@ -187,9 +187,19 @@ export async function createBlockInputHandle(
       }
     },
     clearAfterSave: async () => {
-      const ok = await resetDraftBlock(editor, state, options)
+      // 保存后清空编辑器准备下一次输入：
+      // 创建新的空草稿块并加载，但保留旧块（已保存内容）不删除。
+      // 不能调用 resetDraftBlock（它会删除旧块导致已保存内容丢失）。
+      if (!options.saveTarget) return
+      const newId = await createQuickNoteDraftBlock(options.saveTarget)
+      if (!newId) return
+      state.rootBlockId = newId
+      state.docRootId = newId
+      const ok = await loadSingleBlockIntoProtyle(editor, state)
       if (ok) {
         savedToKernel = false
+        const editEl = editor.protyle.wysiwyg.element.querySelector('[contenteditable="true"]') as HTMLElement | null
+        editEl?.focus()
       }
     },
     insertText: (text: string) => {

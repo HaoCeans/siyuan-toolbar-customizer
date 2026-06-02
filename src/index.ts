@@ -55,6 +55,7 @@ import {
   handleQuickNoteFloatCommand,
   isQuickNoteFloatSaveFromButton,
 } from './quickNote/quickNoteFloatWindow'
+import { destroyQuickNoteBlockWindow } from './quickNote/quickNoteBlockWindow'
 
 // 导入 StressThreshold 清理函数
 import {
@@ -178,6 +179,7 @@ export default class ToolbarCustomizer extends Plugin {
     quickNoteMinimizeAfterSend: false,    // 电脑端：发送后最小化思源
     quickNotePasteClipboardOnOpen: false, // 电脑端：打开捕获窗时粘贴剪贴板
     quickNoteOverflowToolbarEnabled: false, // 电脑端：记事弹窗内显示插件扩展工具栏
+    quickNoteInputFormat: 'plain' as 'plain' | 'block', // 电脑端：一键记事输入格式（独立于手机端）
   }
 
   // 手机端小功能配置
@@ -361,6 +363,12 @@ export default class ToolbarCustomizer extends Plugin {
           ...this.desktopFeatureConfig,
           ...savedDesktopFeatureConfig
         }
+      }
+
+      // 向后兼容：如果电脑端没有独立的 quickNoteInputFormat，从手机端迁移一次
+      if (!savedDesktopFeatureConfig?.quickNoteInputFormat && this.mobileFeatureConfig.quickNoteInputFormat) {
+        this.desktopFeatureConfig.quickNoteInputFormat = this.mobileFeatureConfig.quickNoteInputFormat
+        await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
       }
 
       // 加载手机端小功能配置
@@ -762,6 +770,7 @@ export default class ToolbarCustomizer extends Plugin {
 
   onunload() {
     destroyQuickNoteFloatWindow()
+    destroyQuickNoteBlockWindow()
     try { delete (window as any).__quickNoteFloatCommand } catch { /* ignore */ }
 
     // 清理资源
@@ -1280,6 +1289,24 @@ export default class ToolbarCustomizer extends Plugin {
     if (styleContent) {
       style.textContent = styleContent
       document.head.appendChild(style)
+    }
+
+    // 注入跳转高亮动画样式（功能列表→设置项跳转时使用）
+    if (!document.getElementById('toolbar-customizer-jump-highlight-style')) {
+      const hlStyle = document.createElement('style')
+      hlStyle.id = 'toolbar-customizer-jump-highlight-style'
+      hlStyle.textContent = `
+        @keyframes jump-highlight-pulse {
+          0%   { outline: 3px solid var(--b3-theme-primary); outline-offset: 4px; background: rgba(59, 130, 246, 0.15); }
+          40%  { outline: 3px solid var(--b3-theme-primary); outline-offset: 4px; background: rgba(59, 130, 246, 0.15); }
+          100% { outline: 3px solid transparent; outline-offset: 4px; background: transparent; }
+        }
+        .jump-highlight {
+          animation: jump-highlight-pulse 2s ease-out forwards;
+          border-radius: 8px;
+        }
+      `
+      document.head.appendChild(hlStyle)
     }
 
     syncMobileTopLineBreakButton(

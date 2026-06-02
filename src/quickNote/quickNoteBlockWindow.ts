@@ -716,6 +716,14 @@ function createDirectBlockBrowserWindow(
     // ignore
   }
 
+  // 拦截 close：隐藏而非销毁，保持窗口存活以便瞬间再次唤起
+  const closeInterceptor = (e: any) => {
+    e.preventDefault()
+    applyBlockWindowVisibility(win, false)
+  }
+  win.on('close', closeInterceptor)
+  ;(win as any).__qnBlockCloseInterceptor = closeInterceptor
+
   // ★ 关键优化：在 dom-ready 就注入 CSS，让标题等元素在创建前就被隐藏
   // dom-ready 比 did-finish-load 更早触发，此时 DOM 刚解析完毕、Si源 JS 还未渲染编辑器
   win.webContents.on('dom-ready', () => {
@@ -853,4 +861,20 @@ export async function openDesktopQuickNoteBlockWindow(isFromButton = false): Pro
 
 export function shouldUseDesktopQuickNoteBlockWindow(isFromButton = false): boolean {
   return resolveQuickNoteInputFormat(isFromButton) === 'block'
+}
+
+/** 插件卸载时强制销毁块窗口（移除 close 拦截器后 destroy） */
+export function destroyQuickNoteBlockWindow(): void {
+  const win = findTrackedBlockQuickNoteWindow()
+  if (!win) return
+  try {
+    const interceptor = (win as any).__qnBlockCloseInterceptor
+    if (interceptor) win.removeListener?.('close', interceptor)
+    if (!win.isDestroyed?.()) win.destroy?.()
+  } catch { /* ignore */ }
+  trackedBlockQuickNoteWindow = null
+  injectedBlockWindowIds.clear()
+  try {
+    localStorage.removeItem(QUICKNOTE_BLOCK_WINDOW_ELECTRON_ID_KEY)
+  } catch { /* ignore */ }
 }

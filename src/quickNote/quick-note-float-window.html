@@ -248,9 +248,8 @@
 
       function closeSelf() {
         sendToMain('cancel');
-        try {
-          if (floatSelfWindow) floatSelfWindow.close();
-        } catch (e) {}
+        // 不再直接调用 floatSelfWindow.close()：
+        // 主进程收到 'cancel' 后会隐藏窗口（保持存活），close 拦截器是安全兜底
       }
 
       saveBtn.addEventListener('click', function() {

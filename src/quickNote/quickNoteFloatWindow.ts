@@ -152,6 +152,15 @@ export function initQuickNoteFloatWindow(d: QuickNoteFloatWindowDeps): void {
     attributes: true,
     attributeFilter: ['data-theme-mode'],
   })
+
+  // 延迟 2 秒预创建悬浮窗（隐藏状态），首次快捷键触发时可直接 show，免去创建延迟
+  setTimeout(() => {
+    if (!canUseFloatWindow()) return
+    if (resolveFloatWindow()) return  // 已存在则跳过
+    floatWindowWantsVisible = false
+    floatWindowAllowAutoShow = false
+    createFloatWindow()
+  }, 2000)
 }
 
 export function destroyQuickNoteFloatWindow(): void {
@@ -338,6 +347,14 @@ function createFloatWindow(): void {
       FLOAT_MIN_H,
     )
 
+    // 拦截 close 事件：隐藏而非销毁，保持窗口存活以便瞬间再次唤起
+    const closeInterceptor = (e: any) => {
+      e.preventDefault()
+      applyFloatWindowVisibility(floatWindow, false)
+    }
+    floatWindow.on('close', closeInterceptor)
+    ;(floatWindow as any).__qnCloseInterceptor = closeInterceptor
+
     floatWindow.on('closed', () => {
       floatWindow = null
       floatWindowWantsVisible = true
@@ -432,16 +449,23 @@ function closeFloatWindow(opts?: { force?: boolean }): void {
       floatWindow = null
       return
     }
-    if (!win.closed) {
-      if (opts?.force && typeof win.destroy === 'function') win.destroy()
-      else win.close()
+    if (opts?.force) {
+      // 强制销毁：先移除 close 拦截器，再 destroy
+      try {
+        const interceptor = (win as any).__qnCloseInterceptor
+        if (interceptor) win.removeListener?.('close', interceptor)
+      } catch { /* ignore */ }
+      if (!win.closed && typeof win.destroy === 'function') {
+        win.destroy()
+      }
+      floatWindow = null
+      try {
+        localStorage.removeItem(QUICKNOTE_FLOAT_WINDOW_ELECTRON_ID_KEY)
+      } catch { /* ignore */ }
+    } else {
+      // 非强制：仅隐藏，保持窗口存活以便瞬间再次唤起
+      applyFloatWindowVisibility(win, false)
     }
-  } catch {
-    // ignore
-  }
-  floatWindow = null
-  try {
-    localStorage.removeItem(QUICKNOTE_FLOAT_WINDOW_ELECTRON_ID_KEY)
   } catch {
     // ignore
   }
@@ -456,7 +480,9 @@ export async function handleQuickNoteFloatCommand(cmd: string, payload?: string)
   }
 
   if (cmd === 'cancel') {
-    closeFloatWindow()
+    // 隐藏而非销毁：保持窗口存活，下次唤起时瞬间弹出且保留草稿
+    const win = resolveFloatWindow()
+    if (win) applyFloatWindowVisibility(win, false)
     return
   }
 

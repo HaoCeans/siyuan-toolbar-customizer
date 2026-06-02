@@ -55,7 +55,6 @@ import {
   handleQuickNoteFloatCommand,
   isQuickNoteFloatSaveFromButton,
 } from './quickNote/quickNoteFloatWindow'
-import { destroyQuickNoteBlockWindow } from './quickNote/quickNoteBlockWindow'
 
 // 导入 StressThreshold 清理函数
 import {
@@ -770,7 +769,6 @@ export default class ToolbarCustomizer extends Plugin {
 
   onunload() {
     destroyQuickNoteFloatWindow()
-    destroyQuickNoteBlockWindow()
     try { delete (window as any).__quickNoteFloatCommand } catch { /* ignore */ }
 
     // 清理资源

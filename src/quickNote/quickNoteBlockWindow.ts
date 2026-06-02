@@ -716,6 +716,14 @@ function createDirectBlockBrowserWindow(
     // ignore
   }
 
+  // ★ 关键优化：在 dom-ready 就注入 CSS，让标题等元素在创建前就被隐藏
+  // dom-ready 比 did-finish-load 更早触发，此时 DOM 刚解析完毕、Si源 JS 还未渲染编辑器
+  win.webContents.on('dom-ready', () => {
+    try {
+      win.webContents.insertCSS(buildQuickNoteBlockWindowCss()).catch(() => {})
+    } catch { /* ignore */ }
+  })
+
   win.loadURL(url)
   blockWindowAllowAutoShow = blockWindowWantsVisible
   win.webContents.once('did-finish-load', () => {

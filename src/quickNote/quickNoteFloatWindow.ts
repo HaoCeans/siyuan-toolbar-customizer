@@ -193,9 +193,18 @@ function applyFloatWindowVisibility(win: any, visible: boolean): void {
   try {
     if (visible) {
       applyFloatWindowBounds(win)
+      // 在 show 前先推送关键状态（主题/标题/字号），确保首帧就是正确外观
+      const essential = {
+        isDark: deps?.isDarkMode() ?? false,
+        title: deps?.getFloatTitle() ?? '⚡ 记事',
+        placeholder: deps?.getPlaceholder() ?? '记一笔…',
+        fontSize: getQuickNoteFontSize(),
+      }
+      pushFloatState(essential)
       if (win.isMinimized?.()) win.restore()
       win.show?.()
       win.focus?.()
+      // 完整同步（含剪贴板粘贴等异步操作）在后台进行
       void syncFloatState()
     } else {
       // 用 hide 代替 minimize：alwaysOnTop 窗口 minimize 后在 Windows 上会被系统立即恢复，
@@ -375,9 +384,9 @@ function createFloatWindow(): void {
     const html = getFloatWindowHtml()
     floatWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
 
-    floatWindow.webContents.once('did-finish-load', () => {
+    floatWindow.webContents.once('did-finish-load', async () => {
       applyFloatWindowBounds(floatWindow)
-      syncFloatState()
+      await syncFloatState()  // 确保主题/标题等状态在隐藏前已推送完毕
       applyFloatWindowVisibility(floatWindow, floatWindowWantsVisible)
     })
   } catch (e) {

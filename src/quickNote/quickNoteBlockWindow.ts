@@ -104,6 +104,7 @@ function buildQuickNoteBlockWindowInjectScript(): string {
 
   const stripChrome = () => {
     document.title = ${JSON.stringify(QUICK_NOTE_BLOCK_WINDOW_TITLE)};
+    document.body.setAttribute('data-quick-note-block-window', 'true');
     hide('ul.layout-tab-bar:not(.layout-tab-bar--readonly)');
     hide('.protyle-title');
     hide('.protyle-background');
@@ -300,6 +301,9 @@ function buildQuickNoteBlockWindowInjectScript(): string {
 let blockWindowOpening = false
 let blockWindowAllowAutoShow = true
 let blockWindowWantsVisible = true
+// 防止全局快捷键与 in-app hotkey 连续触发导致 minimize → immediately restore
+let lastBlockToggleTime = 0
+const BLOCK_TOGGLE_COOLDOWN_MS = 500
 const injectedBlockWindowIds = new Set<number>()
 let trackedBlockQuickNoteWindow: any = null
 
@@ -429,7 +433,9 @@ function applyBlockWindowVisibility(win: any, visible: boolean): void {
       win.show?.()
       win.focus?.()
     } else {
-      win.minimize?.()
+      // 用 hide 代替 minimize：alwaysOnTop 窗口 minimize 后在 Windows 上会被系统立即恢复，
+      // 导致「最小化→立刻弹出」的闪烁；hide() 直接隐藏窗口，无此问题。
+      win.hide?.()
     }
   } catch {
     trackedBlockQuickNoteWindow = null
@@ -764,6 +770,11 @@ async function openQuickNoteBlockWindow(blockId: string, bounds: ReturnType<type
 
 /** 电脑端：块格式 — 快捷键/按钮切换（已开则最小化，已最小化则恢复） */
 export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): Promise<boolean> {
+  // 冷却保护：防止短时间内连续 toggle（全局快捷键 + in-app hotkey 双触发）
+  const now = Date.now()
+  if (now - lastBlockToggleTime < BLOCK_TOGGLE_COOLDOWN_MS) return false
+  lastBlockToggleTime = now
+
   if (toggleBlockQuickNoteWindowVisibility()) {
     return true
   }

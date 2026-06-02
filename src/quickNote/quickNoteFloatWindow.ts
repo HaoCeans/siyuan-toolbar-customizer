@@ -35,6 +35,9 @@ let themeObserver: MutationObserver | null = null
 let floatSaveIsFromButton = false
 let floatWindowAllowAutoShow = true
 let floatWindowWantsVisible = true
+// 防止全局快捷键与 in-app hotkey 连续触发导致 minimize → immediately restore
+let lastFloatToggleTime = 0
+const FLOAT_TOGGLE_COOLDOWN_MS = 500
 
 const WIN_W = 200
 const WIN_H = 168
@@ -186,7 +189,9 @@ function applyFloatWindowVisibility(win: any, visible: boolean): void {
       win.focus?.()
       void syncFloatState()
     } else {
-      win.minimize?.()
+      // 用 hide 代替 minimize：alwaysOnTop 窗口 minimize 后在 Windows 上会被系统立即恢复，
+      // 导致「最小化→立刻弹出」的闪烁；hide() 直接隐藏窗口，无此问题。
+      win.hide?.()
     }
   } catch {
     // ignore
@@ -199,6 +204,11 @@ function showFloatWindowIfAllowed(win: any): void {
 
 export function toggleQuickNoteFloatWindow(isFromButton = false): void {
   if (!canUseFloatWindow()) return
+
+  // 冷却保护：防止短时间内连续 toggle（全局快捷键 + in-app hotkey 双触发）
+  const now = Date.now()
+  if (now - lastFloatToggleTime < FLOAT_TOGGLE_COOLDOWN_MS) return
+  lastFloatToggleTime = now
 
   floatSaveIsFromButton = isFromButton
   const win = resolveFloatWindow()

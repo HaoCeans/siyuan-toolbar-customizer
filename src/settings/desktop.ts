@@ -960,7 +960,7 @@ export function createDesktopSettingLayout(
         box-sizing: border-box;
       `
       whaleFunctionListContainer.innerHTML = `
-        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（11项）</div>
+        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（12项）</div>
         <div style="font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>
         <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
           <thead>
@@ -1025,6 +1025,11 @@ export function createDesktopSettingLayout(
               <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑪</td>
               <td style="padding: 10px; font-weight: 500;">手机端前一篇/后一篇文档</td>
               <td style="padding: 10px; color: var(--b3-theme-on-surface);">底部悬浮导航栏，按文件树顺序浏览文档，前后翻页，阅读笔记更流畅</td>
+            </tr>
+            <tr style="background: var(--b3-theme-background);">
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑫</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">一键记事弹窗块格式</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键记事弹窗支持思源块格式输入，富文本编辑，插入标题、列表、代码块等<br/><a href="javascript:void(0)" onclick="(function(){var btn=document.querySelector('button[data-tab=&quot;desktop&quot;]');if(btn)btn.click();setTimeout(function(){var el=document.getElementById('quick-note-format-section-desktop');if(!el)return;el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('jump-highlight');void el.offsetWidth;el.classList.add('jump-highlight');setTimeout(function(){el.classList.remove('jump-highlight')},2000)},300)})()" style="color: var(--b3-theme-primary); font-size: 12px; text-decoration: underline;">👉 点击跳转到设置项</a></td>
             </tr>
             <tr>
               <td colspan="3" style="padding: 12px; text-align: center; color: var(--b3-theme-primary); font-weight: 600; font-style: italic;">持续更新中~</td>

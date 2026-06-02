@@ -938,16 +938,20 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     lastDialogShowTime = Date.now();
   }
 
-  // 移动端：自动聚焦输入框，弹出输入法
+  // 移动端：自动聚焦输入框，弹出输入法（根据开关配置）
   if (isMobileDevice()) {
     if (isFromButton) {
-      // 按钮触发：App在前台，直接聚焦
-      setTimeout(() => {
-        inputHandle.focus();
-      }, 300);
+      // 按钮触发：检查开关后直接聚焦
+      if (pluginInstance?.mobileFeatureConfig?.quickNoteAutoFocusButton !== false) {
+        setTimeout(() => {
+          inputHandle.focus();
+        }, 300);
+      }
     } else {
-      // 自动触发：App在后台，focus() 无效，标记等切回前台时聚焦
-      needsInitialFocus = true;
+      // 自动触发：检查开关后标记等切回前台时聚焦
+      if (pluginInstance?.mobileFeatureConfig?.quickNoteAutoFocusFirstPopup !== false) {
+        needsInitialFocus = true;
+      }
     }
   }
 }
@@ -1610,9 +1614,13 @@ function handleVisibilityChange() {
 
   // ========== 切前台时 ==========
   if (!document.hidden) {
-    // 弹窗正在显示时，恢复输入框焦点（让输入法重新弹出）
-    // 两种情况需要恢复：切后台前输入框有焦点，或新弹窗待初始聚焦
-    if (isNoteDialogShowing && (wasQuickNoteInputFocused || needsInitialFocus)) {
+    // 弹窗正在显示时，根据开关恢复输入框焦点
+    const shouldRestoreFocus = wasQuickNoteInputFocused
+      ? pluginInstance?.mobileFeatureConfig?.quickNoteAutoFocusRestore !== false
+      : needsInitialFocus
+        ? pluginInstance?.mobileFeatureConfig?.quickNoteAutoFocusFirstPopup !== false
+        : false;
+    if (isNoteDialogShowing && shouldRestoreFocus) {
       wasQuickNoteInputFocused = false;
       needsInitialFocus = false;
       setTimeout(() => {
@@ -1824,9 +1832,19 @@ function useApiFallback(notebookId: string, siyuan: any) {
 // 导出函数供其他模块使用
 export { showSmallWindowTip, showSiyuanEditorDialog, shouldUseQuickNoteFloatWindow };
 
+// 防抖：全局快捷键可能短时间内触发多次，导致先最小化再立刻弹出
+let lastToggleTimestamp = 0;
+const TOGGLE_DEBOUNCE_MS = 400;
+
 /** 电脑端：全局快捷键 / 按钮 — 纯文本悬浮窗 或 块格式 openWindow */
 export async function triggerDesktopQuickNoteCapture(isFromButton = false): Promise<void> {
   if (isMobileDevice()) return;
+  // 防抖：全局快捷键走防抖，按钮不限制（按钮连续点击是用户有意操作）
+  if (!isFromButton) {
+    const now = Date.now();
+    if (now - lastToggleTimestamp < TOGGLE_DEBOUNCE_MS) return;
+    lastToggleTimestamp = now;
+  }
   if (pluginInstance?.desktopFeatureConfig?.disableCustomButtons) return;
 
   const captureSettings = getDesktopQuickNoteCaptureSettings();

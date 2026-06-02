@@ -55,8 +55,8 @@ export function createQuickNoteFormatFieldFromOptions(options: QuickNoteFormatFi
   section.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
   const label = document.createElement('label')
-  label.textContent = '📋 输入框格式选择'
-  label.style.cssText = 'font-size: 13px; font-weight: 500;'
+  label.textContent = '③弹窗输入框格式选择'
+  label.style.cssText = 'font-size: 14px; font-weight: 600; color: var(--b3-theme-on-background); margin-top: 4px;'
   section.appendChild(label)
 
   const radioContainer = document.createElement('div')
@@ -206,6 +206,26 @@ export function createDesktopGlobalQuickNoteFormatField(context: QuickNoteGlobal
     isAuthorToolActivated: context.isAuthorToolActivated,
     radioNameSuffix: '-desktop-global',
     onChange: () => context.saveData('mobileFeatureConfig', context.mobileFeatureConfig),
+    onActivationRequired: navigateToDesktopActivationTab,
+  })
+}
+
+type DesktopQuickNoteFormatContext = {
+  desktopFeatureConfig: { quickNoteInputFormat?: QuickNoteInputFormat }
+  isAuthorToolActivated: () => boolean
+  saveData: (key: string, value: unknown) => Promise<void>
+}
+
+/** 电脑端：一键记事格式选择（独立存储于 desktopFeatureConfig） */
+export function createDesktopQuickNoteFormatField(context: DesktopQuickNoteFormatContext): HTMLElement {
+  return createQuickNoteFormatFieldFromOptions({
+    getFormat: () => context.desktopFeatureConfig.quickNoteInputFormat,
+    setFormat: (format) => {
+      context.desktopFeatureConfig.quickNoteInputFormat = format
+    },
+    isAuthorToolActivated: context.isAuthorToolActivated,
+    radioNameSuffix: '-desktop-independent',
+    onChange: () => context.saveData('desktopFeatureConfig', context.desktopFeatureConfig),
     onActivationRequired: navigateToDesktopActivationTab,
   })
 }

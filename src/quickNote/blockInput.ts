@@ -66,8 +66,13 @@ async function resetDraftBlock(
   options: QuickNoteInputAreaOptions,
 ): Promise<boolean> {
   if (!options.saveTarget) return false
+  // 记住旧块 ID，创建新块后删除旧块，避免留下空白块
+  const oldBlockId = state.rootBlockId
   const newId = await createQuickNoteDraftBlock(options.saveTarget)
   if (!newId) return false
+  if (oldBlockId && oldBlockId !== newId) {
+    await deleteQuickNoteDraftBlock(oldBlockId)
+  }
   state.rootBlockId = newId
   state.docRootId = newId
   const ok = await loadSingleBlockIntoProtyle(editor, state)

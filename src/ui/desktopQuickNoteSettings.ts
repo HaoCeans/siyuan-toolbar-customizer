@@ -2,7 +2,7 @@
  * 电脑端设置底部 — 一键记事统一配置区
  */
 
-import { createDesktopGlobalQuickNoteFormatField } from './quickNoteFormatField'
+import { createDesktopQuickNoteFormatField } from './quickNoteFormatField'
 
 export const DESKTOP_QUICK_NOTE_SECTION_ID = 'desktop-quick-note-settings-section'
 
@@ -130,7 +130,7 @@ function createSaveConfigSection(context: DesktopQuickNoteSettingsContext): HTML
   const section = document.createElement('div')
   section.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
-  section.appendChild(createSubTitle('②保存配置'))
+  section.appendChild(createSubTitle('①保存配置'))
   section.appendChild(createHint('选择保存方式并填写对应的目标 ID'))
 
   const radioContainer = document.createElement('div')
@@ -205,7 +205,7 @@ function createInsertPositionSection(context: DesktopQuickNoteSettingsContext): 
   const section = document.createElement('div')
   section.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
-  section.appendChild(createSubTitle('③插入位置'))
+  section.appendChild(createSubTitle('②插入位置'))
   section.appendChild(createHint('追加到文档时，选择插入到顶部或底部'))
 
   const radioContainer = document.createElement('div')
@@ -304,19 +304,19 @@ export function createDesktopQuickNoteSettingsSection(
     '<strong>块格式</strong> → 思源原生独立编辑窗（完整 Protyle，可置顶；编辑内容自动写入日记/文档）。'
   box.appendChild(intro)
 
-  box.appendChild(createSubTitle('①输入框格式'))
-  box.appendChild(
-    createDesktopGlobalQuickNoteFormatField({
-      mobileFeatureConfig: context.mobileFeatureConfig as { quickNoteInputFormat?: 'plain' | 'block' },
-      isAuthorToolActivated: context.isAuthorToolActivated,
-      saveData: async (_key, _value) => {
-        await context.saveMobileConfig()
-      },
-    }),
-  )
-
   box.appendChild(createSaveConfigSection(context))
   box.appendChild(createInsertPositionSection(context))
+
+  const formatField = createDesktopQuickNoteFormatField({
+    desktopFeatureConfig: context.desktopFeatureConfig as { quickNoteInputFormat?: 'plain' | 'block' },
+    isAuthorToolActivated: context.isAuthorToolActivated,
+    saveData: async (_key, _value) => {
+      await context.saveDesktopConfig()
+    },
+  })
+  formatField.id = 'quick-note-format-section-desktop'
+  box.appendChild(formatField)
+
   box.appendChild(createFontSizeSection(context))
 
   const desktopCfg = context.desktopFeatureConfig

@@ -77,6 +77,10 @@ export interface MobileFeatureConfig {
   quickNoteButtonPadding?: number   // 按钮内容的内边距
   quickNoteButtonGap?: number       // 按钮之间的间距
   quickNoteButtonIds?: string[]     // 一键记事弹窗显示的按钮ID（空或undefined=显示全部）
+  // 一键记事弹窗输入法自动弹出开关
+  quickNoteAutoFocusButton?: boolean    // 按钮触发时自动弹出输入法
+  quickNoteAutoFocusFirstPopup?: boolean // 自动触发首次弹出时弹出输入法
+  quickNoteAutoFocusRestore?: boolean   // 切后台前有输入法则切回后恢复
   // 工具栏样式配置
   toolbarStyle?: 'default' | 'divider'  // 工具栏样式：默认或带分割线
 }
@@ -1988,32 +1992,6 @@ export function createMobileSettingLayout(
     }
   });
 
-  // === 输入格式选择（纯文本 / 思源块格式）===
-  setting.addItem({
-    title: '',
-    description: '',
-    createActionElement: () => {
-      const wrapper = document.createElement('div');
-      wrapper.style.cssText = `
-        margin: 0 -16px;
-        width: calc(100% + 32px);
-      `;
-
-      const container = document.createElement('div');
-      container.style.cssText =
-        'padding: 16px; background: var(--b3-theme-background); border: 1px solid var(--b3-border-color); border-radius: 8px;';
-
-      container.appendChild(createMobileQuickNoteFormatField({
-        mobileFeatureConfig: context.mobileFeatureConfig,
-        isAuthorToolActivated: context.isAuthorToolActivated,
-        saveData: context.saveData,
-      }));
-
-      wrapper.appendChild(container);
-      return wrapper;
-    }
-  });
-  
   // ===触发：后台切前台 ===
   setting.addItem({
     title: '',
@@ -2111,7 +2089,7 @@ export function createMobileSettingLayout(
               }
             }
           })
-  
+
           // 保存配置
           config.popupConfig = option.value
           await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
@@ -2119,12 +2097,77 @@ export function createMobileSettingLayout(
   
         container.appendChild(optionContainer)
       })
-  
+
+      // === 输入法自动弹出（合并到同一框内）===
+      const divider = document.createElement('div');
+      divider.style.cssText = 'height: 1px; background: var(--b3-border-color); margin: 16px 0;';
+      container.appendChild(divider);
+
+      const imTitle = document.createElement('div');
+      imTitle.style.cssText = 'font-size: 14px; font-weight: 600; margin-bottom: 12px;';
+      imTitle.textContent = '⌨️ 输入法自动弹出';
+      container.appendChild(imTitle);
+
+      const imItems = [
+        {
+          key: 'quickNoteAutoFocusButton',
+          label: '按钮触发时',
+          desc: '点击工具栏按钮打开弹窗后，自动聚焦并弹出键盘',
+        },
+        {
+          key: 'quickNoteAutoFocusFirstPopup',
+          label: '自启动弹出时',
+          desc: '切后台自动触发弹窗后，切回思源时自动聚焦并弹出键盘',
+        },
+        {
+          key: 'quickNoteAutoFocusRestore',
+          label: '中途切后台再切回来时',
+          desc: '打字中途切后台再切回来，自动恢复键盘',
+        },
+      ];
+
+      imItems.forEach(item => {
+        const row = document.createElement('div');
+        row.style.cssText = 'display: flex; align-items: center; justify-content: space-between; padding: 8px 0;';
+
+        if (item !== imItems[0]) {
+          row.style.borderTop = '1px solid var(--b3-border-color)';
+          row.style.marginTop = '4px';
+        }
+
+        const labelContainer = document.createElement('div');
+        labelContainer.style.cssText = 'flex: 1; margin-right: 12px;';
+
+        const labelText = document.createElement('div');
+        labelText.textContent = item.label;
+        labelText.style.cssText = 'font-size: 13px; font-weight: 500;';
+
+        const descText = document.createElement('div');
+        descText.textContent = item.desc;
+        descText.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: 2px;';
+
+        labelContainer.appendChild(labelText);
+        labelContainer.appendChild(descText);
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = config[item.key] !== false;
+        checkbox.style.cssText = 'transform: scale(1.2); flex-shrink: 0;';
+
+        checkbox.addEventListener('change', async () => {
+          config[item.key] = checkbox.checked;
+          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+        });
+
+        row.appendChild(labelContainer);
+        row.appendChild(checkbox);
+        container.appendChild(row);
+      });
+
       wrapper.appendChild(container);
       return wrapper
     }
   })
-
   // 一键记事保存配置（整合保存方式和ID配置）
   setting.addItem({
     title: '',
@@ -2406,9 +2449,58 @@ export function createMobileSettingLayout(
     }
   })
 
+  // === 输入格式选择（纯文本 / 思源块格式）===
+  setting.addItem({
+    title: '',
+    description: '',
+    createActionElement: () => {
+      const wrapper = document.createElement('div');
+      wrapper.id = 'quick-note-format-section';
+      wrapper.style.cssText = `
+        margin: 0 -16px;
+        width: calc(100% + 32px);
+      `;
+
+      const container = document.createElement('div');
+      container.style.cssText =
+        'padding: 16px; background: var(--b3-theme-background); border: 1px solid var(--b3-border-color); border-radius: 8px;';
+
+      container.appendChild(createMobileQuickNoteFormatField({
+        mobileFeatureConfig: context.mobileFeatureConfig,
+        isAuthorToolActivated: context.isAuthorToolActivated,
+        saveData: context.saveData,
+      }));
+
+      wrapper.appendChild(container);
+      return wrapper;
+    }
+  });
+
+  // ===弹窗输入框字体大小 ===
+  setting.addItem({
+    title: '④弹窗输入框字体大小',
+    description: '💡 调节一键记事弹窗中输入框的字体大小',
+    createActionElement: () => {
+      const config = context.mobileFeatureConfig as any;
+      const currentFontSize = config.quickNoteFontSize || 18;
+
+      return createCustomSlider(
+        '字体大小：',
+        currentFontSize,
+        12,
+        30,
+        'px',
+        async (value) => {
+          config.quickNoteFontSize = value;
+          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+        }
+      );
+    }
+  })
+
   //弹编辑器样式选择
   setting.addItem({
-    title: '③弹窗编辑器样式选择',
+    title: '⑤弹窗编辑器样式选择',
     description: '选择一键记事弹窗的UI风格',
     createActionElement: () => {
       const wrapper = document.createElement('div');
@@ -2486,7 +2578,7 @@ export function createMobileSettingLayout(
 
   // ===弹窗按钮排序方法 ===
   setting.addItem({
-    title: '④弹窗按钮排序方法',
+    title: '⑥弹窗按钮排序方法',
     description: '💡 选择一键记事弹窗中工具栏按钮的排列方式',
     createActionElement: () => {
       const wrapper = document.createElement('div');
@@ -2581,9 +2673,203 @@ export function createMobileSettingLayout(
     }
   })
 
+  // 按钮样式配置模式切换
+  setting.addItem({
+    title: '⑦弹窗按钮大小配置',
+    description: '💡 选择使用默认配置或自定义配置按钮样式',
+    createActionElement: () => {
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = `
+        margin: 0 -16px;
+        width: calc(100% + 32px);
+      `;
+      
+      const container = document.createElement('div');
+      container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--b3-theme-background); border: 1px solid var(--b3-border-color); border-radius: 8px;';
+
+      const config = context.mobileFeatureConfig as any;
+      const useCustom = config.useCustomButtonStyle || false;
+
+      // 选项容器
+      const optionsContainer = document.createElement('div');
+      optionsContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
+
+      // 默认配置选项
+      const defaultOption = document.createElement('div');
+      defaultOption.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--b3-border-color); border-radius: 6px; cursor: pointer;';
+
+      const defaultRadio = document.createElement('input');
+      defaultRadio.type = 'radio';
+      defaultRadio.name = 'button-style-config';
+      defaultRadio.checked = !useCustom;
+      defaultRadio.style.cssText = 'transform: scale(1.2);';
+
+      const defaultLabel = document.createElement('span');
+      defaultLabel.textContent = '使用默认配置';
+      defaultLabel.style.cssText = 'font-size: 14px;';
+
+      defaultOption.appendChild(defaultRadio);
+      defaultOption.appendChild(defaultLabel);
+
+      // 自定义配置选项
+      const customOption = document.createElement('div');
+      customOption.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--b3-border-color); border-radius: 6px; cursor: pointer;';
+
+      const customRadio = document.createElement('input');
+      customRadio.type = 'radio';
+      customRadio.name = 'button-style-config';
+      customRadio.checked = useCustom;
+      customRadio.style.cssText = 'transform: scale(1.2);';
+
+      const customLabel = document.createElement('span');
+      customLabel.textContent = '使用自定义配置';
+      customLabel.style.cssText = 'font-size: 14px;';
+
+      customOption.appendChild(customRadio);
+      customOption.appendChild(customLabel);
+
+      // 更新选中样式
+      const updateSelection = () => {
+        if (defaultRadio.checked) {
+          defaultOption.style.borderColor = 'var(--b3-theme-primary)';
+          defaultOption.style.backgroundColor = 'var(--b3-theme-primary-lightest)';
+          customOption.style.borderColor = 'var(--b3-border-color)';
+          customOption.style.backgroundColor = 'transparent';
+        } else {
+          customOption.style.borderColor = 'var(--b3-theme-primary)';
+          customOption.style.backgroundColor = 'var(--b3-theme-primary-lightest)';
+          defaultOption.style.borderColor = 'var(--b3-border-color)';
+          defaultOption.style.backgroundColor = 'transparent';
+        }
+      };
+
+      updateSelection();
+
+      // 点击事件
+      defaultOption.onclick = async () => {
+        defaultRadio.checked = true;
+        config.useCustomButtonStyle = false;
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+        updateSelection();
+        // 触发自定义事件通知设置项显示/隐藏
+        window.dispatchEvent(new CustomEvent('quicknote-button-style-changed', { detail: false }));
+      };
+
+      customOption.onclick = async () => {
+        customRadio.checked = true;
+        config.useCustomButtonStyle = true;
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+        updateSelection();
+        // 触发自定义事件通知设置项显示/隐藏
+        window.dispatchEvent(new CustomEvent('quicknote-button-style-changed', { detail: true }));
+      };
+
+      optionsContainer.appendChild(defaultOption);
+      optionsContainer.appendChild(customOption);
+      container.appendChild(optionsContainer);
+
+      wrapper.appendChild(container);
+      wrapper.appendChild(createButtonStyleConfigContainer());
+      return wrapper
+    }
+  })
+
+  // === 滑杆创建辅助函数 ===
+  const createSliderRow = (
+    labelText: string,
+    configKey: string,
+    min: number,
+    max: number,
+    defaultValue: number,
+    unit: string = 'px',
+    showBorder: boolean = true
+  ): HTMLElement => {
+    const row = document.createElement('div');
+    row.style.cssText = `display: flex; align-items: center; gap: 12px; padding: 8px 0;${showBorder ? ' border-bottom: 1px solid var(--b3-border-color);' : ''}`;
+
+    const label = document.createElement('span');
+    label.textContent = labelText;
+    label.style.cssText = 'min-width: 100px; font-size: 14px;';
+
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = String(min);
+    slider.max = String(max);
+    slider.value = String((context.mobileFeatureConfig as any)[configKey] || defaultValue);
+    slider.style.cssText = 'flex: 1; cursor: pointer;';
+
+    const valueDisplay = document.createElement('span');
+    valueDisplay.textContent = `${slider.value}${unit}`;
+    valueDisplay.style.cssText = 'min-width: 45px; text-align: right; font-size: 14px;';
+
+    slider.oninput = () => {
+      valueDisplay.textContent = `${slider.value}${unit}`;
+      (context.mobileFeatureConfig as any)[configKey] = parseInt(slider.value);
+    };
+
+    slider.onchange = async () => {
+      (context.mobileFeatureConfig as any)[configKey] = parseInt(slider.value);
+      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+    };
+
+    row.appendChild(label);
+    row.appendChild(slider);
+    row.appendChild(valueDisplay);
+
+    return row;
+  };
+
+  // 创建按钮样式自定义配置容器
+  const createButtonStyleConfigContainer = () => {
+    const wrapper = document.createElement('div');
+    wrapper.id = 'quicknote-button-style-configs';
+    wrapper.style.cssText = 'display: flex; flex-direction: column; gap: 8px; width: 100%;';
+
+    const config = context.mobileFeatureConfig as any;
+    const useCustom = config.useCustomButtonStyle || false;
+
+    // 根据初始状态设置显示/隐藏
+    if (!useCustom) {
+      wrapper.style.display = 'none';
+    }
+
+    // 监听切换事件
+    window.addEventListener('quicknote-button-style-changed', ((e: CustomEvent) => {
+      wrapper.style.display = e.detail ? 'flex' : 'none';
+    }) as EventListener);
+
+    // 使用自定义滑杆组件
+    wrapper.appendChild(createCustomSlider('按钮高度:', config.quickNoteButtonHeight || 40, 24, 66, 'px', async (value) => {
+      config.quickNoteButtonHeight = value;
+      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+    }));
+
+    wrapper.appendChild(createCustomSlider('按钮宽度:', config.quickNoteButtonMinWidth || 36, 20, 60, 'px', async (value) => {
+      config.quickNoteButtonMinWidth = value;
+      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+    }));
+
+    wrapper.appendChild(createCustomSlider('外边距:', config.quickNoteButtonMargin || 2, 0, 10, 'px', async (value) => {
+      config.quickNoteButtonMargin = value;
+      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+    }));
+
+    wrapper.appendChild(createCustomSlider('内边距:', config.quickNoteButtonPadding || 8, 0, 20, 'px', async (value) => {
+      config.quickNoteButtonPadding = value;
+      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+    }));
+
+    wrapper.appendChild(createCustomSlider('按钮间距:', config.quickNoteButtonGap || 6, 0, 20, 'px', async (value) => {
+      config.quickNoteButtonGap = value;
+      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+    }));
+
+    return wrapper;
+  };
+
   // ===弹窗按钮选择 ===
   setting.addItem({
-    title: '⑤弹窗按钮选择',
+    title: '⑧弹窗按钮显示选择',
     description: '💡 选择哪些按钮显示在一键记事弹窗中（不选则显示全部）',
     createActionElement: () => {
       const wrapper = document.createElement('div');
@@ -2732,228 +3018,6 @@ export function createMobileSettingLayout(
       return wrapper;
     }
   })
-
-  // ===弹窗输入框字体大小 ===
-  setting.addItem({
-    title: '⑥弹窗输入框字体大小',  // 原⑤，因插入按钮选择器后顺延
-    description: '💡 调节一键记事弹窗中输入框的字体大小',
-    createActionElement: () => {
-      const config = context.mobileFeatureConfig as any;
-      const currentFontSize = config.quickNoteFontSize || 18;
-
-      return createCustomSlider(
-        '字体大小：',
-        currentFontSize,
-        12,
-        30,
-        'px',
-        async (value) => {
-          config.quickNoteFontSize = value;
-          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
-        }
-      );
-    }
-  })
-
-  // 按钮样式配置模式切换
-  setting.addItem({
-    title: '⑦按钮样式配置',
-    description: '💡 选择使用默认配置或自定义配置按钮样式',
-    createActionElement: () => {
-      const wrapper = document.createElement('div');
-      wrapper.style.cssText = `
-        margin: 0 -16px;
-        width: calc(100% + 32px);
-      `;
-      
-      const container = document.createElement('div');
-      container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--b3-theme-background); border: 1px solid var(--b3-border-color); border-radius: 8px;';
-
-      const config = context.mobileFeatureConfig as any;
-      const useCustom = config.useCustomButtonStyle || false;
-
-      // 选项容器
-      const optionsContainer = document.createElement('div');
-      optionsContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px;';
-
-      // 默认配置选项
-      const defaultOption = document.createElement('div');
-      defaultOption.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--b3-border-color); border-radius: 6px; cursor: pointer;';
-
-      const defaultRadio = document.createElement('input');
-      defaultRadio.type = 'radio';
-      defaultRadio.name = 'button-style-config';
-      defaultRadio.checked = !useCustom;
-      defaultRadio.style.cssText = 'transform: scale(1.2);';
-
-      const defaultLabel = document.createElement('span');
-      defaultLabel.textContent = '使用默认配置';
-      defaultLabel.style.cssText = 'font-size: 14px;';
-
-      defaultOption.appendChild(defaultRadio);
-      defaultOption.appendChild(defaultLabel);
-
-      // 自定义配置选项
-      const customOption = document.createElement('div');
-      customOption.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid var(--b3-border-color); border-radius: 6px; cursor: pointer;';
-
-      const customRadio = document.createElement('input');
-      customRadio.type = 'radio';
-      customRadio.name = 'button-style-config';
-      customRadio.checked = useCustom;
-      customRadio.style.cssText = 'transform: scale(1.2);';
-
-      const customLabel = document.createElement('span');
-      customLabel.textContent = '使用自定义配置';
-      customLabel.style.cssText = 'font-size: 14px;';
-
-      customOption.appendChild(customRadio);
-      customOption.appendChild(customLabel);
-
-      // 更新选中样式
-      const updateSelection = () => {
-        if (defaultRadio.checked) {
-          defaultOption.style.borderColor = 'var(--b3-theme-primary)';
-          defaultOption.style.backgroundColor = 'var(--b3-theme-primary-lightest)';
-          customOption.style.borderColor = 'var(--b3-border-color)';
-          customOption.style.backgroundColor = 'transparent';
-        } else {
-          customOption.style.borderColor = 'var(--b3-theme-primary)';
-          customOption.style.backgroundColor = 'var(--b3-theme-primary-lightest)';
-          defaultOption.style.borderColor = 'var(--b3-border-color)';
-          defaultOption.style.backgroundColor = 'transparent';
-        }
-      };
-
-      updateSelection();
-
-      // 点击事件
-      defaultOption.onclick = async () => {
-        defaultRadio.checked = true;
-        config.useCustomButtonStyle = false;
-        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
-        updateSelection();
-        // 触发自定义事件通知设置项显示/隐藏
-        window.dispatchEvent(new CustomEvent('quicknote-button-style-changed', { detail: false }));
-      };
-
-      customOption.onclick = async () => {
-        customRadio.checked = true;
-        config.useCustomButtonStyle = true;
-        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
-        updateSelection();
-        // 触发自定义事件通知设置项显示/隐藏
-        window.dispatchEvent(new CustomEvent('quicknote-button-style-changed', { detail: true }));
-      };
-
-      optionsContainer.appendChild(defaultOption);
-      optionsContainer.appendChild(customOption);
-      container.appendChild(optionsContainer);
-
-      wrapper.appendChild(container);
-      return wrapper
-    }
-  })
-
-  // === 滑杆创建辅助函数 ===
-  const createSliderRow = (
-    labelText: string,
-    configKey: string,
-    min: number,
-    max: number,
-    defaultValue: number,
-    unit: string = 'px',
-    showBorder: boolean = true
-  ): HTMLElement => {
-    const row = document.createElement('div');
-    row.style.cssText = `display: flex; align-items: center; gap: 12px; padding: 8px 0;${showBorder ? ' border-bottom: 1px solid var(--b3-border-color);' : ''}`;
-
-    const label = document.createElement('span');
-    label.textContent = labelText;
-    label.style.cssText = 'min-width: 100px; font-size: 14px;';
-
-    const slider = document.createElement('input');
-    slider.type = 'range';
-    slider.min = String(min);
-    slider.max = String(max);
-    slider.value = String((context.mobileFeatureConfig as any)[configKey] || defaultValue);
-    slider.style.cssText = 'flex: 1; cursor: pointer;';
-
-    const valueDisplay = document.createElement('span');
-    valueDisplay.textContent = `${slider.value}${unit}`;
-    valueDisplay.style.cssText = 'min-width: 45px; text-align: right; font-size: 14px;';
-
-    slider.oninput = () => {
-      valueDisplay.textContent = `${slider.value}${unit}`;
-      (context.mobileFeatureConfig as any)[configKey] = parseInt(slider.value);
-    };
-
-    slider.onchange = async () => {
-      (context.mobileFeatureConfig as any)[configKey] = parseInt(slider.value);
-      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
-    };
-
-    row.appendChild(label);
-    row.appendChild(slider);
-    row.appendChild(valueDisplay);
-
-    return row;
-  };
-
-  // 创建按钮样式自定义配置容器
-  const createButtonStyleConfigContainer = () => {
-    const wrapper = document.createElement('div');
-    wrapper.id = 'quicknote-button-style-configs';
-    wrapper.style.cssText = 'display: flex; flex-direction: column; gap: 8px; width: 100%;';
-
-    const config = context.mobileFeatureConfig as any;
-    const useCustom = config.useCustomButtonStyle || false;
-
-    // 根据初始状态设置显示/隐藏
-    if (!useCustom) {
-      wrapper.style.display = 'none';
-    }
-
-    // 监听切换事件
-    window.addEventListener('quicknote-button-style-changed', ((e: CustomEvent) => {
-      wrapper.style.display = e.detail ? 'flex' : 'none';
-    }) as EventListener);
-
-    // 使用自定义滑杆组件
-    wrapper.appendChild(createCustomSlider('按钮高度:', config.quickNoteButtonHeight || 40, 24, 66, 'px', async (value) => {
-      config.quickNoteButtonHeight = value;
-      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
-    }));
-
-    wrapper.appendChild(createCustomSlider('按钮宽度:', config.quickNoteButtonMinWidth || 36, 20, 60, 'px', async (value) => {
-      config.quickNoteButtonMinWidth = value;
-      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
-    }));
-
-    wrapper.appendChild(createCustomSlider('外边距:', config.quickNoteButtonMargin || 2, 0, 10, 'px', async (value) => {
-      config.quickNoteButtonMargin = value;
-      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
-    }));
-
-    wrapper.appendChild(createCustomSlider('内边距:', config.quickNoteButtonPadding || 8, 0, 20, 'px', async (value) => {
-      config.quickNoteButtonPadding = value;
-      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
-    }));
-
-    wrapper.appendChild(createCustomSlider('按钮间距:', config.quickNoteButtonGap || 6, 0, 20, 'px', async (value) => {
-      config.quickNoteButtonGap = value;
-      await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
-    }));
-
-    return wrapper;
-  };
-
-  // 添加按钮样式配置容器
-  setting.addItem({
-    title: '',
-    description: '',
-    createActionElement: () => createButtonStyleConfigContainer()
-  });
 
   // === 小功能选择 ===
   createGroupTitle('5️⃣ ','小功能选择')
@@ -3283,7 +3347,7 @@ export function createMobileSettingLayout(
         box-sizing: border-box;
       `
       container.innerHTML = `
-        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（11项）</div>
+        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（12项）</div>
         <div style="font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>
         <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
           <thead>
@@ -3329,25 +3393,30 @@ export function createMobileSettingLayout(
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">滚动文档顶部或底部</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键直达文档首尾，长文档浏览更轻松，阅读体验升级</td>
             </tr>
-            <tr>
+            <tr style="background: var(--b3-theme-background);">
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑧</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">图片快捷导入日记</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">选择图片快速导入日记，支持手动定位或自动追加，图片管理更便捷</td>
             </tr>
-            <tr style="background: var(--b3-theme-background);">
+            <tr>
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑨</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">手机端标签页Tab</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">手机端多文档快速切换，苹果风格悬浮Tab栏，自动管理，告别反复返回</td>
             </tr>
-            <tr>
+            <tr style="background: var(--b3-theme-background);">
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑩</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">手机端悬浮大纲</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">左侧悬浮大纲面板，标题快速跳转，实时跟踪当前位置，阅读长文必备</td>
             </tr>
-            <tr style="background: var(--b3-theme-background);">
+            <tr>
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑪</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">手机端前一篇/后一篇文档</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">底部悬浮导航栏，按文件树顺序浏览文档，前后翻页，阅读笔记更流畅</td>
+            </tr>
+            <tr style="background: var(--b3-theme-background);">
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑫</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">一键记事弹窗块格式</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键记事弹窗支持思源块格式输入，富文本编辑，插入标题、列表、代码块等<br/><a href="javascript:void(0)" onclick="(function(){var el=document.getElementById('quick-note-format-section');if(!el)return;el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('jump-highlight');void el.offsetWidth;el.classList.add('jump-highlight');setTimeout(function(){el.classList.remove('jump-highlight')},2000)})()" style="color: var(--b3-theme-primary); font-size: 12px; text-decoration: underline;">👉 点击跳转到设置项</a></td>
             </tr>
             <tr>
               <td colspan="3" style="padding: 12px; text-align: center; color: var(--b3-theme-primary); font-weight: 600; font-style: italic;">持续更新中~</td>

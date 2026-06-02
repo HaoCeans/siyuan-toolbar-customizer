@@ -11,6 +11,7 @@ import { toggleVisibility as toggleMobileTabs } from "./ui/mobileTabs";
 // 手机端悬浮大纲模块
 import { toggleVisibility as toggleMobileOutline } from "./ui/mobileOutline";
 import { toggleVisibility as toggleMobileDocNav } from "./ui/mobileDocNav";
+import { isDesktopQuickNoteOverflowToolbarEnabled } from "./quickNote/desktopCapture";
 
 // ===== 插件实例（用于需要 app 参数的 API 调用） =====
 export let pluginInstance: any = null;
@@ -675,6 +676,18 @@ function isDesktopDevice(): boolean {
 function shouldShowButton(button: ButtonConfig): boolean {
   const isMobile = isMobileDevice()
 
+  // 弹窗上下文特殊处理：如果弹窗开启了 overflow，强制显示 overflow 按钮
+  // （即使主工具栏 overflow 按钮被禁用，弹窗里仍然需要显示）
+  if (
+    !isMobile &&
+    isOverflowButton(button.id) &&
+    typeof document !== 'undefined' &&
+    document.body.hasAttribute('data-quick-note-block-window') &&
+    isDesktopQuickNoteOverflowToolbarEnabled()
+  ) {
+    return true
+  }
+
   // 检查是否启用
   if (button.enabled === false) return false
 
@@ -717,7 +730,15 @@ function isInputOrEditable(element: HTMLElement): boolean {
  */
 function shouldShowInMainToolbar(button: ButtonConfig): boolean {
   // 扩展工具栏按钮：启用时显示，禁用时隐藏
+  // 弹窗上下文 + 弹窗 overflow 开启时，强制显示
   if (isOverflowButton(button.id)) {
+    if (
+      typeof document !== 'undefined' &&
+      document.body.hasAttribute('data-quick-note-block-window') &&
+      isDesktopQuickNoteOverflowToolbarEnabled()
+    ) {
+      return true
+    }
     return button.enabled !== false
   }
 
@@ -1389,7 +1410,11 @@ export function createButtonsForEditors(editors: NodeListOf<Element>, configs: B
   // 桌面端：根据 buttonsPerLayer 计算溢出层级
   let effectiveConfigs = configs
   if (!isMobile) {
-    const updated = calculateDesktopOverflow(configs)
+    // 弹窗上下文：检查是否在一键记事弹窗 + 弹窗 overflow 是否启用
+    const isPopupContext = typeof document !== 'undefined'
+      && document.body.hasAttribute('data-quick-note-block-window')
+    const forceOverflowEnabled = isPopupContext && isDesktopQuickNoteOverflowToolbarEnabled()
+    const updated = calculateDesktopOverflow(configs, forceOverflowEnabled)
     // 同步 overflowLevel 回原数组
     updated.forEach(btn => {
       const original = configs.find(b => b.id === btn.id)
@@ -2192,9 +2217,9 @@ function showOverflowToolbar(config: ButtonConfig) {
  * 桌面端扩展工具栏：按 buttonsPerLayer 手动分配溢出层级
  * 按 sort 排序后，前 buttonsPerLayer[0] 个 → 主工具栏，接下来 buttonsPerLayer[1] 个 → 第1层，以此类推
  */
-export function calculateDesktopOverflow(buttons: ButtonConfig[]): ButtonConfig[] {
+export function calculateDesktopOverflow(buttons: ButtonConfig[], forceEnabled = false): ButtonConfig[] {
   const overflowBtn = buttons.find(btn => btn.id === OVERFLOW_BUTTON_ID_DESKTOP)
-  if (!overflowBtn || overflowBtn.enabled === false) {
+  if (!overflowBtn || (overflowBtn.enabled === false && !forceEnabled)) {
     // 扩展工具栏未启用，所有按钮都在主工具栏
     return buttons.map(btn => ({ ...btn, overflowLevel: 0 }))
   }

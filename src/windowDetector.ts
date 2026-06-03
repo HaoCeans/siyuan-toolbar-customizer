@@ -696,7 +696,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid ${isDark ? '#404040' : 'transparent'};
+    border: 1px solid ${isDark ? '#404040' : '#e0e0e0'};
   ` : `
     background: ${isDark ? '#1e1e1e' : 'white'};
     border-radius: 12px 12px 0 0;
@@ -708,7 +708,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid ${isDark ? '#404040' : 'transparent'};
+    border: 1px solid ${isDark ? '#404040' : '#e0e0e0'};
   `;
 
   const title = document.createElement('h2');

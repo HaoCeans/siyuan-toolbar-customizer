@@ -54,6 +54,7 @@ let wasQuickNoteInputFocused = false;
 let needsInitialFocus = false;
 // 切后台时保存的光标位置（用于切回后恢复）
 let savedCursorPos: { start: number; end: number } | null = null;
+let savedBlockRange: Range | null = null;
 
 // 高度变化检测定时器 ID（已弃用，保留用于向后兼容清理）
 let heightCheckTimer: ReturnType<typeof setInterval> | null = null;
@@ -344,6 +345,7 @@ async function teardownQuickNoteDialog(dialog: HTMLElement, closeMobile: boolean
   needsInitialFocus = false;
   wasQuickNoteInputFocused = false;
   savedCursorPos = null;
+  savedBlockRange = null;
 }
 
 // === 电脑端专用弹窗 ===
@@ -1603,13 +1605,22 @@ function handleVisibilityChange() {
     wasQuickNoteInputFocused = isNoteDialogShowing &&
       !!getActiveQuickNoteInput()?.element?.contains(document.activeElement);
 
-    // 保存光标位置（纯文本格式），用于切回前台时恢复
+    // 保存光标位置，用于切回前台时恢复
     if (wasQuickNoteInputFocused) {
       const inputHandle = getActiveQuickNoteInput();
       if (inputHandle?.isPlainTextarea()) {
         const textarea = inputHandle.element.querySelector('textarea');
         if (textarea) {
           savedCursorPos = { start: textarea.selectionStart ?? textarea.value.length, end: textarea.selectionEnd ?? textarea.value.length };
+        }
+      } else if (inputHandle) {
+        // 块格式：保存 Selection Range
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          if (inputHandle.element.contains(range.commonAncestorContainer)) {
+            savedBlockRange = range.cloneRange();
+          }
         }
       }
     }
@@ -1639,15 +1650,24 @@ function handleVisibilityChange() {
       needsInitialFocus = false;
       const pos = savedCursorPos;
       savedCursorPos = null;
+      const range = savedBlockRange;
+      savedBlockRange = null;
       setTimeout(() => {
         const handle = getActiveQuickNoteInput();
         if (handle) {
           handle.focus();
-          // 恢复光标位置（纯文本格式）
           if (pos && handle.isPlainTextarea()) {
+            // 恢复光标位置（纯文本格式）
             const textarea = handle.element.querySelector('textarea');
             if (textarea) {
               textarea.setSelectionRange(pos.start, pos.end);
+            }
+          } else if (range && !handle.isPlainTextarea()) {
+            // 恢复光标位置（块格式 contenteditable）
+            const sel = window.getSelection();
+            if (sel) {
+              sel.removeAllRanges();
+              sel.addRange(range);
             }
           }
         }

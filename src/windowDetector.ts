@@ -692,7 +692,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     width: 90%;
     max-width: 500px;
     height: calc(100vh - 80px);
-    box-shadow: ${isDark ? '0 20px 40px rgba(0, 0, 0, 0.5)' : '0 20px 40px rgba(0, 0, 0, 0.15)'}, inset 0 -1px 0 ${isDark ? '#404040' : '#e0e0e0'};
+    box-shadow: ${isDark ? '0 20px 40px rgba(0, 0, 0, 0.5)' : '0 20px 40px rgba(0, 0, 0, 0.15)'};
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -704,7 +704,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     width: 90%;
     max-width: 500px;
     height: calc(100vh - 80px);
-    box-shadow: ${isDark ? '0 10px 30px rgba(0, 0, 0, 0.5)' : '0 10px 30px rgba(0, 0, 0, 0.3)'}, inset 0 -1px 0 ${isDark ? '#404040' : '#e0e0e0'};
+    box-shadow: ${isDark ? '0 10px 30px rgba(0, 0, 0, 0.5)' : '0 10px 30px rgba(0, 0, 0, 0.3)'};
     display: flex;
     flex-direction: column;
     overflow: hidden;

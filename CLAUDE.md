@@ -118,3 +118,20 @@ npm run dev
 - 移动端工具栏偏移使用 CSS 单位（px、vh、vw 等）
 - 点击序列使用 `text:xxx` 语法进行基于文本的元素匹配
 - 模板变量在插入时通过 `processTemplateVariables()` 处理
+
+## 开发注意事项
+
+### 一键记事弹窗遮罩背景色（src/windowDetector.ts）
+
+移动端一键记事弹窗（`showNoteInputDialogMobile`）的遮罩背景已从半透明改为不透明：
+- 暗黑模式 → 纯黑 `rgba(0,0,0,1)`
+- 明亮模式 → 纯灰 `rgba(128,128,128,1)`
+
+原始样式（如需恢复）：
+```js
+background: ${isDark ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.6)'};
+```
+当前样式：
+```js
+background: ${isDark || window.matchMedia('(prefers-color-scheme: dark)').matches ? 'rgba(0, 0, 0, 1)' : 'rgba(128, 128, 128, 1)'};
+```

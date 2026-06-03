@@ -385,7 +385,7 @@ async function showNoteInputDialogDesktop(
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.48);
-    z-index: 100000;
+    z-index: 2147483647;
     pointer-events: auto;
   ` : `
     position: fixed;
@@ -394,7 +394,7 @@ async function showNoteInputDialogDesktop(
     width: 100%;
     height: 100%;
     background: ${isDark ? 'rgba(0, 0, 0, 0.7)' : 'transparent'};
-    z-index: 100000;
+    z-index: 2147483647;
     pointer-events: ${isDark ? 'auto' : 'none'};
   `;
 
@@ -675,7 +675,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     width: 100%;
     height: 100%;
     background: ${isDark || window.matchMedia('(prefers-color-scheme: dark)').matches ? 'rgba(0, 0, 0, 1)' : 'rgba(128, 128, 128, 1)'};
-    z-index: 100000;
+    z-index: 2147483647;
     display: flex;
     justify-content: center;
     align-items: flex-start;
@@ -1490,7 +1490,7 @@ function showSuccessMessage(message: string) {
     color: white;
     padding: 12px 20px;
     border-radius: 6px;
-    z-index: 100001;
+    z-index: 2147483647;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   `;
   

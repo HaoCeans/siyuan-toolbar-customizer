@@ -681,7 +681,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding-top: 20px;
+    padding-top: 40px;
   `;
 
   const content = document.createElement('div');
@@ -693,7 +693,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     padding: 20px;
     width: 90%;
     max-width: 500px;
-    height: calc(100vh - 80px);
+    height: 80vh;
     box-shadow: ${isDark ? '0 20px 40px rgba(0, 0, 0, 0.5)' : '0 20px 40px rgba(0, 0, 0, 0.15)'};
     display: flex;
     flex-direction: column;
@@ -705,7 +705,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     padding: 24px;
     width: 90%;
     max-width: 500px;
-    height: calc(100vh - 88px);
+    height: 80vh;
     box-shadow: ${isDark ? '0 10px 30px rgba(0, 0, 0, 0.5)' : '0 10px 30px rgba(0, 0, 0, 0.3)'};
     display: flex;
     flex-direction: column;
@@ -738,7 +738,6 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    max-height: 70vh;  /* 限制整体最大高度，按钮多时压缩输入框 */
   `;
 
   // 上半部分：记事输入区域

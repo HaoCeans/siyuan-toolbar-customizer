@@ -6707,6 +6707,11 @@ async function executeQuickNote(_config: ButtonConfig) {
     console.error('一键记事执行失败:', error);
     const message = `按钮 "${_config.name}" 的一键记事功能执行失败`;
     showMessage(message, 3000, 'error');
+  } finally {
+    // 清理按钮触发标记，防止残留导致后续自启动弹窗被误判为按钮触发
+    if ((window as any).__pluginInstance?.mobileFeatureConfig) {
+      delete (window as any).__pluginInstance.mobileFeatureConfig.__quickNoteButtonTrigger;
+    }
   }
 }
 

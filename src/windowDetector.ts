@@ -52,6 +52,8 @@ let isNoteDialogOpening = false;
 let wasQuickNoteInputFocused = false;
 // 自动触发时弹窗在后台创建，标记需要初始聚焦（等切回前台时执行）
 let needsInitialFocus = false;
+// 记录当前弹窗的触发来源（用于恢复输入法时区分按钮触发 / 自启动）
+let lastPopupTriggerSource: 'button' | 'auto' = 'auto';
 
 // 高度变化检测定时器 ID（已弃用，保留用于向后兼容清理）
 let heightCheckTimer: ReturnType<typeof setInterval> | null = null;
@@ -341,6 +343,7 @@ async function teardownQuickNoteDialog(dialog: HTMLElement, closeMobile: boolean
   isQuickNoteDialogMinimized = false;
   needsInitialFocus = false;
   wasQuickNoteInputFocused = false;
+  lastPopupTriggerSource = 'auto';
 }
 
 // === 电脑端专用弹窗 ===
@@ -649,6 +652,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
 
   // 标记弹窗正在显示
   isNoteDialogShowing = true;
+  lastPopupTriggerSource = isFromButton ? 'button' : 'auto';
   lastDialogShowTime = Date.now();
 
   // 获取样式配置
@@ -1616,7 +1620,9 @@ function handleVisibilityChange() {
   if (!document.hidden) {
     // 弹窗正在显示时，根据开关恢复输入框焦点
     const shouldRestoreFocus = wasQuickNoteInputFocused
-      ? pluginInstance?.mobileFeatureConfig?.quickNoteAutoFocusRestore !== false
+      ? (lastPopupTriggerSource === 'auto' && pluginInstance?.mobileFeatureConfig?.quickNoteAutoFocusFirstPopup === false
+          ? false
+          : pluginInstance?.mobileFeatureConfig?.quickNoteAutoFocusRestore !== false)
       : needsInitialFocus
         ? pluginInstance?.mobileFeatureConfig?.quickNoteAutoFocusFirstPopup !== false
         : false;

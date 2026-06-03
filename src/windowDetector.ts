@@ -692,11 +692,11 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     width: 90%;
     max-width: 500px;
     height: calc(100vh - 80px);
-    box-shadow: ${isDark ? '0 20px 40px rgba(0, 0, 0, 0.5)' : '0 20px 40px rgba(0, 0, 0, 0.15)'};
+    box-shadow: ${isDark ? '0 20px 40px rgba(0, 0, 0, 0.5)' : '0 20px 40px rgba(0, 0, 0, 0.15)'}, inset 0 -1px 0 ${isDark ? '#404040' : '#e0e0e0'};
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid ${isDark ? '#404040' : '#e0e0e0'};
+    border: 1px solid ${isDark ? '#404040' : 'transparent'};
   ` : `
     background: ${isDark ? '#1e1e1e' : 'white'};
     border-radius: 12px 12px 0 0;
@@ -704,11 +704,11 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     width: 90%;
     max-width: 500px;
     height: calc(100vh - 80px);
-    box-shadow: ${isDark ? '0 10px 30px rgba(0, 0, 0, 0.5)' : '0 10px 30px rgba(0, 0, 0, 0.3)'};
+    box-shadow: ${isDark ? '0 10px 30px rgba(0, 0, 0, 0.5)' : '0 10px 30px rgba(0, 0, 0, 0.3)'}, inset 0 -1px 0 ${isDark ? '#404040' : '#e0e0e0'};
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid ${isDark ? '#404040' : '#e0e0e0'};
+    border: 1px solid ${isDark ? '#404040' : 'transparent'};
   `;
 
   const title = document.createElement('h2');

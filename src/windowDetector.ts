@@ -678,7 +678,8 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     z-index: 100000;
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
+    padding-top: 20px;
   `;
 
   const content = document.createElement('div');

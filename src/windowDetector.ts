@@ -1657,7 +1657,7 @@ function handleVisibilityChange() {
       const dialogEl = getQuickNoteDialogElement();
       const contentEl = dialogEl?.children[0] as HTMLElement | null;
       if (contentEl) {
-        contentEl.style.transition = 'opacity 0.15s ease';
+        contentEl.style.transition = 'opacity 0.3s ease';
         contentEl.style.opacity = '0';
       }
 

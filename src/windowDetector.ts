@@ -52,6 +52,8 @@ let isNoteDialogOpening = false;
 let wasQuickNoteInputFocused = false;
 // 自动触发时弹窗在后台创建，标记需要初始聚焦（等切回前台时执行）
 let needsInitialFocus = false;
+// 切后台时保存的光标位置（用于切回后恢复）
+let savedCursorPos: { start: number; end: number } | null = null;
 
 // 高度变化检测定时器 ID（已弃用，保留用于向后兼容清理）
 let heightCheckTimer: ReturnType<typeof setInterval> | null = null;
@@ -341,6 +343,7 @@ async function teardownQuickNoteDialog(dialog: HTMLElement, closeMobile: boolean
   isQuickNoteDialogMinimized = false;
   needsInitialFocus = false;
   wasQuickNoteInputFocused = false;
+  savedCursorPos = null;
 }
 
 // === 电脑端专用弹窗 ===
@@ -669,7 +672,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     left: 0;
     width: 100%;
     height: 100%;
-    background: ${isDark ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.6)'};
+    background: ${isDark || window.matchMedia('(prefers-color-scheme: dark)').matches ? 'rgba(0, 0, 0, 1)' : 'rgba(128, 128, 128, 1)'};
     z-index: 100000;
     display: flex;
     justify-content: center;
@@ -1600,6 +1603,17 @@ function handleVisibilityChange() {
     wasQuickNoteInputFocused = isNoteDialogShowing &&
       !!getActiveQuickNoteInput()?.element?.contains(document.activeElement);
 
+    // 保存光标位置（纯文本格式），用于切回前台时恢复
+    if (wasQuickNoteInputFocused) {
+      const inputHandle = getActiveQuickNoteInput();
+      if (inputHandle?.isPlainTextarea()) {
+        const textarea = inputHandle.element.querySelector('textarea');
+        if (textarea) {
+          savedCursorPos = { start: textarea.selectionStart ?? textarea.value.length, end: textarea.selectionEnd ?? textarea.value.length };
+        }
+      }
+    }
+
     // 根据配置调用不同的处理函数
     if (popupConfig === 'smallWindowOnly') {
       // ②只在小窗模式：使用小窗模式专用函数
@@ -1623,8 +1637,20 @@ function handleVisibilityChange() {
     if (isNoteDialogShowing && shouldRestoreFocus) {
       wasQuickNoteInputFocused = false;
       needsInitialFocus = false;
+      const pos = savedCursorPos;
+      savedCursorPos = null;
       setTimeout(() => {
-        getActiveQuickNoteInput()?.focus();
+        const handle = getActiveQuickNoteInput();
+        if (handle) {
+          handle.focus();
+          // 恢复光标位置（纯文本格式）
+          if (pos && handle.isPlainTextarea()) {
+            const textarea = handle.element.querySelector('textarea');
+            if (textarea) {
+              textarea.setSelectionRange(pos.start, pos.end);
+            }
+          }
+        }
       }, 300);
     }
 

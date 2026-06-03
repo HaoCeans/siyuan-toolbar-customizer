@@ -687,7 +687,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
   content.tabIndex = -1;
   content.style.cssText = isAppleStyle ? `
     background: ${isDark ? '#1e1e1e' : 'white'};
-    border-radius: 14px;
+    border-radius: 14px 14px 0 0;
     padding: 20px;
     width: 90%;
     max-width: 500px;
@@ -699,7 +699,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     border: 1px solid ${isDark ? '#404040' : 'transparent'};
   ` : `
     background: ${isDark ? '#1e1e1e' : 'white'};
-    border-radius: 12px;
+    border-radius: 12px 12px 0 0;
     padding: 24px;
     width: 90%;
     max-width: 500px;

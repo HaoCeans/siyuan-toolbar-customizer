@@ -673,7 +673,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     top: 0;
     left: 0;
     width: 100%;
-    height: 100%;
+    height: 100vh;
     background: ${isDark || window.matchMedia('(prefers-color-scheme: dark)').matches ? 'rgba(0, 0, 0, 1)' : 'rgba(128, 128, 128, 1)'};
     z-index: 2147483647;
     display: flex;

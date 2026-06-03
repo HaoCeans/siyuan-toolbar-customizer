@@ -979,12 +979,20 @@ function preOpenHiddenQuickNoteOverflowToolbar(platform: 'mobile' | 'desktop'): 
   if (!overflowBtn || document.querySelectorAll(layerSelector).length > 0) {
     return;
   }
+  // 先注入一条样式规则，禁止溢出工具栏的入场动画
+  const noAnimStyle = document.createElement('style');
+  noAnimStyle.id = 'quick-note-no-overflow-anim';
+  noAnimStyle.textContent = `${layerSelector}{animation:none!important;transition:none!important;}`;
+  document.head.appendChild(noAnimStyle);
+
   overflowBtn.click();
+
   document.querySelectorAll(layerSelector).forEach(el => {
     (el as HTMLElement).style.visibility = 'hidden';
     (el as HTMLElement).style.pointerEvents = 'none';
-    (el as HTMLElement).style.animation = 'none';
   });
+  // 移除临时样式（动画已跳过）
+  noAnimStyle.remove();
   overflowBtn.classList.remove('overflow-active');
   overflowBtn.style.backgroundColor = 'transparent';
 }

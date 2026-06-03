@@ -910,9 +910,6 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
 
   document.body.appendChild(dialog);
 
-  // 延后预打开扩展工具栏（隐藏状态），让弹窗先渲染出来
-  setTimeout(() => preOpenHiddenQuickNoteOverflowToolbar('mobile'), 100);
-
   // 电脑端特有功能：自动聚焦、Enter发送、Esc取消（仅纯文本）
   if (!isMobileDevice() && isFromButton && inputHandle.isPlainTextarea()) {
     const textarea = inputHandle.element.querySelector('textarea') as HTMLTextAreaElement | null;
@@ -979,20 +976,12 @@ function preOpenHiddenQuickNoteOverflowToolbar(platform: 'mobile' | 'desktop'): 
   if (!overflowBtn || document.querySelectorAll(layerSelector).length > 0) {
     return;
   }
-  // 先注入一条样式规则，禁止溢出工具栏的入场动画
-  const noAnimStyle = document.createElement('style');
-  noAnimStyle.id = 'quick-note-no-overflow-anim';
-  noAnimStyle.textContent = `${layerSelector}{animation:none!important;transition:none!important;}`;
-  document.head.appendChild(noAnimStyle);
-
   overflowBtn.click();
-
   document.querySelectorAll(layerSelector).forEach(el => {
     (el as HTMLElement).style.visibility = 'hidden';
     (el as HTMLElement).style.pointerEvents = 'none';
+    (el as HTMLElement).style.animation = 'none';
   });
-  // 移除临时样式（动画已跳过）
-  noAnimStyle.remove();
   overflowBtn.classList.remove('overflow-active');
   overflowBtn.style.backgroundColor = 'transparent';
 }

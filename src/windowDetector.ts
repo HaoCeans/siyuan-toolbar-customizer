@@ -1,4 +1,4 @@
-import { isMobileDevice, pluginInstance, setPluginInstance, showPopupSelectDialog, processTemplateVariables, getToolbarAvailableWidth, getButtonWidth, showTemplateContextMenu, pauseToolbarResize, resumeToolbarResize } from './toolbarManager';
+import { isMobileDevice, pluginInstance, setPluginInstance, showPopupSelectDialog, processTemplateVariables, getToolbarAvailableWidth, getButtonWidth, showTemplateContextMenu } from './toolbarManager';
 import * as Notify from './notification';
 import { createQuickNoteInputArea, insertTextIntoQuickNoteDialog, type QuickNoteInputHandle } from './quickNote/inputArea';
 import { resolveQuickNoteInputFormat } from './quickNote/resolveFormat';
@@ -346,8 +346,6 @@ async function teardownQuickNoteDialog(dialog: HTMLElement, closeMobile: boolean
   wasQuickNoteInputFocused = false;
   savedCursorPos = null;
   savedBlockRange = null;
-  // 弹窗关闭时恢复底部工具栏位置更新
-  resumeToolbarResize();
 }
 
 // === 电脑端专用弹窗 ===
@@ -911,8 +909,8 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
 
   document.body.appendChild(dialog);
 
-  // 弹窗显示时暂停底部工具栏位置更新，防止键盘弹出时工具栏移动闪现
-  if (isMobileDevice()) pauseToolbarResize();
+  // 延后预打开扩展工具栏（隐藏状态），让弹窗先渲染出来
+  setTimeout(() => preOpenHiddenQuickNoteOverflowToolbar('mobile'), 100);
 
   // 电脑端特有功能：自动聚焦、Enter发送、Esc取消（仅纯文本）
   if (!isMobileDevice() && isFromButton && inputHandle.isPlainTextarea()) {

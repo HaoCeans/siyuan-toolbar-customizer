@@ -434,6 +434,11 @@ function isOverflowButton(id: string): boolean {
 let resizeHandler: (() => void) | null = null
 let mutationObserver: MutationObserver | null = null
 let customButtonClickHandler: ((e: Event) => void) | null = null  // 专门用于自定义按钮的点击处理
+
+// 弹窗期间暂停工具栏位置更新，防止键盘弹出时工具栏移动闪现
+let toolbarUpdatePaused = false
+export function pauseToolbarResize(): void { toolbarUpdatePaused = true }
+export function resumeToolbarResize(): void { toolbarUpdatePaused = false }
 let overflowCloseHandler: ((e: Event) => void) | null = null  // 扩展工具栏点击外部关闭监听器
 let toolbarObserver: MutationObserver | null = null  // 用于监听工具栏渲染的观察器
 // MutationObserver 防抖用的待执行定时器（需要能在 cleanup 中清理）
@@ -888,6 +893,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
       
       // 更新工具栏位置
       function updateToolbarPosition() {
+        if (toolbarUpdatePaused) return
         const currentHeight = window.innerHeight
       
         // 计算高度变化百分比（相对于基准高度）

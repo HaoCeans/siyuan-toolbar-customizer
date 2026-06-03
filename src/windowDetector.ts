@@ -1,4 +1,4 @@
-import { isMobileDevice, pluginInstance, setPluginInstance, showPopupSelectDialog, processTemplateVariables, getToolbarAvailableWidth, getButtonWidth, showTemplateContextMenu } from './toolbarManager';
+import { isMobileDevice, pluginInstance, setPluginInstance, showPopupSelectDialog, processTemplateVariables, getToolbarAvailableWidth, getButtonWidth, showTemplateContextMenu, pauseToolbarResize, resumeToolbarResize } from './toolbarManager';
 import * as Notify from './notification';
 import { createQuickNoteInputArea, insertTextIntoQuickNoteDialog, type QuickNoteInputHandle } from './quickNote/inputArea';
 import { resolveQuickNoteInputFormat } from './quickNote/resolveFormat';
@@ -346,8 +346,8 @@ async function teardownQuickNoteDialog(dialog: HTMLElement, closeMobile: boolean
   wasQuickNoteInputFocused = false;
   savedCursorPos = null;
   savedBlockRange = null;
-  // 弹窗关闭时恢复底部工具栏的位移动画
-  restoreToolbarTransition();
+  // 弹窗关闭时恢复底部工具栏位置更新
+  resumeToolbarResize();
 }
 
 // === 电脑端专用弹窗 ===
@@ -912,8 +912,8 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
 
   document.body.appendChild(dialog);
 
-  // 弹窗显示时禁用底部工具栏的位移动画，防止键盘弹出时工具栏从遮罩底部闪现
-  suppressToolbarTransition();
+  // 弹窗显示时暂停底部工具栏位置更新，防止键盘弹出时工具栏移动闪现
+  if (isMobileDevice()) pauseToolbarResize();
 
   // 电脑端特有功能：自动聚焦、Enter发送、Esc取消（仅纯文本）
   if (!isMobileDevice() && isFromButton && inputHandle.isPlainTextarea()) {
@@ -962,23 +962,6 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
       }
     }
   }
-}
-
-// 弹窗显示期间临时禁用底部工具栏的 transition，防止键盘弹出时工具栏从遮罩边缘闪现
-const TOOLBAR_NO_TRANSITION_ID = 'quick-note-toolbar-no-transition';
-function suppressToolbarTransition(): void {
-  if (document.getElementById(TOOLBAR_NO_TRANSITION_ID)) return;
-  const style = document.createElement('style');
-  style.id = TOOLBAR_NO_TRANSITION_ID;
-  style.textContent = `
-    .protyle-breadcrumb__bar, .protyle-breadcrumb {
-      transition: none !important;
-    }
-  `;
-  document.head.appendChild(style);
-}
-function restoreToolbarTransition(): void {
-  document.getElementById(TOOLBAR_NO_TRANSITION_ID)?.remove();
 }
 
 // 清理预打开的隐藏扩展工具栏（手机端 + 电脑端记事弹窗）

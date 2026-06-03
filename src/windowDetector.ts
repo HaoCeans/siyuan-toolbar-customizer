@@ -1653,15 +1653,6 @@ function handleVisibilityChange() {
       savedCursorPos = null;
       const range = savedBlockRange;
       savedBlockRange = null;
-
-      // 先隐藏内容，避免键盘弹出过程中的布局跳动被用户看到
-      const dialogEl = getQuickNoteDialogElement();
-      const contentEl = dialogEl?.children[0] as HTMLElement | null;
-      if (contentEl) {
-        contentEl.style.transition = 'opacity 0.3s ease';
-        contentEl.style.opacity = '0';
-      }
-
       setTimeout(() => {
         const handle = getActiveQuickNoteInput();
         if (handle) {
@@ -1681,15 +1672,6 @@ function handleVisibilityChange() {
             }
           }
         }
-        // 键盘动画基本完成后，淡入显示内容
-        setTimeout(() => {
-          if (contentEl) {
-            contentEl.style.opacity = '1';
-            setTimeout(() => {
-              if (contentEl) contentEl.style.transition = '';
-            }, 150);
-          }
-        }, 200);
       }, 150);
     }
 

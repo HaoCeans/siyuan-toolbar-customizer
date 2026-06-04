@@ -94,6 +94,7 @@ export async function createQuoteOverlay(
   if (!quote) return null
 
   const fontSize = pluginInstance?.mobileFeatureConfig?.quickNoteQuoteFontSize || 22
+  const maxLines = pluginInstance?.mobileFeatureConfig?.quickNoteQuoteMaxLines || 5
 
   // 挂载目标：inputHandle.element（输入区 wrapper），overlay 精确覆盖输入框
   const mountTarget = inputHandle.element
@@ -177,7 +178,7 @@ export async function createQuoteOverlay(
     'max-height: 60%',
     'overflow: hidden',
     'display: -webkit-box',
-    '-webkit-line-clamp: 5',
+    `-webkit-line-clamp: ${maxLines}`,
     '-webkit-box-orient: vertical',
   ].join(';')
   quoteEl.textContent = quote

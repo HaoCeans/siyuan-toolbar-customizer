@@ -2623,6 +2623,21 @@ export function createMobileSettingLayout(
       );
       container.appendChild(slider);
 
+      // 显示行数滑杆
+      const currentMaxLines = config.quickNoteQuoteMaxLines || 5;
+      const lineSlider = createCustomSlider(
+        '显示行数：',
+        currentMaxLines,
+        1,
+        10,
+        '行',
+        async (value) => {
+          config.quickNoteQuoteMaxLines = value;
+          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+        },
+      );
+      container.appendChild(lineSlider);
+
       // ===== 字体颜色选择 =====
       const separator = document.createElement('div');
       separator.style.cssText = 'height: 1px; background: var(--b3-border-color); margin: 8px 0;';

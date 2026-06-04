@@ -202,6 +202,7 @@ export default class ToolbarCustomizer extends Plugin {
     quickNoteButtonHeight: 32,    // 弹窗按钮高度（px）
     quickNoteQuoteDocId: '',      // 金句占位文档 ID（留空关闭）
     quickNoteQuoteFontSize: 22,   // 金句占位字体大小（px）
+    quickNoteQuoteMaxLines: 5,    // 金句占位最大显示行数
     quickNoteQuoteColorLight: '#B8860B', // 金句颜色（明亮模式）
     quickNoteQuoteColorDark: '#C9A84C',  // 金句颜色（暗黑模式）
   }

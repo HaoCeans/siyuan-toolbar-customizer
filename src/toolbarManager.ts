@@ -1112,7 +1112,8 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
     // 计算顶部偏移量（工具栏位置 + 工具栏高度 + 额外间距）
     const topOffsetValue = parseInt(config.topToolbarOffset) || 50
     const toolbarHeightValue = parseInt(config.toolbarHeight) || 52
-    const paddingTopValue = topOffsetValue + toolbarHeightValue + 10
+    // padding-top 只需补偿工具栏自身高度，不加 topToolbarOffset（.protyle 已位于原生顶栏下方）
+    const paddingTopValue = toolbarHeightValue
 
     // 如果禁用了自定义按钮，则不应用顶部工具栏样式
     if (disableCustomButtons) {

@@ -687,11 +687,11 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
   content.tabIndex = -1;
   content.style.cssText = isAppleStyle ? `
     background: ${isDark ? '#1e1e1e' : 'white'};
-    border-radius: 14px 14px 0 0;
+    border-radius: 14px;
     padding: 20px;
     width: 90%;
     max-width: 500px;
-    height: calc(100vh - 80px);
+    height: calc(100% - 110px);
     box-shadow: ${isDark ? '0 20px 40px rgba(0, 0, 0, 0.5)' : '0 20px 40px rgba(0, 0, 0, 0.15)'};
     display: flex;
     flex-direction: column;
@@ -699,11 +699,11 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     border: 1px solid ${isDark ? '#404040' : 'transparent'};
   ` : `
     background: ${isDark ? '#1e1e1e' : 'white'};
-    border-radius: 12px 12px 0 0;
+    border-radius: 12px;
     padding: 24px;
     width: 90%;
     max-width: 500px;
-    height: calc(100vh - 80px);
+    height: calc(100% - 110px);
     box-shadow: ${isDark ? '0 10px 30px rgba(0, 0, 0, 0.5)' : '0 10px 30px rgba(0, 0, 0, 0.3)'};
     display: flex;
     flex-direction: column;

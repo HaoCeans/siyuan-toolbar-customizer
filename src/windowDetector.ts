@@ -21,6 +21,7 @@ import {
   shouldUseDesktopQuickNoteBlockWindow,
   toggleDesktopQuickNoteBlockWindow,
 } from './quickNote/quickNoteBlockWindow';
+import { createQuoteOverlay } from './quickNote/quoteOverlay';
 
 export type QuickNoteOpenSource = 'auto' | 'button' | 'globalHotkey';
 
@@ -58,6 +59,9 @@ let savedBlockRange: Range | null = null;
 
 // 高度变化检测定时器 ID（已弃用，保留用于向后兼容清理）
 let heightCheckTimer: ReturnType<typeof setInterval> | null = null;
+
+// 金句占位 overlay 清理句柄
+let quoteOverlayCleanup: (() => void) | null = null;
 
 function isQuickNoteToggleSource(source: QuickNoteOpenSource): boolean {
   return source === 'button' || source === 'globalHotkey';
@@ -323,6 +327,11 @@ function cleanupQuickNoteDialogStyles(): void {
 }
 
 async function teardownQuickNoteDialog(dialog: HTMLElement, closeMobile: boolean): Promise<void> {
+  // 清理金句 overlay（在 dialog.remove() 之前，确保 visualViewport 监听器被移除）
+  if (quoteOverlayCleanup) {
+    quoteOverlayCleanup()
+    quoteOverlayCleanup = null
+  }
   try {
     await cancelQuickNoteDialog(getActiveQuickNoteInput());
   } catch {
@@ -674,7 +683,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     left: 0;
     width: 100%;
     height: 100%;
-    background: ${isDark || window.matchMedia('(prefers-color-scheme: dark)').matches ? 'rgba(0, 0, 0, 1)' : 'rgba(128, 128, 128, 1)'};
+    background: ${isDark ? 'rgba(0, 0, 0, 1)' : 'rgba(128, 128, 128, 1)'};
     z-index: 2147483647;
     display: flex;
     justify-content: center;
@@ -768,6 +777,14 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
   });
   setActiveQuickNoteInput(inputHandle);
   noteSection.appendChild(inputHandle.element);
+
+  // 金句占位 overlay（输入法未打开 + 空输入时随机展示文档段落）
+  quoteOverlayCleanup?.()
+  quoteOverlayCleanup = null
+  const quoteHandle = await createQuoteOverlay(noteSection, inputHandle, isDark)
+  if (quoteHandle) {
+    quoteOverlayCleanup = quoteHandle.cleanup
+  }
 
   if (inputHandle.isPlainTextarea()) {
     const textareaStyleId = 'quick-note-textarea-scrollbar-style';
@@ -1789,6 +1806,12 @@ export function clearSmallWindowDetector(): void {
   if (heightCheckTimer) {
     clearInterval(heightCheckTimer);
     heightCheckTimer = null;
+  }
+
+  // 清理金句 overlay
+  if (quoteOverlayCleanup) {
+    quoteOverlayCleanup()
+    quoteOverlayCleanup = null
   }
 
   // 清除可见性变化监听器

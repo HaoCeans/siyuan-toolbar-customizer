@@ -199,7 +199,11 @@ export default class ToolbarCustomizer extends Plugin {
     quickNoteNotebookId: '',     // 自启动一键记事默认笔记本ID
     quickNoteFontSize: 18,       // 弹窗输入框字体大小（px）
     quickNoteSortMethod: 'bottomToolbar' as const, // 弹窗按钮排序方法：'topToolbar'|'bottomToolbar'
-    quickNoteButtonHeight: 32     // 弹窗按钮高度（px）
+    quickNoteButtonHeight: 32,    // 弹窗按钮高度（px）
+    quickNoteQuoteDocId: '',      // 金句占位文档 ID（留空关闭）
+    quickNoteQuoteFontSize: 22,   // 金句占位字体大小（px）
+    quickNoteQuoteColorLight: '#B8860B', // 金句颜色（明亮模式）
+    quickNoteQuoteColorDark: '#C9A84C',  // 金句颜色（暗黑模式）
   }
 
   // 检查作者功能是否已激活

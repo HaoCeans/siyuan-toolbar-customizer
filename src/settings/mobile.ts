@@ -2574,11 +2574,153 @@ export function createMobileSettingLayout(
     }
   });
 
-  
+  // === 弹窗空输入框内容展示 ===
+  setting.addItem({
+    title: '⑥弹窗空输入框内容展示',
+    description: '💡 弹窗空输入时，随机展示指定文档中的块段落。留空关闭此功能',
+    createActionElement: () => {
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = `
+        margin: 0 -16px;
+        width: calc(100% + 32px);
+      `;
+
+      const container = document.createElement('div');
+      container.style.cssText = 'display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--b3-theme-background); border: 1px solid var(--b3-border-color); border-radius: 8px;';
+
+      const config = context.mobileFeatureConfig as any;
+
+      const label = document.createElement('label');
+      label.textContent = '📄 文档 ID';
+      label.style.cssText = 'font-size: 13px; font-weight: 500;';
+      container.appendChild(label);
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'b3-text-field';
+      input.placeholder = '请输入文档 ID，如：20250101000000-aaaaaa';
+      input.value = config.quickNoteQuoteDocId || '';
+      input.style.cssText = 'font-size: 14px; padding: 8px; width: 100%;';
+      container.appendChild(input);
+
+      input.onchange = async () => {
+        config.quickNoteQuoteDocId = input.value.trim();
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+      };
+
+      // 字体大小滑杆
+      const currentFontSize = config.quickNoteQuoteFontSize || 22;
+      const slider = createCustomSlider(
+        '字体大小：',
+        currentFontSize,
+        14,
+        32,
+        'px',
+        async (value) => {
+          config.quickNoteQuoteFontSize = value;
+          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+        },
+      );
+      container.appendChild(slider);
+
+      // ===== 字体颜色选择 =====
+      const separator = document.createElement('div');
+      separator.style.cssText = 'height: 1px; background: var(--b3-border-color); margin: 8px 0;';
+      container.appendChild(separator);
+
+      const colorTitle = document.createElement('div');
+      colorTitle.textContent = '🎨 字体颜色';
+      colorTitle.style.cssText = 'font-size: 13px; font-weight: 500; margin-bottom: 4px;';
+      container.appendChild(colorTitle);
+
+      // 明亮模式颜色行
+      const lightRow = document.createElement('div');
+      lightRow.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+
+      const lightLabel = document.createElement('span');
+      lightLabel.textContent = '☀️ 明亮模式：';
+      lightLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 85px;';
+
+      const lightColorPicker = document.createElement('input');
+      lightColorPicker.type = 'color';
+      lightColorPicker.value = config.quickNoteQuoteColorLight || '#B8860B';
+      lightColorPicker.style.cssText = 'width: 50px; height: 36px; border: 1px solid var(--b3-border-color); border-radius: 4px; cursor: pointer; flex-shrink: 0;';
+
+      const lightTextInput = document.createElement('input');
+      lightTextInput.className = 'b3-text-field';
+      lightTextInput.type = 'text';
+      lightTextInput.value = config.quickNoteQuoteColorLight || '#B8860B';
+      lightTextInput.placeholder = '#B8860B';
+      lightTextInput.style.cssText = 'width: 90px; font-size: 14px; padding: 6px 8px;';
+
+      lightColorPicker.onchange = async () => {
+        config.quickNoteQuoteColorLight = lightColorPicker.value;
+        lightTextInput.value = lightColorPicker.value;
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+      };
+
+      lightTextInput.onchange = async () => {
+        const v = lightTextInput.value.trim();
+        if (v) {
+          config.quickNoteQuoteColorLight = v;
+          lightColorPicker.value = v.startsWith('#') ? v : '#B8860B';
+          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+        }
+      };
+
+      lightRow.appendChild(lightLabel);
+      lightRow.appendChild(lightColorPicker);
+      lightRow.appendChild(lightTextInput);
+      container.appendChild(lightRow);
+
+      // 暗黑模式颜色行
+      const darkRow = document.createElement('div');
+      darkRow.style.cssText = 'display: flex; align-items: center; gap: 8px;';
+
+      const darkLabel = document.createElement('span');
+      darkLabel.textContent = '🌙 暗黑模式：';
+      darkLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 85px;';
+
+      const darkColorPicker = document.createElement('input');
+      darkColorPicker.type = 'color';
+      darkColorPicker.value = config.quickNoteQuoteColorDark || '#C9A84C';
+      darkColorPicker.style.cssText = 'width: 50px; height: 36px; border: 1px solid var(--b3-border-color); border-radius: 4px; cursor: pointer; flex-shrink: 0;';
+
+      const darkTextInput = document.createElement('input');
+      darkTextInput.className = 'b3-text-field';
+      darkTextInput.type = 'text';
+      darkTextInput.value = config.quickNoteQuoteColorDark || '#C9A84C';
+      darkTextInput.placeholder = '#C9A84C';
+      darkTextInput.style.cssText = 'width: 90px; font-size: 14px; padding: 6px 8px;';
+
+      darkColorPicker.onchange = async () => {
+        config.quickNoteQuoteColorDark = darkColorPicker.value;
+        darkTextInput.value = darkColorPicker.value;
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+      };
+
+      darkTextInput.onchange = async () => {
+        const v = darkTextInput.value.trim();
+        if (v) {
+          config.quickNoteQuoteColorDark = v;
+          darkColorPicker.value = v.startsWith('#') ? v : '#C9A84C';
+          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
+        }
+      };
+
+      darkRow.appendChild(darkLabel);
+      darkRow.appendChild(darkColorPicker);
+      darkRow.appendChild(darkTextInput);
+      container.appendChild(darkRow);
+
+      wrapper.appendChild(container);
+      return wrapper;
+    }
+  })
 
   // ===弹窗按钮排序方法 ===
   setting.addItem({
-    title: '⑥弹窗按钮排序方法',
+    title: '⑦弹窗按钮排序方法',
     description: '💡 选择一键记事弹窗中工具栏按钮的排列方式',
     createActionElement: () => {
       const wrapper = document.createElement('div');
@@ -2675,7 +2817,7 @@ export function createMobileSettingLayout(
 
   // 按钮样式配置模式切换
   setting.addItem({
-    title: '⑦弹窗按钮大小配置',
+    title: '⑧弹窗按钮大小配置',
     description: '💡 选择使用默认配置或自定义配置按钮样式',
     createActionElement: () => {
       const wrapper = document.createElement('div');
@@ -2869,7 +3011,7 @@ export function createMobileSettingLayout(
 
   // ===弹窗按钮选择 ===
   setting.addItem({
-    title: '⑧弹窗按钮显示选择',
+    title: '⑨弹窗按钮显示选择',
     description: '💡 选择哪些按钮显示在一键记事弹窗中（不选则显示全部）',
     createActionElement: () => {
       const wrapper = document.createElement('div');

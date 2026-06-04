@@ -237,13 +237,48 @@ export async function createQuoteOverlay(
 
   // --- 状态追踪 ---
   let keyboardOpen = false
+  let lastHideTime = 0
+  let showTimer: ReturnType<typeof setTimeout> | null = null
+  const DEBOUNCE_MS = 400
   const cleanupFns: (() => void)[] = []
 
-  const updateVisibility = () => {
-    overlay.style.display = (keyboardOpen || hasInputContent(inputHandle)) ? 'none' : 'flex'
+  const hideOverlay = () => {
+    overlay.style.display = 'none'
+    lastHideTime = Date.now()
+    if (showTimer) { clearTimeout(showTimer); showTimer = null }
   }
 
-  // 键盘检测：visualViewport resize
+  const showOverlay = () => {
+    // 防抖：刚隐藏后不立即重新显示，避免键盘动画期间反复闪
+    const elapsed = Date.now() - lastHideTime
+    if (lastHideTime > 0 && elapsed < DEBOUNCE_MS) {
+      if (showTimer) clearTimeout(showTimer)
+      showTimer = setTimeout(() => {
+        showTimer = null
+        if (!keyboardOpen && !hasInputContent(inputHandle) && !inputHandle.element.contains(document.activeElement)) {
+          overlay.style.display = 'flex'
+        }
+      }, DEBOUNCE_MS - elapsed)
+      return
+    }
+    overlay.style.display = 'flex'
+  }
+
+  const updateVisibility = () => {
+    const shouldHide = keyboardOpen || hasInputContent(inputHandle) || inputHandle.element.contains(document.activeElement)
+    if (shouldHide) {
+      hideOverlay()
+    } else {
+      showOverlay()
+    }
+  }
+
+  // ① focusin：用户点击输入框的瞬间立刻隐藏（比 viewport 检测快很多）
+  const onFocusIn = () => hideOverlay()
+  inputHandle.element.addEventListener('focusin', onFocusIn)
+  cleanupFns.push(() => inputHandle.element.removeEventListener('focusin', onFocusIn))
+
+  // ② visualViewport resize：键盘动画结束后更新状态
   const onViewportResize = () => {
     if (!window.visualViewport) return
     const screenHeight = window.screen.height
@@ -253,7 +288,7 @@ export async function createQuoteOverlay(
   window.visualViewport?.addEventListener('resize', onViewportResize)
   cleanupFns.push(() => window.visualViewport?.removeEventListener('resize', onViewportResize))
 
-  // 输入内容变化检测
+  // ③ 输入内容变化检测
   const onInputChange = () => updateVisibility()
 
   if (inputHandle.isPlainTextarea()) {
@@ -273,6 +308,7 @@ export async function createQuoteOverlay(
 
   // overlay 自身清理
   cleanupFns.push(() => overlay.remove())
+  cleanupFns.push(() => { if (showTimer) clearTimeout(showTimer) })
 
   return {
     cleanup: () => {

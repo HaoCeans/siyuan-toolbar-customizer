@@ -530,3 +530,89 @@ background: ${isDark || window.matchMedia('(prefers-color-scheme: dark)').matche
 - 圆角必须四角统一（`14px` / `12px`），不要只做上面圆角
 - 卡片高度用 `calc(100% - Npx)` 控制，`N` 值 = `padding-top(40) + 底部假间距(70)` = `110`
 - 改完一边（Apple / 普通）必须同步改另一边
+
+---
+
+### 19. 一键记事弹窗金句占位（src/quickNote/quoteOverlay.ts）
+
+**相关文件**: `src/quickNote/quoteOverlay.ts`（overlay 创建）、`src/windowDetector.ts`（集成与清理）、`src/settings/mobile.ts`（设置 UI ⑥）、`src/index.ts`（默认配置）
+
+**功能**: 弹窗空输入 + 输入法未打开时，从用户指定的文档中随机抽取段落显示为金色金句占位。微信读书划线分享卡片风格。
+
+**DOM 层级**（修改前必须理解）：
+
+```
+noteSection (flex:1, position:relative 由 overlay 设置)
+  └── inputHandle.element (flex:1, position:relative 由 overlay 设置)
+       ├── textarea / protyle（z-index: auto）
+       └── quote overlay（z-index:1, position:absolute, inset:0）
+            ├── 左上引号 "（72px Georgia）
+            ├── 金句正文（用户可配字号 14-32px、颜色、行数 1-10）
+            ├── 右下引号 "
+            ├── 分割线
+            └── JIN JU 来源标识
+```
+
+**三层显示/隐藏机制**（按触发速度排列）：
+
+| 层级 | 事件 | 作用 |
+|------|------|------|
+| ① | `focusin` | 用户点击输入框瞬间立刻隐藏，比 viewport 检测快 |
+| ② | `visualViewport.resize` | 键盘动画结束后更新 keyboardOpen 状态 |
+| ③ | `input` / `MutationObserver` | 内容变化时隐藏 |
+
+**400ms 防抖**: overlay 隐藏后 400ms 内不会重新显示，防止键盘动画期间反复闪。
+
+**配置字段**（均在 `mobileFeatureConfig`）：
+
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `quickNoteQuoteDocId` | `''` | 金句文档 ID，留空关闭 |
+| `quickNoteQuoteFontSize` | `22` | 字体大小（px，14-32） |
+| `quickNoteQuoteMaxLines` | `5` | 最大显示行数（1-10） |
+| `quickNoteQuoteColorLight` | `'#B8860B'` | 明亮模式颜色 |
+| `quickNoteQuoteColorDark` | `'#C9A84C'` | 暗黑模式颜色 |
+
+**颜色派生**: 引号装饰线、分割线、JIN JU 标识的颜色自动从用户选择的主色通过 `hexToRgb()` + `rgba()` 派生半透明变体，不需要额外配置。
+
+**规则**:
+- overlay 挂载在 `inputHandle.element` 上（不是 noteSection），精确覆盖输入框区域
+- `pointer-events: none` 保证不阻挡交互
+- 缓存 5 分钟（`CACHE_TTL`），每次弹窗重新 `pickRandom` 但不重新查询
+- 清理时需移除 `visualViewport` 监听器、`showTimer`、`focusin` 监听器，并恢复 `mountTarget.style.position`
+- `teardownQuickNoteDialog` 中 overlay 清理放在 `dialog.remove()` 之后，保证金句和弹窗视觉上同时消失
+- SQL 只查 `type='p'`（段落块），不取标题/代码块等
+
+---
+
+### 20. 手机端前后台切换时输入区布局遮罩（src/windowDetector.ts）
+
+**相关文件**: `src/windowDetector.ts`（`handleVisibilityChange()`）
+
+**问题**: 输入框有内容且输入法打开时，切后台再切前台，内容会一瞬间以全高（键盘已关闭）渲染，然后键盘弹起后缩回正确高度，造成闪跳。
+
+**原因**: `handleVisibilityChange()` 中焦点恢复用 `setTimeout(150ms)` 触发键盘弹出，但在这 150ms 内视口已恢复全高，输入区以无键盘布局渲染了一帧。
+
+**修复**: 切后台时在 noteSection 上盖一个同色遮罩（`#quick-note-layout-mask`），切前台焦点恢复 + 键盘弹起后（100ms + 200ms = 300ms）移除遮罩。
+
+```
+切后台 → 在 noteSection 上盖遮罩（同色，z-index:100，pointer-events:none）
+切前台 → 100ms: focus() 恢复焦点
+       → 300ms: 移除遮罩
+```
+
+**遮罩参数**:
+
+| 属性 | 值 |
+|------|-----|
+| 背景色 | 暗色 `#1e1e1e` / 亮色 `white`（与弹窗卡片背景一致） |
+| z-index | `100`（在输入框之上，金句 overlay z-index:1 之下没关系，因为金句此时已被 focusin 隐藏） |
+| pointer-events | `none`（不影响焦点和输入法） |
+| 延迟 | 焦点 100ms + 键盘 200ms = 300ms 总延迟 |
+
+**规则**:
+- 遮罩盖在 noteSection（输入区）上，不影响标题、工具栏按钮、发送/取消按钮
+- 不需要恢复焦点时（输入法没开过），切前台直接移除遮罩，不等待
+- 遮罩 `id='quick-note-layout-mask'`，全局唯一，用 `getElementById` 查找
+- 弹窗被 `teardownQuickNoteDialog` 销毁时，遮罩随 dialog.remove() 一起移除，无需额外清理
+- 不要用 `visibility: hidden`（会阻止输入法弹出），不要用 `opacity: 0`（部分设备干扰 IME 定位）

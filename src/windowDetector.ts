@@ -327,11 +327,6 @@ function cleanupQuickNoteDialogStyles(): void {
 }
 
 async function teardownQuickNoteDialog(dialog: HTMLElement, closeMobile: boolean): Promise<void> {
-  // 清理金句 overlay（在 dialog.remove() 之前，确保 visualViewport 监听器被移除）
-  if (quoteOverlayCleanup) {
-    quoteOverlayCleanup()
-    quoteOverlayCleanup = null
-  }
   try {
     await cancelQuickNoteDialog(getActiveQuickNoteInput());
   } catch {
@@ -348,7 +343,13 @@ async function teardownQuickNoteDialog(dialog: HTMLElement, closeMobile: boolean
   if (closeMobile || dialog.id === 'quick-note-dialog-desktop') {
     cleanupQuickNoteOverflowToolbarLayers();
   }
+  // 先移除整个弹窗（含金句 overlay），视觉上同时消失
   dialog.remove();
+  // 弹窗移除后再清理金句 overlay 的事件监听器（DOM 已不在文档中，不影响视觉）
+  if (quoteOverlayCleanup) {
+    quoteOverlayCleanup()
+    quoteOverlayCleanup = null
+  }
   isNoteDialogShowing = false;
   isQuickNoteDialogMinimized = false;
   needsInitialFocus = false;
@@ -1622,6 +1623,28 @@ function handleVisibilityChange() {
     wasQuickNoteInputFocused = isNoteDialogShowing &&
       !!getActiveQuickNoteInput()?.element?.contains(document.activeElement);
 
+    // 遮盖输入区：切后台时在 noteSection 上盖一层同色遮罩，
+    // 防止切回前台时键盘关闭→重开导致内容在布局变化期间溢出到输入框外面
+    if (isNoteDialogShowing) {
+      const noteDialog = document.getElementById('quick-note-dialog') || document.getElementById('quick-note-dialog-desktop');
+      const noteSection = noteDialog?.querySelector('.toolbar-customizer-qnote-input')?.parentElement as HTMLElement | null;
+      if (noteSection) {
+        const isDark = isSiyuanDarkMode();
+        const mask = document.createElement('div');
+        mask.id = 'quick-note-layout-mask';
+        mask.style.cssText = [
+          'position: absolute',
+          'inset: 0',
+          `background: ${isDark ? '#1e1e1e' : 'white'}`,
+          'z-index: 100',
+          'pointer-events: none',
+          'border-radius: 10px',
+        ].join(';');
+        noteSection.style.position = 'relative';
+        noteSection.appendChild(mask);
+      }
+    }
+
     // 保存光标位置，用于切回前台时恢复
     if (wasQuickNoteInputFocused) {
       const inputHandle = getActiveQuickNoteInput();
@@ -1688,7 +1711,20 @@ function handleVisibilityChange() {
             }
           }
         }
-      }, 150);
+        // 键盘弹起后移除输入区遮罩
+        setTimeout(() => {
+          const mask = document.getElementById('quick-note-layout-mask');
+          if (mask) {
+            mask.remove();
+          }
+        }, 200);
+      }, 100);
+    } else if (isNoteDialogShowing) {
+      // 不需要恢复焦点，直接移除遮罩
+      const mask = document.getElementById('quick-note-layout-mask');
+      if (mask) {
+        mask.remove();
+      }
     }
 
     // 小窗模式：延迟检测是否需要弹窗

@@ -3,7 +3,9 @@
     "allow": [
       "Bash(npm run build)",
       "Bash(dir:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "WebSearch",
+      "mcp__web-reader__webReader"
     ]
   }
 }

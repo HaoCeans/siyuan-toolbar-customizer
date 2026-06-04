@@ -691,7 +691,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     padding: 20px;
     width: 90%;
     max-width: 500px;
-    height: calc(100% - 80px);
+    height: calc(100% - 40px);
     box-shadow: ${isDark ? '0 20px 40px rgba(0, 0, 0, 0.5)' : '0 20px 40px rgba(0, 0, 0, 0.15)'};
     display: flex;
     flex-direction: column;
@@ -703,7 +703,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     padding: 24px;
     width: 90%;
     max-width: 500px;
-    height: calc(100% - 80px);
+    height: calc(100% - 40px);
     box-shadow: ${isDark ? '0 10px 30px rgba(0, 0, 0, 0.5)' : '0 10px 30px rgba(0, 0, 0, 0.3)'};
     display: flex;
     flex-direction: column;

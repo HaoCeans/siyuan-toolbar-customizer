@@ -140,10 +140,16 @@ function setupDesktopCaptureInteraction(
 }
 
 /**
- * 检测思源当前是否为暗黑模式
- * 通过读取思源主题背景色的亮度来判断
+ * 检测当前是否为暗黑模式
+ * 优先检测系统级暗黑（WebView 在系统暗色时会对白色元素做颜色反转），
+ * 再检测思源主题背景色亮度，任一为暗则返回 true。
  */
 function isSiyuanDarkMode(): boolean {
+  // 系统级暗黑模式：WebView 强制暗色会把 white 反转为黑色，
+  // 导致遮罩（灰色）与卡片内容（白色→黑色）颜色撕裂，必须一并感知
+  if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
+    return true;
+  }
   const style = getComputedStyle(document.documentElement);
   const bg = style.getPropertyValue('--b3-theme-background').trim();
   if (bg.startsWith('#')) {
@@ -1582,6 +1588,12 @@ function handleSmallWindowOnlyMode() {
  * 无论小窗还是全屏都弹窗
  */
 function handleBothModesMode() {
+  // 键盘开着（用户正在编辑页面）时不弹窗，防止编辑页面锁屏→开屏误触
+  const keyboardHeight = Math.max(0, window.screen.height - window.innerHeight);
+  if (keyboardHeight > 300) {
+    return;
+  }
+
   // 检查是否有内容
   if (hasNoteDialogContent()) {
     return;

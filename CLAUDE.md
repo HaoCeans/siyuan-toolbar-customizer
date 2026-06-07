@@ -465,20 +465,18 @@ console.log(p?.offsetHeight, c?.offsetHeight); // 两者应相等
 
 ---
 
-### 17. 一键记事弹窗遮罩背景色（src/windowDetector.ts）
+### 17. 一键记事弹窗暗黑模式检测（src/windowDetector.ts）
 
-移动端一键记事弹窗（`showNoteInputDialogMobile`）的遮罩背景已从半透明改为不透明：
-- 暗黑模式 → 纯黑 `rgba(0,0,0,1)`
-- 明亮模式 → 纯灰 `rgba(128,128,128,1)`
+**相关文件**: `src/windowDetector.ts`（`isSiyuanDarkMode()`）
 
-原始样式（如需恢复）：
-```js
-background: ${isDark ? 'rgba(0, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.6)'};
-```
-当前样式：
-```js
-background: ${isDark || window.matchMedia('(prefers-color-scheme: dark)').matches ? 'rgba(0, 0, 0, 1)' : 'rgba(128, 128, 128, 1)'};
-```
+**问题**: `isSiyuanDarkMode()` 原来只读思源 CSS 变量 `--b3-theme-background` 的亮度。当思源明亮模式 + 系统暗黑模式时，WebView 会对 `white` 元素做颜色反转为黑色，但插件认为应该用亮色 → 遮罩显示灰色（代码设置的明亮模式值），卡片/输入框/按钮的 `white` 被反转成黑色 → 上下灰、中间黑撕裂。
+
+**已做修复**: `isSiyuanDarkMode()` 在检查思源主题变量之前，先检测系统级暗黑模式 `window.matchMedia('(prefers-color-scheme: dark)')`，任一为暗则返回 `true`。一处改动覆盖弹窗所有 `isDark` 调用点。
+
+**规则**:
+- 新增颜色分支时，统一使用 `isSiyuanDarkMode()` 返回值，不要单独判断系统主题
+- 遮罩背景为不透明色：暗黑 `rgba(0,0,0,1)` / 明亮 `rgba(128,128,128,1)`
+- 原始半透明样式（如需恢复）：`rgba(0,0,0,0.7)` / `rgba(0,0,0,0.6)`
 
 ---
 

@@ -52,6 +52,22 @@ function buildBlockWrapperStyle(isDark: boolean, isMobile: boolean, isAppleStyle
 
 export const isBlockInputImplemented = true
 
+/** 手机端思源 App WebView 中 contenteditable 无法通过 focus() 弹出键盘，需要用隐藏 input 唤起 */
+function focusBlockEditable(editEl: HTMLElement, isMobile: boolean): void {
+  if (isMobile) {
+    const fakeInput = document.createElement('input')
+    fakeInput.style.cssText = 'position:fixed;left:-9999px;opacity:0;height:0;width:0;pointer-events:none'
+    document.body.appendChild(fakeInput)
+    fakeInput.focus()
+    setTimeout(() => {
+      editEl.focus()
+      fakeInput.remove()
+    }, 50)
+  } else {
+    editEl.focus()
+  }
+}
+
 export function isBlockInputFormat(format: string | undefined): boolean {
   return format === 'block'
 }
@@ -78,7 +94,7 @@ async function resetDraftBlock(
   const ok = await loadSingleBlockIntoProtyle(editor, state)
   if (ok) {
     const editEl = editor.protyle.wysiwyg.element.querySelector('[contenteditable="true"]') as HTMLElement | null
-    editEl?.focus()
+    if (editEl) focusBlockEditable(editEl, options.isMobile)
   }
   return ok
 }
@@ -199,13 +215,13 @@ export async function createBlockInputHandle(
       if (ok) {
         savedToKernel = false
         const editEl = editor.protyle.wysiwyg.element.querySelector('[contenteditable="true"]') as HTMLElement | null
-        editEl?.focus()
+        if (editEl) focusBlockEditable(editEl, options.isMobile)
       }
     },
     insertText: (text: string) => {
       const editEl = editor.protyle.wysiwyg.element.querySelector('[contenteditable="true"]') as HTMLElement | null
       if (!editEl) return
-      editEl.focus()
+      focusBlockEditable(editEl, options.isMobile)
       try {
         document.execCommand('insertText', false, text)
       } catch {
@@ -221,7 +237,7 @@ export async function createBlockInputHandle(
     },
     focus: () => {
       const editEl = editor.protyle.wysiwyg.element.querySelector('[contenteditable="true"]') as HTMLElement | null
-      editEl?.focus()
+      if (editEl) focusBlockEditable(editEl, options.isMobile)
     },
     destroy: () => {
       removeGuards()

@@ -769,7 +769,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
   const fontSize = getQuickNoteFontSize();
   const placeholder = documentId
     ? (isAppleStyle ? '追加到文档' : '请输入要追加到文档的内容...')
-    : (isAppleStyle ? '写日记' : '请输入您的日记内容...');
+    : (isAppleStyle ? '' : '请输入您的日记内容...');
 
   const inputHandle = await createQuickNoteInputArea({
     format: inputFormat,

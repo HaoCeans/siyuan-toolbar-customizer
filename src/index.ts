@@ -211,6 +211,9 @@ export default class ToolbarCustomizer extends Plugin {
     quickNoteQuoteMaxLines: 5,    // 金句占位最大显示行数
     quickNoteQuoteColorLight: '#B8860B', // 金句颜色（明亮模式）
     quickNoteQuoteColorDark: '#C9A84C',  // 金句颜色（暗黑模式）
+    quickNoteAutoFocusButton: true,   // 按钮触发时自动弹出输入法
+    quickNoteAutoFocusFirstPopup: true, // 自启动首次弹出时自动聚焦
+    quickNoteAutoFocusRestore: true,  // 切后台再切回时自动恢复键盘
   }
 
   // 检查作者功能是否已激活

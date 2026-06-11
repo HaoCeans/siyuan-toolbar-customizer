@@ -3505,7 +3505,7 @@ export function createMobileSettingLayout(
         box-sizing: border-box;
       `
       container.innerHTML = `
-        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（12项）</div>
+        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（14项）</div>
         <div style="font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>
         <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
           <thead>

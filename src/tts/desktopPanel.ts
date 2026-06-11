@@ -630,7 +630,6 @@ function updatePlaybackBar(state: string, index: number, total: number): void {
   if (playPauseBtn) {
     const isPlaying = state === 'playing' || state === 'loading'
     updateButtonIcon(playPauseBtn, isPlaying ? 'pause' : 'play', 18, true)
-    playPauseBtn.title = isPlaying ? '暂停' : '继续'
   }
 }
 

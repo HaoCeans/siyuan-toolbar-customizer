@@ -960,7 +960,7 @@ export function createDesktopSettingLayout(
         box-sizing: border-box;
       `
       whaleFunctionListContainer.innerHTML = `
-        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（12项）</div>
+        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（14项）</div>
         <div style="font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>
         <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
           <thead>
@@ -1018,18 +1018,18 @@ export function createDesktopSettingLayout(
             </tr>
             <tr style="background: var(--b3-theme-background);">
               <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑨</td>
-              <td style="padding: 10px; font-weight: 500;">手机端标签页Tab</td>
-              <td style="padding: 10px; color: var(--b3-theme-on-surface);">手机端多文档快速切换，苹果风格悬浮Tab栏，自动管理，告别反复返回</td>
+              <td style="padding: 10px; font-weight: 500;">标签页Tab</td>
+              <td style="padding: 10px; color: var(--b3-theme-on-surface);">桌面端多文档快速切换，悬浮Tab栏，自动管理</td>
             </tr>
             <tr>
               <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑩</td>
-              <td style="padding: 10px; font-weight: 500;">手机端悬浮大纲</td>
-              <td style="padding: 10px; color: var(--b3-theme-on-surface);">左侧悬浮大纲面板，标题快速跳转，实时跟踪当前位置，阅读长文必备</td>
+              <td style="padding: 10px; font-weight: 500;">悬浮大纲</td>
+              <td style="padding: 10px; color: var(--b3-theme-on-surface);">桌面端左侧悬浮大纲面板，标题快速跳转，实时跟踪当前位置，阅读长文必备</td>
             </tr>
             <tr style="background: var(--b3-theme-background);">
               <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑪</td>
-              <td style="padding: 10px; font-weight: 500;">手机端前一篇/后一篇文档</td>
-              <td style="padding: 10px; color: var(--b3-theme-on-surface);">底部悬浮导航栏，按文件树顺序浏览文档，前后翻页，阅读笔记更流畅</td>
+              <td style="padding: 10px; font-weight: 500;">前一篇/后一篇文档</td>
+              <td style="padding: 10px; color: var(--b3-theme-on-surface);">桌面端底部悬浮导航栏，按文件树顺序浏览文档，前后翻页，阅读笔记更流畅</td>
             </tr>
             <tr>
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑫</td>

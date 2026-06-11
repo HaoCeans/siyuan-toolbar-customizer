@@ -448,9 +448,10 @@ export async function forwardProxy(
   payload: any = {},
   headers: any[] = [],
   timeout: number = 7000,
-  contentType: string = "text/html"
+  contentType: string = "text/html",
+  responseEncoding: string = ""
 ): Promise<IResForwardProxy> {
-  let data = {
+  let data: Record<string, unknown> = {
     url: url,
     method: method,
     timeout: timeout,
@@ -458,6 +459,9 @@ export async function forwardProxy(
     headers: headers,
     payload: payload,
   };
+  if (responseEncoding) {
+    data.responseEncoding = responseEncoding;
+  }
   let url1 = "/api/network/forwardProxy";
   return request(url1, data);
 }

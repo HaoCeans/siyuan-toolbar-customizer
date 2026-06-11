@@ -12,6 +12,13 @@ import { toggleVisibility as toggleMobileTabs } from "./ui/mobileTabs";
 import { toggleVisibility as toggleMobileOutline } from "./ui/mobileOutline";
 import { toggleVisibility as toggleMobileDocNav } from "./ui/mobileDocNav";
 import { isDesktopQuickNoteOverflowToolbarEnabled } from "./quickNote/desktopCapture";
+// TTS 朗读模块
+import { showTTSOptionsDesktop } from "./tts/desktopPanel";
+import { showTTSOptionsMobile, cleanupMobileTTS } from "./tts/mobilePanel";
+import { destroyTTSEngine } from "./tts/ttsEngine";
+import { destroyHttpTTSEngine } from "./tts/httpTtsEngine";
+import { destroyMobileTTSEngine } from "./tts/mobileTtsEngine";
+import { destroyEdgeTTSEngine, destroyGoogleTTSEngine } from "./tts/edgeTtsEngine";
 
 // ===== 插件实例（用于需要 app 参数的 API 调用） =====
 export let pluginInstance: any = null;
@@ -64,7 +71,7 @@ export interface ButtonConfig {
   targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
   mobileTargetDocId?: string; // 打开指定ID块：目标块ID（移动端），支持文档ID或块ID
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
-  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary=日记, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮, scroll-doc=滚动文档顶部或底部, image-upload=图片快捷导入日记, mobile-tabs=手机端标签页Tab, mobile-outline=手机端悬浮大纲, doc-nav=手机端前一篇/后一篇文档, slide-comment=滑动快速批注
+  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary=日记, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮, scroll-doc=滚动文档顶部或底部, image-upload=图片快捷导入日记, mobile-tabs=手机端标签页Tab, mobile-outline=手机端悬浮大纲, doc-nav=手机端前一篇/后一篇文档, slide-comment=滑动快速批注, tts=文档朗读
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
   viewName?: string;         // 视图名称
@@ -4038,6 +4045,18 @@ async function executeDiary(config: ButtonConfig) {
 }
 
 /**
+ * 执行文档朗读（TTS）— 根据平台弹出选项面板
+ */
+function executeTTS() {
+  const isMobile = isMobileDevice()
+  if (isMobile) {
+    showTTSOptionsMobile()
+  } else {
+    showTTSOptionsDesktop()
+  }
+}
+
+/**
  * 执行鲸鱼定制工具箱
  */
 async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
@@ -4207,6 +4226,12 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
         Notify.showErrorCommandCannotExecute('未找到鲸鱼快速批注插件，请先安装并启用')
       }
     }
+    return
+  }
+
+  // ⑬文档朗读（TTS）
+  if (subtype === 'tts') {
+    executeTTS()
     return
   }
 
@@ -5491,6 +5516,14 @@ export function cleanup() {
     const el = document.getElementById(id)
     if (el) el.remove()
   })
+
+  // 清理 TTS 朗读引擎
+  destroyTTSEngine()
+  destroyHttpTTSEngine()
+  destroyMobileTTSEngine()
+  destroyEdgeTTSEngine()
+  destroyGoogleTTSEngine()
+  cleanupMobileTTS()
 
   // 重置模块级变量
   currentButtonConfigs = []

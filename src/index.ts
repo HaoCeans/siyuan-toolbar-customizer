@@ -41,6 +41,9 @@ import {
   showTemplateContextMenu
 } from './toolbarManager'
 
+// TTS 设置持久化初始化
+import { initTTSSettings } from './tts/httpTtsEngine'
+
 import {
   initSmallWindowDetector,
   clearSmallWindowDetector,
@@ -536,7 +539,10 @@ export default class ToolbarCustomizer extends Plugin {
   // 布局就绪后初始化（确保 DOM 完全加载）
   onLayoutReady() {
     this.initPluginFunctions()  // initPluginFunctions 是 async，不阻塞后续代码
-    
+
+    // ===== 初始化 TTS 设置缓存（从 plugin.loadData 读取）=====
+    initTTSSettings()
+
     // ===== 应用手机端工具栏样式 =====
     if (this.isMobile) {
       // 延迟应用以确保 toolbarManager 的样式已经加载

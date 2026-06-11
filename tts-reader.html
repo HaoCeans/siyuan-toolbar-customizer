@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>TTS 朗读器</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f0f3;--card:#fff;--text:#1a1a1a;--text2:#888;
+  --border:#ddd;--primary:#4a90d9;--primary-text:#fff;
+  --active:rgba(74,144,217,.15);--shadow:0 2px 12px rgba(0,0,0,.08);
+  --radius:12px;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#181818;--card:#242424;--text:#e0e0e0;--text2:#888;
+    --border:#333;--primary:#5ba0e0;--primary-text:#fff;
+    --active:rgba(91,160,224,.15);--shadow:0 2px 12px rgba(0,0,0,.25);
+  }
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif;
+  background:var(--bg);color:var(--text);
+  min-height:100vh;padding:16px;
+  display:flex;flex-direction:column;align-items:center;
+  -webkit-tap-highlight-color:transparent;
+}
+h1{font-size:18px;font-weight:600;margin-bottom:14px;letter-spacing:.5px}
+.wrap{width:100%;max-width:600px;display:flex;flex-direction:column;gap:14px}
+
+/* ── 输入区 ── */
+textarea{
+  width:100%;min-height:180px;max-height:45vh;
+  background:var(--card);color:var(--text);border:1px solid var(--border);
+  border-radius:var(--radius);padding:14px;font-size:15px;line-height:1.7;
+  resize:vertical;outline:none;font-family:inherit;
+}
+textarea:focus{border-color:var(--primary)}
+textarea::placeholder{color:var(--text2)}
+
+/* ── 设置 ── */
+.settings{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:14px;display:flex;flex-direction:column;gap:10px;
+}
+.row{display:flex;align-items:center;gap:8px}
+.row label{font-size:13px;min-width:44px;opacity:.65;flex-shrink:0}
+.row select{flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px}
+.row input[type=range]{flex:1;accent-color:var(--primary)}
+.row .val{font-size:12px;min-width:32px;text-align:right;color:var(--text2)}
+
+/* ── 控制栏 ── */
+.bar{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:12px 14px;display:flex;align-items:center;gap:6px;box-shadow:var(--shadow);
+}
+.bar .st{font-size:13px;font-weight:500;white-space:nowrap;min-width:72px}
+.bar .pg{font-size:12px;color:var(--text2);white-space:nowrap}
+.bar .sp{flex:1}
+.btn{
+  border:none;background:none;cursor:pointer;font-size:20px;
+  padding:8px;min-width:40px;border-radius:8px;color:var(--text);
+  transition:background .15s;text-align:center;
+}
+.btn:active{opacity:.5}
+.btn.play{
+  background:var(--primary);color:var(--primary-text);
+  border-radius:10px;font-size:14px;font-weight:500;
+  padding:8px 16px;min-width:auto;
+}
+.hint{font-size:11px;color:var(--text2);text-align:center;margin-top:2px}
+</style>
+</head>
+<body>
+
+<h1>🔊 TTS 朗读器</h1>
+
+<div class="wrap">
+  <textarea id="txt" placeholder="在此粘贴要朗读的文本...&#10;&#10;支持中英文混合，按空行自动分段"></textarea>
+
+  <div class="settings">
+    <div class="row">
+      <label>语音</label>
+      <select id="voiceSel"></select>
+    </div>
+    <div class="row">
+      <label>语速</label>
+      <input type="range" id="rateR" min="0.5" max="2.0" step="0.1" value="1.0">
+      <span class="val" id="rateV">1.0x</span>
+    </div>
+  </div>
+
+  <div class="bar">
+    <span class="st" id="st">就绪</span>
+    <span class="pg" id="pg"></span>
+    <span class="sp"></span>
+    <button class="btn" id="prevB">⏮</button>
+    <button class="btn play" id="playB">▶ 朗读</button>
+    <button class="btn" id="nextB">⏭</button>
+    <button class="btn" id="stopB">⏹</button>
+  </div>
+
+  <div class="hint">Edge TTS 在线语音 · 不依赖浏览器语音 · 任何设备可用</div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+// ─── 常量 ──
+const EDGE_URL = 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1';
+const TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4';
+const SEC_VER = '1-143.0.3650.75';
+
+const VOICES = [
+  { name:'zh-CN-XiaoxiaoNeural',   label:'晓晓（女·温柔）' },
+  { name:'zh-CN-YunxiNeural',      label:'云希（男·阳光）' },
+  { name:'zh-CN-XiaoyiNeural',     label:'晓伊（女·活泼）' },
+  { name:'zh-CN-YunjianNeural',    label:'云健（男·沉稳）' },
+  { name:'zh-CN-XiaochenNeural',   label:'晓辰（女·知性）' },
+  { name:'zh-CN-XiaohanNeural',    label:'晓涵（女·甜美）' },
+  { name:'zh-CN-XiaomoNeural',     label:'晓墨（女·文艺）' },
+  { name:'zh-CN-XiaoshuangNeural', label:'晓双（女·童声）' },
+  { name:'zh-CN-YunfengNeural',    label:'云枫（男·磁性）' },
+  { name:'zh-CN-YunhaoNeural',     label:'云皓（男·新闻）' },
+  { name:'zh-CN-YunzeNeural',      label:'云泽（男·纪录片）' },
+];
+
+// ─── DOM ──
+const txt    = document.getElementById('txt');
+const voiceSel = document.getElementById('voiceSel');
+const rateR  = document.getElementById('rateR');
+const rateV  = document.getElementById('rateV');
+const stEl   = document.getElementById('st');
+const pgEl   = document.getElementById('pg');
+const playB  = document.getElementById('playB');
+const prevB  = document.getElementById('prevB');
+const nextB  = document.getElementById('nextB');
+const stopB  = document.getElementById('stopB');
+
+// ─── 填充语音列表 ──
+for (const v of VOICES) {
+  const o = document.createElement('option');
+  o.value = v.name; o.textContent = v.label;
+  voiceSel.appendChild(o);
+}
+rateR.oninput = () => { rateV.textContent = parseFloat(rateR.value).toFixed(1) + 'x'; };
+
+// ─── 状态 ──
+let paragraphs = [];
+let curIdx = -1;
+let playing = false;
+let paused = false;
+let stopped = false;
+let audioEl = new Audio();  // ★ 用 <audio> 元素，任何浏览器都支持
+
+// ─── 段落提取 ──
+function extract() {
+  paragraphs = [];
+  const raw = txt.value || '';
+  if (!raw.trim()) return 0;
+  for (const line of raw.split(/\n+/)) {
+    const t = line.trim();
+    if (t) paragraphs.push(t);
+  }
+  return paragraphs.length;
+}
+
+// ─── 工具 ──
+function uuid() {
+  return 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'.replace(/x/g, () =>
+    Math.floor(Math.random() * 16).toString(16));
+}
+
+function escapeXml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+          .replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+}
+
+function ratePercent(r) {
+  if (r === 1) return '+0%';
+  return r > 1 ? `+${Math.round((r-1)*100)}%` : `-${Math.round((1-r)*100)}%`;
+}
+
+// ─── Sec-MS-GEC 令牌 ──
+async function secMsGec() {
+  try {
+    const ticks = Math.floor(Date.now() / 1000) * 10000000 + 116444736000000000;
+    const str = ticks.toString() + TOKEN;
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('').toUpperCase();
+  } catch { return ''; }
+}
+
+// ─── Edge TTS WebSocket 合成 ──
+function synthesize(text, voice, rate) {
+  return new Promise(async (resolve, reject) => {
+    const reqId = uuid();
+    const sec = await secMsGec();
+    let url = `${EDGE_URL}?TrustedClientToken=${TOKEN}&ConnectionId=${uuid()}`;
+    if (sec) url += `&Sec-MS-GEC=${sec}&Sec-MS-GEC-Version=${SEC_VER}`;
+
+    let settled = false;
+    const chunks = [];
+    const timer = setTimeout(() => {
+      if (!settled) { settled = true; try { ws.close() } catch {} reject(new Error('合成超时(30s)')); }
+    }, 30000);
+
+    let ws;
+    try { ws = new WebSocket(url); }
+    catch(e) { clearTimeout(timer); reject(e); return; }
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen = () => {
+      // ① 配置
+      const cfg = JSON.stringify({context:{synthesis:{audio:{
+        metadataoptions:{sentenceBoundaryEnabled:'false',wordBoundaryEnabled:'true'},
+        outputFormat:'audio-24khz-48kbitrate-mono-mp3'
+      }}}});
+      ws.send(`Content-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n${cfg}`);
+
+      // ② SSML
+      const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='zh-CN'>` +
+        `<voice name='${voice}'><prosody rate='${ratePercent(rate)}'>${escapeXml(text)}</prosody></voice></speak>`;
+      ws.send(`X-RequestId:${reqId}\r\nContent-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n${ssml}`);
+    };
+
+    ws.onmessage = (e) => {
+      if (typeof e.data === 'string') {
+        if (e.data.includes('Path:turn.end')) {
+          if (!settled) {
+            settled = true; clearTimeout(timer);
+            try { ws.close() } catch {}
+            resolve(concatBuffers(chunks));
+          }
+        }
+      } else {
+        // 提取 MP3 音频
+        const bytes = new Uint8Array(e.data);
+        if (bytes.length < 4) return;
+        const hdrLen = (bytes[0] << 8) | bytes[1];
+        if (hdrLen === 0 || bytes.length <= 2 + hdrLen) return;
+        const audio = bytes.subarray(2 + hdrLen);
+        if (audio.length > 10) chunks.push(audio);
+      }
+    };
+
+    ws.onerror = () => {
+      if (!settled) { settled = true; clearTimeout(timer); reject(new Error('WebSocket 连接失败')); }
+    };
+
+    ws.onclose = () => {
+      if (!settled) {
+        settled = true; clearTimeout(timer);
+        if (chunks.length > 0) resolve(concatBuffers(chunks));
+        else reject(new Error('连接关闭，未收到音频'));
+      }
+    };
+  });
+}
+
+function concatBuffers(buffers) {
+  if (!buffers.length) return new ArrayBuffer(0);
+  const total = buffers.reduce((s, b) => s + b.length, 0);
+  const result = new Uint8Array(total);
+  let off = 0;
+  for (const b of buffers) { result.set(b, off); off += b.length; }
+  return result.buffer;
+}
+
+// ─── <audio> + Blob URL 播放（任何浏览器都支持）──
+function playAudio(audioData) {
+  return new Promise((resolve, reject) => {
+    // 释放旧的 blob URL
+    if (audioEl._blobUrl) { try { URL.revokeObjectURL(audioEl._blobUrl) } catch {} }
+
+    const blob = new Blob([audioData], { type: 'audio/mpeg' });
+    const url = URL.createObjectURL(blob);
+    audioEl._blobUrl = url;
+    audioEl.src = url;
+
+    audioEl.onended = () => resolve();
+    audioEl.onerror = () => reject(new Error('音频播放失败'));
+
+    // play() 可能返回 Promise（新浏览器）或不返回（旧浏览器）
+    const p = audioEl.play();
+    if (p && p.catch) p.catch(() => reject(new Error('播放被阻止，请先点击页面')));
+  });
+}
+
+// ─── 播放控制 ──
+async function startRead(startIdx) {
+  const total = extract();
+  if (total === 0) { stEl.textContent = '⚠️ 请输入文本'; return; }
+
+  // 停止之前的
+  doStop();
+  stopped = false;
+  curIdx = startIdx || 0;
+  playing = true;
+  updateUI();
+
+  await readLoop();
+}
+
+async function readLoop() {
+  while (!stopped && curIdx < paragraphs.length) {
+    const text = paragraphs[curIdx];
+    pgEl.textContent = `${curIdx+1}/${paragraphs.length}段`;
+    stEl.textContent = '⏳ 合成中';
+    updateUI();
+
+    try {
+      const audioData = await synthesize(text, voiceSel.value, parseFloat(rateR.value));
+      if (stopped) break;
+
+      stEl.textContent = '🔊 朗读中';
+      updateUI();
+      await playAudio(audioData);
+      if (stopped) break;
+
+      curIdx++;
+    } catch(e) {
+      console.error('[TTS]', e);
+      stEl.textContent = '❌ ' + e.message;
+      updateUI();
+      // 等一下再试下一段
+      await new Promise(r => setTimeout(r, 1000));
+      if (stopped) break;
+      curIdx++;
+    }
+  }
+
+  if (!stopped) {
+    playing = false;
+    stEl.textContent = '✅ 完成';
+    pgEl.textContent = '';
+    updateUI();
+  }
+}
+
+function doPause() {
+  if (!playing || paused) return;
+  audioEl.pause();
+  paused = true;
+  stEl.textContent = '⏸ 已暂停';
+  updateUI();
+}
+
+function doResume() {
+  if (!paused) return;
+  audioEl.play().catch(() => {});
+  paused = false;
+  stEl.textContent = '🔊 朗读中';
+  updateUI();
+}
+
+function doStop() {
+  stopped = true;
+  playing = false;
+  paused = false;
+  audioEl.pause();
+  audioEl.removeAttribute('src');
+  if (audioEl._blobUrl) { try { URL.revokeObjectURL(audioEl._blobUrl) } catch {} audioEl._blobUrl = null; }
+  stEl.textContent = '已停止';
+  pgEl.textContent = '';
+  updateUI();
+}
+
+function updateUI() {
+  if (playing && !paused) {
+    playB.textContent = '⏸ 暂停';
+    playB.onclick = doPause;
+  } else if (paused) {
+    playB.textContent = '▶ 继续';
+    playB.onclick = doResume;
+  } else {
+    playB.textContent = '▶ 朗读';
+    playB.onclick = () => startRead(0);
+  }
+}
+
+// ─── 绑定事件 ──
+playB.onclick = () => startRead(0);
+stopB.onclick = doStop;
+prevB.onclick = () => { if (curIdx > 0) { const i = curIdx - 1; doStop(); startRead(i); } };
+nextB.onclick = () => { if (curIdx < paragraphs.length - 1) { const i = curIdx + 1; doStop(); startRead(i); } };
+
+// ─── 示例 ──
+txt.value = '这是一段示例文本，用于测试朗读功能。\n\n你可以粘贴任意文章到这里，点击朗读按钮即可开始。\n\n支持中文和英文混合朗读，自动按空行分段。语速可以调节，语音也可以选择。\n\n试试看吧！';
+
+})();
+</script>
+</body>
+</html>

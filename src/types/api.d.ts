@@ -52,6 +52,7 @@ interface IResBootProgress {
 
 interface IResForwardProxy {
   body: string;
+  bodyEncoding?: string;  // 内核编码方式：'text'(默认) | 'base64' | 'base64-url' | 'hex' 等
   contentType: string;
   elapsed: number;
   headers: { [key: string]: string };

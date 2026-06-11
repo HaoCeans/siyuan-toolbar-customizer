@@ -614,3 +614,66 @@ noteSection (flex:1, position:relative 由 overlay 设置)
 - 遮罩 `id='quick-note-layout-mask'`，全局唯一，用 `getElementById` 查找
 - 弹窗被 `teardownQuickNoteDialog` 销毁时，遮罩随 dialog.remove() 一起移除，无需额外清理
 - 不要用 `visibility: hidden`（会阻止输入法弹出），不要用 `opacity: 0`（部分设备干扰 IME 定位）
+
+---
+
+### 21. `forwardProxy` 的 headers 格式必须是 `{ "Header-Name": "value" }`
+
+**相关文件**: `src/tts/mobilePanel.ts`（`fetchSiliconFlowTTS`、`tryFetchChunk`）、`src/api.ts`（`forwardProxy`）
+
+**历史 bug**: 硅基流动 TTS 通过 `forwardProxy` 代理时报 401 `Invalid token`。原因是 headers 传了 `{ name: 'Authorization', value: 'Bearer sk-xxx' }`，内核把 `name` 和 `value` 当成了 HTTP 头名，真正的 `Authorization` 头从未被设置。
+
+**内核解析逻辑**（`kernel/api/network.go`）：
+
+```go
+// headers 是 []any，每个元素是 map[string]any
+// 遍历 map 的 key-value，直接 SetHeader(key, value)
+for _, pair := range headers {
+    if m, ok := pair.(map[string]any); ok {
+        for k, v := range m {
+            request.SetHeader(k, fmt.Sprintf("%v", v))
+        }
+    }
+}
+```
+
+**正确格式**（key 就是 HTTP 头名，value 就是头的值）：
+
+```typescript
+// ✅ 正确
+[{ 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }]
+
+// ❌ 错误（内核会设置 name: "Authorization" 和 value: "Bearer sk-xxx" 两个无意义头）
+[{ name: 'Authorization', value: `Bearer ${apiKey}` }]
+```
+
+**规则**:
+- `forwardProxy` 的 `headers` 参数是 `{ [headerName: string]: string }[]`，不是 `{ name: string, value: string }[]`
+- 多个头可以合并在一个对象里：`[{ 'Authorization': '...', 'Content-Type': '...' }]`
+- 内核**不会**过滤 `Authorization` 头，任何合法 HTTP 头名都会被原样转发
+- 手机端 WebView CORS 拦截外部 `fetch`，所有外部 API 请求必须走 `forwardProxy` 代理
+- `responseEncoding: 'base64'` 参数让内核返回 base64 编码的二进制响应，避免音频/图片数据损坏
+
+---
+
+### 22. 手机端 TTS 双模式语速分离存储
+
+**相关文件**: `src/tts/mobilePanel.ts`（`TTSSettings`、`renderFreeContent`、`renderApiContent`、`fetchSiliconFlowTTS`）
+
+**历史 bug**: 硅基流动模式的语速滑杆（0.5-2.0）用 `parseInt()` 读取，吞掉小数精度（1.5 → 1）；且与百度免费模式（0-15）共用同一个 `speed` 字段存储，切换模式时互相覆盖；`fetchSiliconFlowTTS` 还用百度公式 `0.25 + (speed/15)*3.75` 把硅基流动原生语速转成了错误值（1.0x → 0.5x）。
+
+**修复后的存储结构**:
+
+```typescript
+interface TTSSettings {
+  speed: number        // 免费模式语速（百度 0-15，默认 5）
+  apiSpeed: number     // 硅基流动语速（0.25-4.0，默认 1.0）
+  speaker: string      // 硅基流动音色名，如 'alex'
+}
+```
+
+**规则**:
+- 免费模式用 `speed`（0-15 整数），API 模式用 `apiSpeed`（0.25-4.0 浮点数），**禁止**共用字段
+- API 模式滑杆读取必须用 `parseFloat()`，禁止 `parseInt()`
+- `fetchSiliconFlowTTS` 的 speed 参数已经是硅基流动原生范围（0.25-4.0），只需 `Math.max(0.25, Math.min(4.0, speed))` clamp，**禁止**用百度公式转换
+- 新增 TTS 引擎或参数时，对照硅基流动 API 文档确认参数范围，不要假设与百度一致

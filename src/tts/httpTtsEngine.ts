@@ -92,14 +92,20 @@ export async function initTTSSettings(): Promise<void> {
       if (data && typeof data === 'object') {
         if ((data as any).apiSpeed === undefined) (data as any).apiSpeed = 1.0
         settingsCache = data as TTSSettings
-        localStorage.setItem(TTS_SETTINGS_KEY, JSON.stringify(data))
+        const serialized = JSON.stringify(data)
+        if (localStorage.getItem(TTS_SETTINGS_KEY) !== serialized) {
+          localStorage.setItem(TTS_SETTINGS_KEY, serialized)
+        }
       }
     } catch { /* ignore */ }
     try {
       const data = await pluginInstance.loadData(SF_API_CONFIG_KEY)
       if (data && typeof data === 'object') {
         sfConfigCache = data as SFAPIConfig
-        localStorage.setItem(SF_API_CONFIG_KEY, JSON.stringify(data))
+        const serialized = JSON.stringify(data)
+        if (localStorage.getItem(SF_API_CONFIG_KEY) !== serialized) {
+          localStorage.setItem(SF_API_CONFIG_KEY, serialized)
+        }
       }
     } catch { /* ignore */ }
   }

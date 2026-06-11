@@ -53,18 +53,29 @@ function buildBlockWrapperStyle(isDark: boolean, isMobile: boolean, isAppleStyle
 export const isBlockInputImplemented = true
 
 /** 手机端思源 App WebView 中 contenteditable 无法通过 focus() 弹出键盘，需要用隐藏 input 唤起 */
-function focusBlockEditable(editEl: HTMLElement, isMobile: boolean): void {
+function focusBlockEditable(wysiwygEl: HTMLElement, isMobile: boolean, callback?: () => void): void {
+  const editEl = wysiwygEl.querySelector('[contenteditable="true"]') as HTMLElement | null
+  if (!editEl) { callback?.(); return }
   if (isMobile) {
+    // 检查 activeElement 是否在 protyle 编辑器内（可能在不同 block 上）
+    if (wysiwygEl.contains(document.activeElement) && (document.activeElement as HTMLElement)?.isContentEditable) {
+      callback?.()
+      return
+    }
     const fakeInput = document.createElement('input')
+    fakeInput.dataset.tcFakeInput = 'true'
     fakeInput.style.cssText = 'position:fixed;left:-9999px;opacity:0;height:0;width:0;pointer-events:none'
     document.body.appendChild(fakeInput)
     fakeInput.focus()
     setTimeout(() => {
+      if (!document.body.contains(editEl)) { fakeInput.remove(); return }
       editEl.focus()
       fakeInput.remove()
+      callback?.()
     }, 50)
   } else {
     editEl.focus()
+    callback?.()
   }
 }
 
@@ -93,8 +104,7 @@ async function resetDraftBlock(
   state.docRootId = newId
   const ok = await loadSingleBlockIntoProtyle(editor, state)
   if (ok) {
-    const editEl = editor.protyle.wysiwyg.element.querySelector('[contenteditable="true"]') as HTMLElement | null
-    if (editEl) focusBlockEditable(editEl, options.isMobile)
+    focusBlockEditable(editor.protyle.wysiwyg.element, options.isMobile)
   }
   return ok
 }
@@ -214,35 +224,38 @@ export async function createBlockInputHandle(
       const ok = await loadSingleBlockIntoProtyle(editor, state)
       if (ok) {
         savedToKernel = false
-        const editEl = editor.protyle.wysiwyg.element.querySelector('[contenteditable="true"]') as HTMLElement | null
-        if (editEl) focusBlockEditable(editEl, options.isMobile)
+        focusBlockEditable(editor.protyle.wysiwyg.element, options.isMobile)
       }
     },
     insertText: (text: string) => {
-      const editEl = editor.protyle.wysiwyg.element.querySelector('[contenteditable="true"]') as HTMLElement | null
-      if (!editEl) return
-      focusBlockEditable(editEl, options.isMobile)
-      try {
-        document.execCommand('insertText', false, text)
-      } catch {
-        // execCommand 不可用时，用 Selection API 降级（避免直接替换 textContent 丢失格式）
-        const sel = window.getSelection()
-        if (sel && sel.rangeCount > 0) {
-          const range = sel.getRangeAt(0)
-          range.deleteContents()
-          range.insertNode(document.createTextNode(text))
-          range.collapse(false)
+      const wysiwyg = editor.protyle.wysiwyg.element
+      if (!wysiwyg.querySelector('[contenteditable="true"]')) return
+      // focusBlockEditable 在手机端会用隐藏 input 唤起键盘再延迟 50ms 聚焦 editEl，
+      // 必须等聚焦完成后再 execCommand，否则 fakeInput 有焦点时插入文本会失败
+      focusBlockEditable(wysiwyg, options.isMobile, () => {
+        try {
+          document.execCommand('insertText', false, text)
+        } catch {
+          // execCommand 不可用时，用 Selection API 降级
+          const sel = window.getSelection()
+          if (sel && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0)
+            range.deleteContents()
+            range.insertNode(document.createTextNode(text))
+            range.collapse(false)
+          }
         }
-      }
+      })
     },
     focus: () => {
-      const editEl = editor.protyle.wysiwyg.element.querySelector('[contenteditable="true"]') as HTMLElement | null
-      if (editEl) focusBlockEditable(editEl, options.isMobile)
+      focusBlockEditable(editor.protyle.wysiwyg.element, options.isMobile)
     },
     destroy: () => {
       removeGuards()
       destroyQuickNoteProtyle(editor)
       wrapper.remove()
+      // 清理可能残留的 fake input
+      document.querySelectorAll('[data-tc-fake-input]').forEach(el => el.remove())
     },
   }
 }

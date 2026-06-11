@@ -1716,10 +1716,18 @@ function handleVisibilityChange() {
             }
           } else if (range && !handle.isPlainTextarea()) {
             // 恢复光标位置（块格式 contenteditable）
-            const sel = window.getSelection();
-            if (sel) {
-              sel.removeAllRanges();
-              sel.addRange(range);
+            // 手机端 focusBlockEditable 有 50ms 延迟，需等 editEl.focus() 执行后再恢复
+            const restoreRange = () => {
+              const sel = window.getSelection();
+              if (sel) {
+                sel.removeAllRanges();
+                sel.addRange(range);
+              }
+            };
+            if (isMobileDevice()) {
+              setTimeout(restoreRange, 60);
+            } else {
+              restoreRange();
             }
           }
         }

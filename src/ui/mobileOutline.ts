@@ -384,7 +384,7 @@ function updateFocusHighlight(): void {
       parent = parent.parentElement
     }
     // 滚动到可见区域
-    const listEl = outlinePanel.querySelector('#outline-list') as HTMLElement
+    const listEl = outlinePanel.querySelector('#mobile-outline-list') as HTMLElement
     if (listEl) {
       const targetRect = target.getBoundingClientRect()
       const listRect = listEl.getBoundingClientRect()
@@ -422,7 +422,7 @@ function renderOutline(items: OutlineItem[]): string {
 }
 
 function renderOutlinePanel(): void {
-  const listEl = outlinePanel?.querySelector('#outline-list')
+  const listEl = outlinePanel?.querySelector('#mobile-outline-list')
   if (!listEl) return
 
   if (!state.currentDocId) {
@@ -578,11 +578,11 @@ function injectStyles(): void {
       padding: 6px 0;
     }
     /* 收缩态 */
-    .collapsed #outline-list {
+    .collapsed #mobile-outline-list {
       overflow-y: auto;
       scrollbar-width: none;
     }
-    .collapsed #outline-list::-webkit-scrollbar {
+    .collapsed #mobile-outline-list::-webkit-scrollbar {
       display: none;
     }
     .collapsed .outline-item {
@@ -610,14 +610,14 @@ function injectStyles(): void {
       width: 200px;
       padding: 6px;
     }
-    #outline-list {
+    #mobile-outline-list {
       flex: 1;
       overflow-y: auto;
       overflow-x: hidden;
       scrollbar-width: none;
       padding: 2px 0;
     }
-    #outline-list::-webkit-scrollbar {
+    #mobile-outline-list::-webkit-scrollbar {
       display: none;
     }
     /* 标题项 */
@@ -824,7 +824,7 @@ function createPanel(): void {
 
   // 大纲列表
   const list = document.createElement('div')
-  list.id = 'outline-list'
+  list.id = 'mobile-outline-list'
   outlinePanel.appendChild(list)
 
   // 收起按钮

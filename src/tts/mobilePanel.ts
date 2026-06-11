@@ -7,6 +7,9 @@
 
 import { applyFloatPanelBackground, observeSiYuanThemeMode } from '../ui/floatPanelBackground'
 import * as Notify from '../notification'
+import { showMessage } from 'siyuan'
+import { navigateToAdjacentDoc } from '../ui/mobileDocNav'
+import { pluginInstance } from '../toolbarManager'
 import {
   getHttpTTSEngine, destroyHttpTTSEngine,
   SF_VOICES, getTTSSettings, saveTTSSettings, getSFAPIConfig, saveSFAPIConfig,
@@ -23,6 +26,9 @@ let bar: HTMLElement | null = null
 let visHandler: (() => void) | null = null
 let panelThemeUnsub: (() => void) | null = null
 let barThemeUnsub: (() => void) | null = null
+
+/** 朗读完成后动作：'stop' | 'next' | 'prev' */
+let autoReadAction: 'stop' | 'next' | 'prev' = 'stop'
 
 // ─── 导出 ──
 
@@ -121,6 +127,35 @@ function showTTSPanel(total: number): void {
   const content = document.createElement('div')
   card.appendChild(content)
 
+  // ── 朗读完成后动作选择 ──
+  const autoReadRow = document.createElement('div')
+  autoReadRow.style.cssText = 'margin-top: 6px; margin-bottom: 8px;'
+  const autoLabel = document.createElement('div')
+  autoLabel.textContent = '朗读完成后'
+  autoLabel.style.cssText = 'font-size:13px;margin-bottom:6px;opacity:0.6;font-weight:500;letter-spacing:-0.01em;'
+  autoReadRow.appendChild(autoLabel)
+  const autoSel = document.createElement('select')
+  autoSel.style.cssText = `
+    width:100%;padding:10px 14px;border-radius:10px;
+    border:none;
+    background:color-mix(in srgb, var(--b3-theme-on-surface) 6%, transparent);
+    color:var(--b3-theme-on-background);font-size:15px;
+    letter-spacing:-0.01em;outline:none;
+    -webkit-appearance:none;appearance:none;
+  `
+  const autoOpts: Array<{ v: string; t: string }> = [
+    { v: 'stop', t: '停止' },
+    { v: 'next', t: '自动继续朗读下一篇' },
+    { v: 'prev', t: '自动继续朗读上一篇' },
+  ]
+  for (const o of autoOpts) { const opt = document.createElement('option'); opt.value = o.v; opt.textContent = o.t; autoSel.appendChild(opt) }
+  // 从已保存的设置恢复
+  const savedAutoAction = getTTSSettings().autoReadAction || 'stop'
+  autoSel.value = savedAutoAction
+  autoReadAction = savedAutoAction
+  autoReadRow.appendChild(autoSel)
+  card.appendChild(autoReadRow)
+
   function activateMode(mode: string) {
     // Apple 分段控件：激活项浮起 + 阴影，非激活项半透明
     if (mode === 'free') {
@@ -140,8 +175,8 @@ function showTTSPanel(total: number): void {
     }
 
     content.innerHTML = ''
-    if (mode === 'free') renderFreeContent(content, total)
-    else renderApiContent(content, total)
+    if (mode === 'free') renderFreeContent(content, total, autoSel)
+    else renderApiContent(content, total, autoSel)
   }
 
   bindTap(modeFree, () => activateMode('free'))
@@ -155,7 +190,7 @@ function showTTSPanel(total: number): void {
 }
 
 /** 免费模式面板 */
-function renderFreeContent(container: HTMLElement, total: number): void {
+function renderFreeContent(container: HTMLElement, total: number, autoSel?: HTMLSelectElement): void {
   const settings = getTTSSettings()
 
   const hint = document.createElement('div')
@@ -188,9 +223,10 @@ function renderFreeContent(container: HTMLElement, total: number): void {
   const btns = makeBtnRow()
   bindTap(btns.cancel, () => removeOverlay())
   bindTap(btns.confirm, async () => {
+    autoReadAction = autoSel?.value || 'stop'
+    saveTTSSettings({ autoReadAction })
     const speed = parseInt(rateSlider.value)
-    const speaker = typeof settings.speaker === 'number' ? settings.speaker : 4
-    saveTTSSettings({ speed, speaker: String(speaker), lastMode: 'free' })
+    saveTTSSettings({ speed, lastMode: 'free' })
 
     let startP = 0, endP: number | undefined
     parseRange(rangeSel.value, total, (s, e) => { startP = s; endP = e })
@@ -204,7 +240,14 @@ function renderFreeContent(container: HTMLElement, total: number): void {
 
     engine.onStateChange = (st, idx, tot) => updateBar(st, idx, tot)
     engine.onError = (msg) => { Notify.showErrorCommandCannotExecute(msg); removeBar() }
-    engine.onFinish = () => removeBar()
+    engine.onFinish = async () => {
+      if (autoReadAction === 'stop') { removeBar(); return }
+      const success = await navigateToAdjacentDoc(autoReadAction)
+      if (!success) { removeBar(); showMessage('已无更多文档', 2000, 'info'); return }
+      await waitForDocLoaded()
+      await engine.extractParagraphsAsync()
+      engine.speak(0, undefined)
+    }
     createBar(engine)
     engine.speak(startP, endP)
     setupVis(engine)
@@ -213,7 +256,7 @@ function renderFreeContent(container: HTMLElement, total: number): void {
 }
 
 /** 硅基流动 API 模式面板 */
-function renderApiContent(container: HTMLElement, total: number): void {
+function renderApiContent(container: HTMLElement, total: number, autoSel?: HTMLSelectElement): void {
   const cfg = getSFAPIConfig()
   const settings = getTTSSettings()
 
@@ -287,6 +330,8 @@ function renderApiContent(container: HTMLElement, total: number): void {
   const btns = makeBtnRow()
   bindTap(btns.cancel, () => removeOverlay())
   bindTap(btns.confirm, async () => {
+    autoReadAction = autoSel?.value || 'stop'
+    saveTTSSettings({ autoReadAction })
     const apiKey = keyInput.value.trim()
     if (!apiKey) { Notify.showErrorCommandCannotExecute('请填写 API Key'); return }
 
@@ -307,12 +352,36 @@ function renderApiContent(container: HTMLElement, total: number): void {
 
     engine.onStateChange = (st, idx, tot) => updateBar(st, idx, tot)
     engine.onError = (msg) => { Notify.showErrorCommandCannotExecute(msg); removeBar() }
-    engine.onFinish = () => removeBar()
+    engine.onFinish = async () => {
+      if (autoReadAction === 'stop') { removeBar(); return }
+      const success = await navigateToAdjacentDoc(autoReadAction)
+      if (!success) { removeBar(); showMessage('已无更多文档', 2000, 'info'); return }
+      await waitForDocLoaded()
+      await engine.extractParagraphsAsync()
+      engine.speak(0, undefined)
+    }
     createBar(engine)
     engine.speak(startP, endP)
     setupVis(engine)
   })
   container.appendChild(btns.wrap)
+}
+
+// ─── 工具函数 ──
+
+/** 等待新文档加载完成（监听 loaded-protyle-dynamic，5s 超时兜底） */
+function waitForDocLoaded(): Promise<void> {
+  return new Promise((resolve) => {
+    const handler = () => {
+      pluginInstance?.app?.eventBus?.off('loaded-protyle-dynamic', handler)
+      resolve()
+    }
+    pluginInstance?.app?.eventBus?.on('loaded-protyle-dynamic', handler)
+    setTimeout(() => {
+      pluginInstance?.app?.eventBus?.off('loaded-protyle-dynamic', handler)
+      resolve()
+    }, 5000)
+  })
 }
 
 // ─── 播放条（Apple 胶囊形）──
@@ -321,7 +390,7 @@ function createBar(engine: TTSController): void {
   removeBar()
   const b = document.createElement('div')
   b.style.cssText = `
-    position:fixed;bottom:80px;left:16px;right:16px;z-index:5;
+    position:fixed;bottom:80px;left:16px;right:16px;z-index:6;
     border-radius:9999px;padding:10px 16px;
     display:flex;align-items:center;gap:4px;
     font-size:13px;user-select:none;

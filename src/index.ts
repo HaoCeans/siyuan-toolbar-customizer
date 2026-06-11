@@ -74,9 +74,12 @@ import { updateIconDisplay as updateIconDisplayUtil } from './data/icons'
 import { injectTabSwitcher as injectTabSwitcherUtil, cleanupTabSwitcher } from './ui/tabs'
 // 导入手机端标签页Tab模块
 import { init as initMobileTabs, cleanup as cleanupMobileTabs, reloadState as reloadMobileTabsState, updateMaxVisibleTabs } from './ui/mobileTabs'
+	import { init as initDesktopTabs, cleanup as cleanupDesktopTabs } from './ui/desktopTabs'
 // 导入手机端悬浮大纲模块
 import { init as initMobileOutline, cleanup as cleanupMobileOutline, reloadState as reloadMobileOutlineState } from './ui/mobileOutline'
+	import { init as initDesktopOutline, cleanup as cleanupDesktopOutline } from './ui/desktopOutline'
 import { init as initMobileDocNav, cleanup as cleanupMobileDocNav, reloadState as reloadMobileDocNavState } from './ui/mobileDocNav'
+	import { init as initDesktopDocNav, cleanup as cleanupDesktopDocNav } from './ui/desktopDocNav'
 import {
   syncMobileTopLineBreakButton,
   destroyMobileTopLineBreakButton
@@ -661,6 +664,30 @@ export default class ToolbarCustomizer extends Plugin {
       })
     }
 
+	    // 初始化桌面端标签页Tab模块
+    if (!this.isMobile) {
+      // 初始化桌面端标签页Tab模块
+      await initDesktopTabs({
+        saveData: (key, value) => this.saveData(key, value),
+        loadData: (key) => this.loadData(key),
+        eventBus: this.eventBus
+      })
+
+      // 初始化桌面端悬浮大纲模块
+      await initDesktopOutline({
+        saveData: (key, value) => this.saveData(key, value),
+        loadData: (key) => this.loadData(key),
+        eventBus: this.eventBus
+      })
+
+      // 初始化桌面端文档导航模块
+      await initDesktopDocNav({
+        saveData: (key, value) => this.saveData(key, value),
+        loadData: (key) => this.loadData(key),
+        eventBus: this.eventBus
+      })
+    }
+
     // ===== 初始化文本右键菜单模板注入 =====
     // 移除旧的监听器（避免重复监听）
     if (this.eventBusContextMenuHandler) {
@@ -800,6 +827,14 @@ export default class ToolbarCustomizer extends Plugin {
     // 清理手机端文档导航资源
     cleanupMobileDocNav()
 
+n    // 清理桌面端标签页Tab资源
+    cleanupDesktopTabs()
+
+    // 清理桌面端悬浮大纲资源
+    cleanupDesktopOutline()
+
+    // 清理桌面端文档导航资源
+    cleanupDesktopDocNav()
     destroyMobileTopLineBreakButton()
 
     // 移除动态样式

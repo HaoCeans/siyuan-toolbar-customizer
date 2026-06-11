@@ -35,7 +35,10 @@ export async function saveQuickNoteContent(
     }
 
     // 使用 fetchSyncPost 让内核广播更新通知，主编辑器能立即看到新内容
-    const result = await fetchSyncPost('/api/block/appendDailyNoteBlock', {
+    const endpoint = options.insertPosition === 'top'
+      ? '/api/block/prependDailyNoteBlock'
+      : '/api/block/appendDailyNoteBlock'
+    const result = await fetchSyncPost(endpoint, {
       data: `${content}\n`,
       dataType: 'markdown',
       notebook: options.notebookId || undefined,
@@ -51,7 +54,10 @@ export async function saveQuickNoteContent(
   }
 
   // 使用 fetchSyncPost 让内核广播更新通知，主编辑器能立即看到新内容
-  const result = await fetchSyncPost('/api/block/appendDailyNoteBlock', {
+  const endpoint = options.insertPosition === 'top'
+    ? '/api/block/prependDailyNoteBlock'
+    : '/api/block/appendDailyNoteBlock'
+  const result = await fetchSyncPost(endpoint, {
     data: dom,
     dataType: 'dom',
     notebook: options.notebookId || undefined,

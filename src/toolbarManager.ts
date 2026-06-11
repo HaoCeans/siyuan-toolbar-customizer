@@ -8,9 +8,12 @@ import { Dialog, fetchSyncPost, getFrontend, showMessage, openTab as siyuanOpenT
 import * as Notify from "./notification";
 // 手机端标签页Tab模块
 import { toggleVisibility as toggleMobileTabs } from "./ui/mobileTabs";
+import { toggleVisibility as toggleDesktopTabs } from "./ui/desktopTabs";
 // 手机端悬浮大纲模块
 import { toggleVisibility as toggleMobileOutline } from "./ui/mobileOutline";
+import { toggleVisibility as toggleDesktopOutline } from "./ui/desktopOutline";
 import { toggleVisibility as toggleMobileDocNav } from "./ui/mobileDocNav";
+import { toggleVisibility as toggleDesktopDocNav } from "./ui/desktopDocNav";
 import { isDesktopQuickNoteOverflowToolbarEnabled } from "./quickNote/desktopCapture";
 // TTS 朗读模块
 import { showTTSOptionsDesktop } from "./tts/desktopPanel";
@@ -4192,21 +4195,33 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
     return
   }
 
-  // ⑨手机端标签页Tab
-  if (subtype === 'mobile-tabs') {
-    executeMobileTabs(config)
+  // ⑨标签页Tab（桌面端和移动端分别实现）
+  if (subtype === 'mobile-tabs' || subtype === 'desktop-tabs') {
+    if (isDesktopDevice()) {
+      executeDesktopTabs(config)
+    } else {
+      executeMobileTabs(config)
+    }
     return
   }
 
-  // ⑩手机端悬浮大纲
-  if (subtype === 'mobile-outline') {
-    executeMobileOutline(config)
+  // ⑩悬浮大纲（桌面端和移动端分别实现）
+  if (subtype === 'mobile-outline' || subtype === 'desktop-outline') {
+    if (isDesktopDevice()) {
+      executeDesktopOutline(config)
+    } else {
+      executeMobileOutline(config)
+    }
     return
   }
 
-  // ⑪手机端前一篇/后一篇文档
-  if (subtype === 'doc-nav') {
-    executeMobileDocNav(config)
+  // ⑪前一篇/后一篇文档（桌面端和移动端分别实现）
+  if (subtype === 'doc-nav' || subtype === 'desktop-doc-nav') {
+    if (isDesktopDevice()) {
+      executeDesktopDocNav(config)
+    } else {
+      executeMobileDocNav(config)
+    }
     return
   }
 
@@ -5784,7 +5799,7 @@ function getActiveProtyleElement(): HTMLElement | null {
  * 获取当前活动的 Protyle 实例
  * 思源的 protyle 实例可能存储在 window.siyuan.layout 或其他位置
  */
-function getActiveProtyle(): any | null {
+export function getActiveProtyle(): any | null {
   const windowObj = window as any
 
   // 移动端：直接从 window.siyuan.mobile.editor.protyle 获取
@@ -7066,22 +7081,43 @@ export async function showPopupSelectDialog(templates: { name: string; content: 
 }
 
 /**
- * ⑨手机端标签页Tab - 切换显示/隐藏悬浮Tab栏
+ * ⑨标签页Tab（移动端） - 切换显示/隐藏悬浮Tab栏
  */
 function executeMobileTabs(config: ButtonConfig) {
   toggleMobileTabs(config)
 }
 
 /**
- * ⑩手机端悬浮大纲 - 切换显示/隐藏悬浮大纲面板
+ * ⑩悬浮大纲（移动端） - 切换显示/隐藏悬浮大纲面板
  */
 function executeMobileOutline(config: ButtonConfig) {
   toggleMobileOutline(config)
 }
 
 /**
- * ⑪手机端前一篇/后一篇文档 - 切换显示/隐藏文档导航栏
+ * ⑪前一篇/后一篇文档（移动端） - 切换显示/隐藏文档导航栏
  */
 function executeMobileDocNav(config: ButtonConfig) {
   toggleMobileDocNav(config)
+}
+
+/**
+ * 桌面端标签页Tab - 切换显示/隐藏悬浮Tab栏
+ */
+function executeDesktopTabs(config: ButtonConfig) {
+  toggleDesktopTabs(config)
+}
+
+/**
+ * 桌面端悬浮大纲 - 切换显示/隐藏悬浮大纲面板
+ */
+function executeDesktopOutline(config: ButtonConfig) {
+  toggleDesktopOutline(config)
+}
+
+/**
+ * 桌面端前一篇/后一篇文档 - 切换显示/隐藏文档导航栏
+ */
+function executeDesktopDocNav(config: ButtonConfig) {
+  toggleDesktopDocNav(config)
 }

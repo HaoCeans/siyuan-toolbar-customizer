@@ -386,16 +386,24 @@ async function refreshAdjacentDocs(): Promise<void> {
 }
 
 // ===== 导航操作 =====
-async function navigateTo(direction: 'prev' | 'next'): Promise<void> {
+async function navigateTo(direction: 'prev' | 'next'): Promise<boolean> {
   const target = direction === 'prev' ? prevDoc : nextDoc
-  if (!target) return
+  if (!target) return false
 
   try {
     await openMobileFileById(pluginInstance?.app, target.id)
+    return true
   } catch (err) {
     console.error('[文档导航] 打开文档失败:', err)
     showMessage('打开文档失败', 3000, 'error')
+    return false
   }
+}
+
+/** 对外导出：供 TTS 朗读完成自动切文档 */
+export async function navigateToAdjacentDoc(direction: 'prev' | 'next'): Promise<boolean> {
+  await refreshAdjacentDocs()
+  return navigateTo(direction)
 }
 
 // ===== 文档切换处理 =====

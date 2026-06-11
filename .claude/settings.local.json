@@ -5,7 +5,13 @@
       "Bash(dir:*)",
       "Bash(findstr:*)",
       "WebSearch",
-      "mcp__web-reader__webReader"
+      "mcp__web-reader__webReader",
+      "Bash(grep -n \"mobile\\\\|phone\\\\|@media\" \"D:\\\\AAAABBBBCCCC桌面重要文件\\\\桌面22\\\\SiYuan笔记软件\\\\SiYuan笔记库\\\\3.制作插件环境\\\\data\\\\plugins\\\\siyuan-sireader\\\\index.css\")",
+      "Read(//d/AAAABBBBCCCC桌面重要文件/桌面22/SiYuan笔记软件/SiYuan笔记库/3.制作插件环境/data/plugins/siyuan-sireader/**)",
+      "Bash(grep -o \".\\\\{0,20\\\\}_f.\\\\{0,40\\\\}\" \"d:\\\\AAAABBBBCCCC桌面重要文件\\\\桌面22\\\\SiYuan笔记软件\\\\SiYuan插件制作环境\\\\siyuan-toolbar-customizer\\\\dist\\\\index.js\")",
+      "Bash(ls \"d:\\\\AAAABBBBCCCC桌面重要文件\\\\桌面22\\\\SiYuan笔记软件\\\\SiYuan笔记库\\\\3.制作插件环境\\\\data\\\\plugins\\\\siyuan-toolbar-customizer/\" 2>/dev/null | head -20)",
+      "Read(//d/AAAABBBBCCCC桌面重要文件/桌面22/SiYuan笔记软件/SiYuan笔记库/3.制作插件环境/data/plugins/siyuan-toolbar-customizer/**)",
+      "Bash(npx vite *)"
     ]
   }
 }

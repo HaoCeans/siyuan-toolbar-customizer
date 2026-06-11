@@ -15,12 +15,18 @@ import {
 import { applyFloatPanelBackground, observeSiYuanThemeMode } from '../ui/floatPanelBackground'
 import { createIconButton, updateButtonIcon, injectSliderStyles, lucideSvg } from './ttsIconHelper'
 import * as Notify from '../notification'
+import { pluginInstance } from '../toolbarManager'
+import { navigateToAdjacentDoc } from '../ui/desktopDocNav'
+import { showMessage } from 'siyuan'
 
 // ─── 状态 ────────────────────────────────────────────────
 let optionsOverlay: HTMLElement | null = null
 let playbackBar: HTMLElement | null = null
 let optionsThemeUnsub: (() => void) | null = null
 let barThemeUnsub: (() => void) | null = null
+
+/** 朗读完成后动作：'stop' | 'next' | 'prev' */
+let autoReadAction: 'stop' | 'next' | 'prev' = 'stop'
 
 // ─── 导出 ────────────────────────────────────────────────
 
@@ -136,6 +142,38 @@ function createOptionsPanel(total: number): void {
   const content = document.createElement('div')
   card.appendChild(content)
 
+  // ── 朗读完成后动作选择（在所有模式底部共用）
+  const autoReadRow = document.createElement('div')
+  autoReadRow.style.cssText = 'margin-top: 6px; margin-bottom: 8px;'
+  const autoLabel = document.createElement('div')
+  autoLabel.textContent = '朗读完成后'
+  autoLabel.style.cssText = 'font-size:13px;margin-bottom:6px;opacity:0.6;font-weight:500;letter-spacing:-0.01em;'
+  autoReadRow.appendChild(autoLabel)
+  const autoSel = document.createElement('select')
+  autoSel.style.cssText = `
+    width:100%;padding:10px 14px;border-radius:10px;
+    border:none;
+    background:color-mix(in srgb, var(--b3-theme-on-surface) 6%, transparent);
+    color:var(--b3-theme-on-background);font-size:13px;
+    letter-spacing:-0.01em;outline:none;
+  `
+  const autoOpts = [
+    { v: 'stop', t: '停止' },
+    { v: 'next', t: '自动继续朗读下一篇' },
+    { v: 'prev', t: '自动继续朗读上一篇' },
+  ]
+  for (const o of autoOpts) {
+    const opt = document.createElement('option')
+    opt.value = o.v; opt.textContent = o.t
+    autoSel.appendChild(opt)
+  }
+  // 从已保存的设置恢复
+  const savedAutoAction = getTTSSettings().autoReadAction || 'stop'
+  autoSel.value = savedAutoAction
+  autoReadAction = savedAutoAction
+  autoReadRow.appendChild(autoSel)
+  card.appendChild(autoReadRow)
+
   function activateMode(mode: string) {
     for (const t of tabData) {
       const active = t.key === mode
@@ -152,9 +190,9 @@ function createOptionsPanel(total: number): void {
       }
     }
     content.innerHTML = ''
-    if (mode === 'webspeech') renderWebSpeechContent(content, total)
-    else if (mode === 'free') renderFreeContent(content, total)
-    else renderApiContent(content, total)
+    if (mode === 'webspeech') renderWebSpeechContent(content, total, autoSel)
+    else if (mode === 'free') renderFreeContent(content, total, autoSel)
+    else renderApiContent(content, total, autoSel)
   }
 
   // 卡片内所有点击阻止冒泡
@@ -171,7 +209,7 @@ function createOptionsPanel(total: number): void {
 
 // ─── Web Speech 模式面板（原有功能）─────────────────────────
 
-function renderWebSpeechContent(container: HTMLElement, total: number): void {
+function renderWebSpeechContent(container: HTMLElement, total: number, autoSel?: HTMLSelectElement): void {
   const engine = getTTSEngine()
   if (!engine.isAvailable) {
     const warn = document.createElement('div')
@@ -247,6 +285,8 @@ function renderWebSpeechContent(container: HTMLElement, total: number): void {
   btns.cancel.onclick = (e) => { e.stopPropagation(); removeOptionsPanel() }
   btns.confirm.onclick = (e) => {
     e.stopPropagation()
+    autoReadAction = autoSel?.value || 'stop'
+    saveTTSSettings({ autoReadAction })
     const opts: TTSOptions = {
       rate: parseFloat(rateSlider.value),
       pitch: parseFloat(pitchSlider.value),
@@ -264,7 +304,7 @@ function renderWebSpeechContent(container: HTMLElement, total: number): void {
 
 // ─── 百度免费模式面板 ──────────────────────────────────────
 
-function renderFreeContent(container: HTMLElement, total: number): void {
+function renderFreeContent(container: HTMLElement, total: number, autoSel?: HTMLSelectElement): void {
   const settings = getTTSSettings()
 
   const hint = document.createElement('div')
@@ -298,6 +338,7 @@ function renderFreeContent(container: HTMLElement, total: number): void {
   btns.cancel.onclick = (e) => { e.stopPropagation(); removeOptionsPanel() }
   btns.confirm.onclick = async (e) => {
     e.stopPropagation()
+    autoReadAction = autoSel?.value || 'stop'
     const speed = parseInt(rateSlider.value)
     const startP = parseInt(rangeSel.value === 'all' ? '0' : rangeSel.value)
     const endP = rangeSel.value === 'all' ? undefined : parseInt(rangeSel.value)
@@ -319,7 +360,7 @@ function renderFreeContent(container: HTMLElement, total: number): void {
 
 // ─── 硅基流动 API 模式面板 ──────────────────────────────────
 
-function renderApiContent(container: HTMLElement, total: number): void {
+function renderApiContent(container: HTMLElement, total: number, autoSel?: HTMLSelectElement): void {
   const cfg = getSFAPIConfig()
   const settings = getTTSSettings()
 
@@ -403,6 +444,7 @@ function renderApiContent(container: HTMLElement, total: number): void {
   btns.cancel.onclick = (e) => { e.stopPropagation(); removeOptionsPanel() }
   btns.confirm.onclick = async (e) => {
     e.stopPropagation()
+    autoReadAction = autoSel?.value || 'stop'
     const apiKey = keyInput.value.trim()
     if (!apiKey) { Notify.showErrorCommandCannotExecute('请填写 API Key'); return }
 
@@ -429,13 +471,40 @@ function renderApiContent(container: HTMLElement, total: number): void {
 
 // ─── 阶段二：播放启动 ──────────────────────────────────
 
+/** 等待新文档加载完成（监听 loaded-protyle-dynamic，5s 超时兜底） */
+function waitForDocLoaded(): Promise<void> {
+  return new Promise((resolve) => {
+    const handler = () => {
+      pluginInstance?.app?.eventBus?.off('loaded-protyle-dynamic', handler)
+      resolve()
+    }
+    pluginInstance?.app?.eventBus?.on('loaded-protyle-dynamic', handler)
+    setTimeout(() => {
+      pluginInstance?.app?.eventBus?.off('loaded-protyle-dynamic', handler)
+      resolve()
+    }, 5000)
+  })
+}
+
 function startWebSpeechPlayback(opts: TTSOptions): void {
   const engine = getTTSEngine()
   engine.onStateChange = (state, index, total) => {
     updatePlaybackBar(state, index, total)
   }
-  engine.onFinish = () => {
-    removePlaybackBar()
+  engine.onFinish = async () => {
+    if (autoReadAction === 'stop') {
+      removePlaybackBar()
+      return
+    }
+    const success = await navigateToAdjacentDoc(autoReadAction)
+    if (!success) {
+      removePlaybackBar()
+      showMessage('已无更多文档', 2000, 'info')
+      return
+    }
+    await waitForDocLoaded()
+    engine.extractParagraphs()
+    engine.speak({ ...opts, startParagraph: 0, endParagraph: undefined })
   }
   createPlaybackBar(engine)
   engine.speak(opts)
@@ -449,8 +518,20 @@ function startHttpPlayback(engine: HttpTTSEngine, startP: number, endP: number |
     Notify.showErrorCommandCannotExecute(msg)
     removePlaybackBar()
   }
-  engine.onFinish = () => {
-    removePlaybackBar()
+  engine.onFinish = async () => {
+    if (autoReadAction === 'stop') {
+      removePlaybackBar()
+      return
+    }
+    const success = await navigateToAdjacentDoc(autoReadAction)
+    if (!success) {
+      removePlaybackBar()
+      showMessage('已无更多文档', 2000, 'info')
+      return
+    }
+    await waitForDocLoaded()
+    await engine.extractParagraphsAsync()
+    engine.speak(0, undefined)
   }
   createPlaybackBar(engine)
   engine.speak(startP, endP)

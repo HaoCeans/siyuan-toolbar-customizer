@@ -38,6 +38,7 @@ export interface TTSSettings {
   apiSpeed: number     // 硅基流动语速（0.25-4.0，默认 1.0）
   speaker: string      // 硅基流动音色名，如 'alex'
   lastMode?: string    // 上次使用的模式：'webspeech' | 'free' | 'api'
+  autoReadAction?: 'stop' | 'next' | 'prev'  // 朗读完成后动作，默认 'stop'
 }
 
 export interface SFAPIConfig {
@@ -466,9 +467,10 @@ export class HttpTTSEngine {
       .catch(err => {
         if (this.stopped) return
         const msg = err instanceof Error ? err.message : String(err)
-        console.warn('[HttpTTS] error:', msg)
-        this.onError?.(`朗读失败：${msg}`)
-        this.stop()
+        console.warn('[HttpTTS] 段落朗读失败，跳过:', msg)
+        // 跳过失败段落，继续下一段
+        this.currentIndex++
+        this.playCurrentParagraph()
       })
   }
 

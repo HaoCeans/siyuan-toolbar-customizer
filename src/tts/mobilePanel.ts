@@ -234,7 +234,6 @@ function renderFreeContent(container: HTMLElement, total: number, autoSel?: HTML
 
     const engine = getHttpTTSEngine()
     engine.setSpeed(speed)
-    engine.setSpeaker(speaker)
     engine.setMode('free')
     await engine.extractParagraphsAsync()
 

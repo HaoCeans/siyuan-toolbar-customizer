@@ -39,6 +39,7 @@ export interface TTSSettings {
   speaker: string      // 硅基流动音色名，如 'alex'
   lastMode?: string    // 上次使用的模式：'webspeech' | 'free' | 'api'
   autoReadAction?: 'stop' | 'next' | 'prev'  // 朗读完成后动作，默认 'stop'
+  webSpeechVoiceName?: string  // 浏览器语音引擎上次选择的语音名
 }
 
 export interface SFAPIConfig {
@@ -315,6 +316,7 @@ export class HttpTTSEngine {
   private apiToken = ''
   private speaker: number | string = 4
   private directFetch = false  // 桌面端可设为 true，直接 fetch 不走 forwardProxy
+  private successCount = 0
 
   private audioEl: HTMLAudioElement = new Audio()
   private blobUrl: string | null = null
@@ -378,6 +380,7 @@ export class HttpTTSEngine {
   speak(startParagraph = 0, endParagraph?: number): boolean {
     this.stop()
     this.stopped = false
+    this.successCount = 0
     this.endParagraphIndex = endParagraph ?? this.paragraphs.length - 1
     if (this.paragraphs.length === 0) return false
 
@@ -451,7 +454,11 @@ export class HttpTTSEngine {
       this.state = 'idle'
       this.currentIndex = -1
       this.notify()
-      this.onFinish?.()
+      if (this.successCount === 0) {
+        this.onError?.('所有段落朗读均失败，请检查网络连接或朗读设置')
+      } else {
+        this.onFinish?.()
+      }
       return
     }
 
@@ -467,6 +474,7 @@ export class HttpTTSEngine {
       })
       .then(() => {
         if (this.stopped) return
+        this.successCount++
         this.currentIndex++
         this.playCurrentParagraph()
       })

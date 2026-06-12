@@ -275,6 +275,9 @@ function renderWebSpeechContent(container: HTMLElement, total: number, autoSel?:
     opt.value = v.name; opt.textContent = `${v.name} (${v.lang})`
     voiceSelect.appendChild(opt)
   }
+  // 恢复上次选择的语音
+  const savedVoice = getTTSSettings().webSpeechVoiceName
+  if (savedVoice) voiceSelect.value = savedVoice
   voiceRow.appendChild(voiceSelect)
   form.appendChild(voiceRow)
 
@@ -295,7 +298,7 @@ function renderWebSpeechContent(container: HTMLElement, total: number, autoSel?:
       endParagraph: endSelect.value === 'all' ? undefined : parseInt(endSelect.value),
       voiceName: voiceSelect.value || undefined,
     }
-    saveTTSSettings({ lastMode: 'webspeech' })
+    saveTTSSettings({ lastMode: 'webspeech', webSpeechVoiceName: voiceSelect.value || undefined })
     removeOptionsPanel()
     startWebSpeechPlayback(opts)
   }
@@ -339,6 +342,7 @@ function renderFreeContent(container: HTMLElement, total: number, autoSel?: HTML
   btns.confirm.onclick = async (e) => {
     e.stopPropagation()
     autoReadAction = autoSel?.value || 'stop'
+    saveTTSSettings({ autoReadAction })
     const speed = parseInt(rateSlider.value)
     const startP = parseInt(rangeSel.value === 'all' ? '0' : rangeSel.value)
     const endP = rangeSel.value === 'all' ? undefined : parseInt(rangeSel.value)
@@ -445,6 +449,7 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: HTMLS
   btns.confirm.onclick = async (e) => {
     e.stopPropagation()
     autoReadAction = autoSel?.value || 'stop'
+    saveTTSSettings({ autoReadAction })
     const apiKey = keyInput.value.trim()
     if (!apiKey) { Notify.showErrorCommandCannotExecute('请填写 API Key'); return }
 

@@ -547,6 +547,10 @@ async function showNoteInputDialogDesktop(
     cursor: pointer;
   `;
   cancelBtn.onclick = async () => {
+    const hasContent = await inputHandle.getContent()
+    if (hasContent) {
+      if (!confirm('当前内容尚未保存，确定要取消吗？')) return
+    }
     await teardownQuickNoteDialog(dialog, false);
   };
 
@@ -920,10 +924,158 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     e.preventDefault();
   });
   cancelBtn.onclick = async () => {
+    const hasContent = await inputHandle.getContent()
+    if (hasContent) {
+      const confirmed = await new Promise<boolean>((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+          position: fixed; inset: 0; z-index: 2147483647;
+          display: flex; align-items: center; justify-content: center;
+          background: rgba(0,0,0,0.35);
+          backdrop-filter: blur(4px);
+          -webkit-backdrop-filter: blur(4px);
+          animation: tc-confirm-fade-in 0.15s ease-out;
+        `;
+        const box = document.createElement('div');
+        box.style.cssText = `
+          width: min(260px, 80vw);
+          background: ${isDark ? '#2c2c2e' : '#ffffff'};
+          border-radius: 14px;
+          overflow: hidden;
+          box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+          animation: tc-confirm-scale-in 0.2s ease-out;
+        `;
+        const msg = document.createElement('div');
+        msg.textContent = '当前内容尚未保存，确定要取消吗？';
+        msg.style.cssText = `
+          padding: 20px 16px 18px;
+          font-size: 17px;
+          text-align: center;
+          color: ${isDark ? '#e0e0e0' : '#1c1c1e'};
+          line-height: 1.5;
+          word-break: break-word;
+        `;
+        const actions = document.createElement('div');
+        actions.style.cssText = `
+          border-top: 0.5px solid ${isDark ? '#38383a' : '#c6c6c8'};
+          display: flex;
+        `;
+        const makeAction = (text: string, bold: boolean, isConfirm: boolean) => {
+          const btn = document.createElement('button');
+          btn.textContent = text;
+          btn.style.cssText = `
+            flex: 1;
+            padding: 11px 0;
+            font-size: 17px;
+            background: transparent;
+            color: ${isConfirm
+              ? (isDark ? '#4da3ff' : '#007aff')
+              : (isDark ? '#8e8e93' : '#8e8e93')};
+            border: none;
+            border-right: ${isConfirm ? 'none' : `0.5px solid ${isDark ? '#38383a' : '#c6c6c8'}`};
+            font-weight: ${bold ? 600 : 400};
+            cursor: pointer;
+          `;
+          btn.onclick = () => {
+            overlay.remove();
+            resolve(isConfirm);
+          };
+          return btn;
+        };
+        actions.appendChild(makeAction('确定', false, true));
+        actions.appendChild(makeAction('取消', true, false));
+        box.appendChild(msg);
+        box.appendChild(actions);
+        overlay.appendChild(box);
+        // 注入动画 keyframes（仅首次）
+        if (!document.getElementById('tc-confirm-anim-style')) {
+          const style = document.createElement('style');
+          style.id = 'tc-confirm-anim-style';
+          style.textContent = `
+            @keyframes tc-confirm-fade-in { from { opacity:0 } to { opacity:1 } }
+            @keyframes tc-confirm-scale-in { from { opacity:0; transform:scale(0.92) } to { opacity:1; transform:scale(1) } }
+          `;
+          document.head.appendChild(style);
+        }
+        document.body.appendChild(overlay);
+      });
+      if (!confirmed) return;
+    }
     await teardownQuickNoteDialog(dialog, true);
   };
 
   buttonContainer.appendChild(cancelBtn);
+
+  // 块格式时：取消与发送之间插入缩进/反缩进图标按钮
+  if (inputFormat === 'block') {
+    const makeListBtn = (svgHtml: string, title: string, shiftKey: boolean) => {
+      const btn = document.createElement('button');
+      btn.title = title;
+      btn.innerHTML = svgHtml;
+      btn.style.cssText = `
+        display: flex; align-items: center; justify-content: center;
+        width: 32px; height: 32px;
+        background: ${isDark ? '#444' : '#f0f0f0'};
+        border: 1px solid ${isDark ? '#666' : '#ddd'};
+        border-radius: 8px;
+        cursor: pointer;
+        padding: 0;
+        flex-shrink: 0;
+        transition: transform 0.1s, background 0.1s;
+      `;
+      const svg = btn.querySelector('svg') as SVGSVGElement;
+      if (svg) {
+        svg.style.cssText = `width:18px;height:18px;fill:none;stroke:${isDark ? '#e0e0e0' : '#333'};stroke-width:2;stroke-linecap:round;stroke-linejoin:round;`;
+      }
+      btn.tabIndex = -1;
+      const pressBg = isDark ? '#555' : '#e0e0e0';
+      const normalBg = isDark ? '#444' : '#f0f0f0';
+      const press = () => { btn.style.transform = 'scale(0.88)'; btn.style.background = pressBg; };
+      const release = () => { btn.style.transform = ''; btn.style.background = normalBg; };
+      const doAction = () => {
+        const wysiwyg = inputHandle.element.querySelector('.protyle-wysiwyg') as HTMLElement | null;
+        if (!wysiwyg) return;
+        wysiwyg.focus({ preventScroll: true });
+        const ev = new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          key: 'Tab',
+          code: 'Tab',
+          keyCode: 9,
+          which: 9,
+          shiftKey,
+          ctrlKey: false,
+          altKey: false,
+          metaKey: false,
+        });
+        try {
+          Object.defineProperty(ev, 'keyCode', { configurable: true, get: () => 9 });
+          Object.defineProperty(ev, 'which', { configurable: true, get: () => 9 });
+        } catch { /* ignore */ }
+        wysiwyg.dispatchEvent(ev);
+      };
+      btn.addEventListener('touchstart', (e) => { press(); }, { passive: true });
+      btn.addEventListener('touchend', (e) => {
+        release();
+        e.preventDefault(); // 防止 300ms 延迟，同时阻止后续 mousedown
+        doAction();
+      });
+      btn.addEventListener('touchcancel', () => release());
+      btn.addEventListener('mousedown', (e) => { e.preventDefault(); press(); });
+      btn.addEventListener('mouseup', (e) => {
+        release();
+        if (e.button === 0) doAction();
+      });
+      btn.addEventListener('mouseleave', () => release());
+      return btn;
+    };
+
+    const outdentSvg = '<svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><polyline points="7 3 4 6 7 9"/><line x1="6" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>';
+    const indentSvg = '<svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><polyline points="17 3 20 6 17 9"/><line x1="3" y1="12" x2="18" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>';
+    buttonContainer.appendChild(makeListBtn(outdentSvg, '减少缩进', true));
+    buttonContainer.appendChild(makeListBtn(indentSvg, '提升层级', false));
+  }
+
   buttonContainer.appendChild(saveBtn);
 
   content.appendChild(title);
@@ -1020,6 +1172,11 @@ async function closeNoteDialog() {
     if (timeSinceOpen < DIALOG_PROTECTION_MS) {
       return;
     }
+    const handle = getActiveQuickNoteInput();
+    if (handle) {
+      const hasContent = await handle.getContent()
+      if (hasContent) return
+    }
     const isMobileDialog = noteDialog.id === 'quick-note-dialog';
     await teardownQuickNoteDialog(noteDialog, isMobileDialog);
     lastDialogShowTime = Date.now();
@@ -1045,6 +1202,10 @@ function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null, 
   
   // 防止按钮获取焦点，保持输入法不关闭
   clonedBtn.tabIndex = -1;
+  // 阻止 mousedown 导致的焦点转移，保持 textarea/contenteditable 选区不丢失
+  clonedBtn.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+  });
 
   // 获取配置的按钮样式
   const useCustomStyle = pluginInstance?.mobileFeatureConfig?.useCustomButtonStyle || false;

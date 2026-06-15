@@ -290,6 +290,29 @@ export class TTSEngine {
     removeHighlightStyle()
   }
 
+  /** 朗读一段文字，完成后回调（不改变当前段落索引和高亮） */
+  speakOnce(text: string, onDone?: () => void): void {
+    if (!this.synth) { onDone?.(); return }
+    this.synth.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    this.currentUtterance = utterance
+    utterance.rate = this.options?.rate ?? 1.0
+    utterance.pitch = this.options?.pitch ?? 1.0
+    utterance.volume = this.options?.volume ?? 1.0
+    utterance.lang = 'zh-CN'
+    const allVoices = this.synth.getVoices()
+    if (this.options?.voiceName) {
+      const voice = allVoices.find(v => v.name === this.options.voiceName)
+      if (voice) utterance.voice = voice
+    } else {
+      const zhVoice = allVoices.find(v => v.lang.startsWith('zh'))
+      if (zhVoice) utterance.voice = zhVoice
+    }
+    utterance.onend = () => onDone?.()
+    utterance.onerror = () => onDone?.()
+    this.synth.speak(utterance)
+  }
+
   // ─── 内部方法 ─────────────────────────────────────
 
   private speakParagraph(index: number): void {
@@ -465,6 +488,69 @@ export function getTTSEngine(): TTSEngine {
     engineInstance = new TTSEngine()
   }
   return engineInstance
+}
+
+/**
+ * 获取当前文档标题
+ * 手机端优先从 siyuan 内部对象获取，桌面端从 DOM 获取，降级走 API
+ */
+export function getCurrentDocTitle(): string {
+  // ① 手机端：siyuan.mobile.editor.protyle.title
+  const w = window as any
+  const mobileProtyle = w.siyuan?.mobile?.editor?.protyle
+  if (mobileProtyle) {
+    const mobileTitle = mobileProtyle.title
+    if (typeof mobileTitle === 'string' && mobileTitle.trim()) {
+      return mobileTitle.replace(/\u200b/g, '').trim()
+    }
+    // 有些版本 title 在 element 上
+    const titleEl = mobileProtyle.element?.querySelector('.protyle-title')
+    if (titleEl) {
+      const text = (titleEl.textContent || '').replace(/\u200b/g, '').trim()
+      if (text) return text
+    }
+  }
+
+  // ② 桌面端 / 通用：DOM 查询 .protyle-title
+  const titleSelectors = [
+    '.layout__wnd--active .protyle-title .protyle-wysiwyg',
+    '.protyle:not(.fn__none) .protyle-title .protyle-wysiwyg',
+    '.protyle-title [data-node-id]',
+  ]
+  for (const sel of titleSelectors) {
+    const el = document.querySelector(sel)
+    const text = el ? (el.textContent || '').replace(/\u200b/g, '').trim() : ''
+    if (text) return text
+  }
+
+  // ③ 降级：API 获取（同步 XHR）
+  const docId = getCurrentDocId()
+  if (docId) {
+    try {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', '/api/query/block', false)
+      xhr.setRequestHeader('Content-Type', 'application/json')
+      xhr.send(JSON.stringify({ id: docId }))
+      if (xhr.status === 200) {
+        const resp = JSON.parse(xhr.responseText)
+        // 遍历返回的块，找标题块（type='d'）
+        const blocks = resp?.data?.blocks || []
+        for (const block of blocks) {
+          if (block.type === 'd') {
+            const content = (block.content || '').replace(/\u200b/g, '').trim()
+            if (content) return content
+          }
+        }
+        // 兜底：用第一个块的 content
+        for (const block of blocks) {
+          const content = (block.content || '').replace(/\u200b/g, '').trim()
+          if (content) return content
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  return ''
 }
 
 export function destroyTTSEngine(): void {

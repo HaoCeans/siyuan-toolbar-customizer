@@ -986,6 +986,38 @@ export function createDesktopButtonItem(
     categoriesHint.textContent = '💡 每行输入一个分类选项，点击按钮后会弹出选择对话框'
     lifeLogConfigDiv.appendChild(categoriesHint)
 
+    // 分类按钮字体大小
+    const fontSizeLabel = document.createElement('label')
+    fontSizeLabel.textContent = '🔤 分类按钮字体大小（px）'
+    fontSizeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
+    lifeLogConfigDiv.appendChild(fontSizeLabel)
+
+    const fontSizeInput = document.createElement('input')
+    fontSizeInput.type = 'number'
+    fontSizeInput.className = 'b3-text-field'
+    fontSizeInput.min = '8'
+    fontSizeInput.max = '24'
+    fontSizeInput.value = String(button.lifeLogCatFontSize ?? 14)
+    fontSizeInput.style.cssText = 'font-size: 13px; width: 80px;'
+    fontSizeInput.onchange = () => { button.lifeLogCatFontSize = Number(fontSizeInput.value) || 14 }
+    lifeLogConfigDiv.appendChild(fontSizeInput)
+
+    // 分类按钮内边距
+    const paddingLabel = document.createElement('label')
+    paddingLabel.textContent = '📐 分类按钮内边距（px）'
+    paddingLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
+    lifeLogConfigDiv.appendChild(paddingLabel)
+
+    const paddingInput = document.createElement('input')
+    paddingInput.type = 'number'
+    paddingInput.className = 'b3-text-field'
+    paddingInput.min = '2'
+    paddingInput.max = '20'
+    paddingInput.value = String(button.lifeLogCatPadding ?? 8)
+    paddingInput.style.cssText = 'font-size: 13px; width: 80px;'
+    paddingInput.onchange = () => { button.lifeLogCatPadding = Number(paddingInput.value) || 8 }
+    lifeLogConfigDiv.appendChild(paddingInput)
+
     authorToolField.appendChild(lifeLogConfigDiv)
 
     // 弹窗框模板选择配置区
@@ -2538,6 +2570,38 @@ export function populateDesktopEditForm(
     categoriesHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
     categoriesHint.textContent = '💡 每行输入一个分类选项，点击按钮后会弹出选择对话框'
     lifeLogConfigDiv.appendChild(categoriesHint)
+
+    // 分类按钮字体大小
+    const fontSizeLabel = document.createElement('label')
+    fontSizeLabel.textContent = '🔤 分类按钮字体大小（px）'
+    fontSizeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
+    lifeLogConfigDiv.appendChild(fontSizeLabel)
+
+    const fontSizeInput = document.createElement('input')
+    fontSizeInput.type = 'number'
+    fontSizeInput.className = 'b3-text-field'
+    fontSizeInput.min = '8'
+    fontSizeInput.max = '24'
+    fontSizeInput.value = String(button.lifeLogCatFontSize ?? 14)
+    fontSizeInput.style.cssText = 'font-size: 13px; width: 80px;'
+    fontSizeInput.onchange = () => { button.lifeLogCatFontSize = Number(fontSizeInput.value) || 14 }
+    lifeLogConfigDiv.appendChild(fontSizeInput)
+
+    // 分类按钮内边距
+    const paddingLabel = document.createElement('label')
+    paddingLabel.textContent = '📐 分类按钮内边距（px）'
+    paddingLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
+    lifeLogConfigDiv.appendChild(paddingLabel)
+
+    const paddingInput = document.createElement('input')
+    paddingInput.type = 'number'
+    paddingInput.className = 'b3-text-field'
+    paddingInput.min = '2'
+    paddingInput.max = '20'
+    paddingInput.value = String(button.lifeLogCatPadding ?? 8)
+    paddingInput.style.cssText = 'font-size: 13px; width: 80px;'
+    paddingInput.onchange = () => { button.lifeLogCatPadding = Number(paddingInput.value) || 8 }
+    lifeLogConfigDiv.appendChild(paddingInput)
 
     authorToolField.appendChild(lifeLogConfigDiv)
 

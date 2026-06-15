@@ -240,7 +240,13 @@ function renderFreeContent(container: HTMLElement, total: number, autoSel?: HTML
     engine.onStateChange = (st, idx, tot) => updateBar(st, idx, tot)
     engine.onError = (msg) => { Notify.showErrorCommandCannotExecute(msg); removeBar() }
     engine.onFinish = async () => {
-      if (autoReadAction === 'stop') { removeBar(); return }
+      if (autoReadAction === 'stop') {
+        const s = bar?.querySelector('#tm-s') as HTMLElement
+        if (s) s.textContent = '朗读完成'
+        engine.onStateChange = () => {}
+        await engine.speakOnce('本文档已经朗读完成', () => removeBar())
+        return
+      }
       const success = await navigateToAdjacentDoc(autoReadAction)
       if (!success) { removeBar(); showMessage('已无更多文档', 2000, 'info'); return }
       await waitForDocLoaded()
@@ -352,7 +358,13 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: HTMLS
     engine.onStateChange = (st, idx, tot) => updateBar(st, idx, tot)
     engine.onError = (msg) => { Notify.showErrorCommandCannotExecute(msg); removeBar() }
     engine.onFinish = async () => {
-      if (autoReadAction === 'stop') { removeBar(); return }
+      if (autoReadAction === 'stop') {
+        const s = bar?.querySelector('#tm-s') as HTMLElement
+        if (s) s.textContent = '朗读完成'
+        engine.onStateChange = () => {}
+        await engine.speakOnce('本文档已经朗读完成', () => removeBar())
+        return
+      }
       const success = await navigateToAdjacentDoc(autoReadAction)
       if (!success) { removeBar(); showMessage('已无更多文档', 2000, 'info'); return }
       await waitForDocLoaded()

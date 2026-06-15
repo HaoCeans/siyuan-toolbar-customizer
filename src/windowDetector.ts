@@ -22,6 +22,7 @@ import {
   toggleDesktopQuickNoteBlockWindow,
 } from './quickNote/quickNoteBlockWindow';
 import { createQuoteOverlay } from './quickNote/quoteOverlay';
+import { fetchSyncPost } from 'siyuan';
 
 export type QuickNoteOpenSource = 'auto' | 'button' | 'globalHotkey';
 
@@ -62,6 +63,16 @@ let heightCheckTimer: ReturnType<typeof setInterval> | null = null;
 
 // 金句占位 overlay 清理句柄
 let quoteOverlayCleanup: (() => void) | null = null;
+
+// 叶归Lifelog 模式状态
+let isLifelogMode = false;
+let lifelogSelectedCategory = '';
+let lifelogNotebookId = '';
+let lifelogCategories: string[] = [];
+let lifelogToolbarContainer: HTMLElement | null = null;
+let pendingLifelogConfig: any = null;
+let lifelogIndentBtns: HTMLElement[] = [];
+let lifelogDialogTitle: HTMLHeadingElement | null = null;
 
 function isQuickNoteToggleSource(source: QuickNoteOpenSource): boolean {
   return source === 'button' || source === 'globalHotkey';
@@ -362,6 +373,14 @@ async function teardownQuickNoteDialog(dialog: HTMLElement, closeMobile: boolean
   wasQuickNoteInputFocused = false;
   savedCursorPos = null;
   savedBlockRange = null;
+  isLifelogMode = false;
+  lifelogSelectedCategory = '';
+  lifelogNotebookId = '';
+  lifelogCategories = [];
+  lifelogToolbarContainer = null;
+  pendingLifelogConfig = null;
+  lifelogDialogTitle = null;
+  lifelogIndentBtns = [];
 }
 
 // === 电脑端专用弹窗 ===
@@ -732,9 +751,15 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
   `;
 
   const title = document.createElement('h2');
-  title.textContent = isAppleStyle
-    ? (documentId ? '文档记事' : '日记记事')
-    : (documentId ? '📒 文档记事' : '📒 日记记事');
+  const cfg = pendingLifelogConfig;
+  if (cfg) {
+    title.textContent = '📒 LifeLog';
+  } else {
+    title.textContent = isAppleStyle
+      ? (documentId ? '文档记事' : '日记记事')
+      : (documentId ? '📒 文档记事' : '📒 日记记事');
+  }
+  lifelogDialogTitle = title;
   title.style.cssText = isAppleStyle ? `
     margin: 0 0 16px 0;
     color: ${isDark ? '#e0e0e0' : '#000'};
@@ -769,7 +794,9 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     min-height: 32px;  /* 至少保留一行输入空间 */
   `;
 
-  const inputFormat = resolveQuickNoteInputFormat(isFromButton);
+  let inputFormat = resolveQuickNoteInputFormat(isFromButton);
+  // Lifelog 模式强制纯文本
+  if (pendingLifelogConfig) inputFormat = 'plain';
   const fontSize = getQuickNoteFontSize();
   const placeholder = documentId
     ? (isAppleStyle ? '追加到文档' : '请输入要追加到文档的内容...')
@@ -850,9 +877,57 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     padding: 0 8px;
   `;
   toolbarSection.appendChild(toolbarContainer);
+  lifelogToolbarContainer = toolbarContainer;
 
-  // 获取并复制底部工具栏按钮
-  copyBottomToolbarButtons(toolbarContainer);
+  if (cfg) {
+    // Lifelog 模式：直接创建分类按钮，跳过复制工具栏
+    const categories = cfg.lifeLogCategories || ['学习', '工作', '生活'];
+    lifelogNotebookId = cfg.lifeLogNotebookId || '';
+    lifelogCategories = categories;
+    lifelogSelectedCategory = categories[0];
+    isLifelogMode = true;
+    const normalBg = isDark ? '#333' : '#f2f2f7';
+    const normalColor = isDark ? '#e0e0e0' : '#333';
+    const activeBg = isDark ? '#4da3ff' : '#007aff';
+    const catFontSize = cfg.lifeLogCatFontSize ?? 14;
+    const catPadding = cfg.lifeLogCatPadding ?? 8;
+    toolbarContainer.style.cssText = `
+      display: flex; flex-wrap: wrap; gap: 8px;
+      justify-content: center; align-items: center;
+      padding: 4px 0;
+    `;
+    categories.forEach((cat) => {
+      const btn = document.createElement('button');
+      btn.textContent = cat;
+      const isActive = cat === lifelogSelectedCategory;
+      btn.style.cssText = `
+        font-size: ${catFontSize}px; padding: ${catPadding}px ${catPadding * 2}px;
+        background: ${isActive ? activeBg : normalBg};
+        color: ${isActive ? 'white' : normalColor};
+        border: none; border-radius: 16px;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+      `;
+      btn.tabIndex = -1;
+      btn.addEventListener('mousedown', (e) => e.preventDefault());
+      btn.addEventListener('touchstart', (e) => e.preventDefault(), { passive: true });
+      btn.onclick = () => {
+        lifelogSelectedCategory = cat;
+        toolbarContainer.querySelectorAll('.tc-lifelog-cat').forEach((b) => {
+          const el = b as HTMLElement;
+          el.style.background = normalBg;
+          el.style.color = normalColor;
+        });
+        btn.style.background = activeBg;
+        btn.style.color = 'white';
+      };
+      btn.classList.add('tc-lifelog-cat');
+      toolbarContainer.appendChild(btn);
+    });
+  } else {
+    // 正常模式：复制底部工具栏按钮
+    copyBottomToolbarButtons(toolbarContainer);
+  }
 
   mainContainer.appendChild(noteSection);
   mainContainer.appendChild(toolbarSection);
@@ -887,6 +962,25 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
   });
   saveBtn.onclick = async () => {
     try {
+      // Lifelog 模式：格式化为 HH:MM 分类：内容，写入每日笔记
+      if (isLifelogMode) {
+        const handle = getActiveQuickNoteInput();
+        const ta = handle?.element.querySelector('textarea') as HTMLTextAreaElement | null;
+        const text = ta?.value.trim() || '';
+        if (!text) return;
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const content = `${hours}:${minutes} ${lifelogSelectedCategory}：${text}\n`;
+        const ok = await saveLifelogContent(lifelogNotebookId, content);
+        if (ok) {
+          showSuccessMessage('✅ Lifelog 已保存');
+          await teardownQuickNoteDialog(dialog, true);
+        } else {
+          alert('Lifelog 保存失败，请重试');
+        }
+        return;
+      }
       const success = await runQuickNoteSave(
         inputHandle,
         notebookId,
@@ -924,7 +1018,10 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     e.preventDefault();
   });
   cancelBtn.onclick = async () => {
-    const hasContent = await inputHandle.getContent()
+    // Lifelog 模式从当前 handle 判断
+    const hasContent = isLifelogMode
+      ? !!(getActiveQuickNoteInput()?.element.querySelector('textarea') as HTMLTextAreaElement)?.value.trim()
+      : !!(await inputHandle.getContent())
     if (hasContent) {
       const confirmed = await new Promise<boolean>((resolve) => {
         const overlay = document.createElement('div');
@@ -1072,8 +1169,29 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
 
     const outdentSvg = '<svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><polyline points="7 3 4 6 7 9"/><line x1="6" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>';
     const indentSvg = '<svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><polyline points="17 3 20 6 17 9"/><line x1="3" y1="12" x2="18" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>';
-    buttonContainer.appendChild(makeListBtn(outdentSvg, '减少缩进', true));
-    buttonContainer.appendChild(makeListBtn(indentSvg, '提升层级', false));
+    const outdentBtn = makeListBtn(outdentSvg, '减少缩进', true);
+    const indentBtn = makeListBtn(indentSvg, '提升层级', false);
+    buttonContainer.appendChild(outdentBtn);
+    buttonContainer.appendChild(indentBtn);
+    lifelogIndentBtns = [outdentBtn, indentBtn];
+
+    // 键盘弹出时显示，收起时隐藏
+    outdentBtn.style.display = 'none';
+    indentBtn.style.display = 'none';
+    const listBtns = [outdentBtn, indentBtn];
+    const vv = window.visualViewport;
+    if (vv) {
+      const baseHeight = vv.height;
+      const onResize = () => {
+        if (isLifelogMode) return;
+        const open = vv.height < baseHeight - 30;
+        const display = open ? '' : 'none';
+        listBtns[0].style.display = display;
+        listBtns[1].style.display = display;
+      };
+      vv.addEventListener('resize', onResize);
+      dialog.addEventListener('DOMNodeRemoved', () => vv.removeEventListener('resize', onResize));
+    }
   }
 
   buttonContainer.appendChild(saveBtn);
@@ -1084,6 +1202,15 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
   dialog.appendChild(content);
 
   document.body.appendChild(dialog);
+
+  // pendingLifelogConfig 已在构建弹窗时直接处理，此处清理并聚焦
+  if (pendingLifelogConfig) {
+    pendingLifelogConfig = null;
+    setTimeout(() => {
+      const ta = getActiveQuickNoteInput()?.element.querySelector('textarea') as HTMLTextAreaElement | null;
+      ta?.focus();
+    }, 50);
+  }
 
   // 延后预打开扩展工具栏（隐藏状态），让弹窗先渲染出来
   setTimeout(() => preOpenHiddenQuickNoteOverflowToolbar('mobile'), 100);
@@ -1485,6 +1612,197 @@ function renderButtons(
 }
 
 /**
+ * 切换到 Lifelog 模式：工具栏变为分类按钮 + 输入框切换为纯文本
+ */
+async function switchToLifelogMode(buttonConfig: any): Promise<void> {
+  const notebookId = buttonConfig.lifeLogNotebookId;
+  if (!notebookId) {
+    Notify.showErrorCommandCannotExecute('请先配置笔记本ID');
+    return;
+  }
+  if (!lifelogToolbarContainer) return;
+
+  const categories = buttonConfig.lifeLogCategories || ['学习', '工作', '生活'];
+  lifelogNotebookId = notebookId;
+  lifelogCategories = categories;
+  lifelogSelectedCategory = categories[0];
+  isLifelogMode = true;
+
+  // 隐藏缩进按钮
+  lifelogIndentBtns.forEach((b) => { b.style.display = 'none'; });
+
+  // 检查是否有已有内容，有则提示确认
+  const oldHandle = getActiveQuickNoteInput();
+  let existingText = '';
+  if (oldHandle) {
+    const ta = oldHandle.element.querySelector('textarea') as HTMLTextAreaElement | null;
+    if (ta) {
+      existingText = ta.value.trim();
+    } else {
+      const wysiwyg = oldHandle.element.querySelector('.protyle-wysiwyg') as HTMLElement | null;
+      if (wysiwyg) existingText = (wysiwyg.textContent || '').replace(/\u200b/g, '').trim();
+    }
+  }
+  if (existingText) {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position: fixed; inset: 0; z-index: 2147483647;
+        display: flex; align-items: center; justify-content: center;
+        background: rgba(0,0,0,0.35);
+        backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+        animation: tc-confirm-fade-in 0.15s ease-out;
+      `;
+      const box = document.createElement('div');
+      box.style.cssText = `
+        width: min(260px, 80vw); background: ${isSiyuanDarkMode() ? '#2c2c2e' : '#fff'};
+        border-radius: 14px; overflow: hidden;
+        box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+        animation: tc-confirm-scale-in 0.2s ease-out;
+      `;
+      const msg = document.createElement('div');
+      msg.textContent = '当前内容尚未保存，切换到 LifeLog 将清空，确定吗？';
+      msg.style.cssText = `padding: 20px 16px 18px; font-size: 17px; text-align: center; color: ${isSiyuanDarkMode() ? '#e0e0e0' : '#1c1c1e'}; line-height: 1.5;`;
+      const actions = document.createElement('div');
+      actions.style.cssText = `border-top: 0.5px solid ${isSiyuanDarkMode() ? '#38383a' : '#c6c6c8'}; display: flex;`;
+      const mkBtn = (text: string, isConfirm: boolean) => {
+        const btn = document.createElement('button');
+        btn.textContent = text;
+        btn.style.cssText = `flex:1; padding:11px 0; font-size:17px; background:transparent; color:${isSiyuanDarkMode() ? '#4da3ff' : '#007aff'}; border:none; border-right:0.5px solid ${isSiyuanDarkMode() ? '#38383a' : '#c6c6c8'}; cursor:pointer;`;
+        btn.onclick = () => { overlay.remove(); resolve(isConfirm); };
+        return btn;
+      };
+      actions.appendChild(mkBtn('确定', true));
+      actions.appendChild(mkBtn('取消', false));
+      box.appendChild(msg); box.appendChild(actions);
+      overlay.appendChild(box);
+      if (!document.getElementById('tc-confirm-anim-style')) {
+        const style = document.createElement('style'); style.id = 'tc-confirm-anim-style';
+        style.textContent = `@keyframes tc-confirm-fade-in { from { opacity:0 } to { opacity:1 } } @keyframes tc-confirm-scale-in { from { opacity:0; transform:scale(0.92) } to { opacity:1; transform:scale(1) } }`;
+        document.head.appendChild(style);
+      }
+      document.body.appendChild(overlay);
+    });
+    if (!confirmed) return;
+  }
+
+  isLifelogMode = true;
+
+  // 标题改为 Lifelog
+  if (lifelogDialogTitle) lifelogDialogTitle.textContent = '📒 LifeLog';
+
+  // 销毁当前 inputHandle，创建纯文本 inputHandle（如果已是纯文本则跳过，避免输入法闪烁）
+  if (oldHandle) {
+    if (oldHandle.isPlainTextarea()) {
+      // 已经是纯文本，清空内容即可，不销毁重建
+      const ta = oldHandle.element.querySelector('textarea') as HTMLTextAreaElement | null;
+      if (ta) ta.value = '';
+    } else {
+      // 块格式：销毁旧 Protyle，创建纯文本输入区
+      const noteSection = oldHandle.element.parentElement;
+      if (oldHandle.cancelDraft) {
+        try { await oldHandle.cancelDraft(); } catch { /* ignore */ }
+      }
+      oldHandle.destroy();
+      const isDark = isSiyuanDarkMode();
+      const fontSize = getQuickNoteFontSize();
+      const newHandle = await createQuickNoteInputArea({
+        format: 'plain', isMobile: true, isDark, fontSize, placeholder: '请输入内容...',
+      });
+      setActiveQuickNoteInput(newHandle);
+      noteSection?.appendChild(newHandle.element);
+      setTimeout(() => (newHandle.element.querySelector('textarea') as HTMLTextAreaElement)?.focus(), 50);
+    }
+  }
+
+  // 工具栏变为分类按钮
+  const isDark = isSiyuanDarkMode();
+  const container = lifelogToolbarContainer;
+  container.innerHTML = '';
+  container.style.cssText = `
+    display: flex; flex-wrap: wrap; gap: 8px;
+    justify-content: center; align-items: center;
+    padding: 4px 0;
+  `;
+
+  // 分类按钮
+  const normalBg = isDark ? '#333' : '#f2f2f7';
+  const normalColor = isDark ? '#e0e0e0' : '#333';
+  const activeBg = isDark ? '#4da3ff' : '#007aff';
+  const catFontSize = buttonConfig.lifeLogCatFontSize ?? 14;
+  const catPadding = buttonConfig.lifeLogCatPadding ?? 8;
+  categories.forEach((cat) => {
+    const btn = document.createElement('button');
+    btn.textContent = cat;
+    const isActive = cat === lifelogSelectedCategory;
+    btn.style.cssText = `
+      font-size: ${catFontSize}px; padding: ${catPadding}px ${catPadding * 2}px;
+      background: ${isActive ? activeBg : normalBg};
+      color: ${isActive ? 'white' : normalColor};
+      border: none; border-radius: 16px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    `;
+    btn.tabIndex = -1;
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('touchstart', (e) => e.preventDefault(), { passive: true });
+    btn.onclick = () => {
+      lifelogSelectedCategory = cat;
+      container.querySelectorAll('.tc-lifelog-cat').forEach((b) => {
+        const el = b as HTMLElement;
+        el.style.background = normalBg;
+        el.style.color = normalColor;
+      });
+      btn.style.background = activeBg;
+      btn.style.color = 'white';
+    };
+    btn.classList.add('tc-lifelog-cat');
+    container.appendChild(btn);
+  });
+}
+
+/**
+ * Lifelog 内容写入每日笔记（3层降级）
+ */
+async function saveLifelogContent(notebookId: string, content: string): Promise<boolean> {
+  try {
+    // 优先：appendDailyNoteBlock
+    const r = await fetchSyncPost('/api/block/appendDailyNoteBlock', {
+      data: content,
+      dataType: 'markdown',
+      notebook: notebookId,
+    });
+    if (r.code === 0) return true;
+  } catch { /* fallthrough */ }
+
+  try {
+    // 降级1：getDailyNote + appendBlock
+    const daily = await fetchSyncPost('/api/filetree/getDailyNote', { notebook: notebookId });
+    if (daily.code === 0 && daily.data?.box) {
+      const r = await fetchSyncPost('/api/block/appendBlock', {
+        dataType: 'markdown',
+        data: content,
+        parentID: daily.data.id,
+      });
+      if (r.code === 0) return true;
+    }
+    // 降级2：createDailyNote + appendBlock
+    const today = new Date();
+    const title = `${today.getFullYear()}年${String(today.getMonth() + 1).padStart(2, '0')}月${String(today.getDate()).padStart(2, '0')}日`;
+    const created = await fetchSyncPost('/api/filetree/createDailyNote', { notebook: notebookId, title });
+    if (created.code === 0 && created.data) {
+      const r = await fetchSyncPost('/api/block/appendBlock', {
+        dataType: 'markdown',
+        data: content,
+        parentID: created.data,
+      });
+      if (r.code === 0) return true;
+    }
+  } catch { /* all failed */ }
+  return false;
+}
+
+/**
  * 处理按钮点击事件
  * 统一处理各种类型按钮的点击逻辑
  */
@@ -1538,7 +1856,20 @@ async function handleButtonClick(
       // 不关闭弹窗，直接返回
       return;
     }
-    
+
+    // 叶归Lifelog适配：切换弹窗为Lifelog模式
+    if (buttonConfig.type === 'author-tool' && buttonConfig.authorToolSubtype === 'life-log') {
+      const noteDialog = getQuickNoteDialogElement();
+      if (noteDialog) {
+        switchToLifelogMode(buttonConfig);
+      } else {
+        pendingLifelogConfig = buttonConfig;
+        const nbId = buttonConfig.lifeLogNotebookId || pluginInstance?.mobileFeatureConfig?.quickNoteNotebookId || '';
+        void showNoteInputDialogMobile(nbId);
+      }
+      return;
+    }
+
     // 其他类型按钮：通过原始按钮触发
     if (originalBtn) {
       originalBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
@@ -2117,6 +2448,19 @@ function useApiFallback(notebookId: string, siyuan: any) {
 
 // 导出函数供其他模块使用
 export { showSmallWindowTip, showSiyuanEditorDialog, shouldUseQuickNoteFloatWindow };
+
+/**
+ * 从主工具栏触发 Lifelog 模式（打开记事弹窗并切换）
+ */
+export function triggerLifelogQuickNote(buttonConfig: any): void {
+  if (!buttonConfig.lifeLogNotebookId) {
+    Notify.showErrorCommandCannotExecute('请先配置笔记本ID');
+    return;
+  }
+  pendingLifelogConfig = buttonConfig;
+  const nbId = buttonConfig.lifeLogNotebookId;
+  void showNoteInputDialogMobile(nbId);
+}
 
 // 防抖：全局快捷键可能短时间内触发多次，导致先最小化再立刻弹出
 let lastToggleTimestamp = 0;

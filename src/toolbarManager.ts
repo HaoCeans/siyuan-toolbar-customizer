@@ -90,6 +90,8 @@ export interface ButtonConfig {
   diaryNotebookId?: string;   // 日记底部功能：指定笔记本ID（留空则使用Alt+5快捷键）
   lifeLogCategories?: string[]; // 叶归LifeLog适配：分类选项列表
   lifeLogNotebookId?: string; // 叶归LifeLog适配：目标笔记本ID
+  lifeLogCatFontSize?: number; // 叶归LifeLog适配：分类按钮字体大小（px，默认14）
+  lifeLogCatPadding?: number; // 叶归LifeLog适配：分类按钮内边距（px，默认8）
   imageUploadMode?: 'manual' | 'daily-note'; // 图片快捷导入：插入模式（manual=手动位置, daily-note=日记底部）
   imageUploadNotebookId?: string; // 图片快捷导入：日记模式目标笔记本ID
   cardContainerHeight?: string; // 卡片模式容器高度
@@ -4097,89 +4099,44 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
 
   // 叶归LifeLog适配类型
   if (subtype === 'life-log') {
+    // 手机端：使用记事弹窗内嵌模式
+    const frontend = getFrontend()
+    if (frontend === 'mobile' || frontend === 'browser-mobile') {
+      triggerLifelogQuickNote(config)
+      return
+    }
+    // 桌面端：苹果风格合并对话框
     try {
       const categories = config.lifeLogCategories || ['学习', '工作', '生活']
+      const result = await showLifelogDialog(categories)
 
-      // 创建选择对话框（不恢复焦点，因为接下来还要弹出输入框）
-      const selectedCategory = await showCategorySelectionDialog(categories, { restoreFocus: false })
+      if (result) {
+        const { category, content: inputContent } = result
+        const now = new Date()
+        const hours = String(now.getHours()).padStart(2, '0')
+        const minutes = String(now.getMinutes()).padStart(2, '0')
+        const formattedContent = `${hours}:${minutes} ${category}：${inputContent}\n`
+        const notebookId = config.lifeLogNotebookId
 
-      if (selectedCategory) {
-        // 保存当前焦点元素和滚动位置（在弹出输入框之前）
-        const activeElementBeforeInput = document.activeElement as HTMLElement
-        // 查找思源实际的滚动容器（优先活动 protyle 内的 .protyle-content）
-        const activeProtyle = document.querySelector('.protyle:not(.fn__hidden):not(.fn__none)')
-        const scrollContainer = (activeProtyle?.querySelector('.protyle-content') || document.querySelector('.layout__center')) as HTMLElement | null
-        const scrollPositionBefore = scrollContainer
-          ? scrollContainer.scrollTop
-          : (window.pageYOffset || document.documentElement.scrollTop)
+        if (!notebookId) {
+          Notify.showErrorCommandCannotExecute('请先配置笔记本ID')
+          return
+        }
 
-        // 弹出输入框，让用户输入具体内容
-        const inputContent = await showTextInputDialog('请输入内容', '例如：写插件')
+        try {
+          const response = await fetchSyncPost('/api/block/appendDailyNoteBlock', {
+            data: formattedContent,
+            dataType: 'markdown',
+            notebook: notebookId,
+          })
 
-        if (inputContent !== null) {
-          // 获取当前时间
-          const now = new Date()
-          const hours = String(now.getHours()).padStart(2, '0')
-          const minutes = String(now.getMinutes()).padStart(2, '0')
-
-          // 生成内容格式：19:50 工作：输入内容\n
-          const content = `${hours}:${minutes} ${selectedCategory}：${inputContent}\n`
-
-          // 获取笔记本ID
-          const notebookId = config.lifeLogNotebookId
-
-          if (!notebookId) {
-            // 如果没有配置笔记本ID，给出提示
-            Notify.showErrorCommandCannotExecute('请先配置笔记本ID');
-            return;
+          if (response.code === 0) {
+            if (config.showNotification) Notify.showInfoCopySuccess()
+          } else {
+            await appendToDailyNoteAlternative(notebookId, formattedContent, config.showNotification)
           }
-
-          try {
-            // 尝试使用appendDailyNoteBlock API将内容追加到指定笔记本的每日笔记
-            const response = await fetchSyncPost('/api/block/appendDailyNoteBlock', {
-              data: content,
-              dataType: 'markdown',
-              notebook: notebookId
-            });
-
-            if (response.code === 0) {
-              if (config.showNotification) {
-                Notify.showInfoCopySuccess() // 使用现有的成功通知
-              }
-
-              // 延迟恢复滚动位置（等待思源完成跳转）
-              setTimeout(() => {
-                // 恢复滚动位置到思源的实际滚动容器（优先活动 protyle）
-                const activeProtyleNow = document.querySelector('.protyle:not(.fn__hidden):not(.fn__none)')
-                const currentScrollContainer = (activeProtyleNow?.querySelector('.protyle-content') || document.querySelector('.layout__center')) as HTMLElement | null
-                if (currentScrollContainer) {
-                  currentScrollContainer.scrollTop = scrollPositionBefore
-                } else {
-                  window.scrollTo(0, scrollPositionBefore)
-                }
-
-                // 移动端不恢复焦点，避免重新弹出输入法
-                const frontend = getFrontend()
-                const isMobileDevice = frontend === 'mobile' || frontend === 'browser-mobile'
-                if (!isMobileDevice && activeElementBeforeInput && document.contains(activeElementBeforeInput)) {
-                  try {
-                    activeElementBeforeInput.focus({ preventScroll: true })
-                  } catch (e) {
-                    // 如果无法聚焦，忽略错误
-                    console.warn('[叶归LifeLog适配] 恢复焦点失败:', e)
-                  }
-                }
-              }, 300) // 300ms延迟，确保思源的跳转动画完成
-            } else {
-              console.warn('[叶归LifeLog适配] 追加到每日笔记失败:', response.msg)
-              // 如果API调用失败，尝试使用替代方案
-              await appendToDailyNoteAlternative(notebookId, content, config.showNotification);
-            }
-          } catch (apiError) {
-            console.warn('[叶归LifeLog适配] appendDailyNoteBlock API调用失败，尝试替代方案:', apiError)
-            // 如果API调用失败，尝试使用替代方案
-            await appendToDailyNoteAlternative(notebookId, content, config.showNotification);
-          }
+        } catch (apiError) {
+          await appendToDailyNoteAlternative(notebookId, formattedContent, config.showNotification)
         }
       }
     } catch (error) {
@@ -4433,6 +4390,223 @@ async function executeImageUpload(config: ButtonConfig) {
   fileInput.click()
   // 安全兜底：30秒后自动清除标记（防止 onchange/cancel 均不触发的极端情况）
   setTimeout(() => { ;(window as any).__imagePickerActive = false }, 30000)
+}
+
+/**
+ * 叶归 LifeLog 合并对话框：分类选择 + 输入内容（苹果风格）
+ */
+async function showLifelogDialog(categories: string[]): Promise<{ category: string; content: string } | null> {
+  return new Promise((resolve) => {
+    const activeElement = document.activeElement as HTMLElement;
+
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position: fixed; inset: 0; z-index: 2147483647;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.4); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+      animation: tc-ll-fade-in 0.15s ease-out;
+    `;
+    overlay.tabIndex = -1;
+
+    const box = document.createElement('div');
+    box.style.cssText = `
+      width: min(360px, 85vw);
+      background: var(--b3-theme-background);
+      border-radius: 14px; overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
+      animation: tc-ll-scale-in 0.2s ease-out;
+    `;
+
+    // 标题
+    const title = document.createElement('div');
+    title.textContent = '📒 LifeLog';
+    title.style.cssText = `
+      padding: 18px 16px 12px; font-size: 17px; font-weight: 600;
+      color: var(--b3-theme-on-background); text-align: center;
+    `;
+    box.appendChild(title);
+
+    // 输入框（多行文本域，支持长文本自动换行+滚动条）
+    const input = document.createElement('textarea');
+    input.placeholder = '例如：写插件';
+    input.style.cssText = `
+      margin: 0 16px 12px; padding: 10px 12px;
+      border: 1px solid var(--b3-border-color); border-radius: 8px;
+      background: var(--b3-theme-surface); color: var(--b3-theme-on-surface);
+      font-size: 14px; outline: none; box-sizing: border-box; width: calc(100% - 32px);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      height: 120px; min-height: 60px; max-height: 300px;
+      overflow-y: auto; resize: vertical;
+      white-space: pre-wrap; word-wrap: break-word;
+      line-height: 1.5;
+      font-family: inherit;
+    `;
+    box.appendChild(input);
+
+    // 分类按钮区域（网格布局，等宽对齐）
+    const catWrap = document.createElement('div');
+    const colCount = Math.max(2, Math.min(categories.length, 4));
+    catWrap.style.cssText = `
+      display: grid; grid-template-columns: repeat(${colCount}, 1fr);
+      gap: 8px; padding: 0 16px 12px;
+    `;
+    const normalBg = 'var(--b3-theme-surface)';
+    const activeColor = 'var(--b3-theme-on-background)';
+
+    let selectedIdx = 0;
+    let focusOnCat = false;
+    const catBtns: HTMLButtonElement[] = [];
+
+    categories.forEach((cat, idx) => {
+      const btn = document.createElement('button');
+      btn.textContent = cat;
+      btn.style.cssText = `
+        font-size: 13px; padding: 8px 4px; border: none;
+        border-radius: 10px; cursor: pointer;
+        transition: background 0.15s, color 0.15s, transform 0.15s;
+        background: ${normalBg};
+        color: ${activeColor};
+        text-align: center; white-space: nowrap;
+      `;
+      btn.onclick = () => {
+        selectedIdx = idx;
+        focusOnCat = true;
+        updateCatHighlight();
+        confirmBtn.focus();
+      };
+      catBtns.push(btn);
+      catWrap.appendChild(btn);
+    });
+    // 自适应缩小字号：文字超宽时缩小而非省略
+    catBtns.forEach((btn) => {
+      requestAnimationFrame(() => {
+        if (btn.scrollWidth > btn.clientWidth) {
+          const scale = btn.clientWidth / btn.scrollWidth;
+          const baseFontSize = 13;
+          btn.style.fontSize = `${Math.max(9, baseFontSize * scale)}px`;
+        }
+      });
+    });
+    box.appendChild(catWrap);
+
+    const updateCatHighlight = () => {
+      catBtns.forEach((b, i) => {
+        b.style.background = i === selectedIdx ? 'var(--b3-theme-primary)' : normalBg;
+        b.style.color = i === selectedIdx ? 'white' : activeColor;
+        b.style.transform = (focusOnCat && i === selectedIdx) ? 'scale(1.05)' : 'scale(1)';
+      });
+    };
+
+    // 进入类别选择模式的通用逻辑
+    const enterCatMode = (targetIdx: number) => {
+      if (!focusOnCat) {
+        selectedIdx = 0;
+        focusOnCat = true;
+        input.style.borderColor = 'var(--b3-theme-primary)';
+        input.style.boxShadow = '0 0 0 2px rgba(var(--b3-theme-primary-rgb, 0,122,255), 0.2)';
+        catWrap.style.transition = 'transform 0.2s ease-out, opacity 0.2s ease-out';
+        catWrap.style.transform = 'scale(1.02)';
+        setTimeout(() => { catWrap.style.transform = 'scale(1)'; }, 200);
+      } else {
+        selectedIdx = targetIdx;
+      }
+      updateCatHighlight();
+    };
+
+    // 输入框键盘事件：Ctrl+Enter 发送，Escape 关闭
+    // Enter 在 textarea 中正常换行，箭头键正常移动光标
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); cleanup(); resolve(null); }
+      else if ((e.key === 'Enter') && (e.ctrlKey || e.metaKey || e.shiftKey)) {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (!text) return;
+        if (!focusOnCat) { enterCatMode(0); }
+        cleanup();
+        resolve({ category: categories[selectedIdx], content: text });
+      }
+    });
+
+    // 分类区域键盘事件：方向键导航，Enter发送，Escape回输入框
+    catWrap.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); selectedIdx = (selectedIdx - 1 + categories.length) % categories.length; updateCatHighlight(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); selectedIdx = (selectedIdx + 1) % categories.length; updateCatHighlight(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); selectedIdx = (selectedIdx - colCount + categories.length) % categories.length; updateCatHighlight(); }
+      else if (e.key === 'ArrowDown') { e.preventDefault(); selectedIdx = (selectedIdx + colCount) % categories.length; updateCatHighlight(); }
+      else if (e.key === 'Enter') { e.preventDefault(); const text = input.value.trim(); if (text) { cleanup(); resolve({ category: categories[selectedIdx], content: text }); } }
+      else if (e.key === 'Escape') {
+        e.preventDefault();
+        focusOnCat = false;
+        input.style.borderColor = '';
+        input.style.boxShadow = '';
+        updateCatHighlight();
+        input.focus();
+      }
+    });
+    catWrap.tabIndex = 0;
+
+    // 分隔线
+    const sep = document.createElement('div');
+    sep.style.cssText = `margin: 0 16px; border-top: 0.5px solid var(--b3-border-color);`;
+    box.appendChild(sep);
+
+    // 按钮容器
+    const btnRow = document.createElement('div');
+    btnRow.style.cssText = `display: flex; gap: 8px; padding: 4px 16px 16px;`;
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = '取消';
+    cancelBtn.style.cssText = `
+      flex: 1; padding: 10px 0; font-size: 17px; background: transparent;
+      color: var(--b3-theme-on-background); border: none; cursor: pointer;
+      font-weight: 400;
+    `;
+    cancelBtn.onclick = () => { cleanup(); resolve(null); };
+    btnRow.appendChild(cancelBtn);
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.textContent = '发送';
+    confirmBtn.style.cssText = `
+      flex: 1; padding: 10px 0; font-size: 17px; background: transparent;
+      color: var(--b3-theme-primary); border: none; cursor: pointer;
+      font-weight: 600;
+    `;
+    confirmBtn.onclick = () => {
+      const text = input.value.trim();
+      if (!text) return;
+      cleanup();
+      resolve({ category: categories[selectedIdx], content: text });
+    };
+    btnRow.appendChild(confirmBtn);
+
+    box.appendChild(btnRow);
+    overlay.appendChild(box);
+
+    // 注入动画（仅首次）
+    if (!document.getElementById('tc-ll-anim-style')) {
+      const style = document.createElement('style');
+      style.id = 'tc-ll-anim-style';
+      style.textContent = `
+        @keyframes tc-ll-fade-in { from { opacity:0 } to { opacity:1 } }
+        @keyframes tc-ll-scale-in { from { opacity:0; transform:scale(0.92) } to { opacity:1; transform:scale(1) } }
+      `;
+      document.head.appendChild(style);
+    }
+    document.body.appendChild(overlay);
+
+    setTimeout(() => { if (document.contains(input)) input.focus(); }, 50);
+
+    overlay.addEventListener('mousedown', (e) => {
+      if (e.target === overlay) { cleanup(); resolve(null); }
+    });
+
+    const cleanup = () => {
+      overlay.remove();
+      if (activeElement && document.contains(activeElement)) {
+        try { activeElement.focus({ preventScroll: true }); } catch { /* ignore */ }
+      }
+    };
+  });
 }
 
 /**
@@ -6525,6 +6699,7 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
 import {
   showSmallWindowTip as showSmallWindowTipFromDetector,
   triggerDesktopQuickNoteCapture,
+  triggerLifelogQuickNote,
 } from './windowDetector';
 
 // 一键记事执行函数

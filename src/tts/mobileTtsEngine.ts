@@ -130,6 +130,61 @@ export class MobileTTSEngine {
 
   cleanup(): void { this.stop(); this.paragraphs = [] }
 
+  /** 朗读一段文字，完成后回调 */
+  async speakOnce(text: string, onDone?: () => void): Promise<void> {
+    try {
+      const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&le=zh&type=${this.voiceType}`
+      await this.fetchAndPlayOnce(url)
+    } catch { /* ignore */ }
+    onDone?.()
+  }
+
+  /** 获取音频并播放一次，完成后 resolve（不触发段落切换） */
+  private async fetchAndPlayOnce(ttsUrl: string): Promise<void> {
+    if (this.stopped) return
+
+    // ① 直接 fetch
+    try {
+      const resp = await fetch(ttsUrl)
+      if (resp.ok) {
+        const blob = await resp.blob()
+        if (blob.size >= 100 && !this.stopped) {
+          await this.playBlobOnce(blob)
+          return
+        }
+      }
+    } catch {
+      if (this.stopped) return
+    }
+
+    // ② 思源内核代理
+    try {
+      const blob = await this.fetchViaKernelProxy(ttsUrl)
+      if (blob && !this.stopped) {
+        await this.playBlobOnce(blob)
+        return
+      }
+    } catch {
+      if (this.stopped) return
+    }
+
+    // ③ 直接 audio.src
+    this.tryDirectAudio(ttsUrl)
+  }
+
+  /** 播放一次 Blob，完成后 resolve */
+  private playBlobOnce(blob: Blob): Promise<void> {
+    return new Promise((resolve) => {
+      const blobUrl = URL.createObjectURL(blob)
+      const audio = new Audio(blobUrl)
+      this.audio = audio
+      this.blobUrl = blobUrl
+      audio.onended = () => { URL.revokeObjectURL(blobUrl); this.blobUrl = null; resolve() }
+      audio.onerror = () => { URL.revokeObjectURL(blobUrl); this.blobUrl = null; resolve() }
+      audio.play().catch(() => resolve())
+    })
+  }
+
   // ─── 内部 ─────────────────────────────────────────
 
   private playCurrentParagraph(): void {

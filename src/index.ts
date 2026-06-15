@@ -44,6 +44,9 @@ import {
 // TTS 设置持久化初始化
 import { initTTSSettings } from './tts/httpTtsEngine'
 
+// 清理残留草稿块
+import { deleteQuickNoteDraftBlock } from './quickNote/kernelBlock'
+
 import {
   initSmallWindowDetector,
   clearSmallWindowDetector,
@@ -542,8 +545,30 @@ export default class ToolbarCustomizer extends Plugin {
     }
   }
 
+  /** 插件启动时清理上次残留的草稿块（重启前未 cancelDraft 的情况） */
+  private cleanupOrphanDraftBlocks(): void {
+    const tryClean = (key: string) => {
+      try {
+        const raw = localStorage.getItem(key)
+        if (raw) {
+          const data = JSON.parse(raw)
+          const blockId = data.draftBlockId || data.rootBlockId || null
+          if (blockId) {
+            localStorage.removeItem(key)
+            deleteQuickNoteDraftBlock(blockId)
+              .then(() => console.log('[QuickNote] 清理残留草稿块:', blockId, 'from', key))
+              .catch(() => {})
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    tryClean('__quickNoteDialogDraftBlockId')
+    tryClean('__quickNoteBlockWindowSession')
+  }
+
   // 布局就绪后初始化（确保 DOM 完全加载）
   onLayoutReady() {
+    this.cleanupOrphanDraftBlocks()
     this.initPluginFunctions()  // initPluginFunctions 是 async，不阻塞后续代码
 
     // ===== 初始化 TTS 设置缓存（从 plugin.loadData 读取）=====

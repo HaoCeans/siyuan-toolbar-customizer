@@ -498,7 +498,10 @@ function startWebSpeechPlayback(opts: TTSOptions): void {
   }
   engine.onFinish = async () => {
     if (autoReadAction === 'stop') {
-      removePlaybackBar()
+      const statusEl = playbackBar?.querySelector('#tts-bar-status') as HTMLElement
+      if (statusEl) statusEl.textContent = '朗读完成'
+      engine.onStateChange = () => {}
+      engine.speakOnce('本文档已经朗读完成', () => removePlaybackBar())
       return
     }
     const success = await navigateToAdjacentDoc(autoReadAction)
@@ -525,7 +528,10 @@ function startHttpPlayback(engine: HttpTTSEngine, startP: number, endP: number |
   }
   engine.onFinish = async () => {
     if (autoReadAction === 'stop') {
-      removePlaybackBar()
+      const statusEl = playbackBar?.querySelector('#tts-bar-status') as HTMLElement
+      if (statusEl) statusEl.textContent = '朗读完成'
+      engine.onStateChange = () => {}
+      await engine.speakOnce('本文档已经朗读完成', () => removePlaybackBar())
       return
     }
     const success = await navigateToAdjacentDoc(autoReadAction)

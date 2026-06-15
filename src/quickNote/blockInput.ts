@@ -134,6 +134,9 @@ export async function createBlockInputHandle(
     return buildFallbackHandle(wrapper, loadingEl)
   }
 
+  // 持久化 draftId，用于插件重启时清理残留草稿块
+  try { localStorage.setItem('__quickNoteDialogDraftBlockId', draftId) } catch { /* ignore */ }
+
   const state = createQuickNoteRootState(draftId)
   let savedToKernel = false
 
@@ -211,6 +214,7 @@ export async function createBlockInputHandle(
       for (const id of ids) {
         await deleteQuickNoteDraftBlock(id)
       }
+      try { localStorage.removeItem('__quickNoteDialogDraftBlockId') } catch { /* ignore */ }
     },
     clearAfterSave: async () => {
       // 保存后清空编辑器准备下一次输入：

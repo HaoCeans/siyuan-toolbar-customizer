@@ -444,6 +444,16 @@ export class HttpTTSEngine {
     this.paragraphs = []
   }
 
+  /** 朗读一段文字，完成后回调（不改变段落索引和高亮） */
+  async speakOnce(text: string, onDone?: () => void): Promise<void> {
+    try {
+      const audioData = await this.fetchTTSAudio(text)
+      if (this.stopped) { onDone?.(); return }
+      await this.playAudioData(audioData)
+    } catch { /* ignore */ }
+    onDone?.()
+  }
+
   // ─── 内部 ────────────────────────────────────────
 
   private playCurrentParagraph(): void {

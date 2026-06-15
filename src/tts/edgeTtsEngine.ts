@@ -441,6 +441,18 @@ export class EdgeTTSEngine {
     this.releaseAudio()
   }
 
+  /** 朗读一段文字，完成后回调 */
+  async speakOnce(text: string, onDone?: () => void): Promise<void> {
+    try {
+      const audio = await this.synthesize(text)
+      if (this.stopped) { onDone?.(); return }
+      const buffer = await this.audioCtx.decodeAudioData(audio)
+      if (this.stopped) { onDone?.(); return }
+      await this.playAudioBuffer(buffer)
+    } catch { /* ignore */ }
+    onDone?.()
+  }
+
   // ─── 内部：段落播放流程 ──────────────────────────────
 
   private playCurrentParagraph(): void {
@@ -854,6 +866,16 @@ export class GoogleTTSEngine {
     this.stop()
     this.paragraphs = []
     if (this.audioCtx) { this.audioCtx.close().catch(() => {}); this.audioCtx = null }
+  }
+
+  /** 朗读一段文字，完成后回调 */
+  async speakOnce(text: string, onDone?: () => void): Promise<void> {
+    try {
+      const audio = await fetchGoogleTTS(text)
+      if (!audio || this.stopped) { onDone?.(); return }
+      await this.playAudioData(audio)
+    } catch { /* ignore */ }
+    onDone?.()
   }
 
   // ─── 内部 ──────────────────────────────────────────

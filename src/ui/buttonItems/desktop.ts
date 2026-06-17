@@ -762,13 +762,14 @@ export function createDesktopButtonItem(
       <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>⑨ 标签页Tab</option>
       <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>⑩ 悬浮大纲</option>
       <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 前一篇/后一篇文档</option>
-      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
-      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
-    `
-    subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts'
-      // 刷新表单以显示/隐藏相关配置
-      if ((subtypeSelect as any).refreshForm) {
+	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
+	      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
+	      <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
+	    `
+	    subtypeSelect.onchange = () => {
+	      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks'
+	      // 刷新表单以显示/隐藏相关配置
+	      if ((subtypeSelect as any).refreshForm) {
         (subtypeSelect as any).refreshForm()
       }
     }
@@ -1554,7 +1555,7 @@ export function createDesktopButtonItem(
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
         img1UploadConfigDiv.style.display = 'flex'
-      } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts') {
+      } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts' || subtype === 'clear-empty-blocks') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'
@@ -2167,12 +2168,13 @@ export function populateDesktopEditForm(
       <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>⑨ 标签页Tab</option>
       <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>⑩ 悬浮大纲</option>
       <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 前一篇/后一篇文档</option>
-      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
-      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
-    `
-    subtypeSelect.onchange = () => {
-      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts'
-      ;(subtypeSelect as any).refreshForm?.()
+	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
+	      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
+	      <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
+	    `
+	    subtypeSelect.onchange = () => {
+	      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks'
+	      ;(subtypeSelect as any).refreshForm?.()
     }
     authorToolField.appendChild(subtypeSelect)
 
@@ -2980,7 +2982,7 @@ export function populateDesktopEditForm(
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
         img2UploadConfigDiv.style.display = 'flex'
-      } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts') {
+      } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts' || subtype === 'clear-empty-blocks') {
         docConfigDiv.style.display = 'none'
         dbConfigDiv.style.display = 'none'
         diaryConfigDiv.style.display = 'none'

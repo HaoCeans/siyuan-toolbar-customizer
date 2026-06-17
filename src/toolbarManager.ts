@@ -22,6 +22,10 @@ import { destroyTTSEngine } from "./tts/ttsEngine";
 import { destroyHttpTTSEngine } from "./tts/httpTtsEngine";
 import { destroyMobileTTSEngine } from "./tts/mobileTtsEngine";
 import { destroyEdgeTTSEngine, destroyGoogleTTSEngine } from "./tts/edgeTtsEngine";
+// 确认对话框
+import { showConfirmDialog } from "./ui/dialog";
+// API 工具
+import { deleteBlock } from "./api";
 
 // ===== 插件实例（用于需要 app 参数的 API 调用） =====
 export let pluginInstance: any = null;
@@ -74,7 +78,7 @@ export interface ButtonConfig {
   targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
   mobileTargetDocId?: string; // 打开指定ID块：目标块ID（移动端），支持文档ID或块ID
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
-  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary=日记, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮, scroll-doc=滚动文档顶部或底部, image-upload=图片快捷导入日记, mobile-tabs=手机端标签页Tab, mobile-outline=手机端悬浮大纲, doc-nav=手机端前一篇/后一篇文档, slide-comment=滑动快速批注, tts=文档朗读
+	  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary=日记, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮, scroll-doc=滚动文档顶部或底部, image-upload=图片快捷导入日记, mobile-tabs=手机端标签页Tab, mobile-outline=手机端悬浮大纲, doc-nav=手机端前一篇/后一篇文档, slide-comment=滑动快速批注, tts=文档朗读, clear-empty-blocks=一键清理空块
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
   viewName?: string;         // 视图名称
@@ -4062,6 +4066,87 @@ function executeTTS() {
 }
 
 /**
+ * 一键清理当前文档的空块
+ * 
+ * 扫描当前活动编辑器中的空块（无文本、无内嵌媒体、无子块的段落/标题/列表项），
+ * 经用户确认后逐一删除。
+ */
+async function executeClearEmptyBlocks(): Promise<void> {
+  // 1. 获取当前活动编辑器
+  const protyle = getActiveProtyle()
+  if (!protyle?.wysiwyg?.element) {
+    Notify.showInfoEditorNotFocused()
+    return
+  }
+
+  const wysiwyg = protyle.wysiwyg.element
+
+  // 2. 扫描所有块，筛选空块
+  const emptyBlockIds: string[] = []
+  const blockElements = wysiwyg.querySelectorAll<HTMLElement>('[data-node-id]')
+
+  for (const el of blockElements) {
+    // 跳过隐藏块（如折叠标题下的子块）
+    if (el.offsetParent === null) continue
+
+    const type = el.dataset.type
+    // 只处理内容块：段落、标题、列表项
+    if (!type || !['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li'].includes(type)) continue
+
+    const nodeId = el.dataset.nodeId
+    if (!nodeId) continue
+
+    // 检查是否有可见文本
+    const hasText = (el.textContent?.trim() || '').length > 0
+    // 检查是否有内嵌媒体（图片、视频、公式等）
+    const hasEmbedded = el.querySelector(':scope > img, :scope > video, :scope > audio, :scope > iframe, .protyle-icon') !== null
+    // 检查是否有子块（如 li 嵌套了列表）
+    const hasChildBlocks = el.querySelector(':scope > [data-node-id]') !== null
+
+    if (!hasText && !hasEmbedded && !hasChildBlocks) {
+      emptyBlockIds.push(nodeId)
+    }
+  }
+
+  // 3. 无空块
+  if (emptyBlockIds.length === 0) {
+    Notify.showSuccess('当前文档没有空块')
+    return
+  }
+
+  // 4. 确认删除
+  const confirmed = await showConfirmDialog({
+    title: '清理空块',
+    message: `发现 ${emptyBlockIds.length} 个空块，是否删除？`,
+    hint: '删除后不可撤销，建议先保存快照',
+    confirmText: '删除',
+    cancelText: '取消',
+  })
+  if (!confirmed) return
+
+  // 5. 倒序删除（从文档末尾向上，避免 ID 失效）
+  let successCount = 0
+  const sortedIds = [...emptyBlockIds].reverse()
+  for (const id of sortedIds) {
+    try {
+      const result = await deleteBlock(id)
+      if (result !== null) successCount++
+    } catch (e) {
+      console.warn('[清理空块] 删除失败:', id, e)
+    }
+  }
+
+  // 6. 显示结果
+  if (successCount === 0) {
+    Notify.showErrorCommandCannotExecute('清理空块失败')
+  } else if (successCount < emptyBlockIds.length) {
+    Notify.showSuccess(`已删除 ${successCount}/${emptyBlockIds.length} 个空块`)
+  } else {
+    Notify.showSuccess(`已删除 ${successCount} 个空块`)
+  }
+}
+
+/**
  * 执行鲸鱼定制工具箱
  */
 async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
@@ -4201,13 +4286,19 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
     return
   }
 
-  // ⑬文档朗读（TTS）
-  if (subtype === 'tts') {
-    executeTTS()
-    return
-  }
+	  // ⑬文档朗读（TTS）
+	  if (subtype === 'tts') {
+	    executeTTS()
+	    return
+	  }
 
-  // 打开指定ID块类型（默认）
+	  // ⑭一键清理当前文档的空块
+	  if (subtype === 'clear-empty-blocks') {
+	    await executeClearEmptyBlocks()
+	    return
+	  }
+
+	  // 打开指定ID块类型（默认）
   const frontend = getFrontend()
   const isMobile = frontend === 'mobile' || frontend === 'browser-mobile'
 

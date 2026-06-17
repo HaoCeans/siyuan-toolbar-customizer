@@ -855,11 +855,12 @@ export function createMobileButtonItem(
         <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>⑨ 标签页Tab</option>
         <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>⑩ 悬浮大纲</option>
         <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 前一篇/后一篇文档</option>
-        <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
-        <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
-      `
-      subtypeSelect.onchange = () => {
-        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts'
+	        <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
+	        <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
+	        <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
+	      `
+	      subtypeSelect.onchange = () => {
+	        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks'
         ;(subtypeSelect as any).refreshForm?.()
       }
       authorToolContainer.appendChild(subtypeSelect)
@@ -1771,8 +1772,18 @@ export function createMobileButtonItem(
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'none'
           imageUploadConfigDiv.style.display = 'flex'
-          floatOpacityConfigDiv.style.display = 'none'
-        } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts') {
+	          floatOpacityConfigDiv.style.display = 'none'
+	        } else if (subtype === 'clear-empty-blocks') {
+	          docConfigDiv.style.display = 'none'
+	          dbConfigDiv.style.display = 'none'
+	          diaryConfigDiv.style.display = 'none'
+	          lifeLogConfigDiv.style.display = 'none'
+	          popupSelectConfigDiv.style.display = 'none'
+	          buttonSequenceConfigDiv.style.display = 'none'
+	          scrollDocConfigDiv.style.display = 'none'
+	          imageUploadConfigDiv.style.display = 'none'
+	          floatOpacityConfigDiv.style.display = 'none'
+	        } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts') {
           docConfigDiv.style.display = 'none'
           dbConfigDiv.style.display = 'none'
           diaryConfigDiv.style.display = 'none'

@@ -51,6 +51,8 @@ export interface MobileTabsContext {
   maxVisibleTabs?: number
   /** 悬浮弹窗垂直位置 */
   floatPanelPosition?: string
+  /** 折叠面板样式：preview=收起显示预览小图标, minimal=收起仅显示展开手柄 */
+  collapseStyle?: 'preview' | 'minimal'
 }
 
 // ===== 模块状态 =====
@@ -1415,10 +1417,11 @@ export async function init(context: MobileTabsContext): Promise<void> {
 
   await loadState()
 
-  autoHideOnScrollEnabled = !!context.autoHideOnScroll
-  currentFloatOpacityForAutoHide = context.floatOpacity
-  currentMaxVisibleTabs = Math.max(1, Math.min(MAX_TABS, context.maxVisibleTabs ?? MAX_TABS))
-  hiddenByScroll = false
+	  autoHideOnScrollEnabled = !!context.autoHideOnScroll
+	  currentFloatOpacityForAutoHide = context.floatOpacity
+	  currentMaxVisibleTabs = Math.max(1, Math.min(MAX_TABS, context.maxVisibleTabs ?? MAX_TABS))
+	  currentCollapseStyle = context.collapseStyle || 'preview'
+	  hiddenByScroll = false
   lastScrollTopForAutoHide = null
   lastAutoHideToggleAt = 0
 

@@ -22,6 +22,7 @@ interface OutlineContext {
   floatOpacity?: number
   autoHideOnScroll?: boolean
   floatPanelPosition?: string
+  collapseStyle?: 'preview' | 'minimal'
 }
 
 interface MobileOutlineState {
@@ -931,11 +932,12 @@ export async function init(context: OutlineContext): Promise<void> {
     })
   }
 
-  await loadState()
+	  await loadState()
 
-  autoHideOnScrollEnabled = !!context.autoHideOnScroll
-  currentFloatOpacityForAutoHide = context.floatOpacity
-  hiddenByScroll = false
+	  autoHideOnScrollEnabled = !!context.autoHideOnScroll
+	  currentFloatOpacityForAutoHide = context.floatOpacity
+	  currentCollapseStyle = context.collapseStyle || 'preview'
+	  hiddenByScroll = false
   lastScrollTopForAutoHide = null
   lastAutoHideToggleAt = 0
 

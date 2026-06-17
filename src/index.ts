@@ -646,41 +646,44 @@ export default class ToolbarCustomizer extends Plugin {
       // 初始化小窗模式检测器
       initSmallWindowDetector()
 
-      // 从按钮配置中查找各模块的透明度、滚动隐藏（与 toggleVisibility 一致，避免重载后仅恢复可见态却丢失开关）
-      const findAuthorToolFloatOptions = (subtype: string): { floatOpacity?: number; autoHideOnScroll?: boolean; maxVisibleTabs?: number; floatPanelPosition?: string } => {
-        const btn = this.mobileButtonConfigs.find(b => b.type === 'author-tool' && b.authorToolSubtype === subtype)
-        return {
-          floatOpacity: btn?.floatOpacity,
-          autoHideOnScroll: btn?.autoHideOnScroll,
-          maxVisibleTabs: btn?.maxVisibleTabs,
-          floatPanelPosition: btn?.floatPanelPosition
-        }
-      }
+	      // 从按钮配置中查找各模块的透明度、滚动隐藏（与 toggleVisibility 一致，避免重载后仅恢复可见态却丢失开关）
+	      const findAuthorToolFloatOptions = (subtype: string): { floatOpacity?: number; autoHideOnScroll?: boolean; maxVisibleTabs?: number; floatPanelPosition?: string; collapseStyle?: 'preview' | 'minimal' } => {
+	        const btn = this.mobileButtonConfigs.find(b => b.type === 'author-tool' && b.authorToolSubtype === subtype)
+	        return {
+	          floatOpacity: btn?.floatOpacity,
+	          autoHideOnScroll: btn?.autoHideOnScroll,
+	          maxVisibleTabs: btn?.maxVisibleTabs,
+	          floatPanelPosition: btn?.floatPanelPosition,
+	          collapseStyle: btn?.collapseStyle
+	        }
+	      }
 
       const tabsOpts = findAuthorToolFloatOptions('mobile-tabs')
       const outlineOpts = findAuthorToolFloatOptions('mobile-outline')
       const docNavOpts = findAuthorToolFloatOptions('doc-nav')
 
-      // 初始化手机端标签页Tab模块（await 确保 switch-protyle handler 在 loadState 完成后才注册）
-      await initMobileTabs({
-        saveData: (key, value) => this.saveData(key, value),
-        loadData: (key) => this.loadData(key),
-        eventBus: this.eventBus,
-        floatOpacity: tabsOpts.floatOpacity,
-        autoHideOnScroll: tabsOpts.autoHideOnScroll,
-        maxVisibleTabs: tabsOpts.maxVisibleTabs,
-        floatPanelPosition: tabsOpts.floatPanelPosition
-      })
+	      // 初始化手机端标签页Tab模块（await 确保 switch-protyle handler 在 loadState 完成后才注册）
+	      await initMobileTabs({
+	        saveData: (key, value) => this.saveData(key, value),
+	        loadData: (key) => this.loadData(key),
+	        eventBus: this.eventBus,
+	        floatOpacity: tabsOpts.floatOpacity,
+	        autoHideOnScroll: tabsOpts.autoHideOnScroll,
+	        maxVisibleTabs: tabsOpts.maxVisibleTabs,
+	        floatPanelPosition: tabsOpts.floatPanelPosition,
+	        collapseStyle: tabsOpts.collapseStyle
+	      })
 
-      // 初始化手机端悬浮大纲模块
-      await initMobileOutline({
-        saveData: (key, value) => this.saveData(key, value),
-        loadData: (key) => this.loadData(key),
-        eventBus: this.eventBus,
-        floatOpacity: outlineOpts.floatOpacity,
-        autoHideOnScroll: outlineOpts.autoHideOnScroll,
-        floatPanelPosition: outlineOpts.floatPanelPosition
-      })
+	      // 初始化手机端悬浮大纲模块
+	      await initMobileOutline({
+	        saveData: (key, value) => this.saveData(key, value),
+	        loadData: (key) => this.loadData(key),
+	        eventBus: this.eventBus,
+	        floatOpacity: outlineOpts.floatOpacity,
+	        autoHideOnScroll: outlineOpts.autoHideOnScroll,
+	        floatPanelPosition: outlineOpts.floatPanelPosition,
+	        collapseStyle: outlineOpts.collapseStyle
+	      })
 
       // 初始化手机端文档导航模块
       await initMobileDocNav({

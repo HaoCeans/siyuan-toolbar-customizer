@@ -1465,9 +1465,48 @@ export function createDesktopButtonItem(
     timeRangeColInput.onchange = () => { button.timeRangeColumnName = timeRangeColInput.value }
     dbConfigDiv.appendChild(timeRangeColInput)
 
-    authorToolField.appendChild(dbConfigDiv)
+	    authorToolField.appendChild(dbConfigDiv)
 
-    // 根据当前选择显示/隐藏配置区
+	    // 折叠样式选择（⑨⑩ 共用）
+	    const collapseStyleConfigDiv = document.createElement('div')
+	    collapseStyleConfigDiv.id = 'collapse-style-config-desktop'
+	    collapseStyleConfigDiv.style.cssText = 'display: none; flex-direction: column; gap: 6px; margin-top: 8px; padding: 10px 12px; background: rgba(66, 133, 244, 0.06); border-radius: 6px; border: 1px solid rgba(66, 133, 244, 0.15);'
+
+	    const collapseStyleLabel = document.createElement('label')
+	    collapseStyleLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-bottom: 4px;'
+	    collapseStyleLabel.textContent = '折叠样式'
+	    collapseStyleConfigDiv.appendChild(collapseStyleLabel)
+
+	    const currentCollapseStyle = button.collapseStyle || 'preview'
+	    const collapseStyleItems = [
+	      { value: 'preview', label: '方案一：收起显示项目预览' },
+	      { value: 'minimal', label: '方案二：收起仅显示展开手柄' },
+	    ]
+
+	    collapseStyleItems.forEach(item => {
+	      const radioWrap = document.createElement('label')
+	      radioWrap.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; padding: 4px 0;'
+
+	      const radio = document.createElement('input')
+	      radio.type = 'radio'
+	      radio.name = 'collapse-style-desktop-' + button.id
+	      radio.value = item.value
+	      radio.checked = currentCollapseStyle === item.value
+	      radio.style.cssText = 'cursor: pointer; accent-color: var(--b3-theme-primary);'
+	      radio.addEventListener('change', () => {
+	        if (radio.checked) {
+	          button.collapseStyle = item.value as 'preview' | 'minimal'
+	        }
+	      })
+
+	      radioWrap.appendChild(radio)
+	      radioWrap.appendChild(document.createTextNode(item.label))
+	      collapseStyleConfigDiv.appendChild(radioWrap)
+	    })
+
+	    authorToolField.appendChild(collapseStyleConfigDiv)
+
+	    // 根据当前选择显示/隐藏配置区
     const updateVisibility = () => {
       const subtype = subtypeSelect.value
       if (subtype === 'open-doc') {
@@ -1555,15 +1594,16 @@ export function createDesktopButtonItem(
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
         img1UploadConfigDiv.style.display = 'flex'
-      } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts' || subtype === 'clear-empty-blocks') {
-        docConfigDiv.style.display = 'none'
-        dbConfigDiv.style.display = 'none'
-        diaryConfigDiv.style.display = 'none'
-        lifeLogConfigDiv.style.display = 'none'
-        popupSelectConfigDiv.style.display = 'none'
-        buttonSequenceConfigDiv.style.display = 'none'
-        scrollDocConfigDiv.style.display = 'none'
-        img1UploadConfigDiv.style.display = 'none'
+	    } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts' || subtype === 'clear-empty-blocks') {
+	      docConfigDiv.style.display = 'none'
+	      dbConfigDiv.style.display = 'none'
+	      diaryConfigDiv.style.display = 'none'
+	      lifeLogConfigDiv.style.display = 'none'
+	      popupSelectConfigDiv.style.display = 'none'
+	      buttonSequenceConfigDiv.style.display = 'none'
+	      scrollDocConfigDiv.style.display = 'none'
+	      img1UploadConfigDiv.style.display = 'none'
+	      collapseStyleConfigDiv.style.display = (subtype === 'mobile-tabs' || subtype === 'mobile-outline') ? 'flex' : 'none'
       } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'
@@ -2892,9 +2932,48 @@ export function populateDesktopEditForm(
     img2NotebookRow.appendChild(img2NotebookInput)
     img2UploadConfigDiv.appendChild(img2NotebookRow)
 
-    authorToolField.appendChild(img2UploadConfigDiv)
+	    authorToolField.appendChild(img2UploadConfigDiv)
 
-    // 根据当前选择显示/隐藏配置区
+	    // 折叠样式选择（⑨⑩ 共用）
+	    const collapseStyleConfigDiv2 = document.createElement('div')
+	    collapseStyleConfigDiv2.id = 'collapse-style-config-desktop-2'
+	    collapseStyleConfigDiv2.style.cssText = 'display: none; flex-direction: column; gap: 6px; margin-top: 8px; padding: 10px 12px; background: rgba(66, 133, 244, 0.06); border-radius: 6px; border: 1px solid rgba(66, 133, 244, 0.15);'
+
+	    const collapseStyleLabel2 = document.createElement('label')
+	    collapseStyleLabel2.style.cssText = 'font-size: 13px; font-weight: 500; margin-bottom: 4px;'
+	    collapseStyleLabel2.textContent = '折叠样式'
+	    collapseStyleConfigDiv2.appendChild(collapseStyleLabel2)
+
+	    const currentCollapseStyle2 = button.collapseStyle || 'preview'
+	    const collapseStyleItems2 = [
+	      { value: 'preview', label: '方案一：收起显示项目预览' },
+	      { value: 'minimal', label: '方案二：收起仅显示展开手柄' },
+	    ]
+
+	    collapseStyleItems2.forEach(item => {
+	      const radioWrap = document.createElement('label')
+	      radioWrap.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; padding: 4px 0;'
+
+	      const radio = document.createElement('input')
+	      radio.type = 'radio'
+	      radio.name = 'collapse-style-desktop-2-' + button.id
+	      radio.value = item.value
+	      radio.checked = currentCollapseStyle2 === item.value
+	      radio.style.cssText = 'cursor: pointer; accent-color: var(--b3-theme-primary);'
+	      radio.addEventListener('change', () => {
+	        if (radio.checked) {
+	          button.collapseStyle = item.value as 'preview' | 'minimal'
+	        }
+	      })
+
+	      radioWrap.appendChild(radio)
+	      radioWrap.appendChild(document.createTextNode(item.label))
+	      collapseStyleConfigDiv2.appendChild(radioWrap)
+	    })
+
+	    authorToolField.appendChild(collapseStyleConfigDiv2)
+
+	    // 根据当前选择显示/隐藏配置区
     const updateVisibility = () => {
       const subtype = subtypeSelect.value
       if (subtype === 'open-doc') {
@@ -2982,15 +3061,16 @@ export function populateDesktopEditForm(
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
         img2UploadConfigDiv.style.display = 'flex'
-      } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts' || subtype === 'clear-empty-blocks') {
-        docConfigDiv.style.display = 'none'
-        dbConfigDiv.style.display = 'none'
-        diaryConfigDiv.style.display = 'none'
-        lifeLogConfigDiv.style.display = 'none'
-        popupSelectConfigDiv.style.display = 'none'
-        buttonSequenceConfigDiv.style.display = 'none'
-        scrollDocConfigDiv.style.display = 'none'
-        img2UploadConfigDiv.style.display = 'none'
+	      } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts' || subtype === 'clear-empty-blocks') {
+	        docConfigDiv.style.display = 'none'
+	        dbConfigDiv.style.display = 'none'
+	        diaryConfigDiv.style.display = 'none'
+	        lifeLogConfigDiv.style.display = 'none'
+	        popupSelectConfigDiv.style.display = 'none'
+	        buttonSequenceConfigDiv.style.display = 'none'
+	        scrollDocConfigDiv.style.display = 'none'
+	        img2UploadConfigDiv.style.display = 'none'
+	        collapseStyleConfigDiv2.style.display = (subtype === 'mobile-tabs' || subtype === 'mobile-outline') ? 'flex' : 'none'
       } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'

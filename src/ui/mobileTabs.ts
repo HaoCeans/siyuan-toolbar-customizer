@@ -73,6 +73,7 @@ let pinBtnEl: HTMLElement | null = null
 
 /** 最近一次应用到标签栏的透明度（用于思源内切换亮/暗后重算背景） */
 let lastTabsFloatOpacity: number | undefined
+let currentCollapseStyle: 'preview' | 'minimal' = 'preview'
 let themeModeUnsubscribe: (() => void) | null = null
 
 let boundScrollEl: HTMLElement | null = null
@@ -1106,10 +1107,15 @@ function injectStyles(): void {
     html[data-theme-mode="dark"] .mobile-tabs-menu-item {
       color: #f5f5f7;
     }
-    html[data-theme-mode="dark"] .mobile-tabs-menu-item:active {
-      background: rgba(255,255,255,0.08);
-    }
-  `
+	    html[data-theme-mode="dark"] .mobile-tabs-menu-item:active {
+	      background: rgba(255,255,255,0.08);
+	    }
+	    /* 方案二：收起态隐藏所有标签项和图钉按钮 */
+	    .collapsed.minimal .mobile-tab-item,
+	    .collapsed.minimal .mobile-tab-pin {
+	      display: none;
+	    }
+	  `
   document.head.appendChild(style)
   injectedStyle = style
 }
@@ -1249,9 +1255,10 @@ function createTabBar(): void {
 
   injectStyles()
 
-  tabBar = document.createElement('div')
-  tabBar.id = 'mobile-tabs-bar'
-  tabBar.className = (state.isExpanded ? 'expanded' : 'collapsed')
+	  tabBar = document.createElement('div')
+	  tabBar.id = 'mobile-tabs-bar'
+	  const classNames = state.isExpanded ? 'expanded' : 'collapsed'
+	  tabBar.className = currentCollapseStyle === 'minimal' && !state.isExpanded ? classNames + ' minimal' : classNames
 
   // 图钉按钮（放在顶部）：钉住“当前标签页”，不是钉住整个悬浮窗
   const pinBtn = document.createElement('div')
@@ -1316,7 +1323,8 @@ function removeTabBar(): void {
 function toggleExpand(): void {
   if (!tabBar) return
   state.isExpanded = !state.isExpanded
-  tabBar.className = (state.isExpanded ? 'expanded' : 'collapsed')
+  const baseClass = state.isExpanded ? 'expanded' : 'collapsed'
+  tabBar.className = currentCollapseStyle === 'minimal' && !state.isExpanded ? baseClass + ' minimal' : baseClass
   debouncedPersist()
 }
 
@@ -1499,10 +1507,11 @@ export function toggleVisibility(config: ButtonConfig): void {
   state.isVisible = !state.isVisible
 
   if (state.isVisible) {
-    // 更新滚动隐藏开关配置
-    autoHideOnScrollEnabled = !!config.autoHideOnScroll
-    currentFloatOpacityForAutoHide = config.floatOpacity
-    currentMaxVisibleTabs = Math.max(1, Math.min(MAX_TABS, config.maxVisibleTabs ?? MAX_TABS))
+	    // 更新滚动隐藏开关配置
+	    autoHideOnScrollEnabled = !!config.autoHideOnScroll
+	    currentFloatOpacityForAutoHide = config.floatOpacity
+	    currentMaxVisibleTabs = Math.max(1, Math.min(MAX_TABS, config.maxVisibleTabs ?? MAX_TABS))
+	    currentCollapseStyle = config.collapseStyle || 'preview'
     hiddenByScroll = false
     lastScrollTopForAutoHide = null
 

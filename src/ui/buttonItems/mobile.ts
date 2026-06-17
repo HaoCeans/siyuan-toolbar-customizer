@@ -1538,9 +1538,61 @@ export function createMobileButtonItem(
 
       maxVisibleTabsContainer.appendChild(maxVisibleRow)
       maxVisibleTabsContainer.appendChild(maxVisibleHint)
-      floatOpacityConfigDiv.appendChild(maxVisibleTabsContainer)
+	      floatOpacityConfigDiv.appendChild(maxVisibleTabsContainer)
 
-      authorToolContainer.appendChild(floatOpacityConfigDiv)
+	      // 折叠样式选择（⑨⑩ 共用）
+	      const collapseStyleContainer = document.createElement('div')
+	      collapseStyleContainer.id = 'collapse-style-config-mobile'
+	      collapseStyleContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px; margin-top: 4px;'
+
+	      const collapseStyleLabel = document.createElement('label')
+	      collapseStyleLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
+	      collapseStyleLabel.textContent = '折叠样式'
+	      collapseStyleContainer.appendChild(collapseStyleLabel)
+
+	      const collapseStyleOptionsWrap = document.createElement('div')
+	      collapseStyleOptionsWrap.style.cssText = 'display: flex; flex-direction: column; gap: 8px; padding: 8px; background: rgba(66, 133, 244, 0.06); border-radius: 6px; border: 1px solid rgba(66, 133, 244, 0.15);'
+
+	      const currentCollapseStyle = button.collapseStyle || 'preview'
+
+	      const collapseStyleItems = [
+	        { value: 'preview', label: '方案一：收起显示项目预览' },
+	        { value: 'minimal', label: '方案二：收起仅显示展开手柄' },
+	      ]
+
+	      collapseStyleItems.forEach(item => {
+	        const radioWrap = document.createElement('label')
+	        radioWrap.style.cssText = 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 500; padding: 6px 10px; border-radius: 6px; transition: background 0.2s;'
+	        radioWrap.addEventListener('mouseenter', () => { radioWrap.style.background = 'rgba(66, 133, 244, 0.08)' })
+	        radioWrap.addEventListener('mouseleave', () => { radioWrap.style.background = 'transparent' })
+
+	        const radio = document.createElement('input')
+	        radio.type = 'radio'
+	        radio.name = 'collapse-style-mobile-' + button.id
+	        radio.value = item.value
+	        radio.checked = currentCollapseStyle === item.value
+	        radio.style.cssText = 'cursor: pointer; width: 16px; height: 16px; accent-color: var(--b3-theme-primary);'
+
+	        radio.addEventListener('click', async () => {
+	          button.collapseStyle = item.value as 'preview' | 'minimal'
+	          await context.saveData('mobileButtonConfigs', context.buttonConfigs)
+	          context.updateMobileToolbar?.()
+	        })
+
+	        radioWrap.appendChild(radio)
+	        radioWrap.appendChild(document.createTextNode(item.label))
+	        collapseStyleOptionsWrap.appendChild(radioWrap)
+	      })
+
+	      const collapseStyleHint = document.createElement('div')
+	      collapseStyleHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); opacity: 0.7; margin-top: 2px;'
+	      collapseStyleHint.textContent = '💡 选择收起时面板的显示方式'
+
+	      collapseStyleContainer.appendChild(collapseStyleOptionsWrap)
+	      collapseStyleContainer.appendChild(collapseStyleHint)
+	      floatOpacityConfigDiv.appendChild(collapseStyleContainer)
+
+	      authorToolContainer.appendChild(floatOpacityConfigDiv)
 
       // 日记顶部或底部配置区（说明 + 位置选择 + 笔记本ID + 等待时间配置）
       const diaryConfigDiv = document.createElement('div')
@@ -1792,11 +1844,13 @@ export function createMobileButtonItem(
           buttonSequenceConfigDiv.style.display = 'none'
           scrollDocConfigDiv.style.display = 'none'
           imageUploadConfigDiv.style.display = 'none'
-          floatOpacityConfigDiv.style.display = 'flex'
-          // 最大可见标签数仅 mobile-tabs 类型显示
-          maxVisibleTabsContainer.style.display = subtype === 'mobile-tabs' ? 'flex' : 'none'
-          // 弹窗位置仅 mobile-tabs 和 mobile-outline 显示
-          positionContainer.style.display = (subtype === 'mobile-tabs' || subtype === 'mobile-outline') ? 'flex' : 'none'
+	          floatOpacityConfigDiv.style.display = 'flex'
+	          // 最大可见标签数仅 mobile-tabs 类型显示
+	          maxVisibleTabsContainer.style.display = subtype === 'mobile-tabs' ? 'flex' : 'none'
+	          // 弹窗位置仅 mobile-tabs 和 mobile-outline 显示
+	          positionContainer.style.display = (subtype === 'mobile-tabs' || subtype === 'mobile-outline') ? 'flex' : 'none'
+	          // 折叠样式仅 mobile-tabs 和 mobile-outline 显示
+	          collapseStyleContainer.style.display = (subtype === 'mobile-tabs' || subtype === 'mobile-outline') ? 'flex' : 'none'
         } else {
           docConfigDiv.style.display = 'flex'
           dbConfigDiv.style.display = 'none'

@@ -54,6 +54,7 @@ let titleRefreshTimer: ReturnType<typeof setInterval> | null = null
 let renderSeq = 0  // 渲染序号，避免切文档时异步返回乱序
 
 let lastOutlineFloatOpacity: number | undefined
+let currentCollapseStyle: 'preview' | 'minimal' = 'preview'
 let themeModeUnsubscribe: (() => void) | null = null
 
 // ===== 输入法/键盘弹出时自动隐藏 =====
@@ -603,9 +604,13 @@ function injectStyles(): void {
       border-radius: 8px;
       font-size: 11px;
     }
-    .collapsed .outline-item--focus .outline-icon {
-      box-shadow: 0 0 0 2px rgba(255,255,255,0.9), 0 0 0 3.5px rgba(0,122,255,0.5);
-    }
+	    .collapsed .outline-item--focus .outline-icon {
+	      box-shadow: 0 0 0 2px rgba(255,255,255,0.9), 0 0 0 3.5px rgba(0,122,255,0.5);
+	    }
+	    /* 方案二：收起态隐藏所有标题项 */
+	    .collapsed.minimal .outline-item {
+	      display: none;
+	    }
     #mobile-outline-panel.expanded {
       width: 200px;
       padding: 6px;
@@ -818,9 +823,10 @@ function createPanel(): void {
 
   injectStyles()
 
-  outlinePanel = document.createElement('div')
-  outlinePanel.id = 'mobile-outline-panel'
-  outlinePanel.className = state.isExpanded ? 'expanded' : 'collapsed'
+	  outlinePanel = document.createElement('div')
+	  outlinePanel.id = 'mobile-outline-panel'
+	  const classNames = state.isExpanded ? 'expanded' : 'collapsed'
+	  outlinePanel.className = currentCollapseStyle === 'minimal' && !state.isExpanded ? classNames + ' minimal' : classNames
 
   // 大纲列表
   const list = document.createElement('div')
@@ -857,7 +863,8 @@ function removePanel(): void {
 function toggleExpand(): void {
   if (!outlinePanel) return
   state.isExpanded = !state.isExpanded
-  outlinePanel.className = state.isExpanded ? 'expanded' : 'collapsed'
+  const baseClass = state.isExpanded ? 'expanded' : 'collapsed'
+  outlinePanel.className = currentCollapseStyle === 'minimal' && !state.isExpanded ? baseClass + ' minimal' : baseClass
   debouncedPersist()
 }
 
@@ -1024,9 +1031,10 @@ export function toggleVisibility(config: ButtonConfig): void {
   state.isVisible = !state.isVisible
 
   if (state.isVisible) {
-    // 更新滚动隐藏开关与用于恢复的透明度
-    autoHideOnScrollEnabled = !!config.autoHideOnScroll
-    currentFloatOpacityForAutoHide = config.floatOpacity
+	    // 更新滚动隐藏开关与用于恢复的透明度
+	    autoHideOnScrollEnabled = !!config.autoHideOnScroll
+	    currentFloatOpacityForAutoHide = config.floatOpacity
+	    currentCollapseStyle = config.collapseStyle || 'preview'
     hiddenByScroll = false
     lastScrollTopForAutoHide = null
     lastAutoHideToggleAt = 0

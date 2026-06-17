@@ -1244,8 +1244,8 @@ function applyPosition(el: HTMLElement, position?: string): void {
     el.style.transform = 'none'
   } else if (pos === 'bottom') {
     el.style.top = 'auto'
-    // 底部工具栏高度约 40-52px，加上安全区域和间距，确保面板在工具栏上方
-    el.style.bottom = 'calc(60px + env(safe-area-inset-bottom))'
+    // 与前一篇/后一篇底部高度一致 (80px)，确保在工具栏上方
+    el.style.bottom = 'calc(80px + env(safe-area-inset-bottom))'
     el.style.transform = 'none'
   } else {
     el.style.top = '50%'

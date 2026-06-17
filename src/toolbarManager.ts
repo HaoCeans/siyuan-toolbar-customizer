@@ -4096,8 +4096,9 @@ async function executeClearEmptyBlocks(): Promise<void> {
     const nodeId = el.dataset.nodeId
     if (!nodeId) continue
 
-    // 检查是否有可见文本
-    const hasText = (el.textContent?.trim() || '').length > 0
+	    // 检查是否有可见文本（思源空块含零宽空格 \u200b，.trim() 不移除它）
+	    const text = (el.textContent || '').replace(/[\u200b\ufeff]/g, '').trim()
+	    const hasText = text.length > 0
     // 检查是否有内嵌媒体（图片、视频、公式等）
     const hasEmbedded = el.querySelector(':scope > img, :scope > video, :scope > audio, :scope > iframe, .protyle-icon') !== null
     // 检查是否有子块（如 li 嵌套了列表）

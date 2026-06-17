@@ -75,6 +75,7 @@ let pinBtnEl: HTMLElement | null = null
 let lastTabsFloatOpacity: number | undefined
 let currentCollapseStyle: 'preview' | 'minimal' = 'preview'
 let themeModeUnsubscribe: (() => void) | null = null
+let collapseStyleSavedHandler: (() => void) | null = null
 
 let boundScrollEl: HTMLElement | null = null
 let scrollBindRetryTimer: ReturnType<typeof setInterval> | null = null
@@ -1496,6 +1497,23 @@ export async function init(context: MobileTabsContext): Promise<void> {
   if (state.isVisible) {
     setTimeout(() => { handleSwitchProtyle() }, 100)
   }
+
+  // 监听设置保存后的折叠样式变更事件：关闭面板让用户下次打开时生效
+  collapseStyleSavedHandler = () => {
+    if (state.isVisible) {
+      state.isVisible = false
+      fadeOutAndRemoveTabBar()
+      stopTitleRefresh()
+      closeAllTabs()
+      autoHideOnScrollEnabled = false
+      hiddenByScroll = false
+      lastScrollTopForAutoHide = null
+      currentFloatOpacityForAutoHide = undefined
+      lastAutoHideToggleAt = 0
+      unbindScrollListener()
+    }
+  }
+  window.addEventListener('collapse-style-saved', collapseStyleSavedHandler)
 }
 
 export function toggleVisibility(config: ButtonConfig): void {
@@ -1734,6 +1752,12 @@ export function cleanup(): void {
   lastTabsFloatOpacity = undefined
   lastScrollTopForAutoHide = null
   lastAutoHideToggleAt = 0
-  currentMaxVisibleTabs = MAX_TABS
-  scrollBindRetryCount = 0
-}
+	  currentMaxVisibleTabs = MAX_TABS
+	  scrollBindRetryCount = 0
+	  currentCollapseStyle = 'preview'
+
+	  if (collapseStyleSavedHandler) {
+	    window.removeEventListener('collapse-style-saved', collapseStyleSavedHandler)
+	    collapseStyleSavedHandler = null
+	  }
+	}

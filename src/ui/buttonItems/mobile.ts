@@ -1573,11 +1573,13 @@ export function createMobileButtonItem(
 	        radio.checked = currentCollapseStyle === item.value
 	        radio.style.cssText = 'cursor: pointer; width: 16px; height: 16px; accent-color: var(--b3-theme-primary);'
 
-	        radio.addEventListener('click', async () => {
-	          button.collapseStyle = item.value as 'preview' | 'minimal'
-	          await context.saveData('mobileButtonConfigs', context.buttonConfigs)
-	          context.updateMobileToolbar?.()
-	        })
+		        radio.addEventListener('click', async () => {
+		          button.collapseStyle = item.value as 'preview' | 'minimal'
+		          await context.saveData('mobileButtonConfigs', context.buttonConfigs)
+		          context.updateMobileToolbar?.()
+		          // 如果面板当前可见，自动关闭让用户下次打开时生效
+		          window.dispatchEvent(new CustomEvent('collapse-style-saved'))
+		        })
 
 	        radioWrap.appendChild(radio)
 	        radioWrap.appendChild(document.createTextNode(item.label))

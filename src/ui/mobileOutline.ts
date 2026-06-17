@@ -56,6 +56,7 @@ let renderSeq = 0  // 渲染序号，避免切文档时异步返回乱序
 let lastOutlineFloatOpacity: number | undefined
 let currentCollapseStyle: 'preview' | 'minimal' = 'preview'
 let themeModeUnsubscribe: (() => void) | null = null
+let collapseStyleSavedHandler: (() => void) | null = null
 
 // ===== 输入法/键盘弹出时自动隐藏 =====
 let hiddenByKeyboard = false
@@ -1013,6 +1014,23 @@ export async function init(context: OutlineContext): Promise<void> {
 
   // 面板不可见时，不注册滚动/键盘/visibility 监听，避免无谓开销
 
+  // 监听设置保存后的折叠样式变更事件：关闭面板让用户下次打开时生效
+  collapseStyleSavedHandler = () => {
+    if (state.isVisible) {
+      state.isVisible = false
+      removePanel()
+      stopTitleRefresh()
+      currentFocusId = null
+      autoHideOnScrollEnabled = false
+      hiddenByScroll = false
+      lastScrollTopForAutoHide = null
+      currentFloatOpacityForAutoHide = undefined
+      lastAutoHideToggleAt = 0
+      detachInteractionListeners()
+    }
+  }
+  window.addEventListener('collapse-style-saved', collapseStyleSavedHandler)
+
   // 兜底：插件重载后 protyle 可能已就绪但事件已错过，主动同步一次
   if (state.isVisible) {
     initSwitchTimer = setTimeout(() => {
@@ -1182,10 +1200,16 @@ export function cleanup(): void {
   keyboardBaselineHeight = null
   hiddenByScroll = false
   autoHideOnScrollEnabled = false
-  currentFloatOpacityForAutoHide = undefined
-  lastScrollTopForAutoHide = null
-  lastAutoHideToggleAt = 0
-  scrollBindRetryCount = 0
+	  currentFloatOpacityForAutoHide = undefined
+	  lastScrollTopForAutoHide = null
+	  lastAutoHideToggleAt = 0
+	  scrollBindRetryCount = 0
+	  currentCollapseStyle = 'preview'
+
+	  if (collapseStyleSavedHandler) {
+	    window.removeEventListener('collapse-style-saved', collapseStyleSavedHandler)
+	    collapseStyleSavedHandler = null
+	  }
 
   ctx = null
 }

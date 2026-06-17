@@ -1496,6 +1496,7 @@ export function createDesktopButtonItem(
 	      radio.addEventListener('change', () => {
 	        if (radio.checked) {
 	          button.collapseStyle = item.value as 'preview' | 'minimal'
+	          window.dispatchEvent(new CustomEvent('collapse-style-saved'))
 	        }
 	      })
 
@@ -2963,6 +2964,7 @@ export function populateDesktopEditForm(
 	      radio.addEventListener('change', () => {
 	        if (radio.checked) {
 	          button.collapseStyle = item.value as 'preview' | 'minimal'
+	          window.dispatchEvent(new CustomEvent('collapse-style-saved'))
 	        }
 	      })
 

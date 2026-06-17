@@ -151,16 +151,15 @@ function setupDesktopCaptureInteraction(
 }
 
 /**
- * 检测当前是否为暗黑模式
- * 优先检测系统级暗黑（WebView 在系统暗色时会对白色元素做颜色反转），
- * 再检测思源主题背景色亮度，任一为暗则返回 true。
+ * 检测思源当前是否为暗黑模式。
+ * 
+ * 策略：
+ * 1. 先通过 CSS 变量 --b3-theme-background 的亮度判断思源实际使用的主题
+ *    （用户可能在系统深色下强制切到明亮，此方式能正确反映思源本体的外观）
+ * 2. 若 CSS 变量无法解析，再回退到系统偏好
+ *    （部分 WebView 在系统深色时会对白色元素做颜色反转，回退可兜底）
  */
 function isSiyuanDarkMode(): boolean {
-  // 系统级暗黑模式：WebView 强制暗色会把 white 反转为黑色，
-  // 导致遮罩（灰色）与卡片内容（白色→黑色）颜色撕裂，必须一并感知
-  if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
-    return true;
-  }
   const style = getComputedStyle(document.documentElement);
   const bg = style.getPropertyValue('--b3-theme-background').trim();
   if (bg.startsWith('#')) {
@@ -174,6 +173,10 @@ function isSiyuanDarkMode(): boolean {
     if (match && match.length >= 3) {
       return (parseInt(match[0]) * 299 + parseInt(match[1]) * 587 + parseInt(match[2]) * 114) / 1000 < 128;
     }
+  }
+  // 回退：系统偏好（WebView 颜色反转场景兜底）
+  if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
+    return true;
   }
   return false;
 }

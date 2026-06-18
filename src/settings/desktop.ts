@@ -1018,7 +1018,7 @@ export function createDesktopSettingLayout(
             </tr>
             <tr style="background: var(--b3-theme-background);">
               <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑨</td>
-              <td style="padding: 10px; font-weight: 500;">标签页Tab</td>
+              <td style="padding: 10px; font-weight: 500;">悬浮标签页Tab</td>
               <td style="padding: 10px; color: var(--b3-theme-on-surface);">桌面端多文档快速切换，悬浮Tab栏，自动管理</td>
             </tr>
             <tr>

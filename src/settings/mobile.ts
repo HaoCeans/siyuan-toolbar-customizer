@@ -3563,7 +3563,7 @@ export function createMobileSettingLayout(
             </tr>
             <tr style="background: var(--b3-theme-background);">
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑨</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">手机端标签页Tab</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">手机端悬浮标签页Tab</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">手机端多文档快速切换，苹果风格悬浮Tab栏，自动管理，告别反复返回</td>
             </tr>
             <tr>

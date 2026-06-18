@@ -4073,70 +4073,50 @@ function executeTTS() {
  * 经用户确认后逐一删除。
  */
 async function executeClearEmptyBlocks(): Promise<void> {
-  console.log('[清理空块] === 开始执行 ===')
-
   // 1. 获取当前活动编辑器
   const protyle = getActiveProtyle()
-  console.log('[清理空块] getActiveProtyle() 结果:', protyle ? '有' : '无')
   if (!protyle?.wysiwyg?.element) {
-    console.log('[清理空块] 未获取到编辑器')
     Notify.showInfoEditorNotFocused()
     return
   }
 
   const wysiwyg = protyle.wysiwyg.element
-  console.log('[清理空块] wysiwyg 元素:', wysiwyg.tagName, wysiwyg.id || '(无id)')
 
   // 2. 扫描所有块，筛选空块
   const emptyBlockIds: string[] = []
   const blockElements = wysiwyg.querySelectorAll<HTMLElement>('[data-node-id]')
-  console.log('[清理空块] 找到 [data-node-id] 元素个数:', blockElements.length)
 
   for (const el of blockElements) {
     // 跳过隐藏块（如折叠标题下的子块）
-    if (el.offsetParent === null) { console.log('[清理空块] 跳过隐藏块:', el.dataset.nodeId); continue }
+    if (el.offsetParent === null) continue
 
     const type = el.dataset.type
     const nodeId = el.dataset.nodeId
-    // 输出每个非隐藏块的类型和ID用于调试
-    console.log(`[清理空块] 检查块: id=${nodeId}, data-type="${type}", class="${el.className}"`)
 
     // 只处理内容块：段落、标题、列表项
-    if (!type || !['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'NodeParagraph', 'NodeHeading', 'NodeListItem'].includes(type)) {
-      console.log(`[清理空块] 跳过不处理的类型: ${type}`)
-      continue
-    }
-
+    if (!type || !['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'NodeParagraph', 'NodeHeading', 'NodeListItem'].includes(type)) continue
     if (!nodeId) continue
 
     // 检查是否有可见文本（思源空块含零宽空格 \u200b，.trim() 不移除它）
-    const rawText = el.textContent || ''
-    const cleanedText = rawText.replace(/[\u200b\ufeff]/g, '').trim()
+    const cleanedText = (el.textContent || '').replace(/[\u200b\ufeff]/g, '').trim()
     const hasText = cleanedText.length > 0
-    console.log(`[清理空块]   文本: rawLen=${rawText.length}, cleanedLen=${cleanedText.length}, hasText=${hasText}`)
     // 检查是否有内嵌媒体（图片、视频、公式等）
     const hasEmbedded = el.querySelector(':scope > img, :scope > video, :scope > audio, :scope > iframe, .protyle-icon') !== null
     // 检查是否有子块（如 li 嵌套了列表）
     const hasChildBlocks = el.querySelector(':scope > [data-node-id]') !== null
 
-    console.log(`[清理空块]   判定: hasText=${hasText}, hasEmbedded=${hasEmbedded}, hasChildBlocks=${hasChildBlocks}`)
-
     if (!hasText && !hasEmbedded && !hasChildBlocks) {
-      console.log(`[清理空块]   ✅ 判定为空块: ${nodeId}`)
       emptyBlockIds.push(nodeId)
     }
   }
 
   // 3. 无空块
-  console.log('[清理空块] 扫描完成，空块数:', emptyBlockIds.length)
   if (emptyBlockIds.length === 0) {
     Notify.showSuccess('当前文档没有空块')
-    console.log('[清理空块] 无空块，退出')
     return
   }
 
   // 4. 确认删除
-  console.log('[清理空块] 准备显示确认弹窗，空块列表:', emptyBlockIds)
   const confirmed = await showConfirmDialog({
     title: '清理空块',
     message: `发现 ${emptyBlockIds.length} 个空块，是否删除？`,
@@ -4144,17 +4124,14 @@ async function executeClearEmptyBlocks(): Promise<void> {
     confirmText: '删除',
     cancelText: '取消',
   })
-  console.log('[清理空块] 确认弹窗结果:', confirmed)
   if (!confirmed) return
 
   // 5. 倒序删除（从文档末尾向上，避免 ID 失效）
   let successCount = 0
   const sortedIds = [...emptyBlockIds].reverse()
-  console.log('[清理空块] 开始删除，顺序:', sortedIds)
   for (const id of sortedIds) {
     try {
       const result = await deleteBlock(id)
-      console.log('[清理空块] 删除 ' + id + ':', result !== null ? '成功' : '失败(返回null)', result)
       if (result !== null) successCount++
     } catch (e) {
       console.warn('[清理空块] 删除异常:', id, e)
@@ -4162,7 +4139,6 @@ async function executeClearEmptyBlocks(): Promise<void> {
   }
 
   // 6. 显示结果
-  console.log('[清理空块] 删除完成: 成功', successCount, '/ 总共', emptyBlockIds.length)
   if (successCount === 0) {
     Notify.showErrorCommandCannotExecute('清理空块失败')
   } else if (successCount < emptyBlockIds.length) {
@@ -4170,7 +4146,6 @@ async function executeClearEmptyBlocks(): Promise<void> {
   } else {
     Notify.showSuccess(`已删除 ${successCount} 个空块`)
   }
-  console.log('[清理空块] === 执行完毕 ===')
 }
 
 /**

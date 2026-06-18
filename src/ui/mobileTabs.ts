@@ -1210,6 +1210,10 @@ function renderTabList(): void {
         longPressTimer = null
       }
       switchToTab(tab.id)
+      // 与大纲一致：展开态点击后自动收起
+      if (state.isExpanded) {
+        toggleExpand()
+      }
     })
 
     item.appendChild(number)

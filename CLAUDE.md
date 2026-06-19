@@ -782,3 +782,18 @@ handleToolbarAutoHideScroll()      ← 滚动事件处理器
 - 必须用思源 API，不能用 DOM 选择器或 `offsetParent` 等启发式
 - 样式注入在 `refreshKmindZenCompat` 自身完成
 - cleanup 中移除 class 和 `#kmind-zen-compat-style`
+
+---
+
+### 25. 新增按钮功能：操作清单
+
+以新增 `⑯ 新功能` 为例，需改 6 个文件：
+
+| # | 文件 | 改动 |
+|---|------|------|
+| 1 | `toolbarManager.ts` L80 | `ButtonConfig.authorToolSubtype` 联合类型追加 `'new-feature'`；如需专属字段，在接口新增 |
+| 2 | `toolbarManager.ts` L240/360 | `DEFAULT_DESKTOP_BUTTONS` / `DEFAULT_MOBILE_BUTTONS` 各加一个按钮对象（type: 'author-tool', authorToolSubtype: 'new-feature'） |
+| 3 | `desktop.ts` L760 / `mobile.ts` L860 | 子类型 `<select>` 加 `<option value="new-feature">⑯ 新功能</option>`（桌面 2 处 + 手机 1 处） |
+| 4 | `desktop.ts` / `mobile.ts` | `updateVisibility` 加分支；创建专属配置 div（初始 `display:none`），追加到 `authorToolField`/`authorToolContainer` |
+| 5 | `toolbarManager.ts` L4820 | 路由分支 `if (subtype === 'new-feature')` → 调用执行函数 |
+| 6 | `settings/desktop.ts` / `mobile.ts` | 功能列表表格追加一行（序号+名称+说明） |

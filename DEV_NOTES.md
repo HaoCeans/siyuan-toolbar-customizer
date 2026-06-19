@@ -461,3 +461,137 @@ body.kmind-zen-active.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data
 - 样式注入在 `refreshKmindZenCompat` 自身完成，不依赖 `initCustomButtons` 的平台分支
 - cleanup 中移除 `body.kmind-zen-active` class 和样式元素 `#kmind-zen-compat-style`
 - API 调用是异步的（`.then()`），class 切换有几毫秒延迟，不影响体验
+
+---
+
+## 13. 新增按钮功能：完整操作指南
+
+以新增一个假设的 `⑯ 新功能` 为例，列出需要修改的所有文件和位置。
+
+### Step 1：定义数据字段（如需要新配置项）
+
+`src/toolbarManager.ts` → `ButtonConfig` 接口（约第 80 行）：
+
+```typescript
+// 如果是 author-tool 的新子类型，只需在联合类型中追加
+authorToolSubtype?: '...' | 'toggle-lock' | 'new-feature';
+
+// 如果新功能需要专属配置字段，在这里新增（加在相关字段附近）
+newFeatureOption?: string;  // 仅 new-feature 使用
+```
+
+### Step 2：添加默认按钮配置
+
+`src/toolbarManager.ts` → `DEFAULT_DESKTOP_BUTTONS` / `DEFAULT_MOBILE_BUTTONS`（约第 240/360 行）：
+
+```typescript
+{
+  id: 'new-feature-desktop',       // 唯一 ID，建议含平台后缀
+  name: '新功能',
+  type: 'author-tool',
+  authorToolSubtype: 'new-feature',
+  icon: '✨',                      // 默认图标
+  iconSize: 18,
+  minWidth: 32,
+  marginRight: 8,
+  sort: 16,                        // 排序数字，越大越靠左
+  platform: 'desktop',             // 'desktop' | 'mobile' | 不设为双平台
+  showNotification: true,
+  newFeatureOption: 'default',     // 新专属字段
+}
+```
+
+只需写 desktop 版本，mobile 版本同理（id 后缀改为 `-mobile`，platform 改为 `'mobile'`）。
+
+### Step 3：配置面板 — 子类型下拉框
+
+`src/ui/buttonItems/desktop.ts` 和 `mobile.ts` → `authorToolField` 区域的 `<select>`：
+
+```html
+<option value="new-feature">⑯ 新功能</option>
+```
+
+两处都要加：
+- `desktop.ts`：`createDesktopButtonItem` 函数（约第 760 行）+ `populateDesktopEditForm` 函数（约第 2240 行）
+- `mobile.ts`：`createMobileButtonItem` 函数（约第 860 行）
+
+### Step 4：配置面板 — 可见性控制和专属配置 UI
+
+**4a）** 在 `desktop.ts` 和 `mobile.ts` 的 `updateVisibility` 函数中，为新子类型添加分支：
+
+```typescript
+} else if (subtype === 'new-feature') {
+    docConfigDiv.style.display = 'none'
+    dbConfigDiv.style.display = 'none'
+    // ... 隐藏其他子类型的配置区
+    newFeatureConfigDiv.style.display = 'flex'  // 显示专属配置
+}
+```
+
+**4b）** 创建专属配置容器（与其他配置区并列，在 `authorToolField` 内）：
+
+```typescript
+const newFeatureConfigDiv = document.createElement('div')
+newFeatureConfigDiv.id = 'new-feature-config'
+newFeatureConfigDiv.style.cssText = 'display: none; flex-direction: column; gap: 6px; ...'
+// 添加表单控件（输入框、选择器、开关等）
+newFeatureConfigDiv.appendChild(createDesktopField('选项名称', button.newFeatureOption || '', '默认值', (v) => {
+  button.newFeatureOption = v
+}, 'text'))
+authorToolField.appendChild(newFeatureConfigDiv)
+```
+
+**关键**：容器初始 `display: none`，由 `updateVisibility` 控制显隐。放在 `authorToolField` 内部，与其他配置区风格一致。
+
+### Step 5：实现执行逻辑
+
+`src/toolbarManager.ts` → 找到 author-tool 路由区（约第 4820 行），添加：
+
+```typescript
+// ⑯新功能
+if (subtype === 'new-feature') {
+  await executeNewFeature(config)
+  return
+}
+```
+
+然后在附近实现执行函数：
+
+```typescript
+async function executeNewFeature(config: ButtonConfig): Promise<void> {
+  // 读取配置
+  const option = config.newFeatureOption || 'default'
+  // 执行业务逻辑
+  // ...
+  if (config.showNotification) showMessage('新功能执行成功', 2000, 'info')
+}
+```
+
+### Step 6：功能列表说明（设置页）
+
+`src/settings/desktop.ts` 和 `mobile.ts` → 功能列表表格，追加一行：
+
+```html
+<tr>
+  <td>⑯</td>
+  <td>新功能</td>
+  <td>功能说明文字，简要描述用途和使用方法</td>
+</tr>
+```
+
+两个文件都要更新。
+
+### Step 7（可选）：导出/导入兼容
+
+ButtonConfig 的字段会在 JSON 导出/导入中自动保留，无需额外处理。但如果是复杂对象（非 string/number/boolean），需确认序列化兼容。
+
+### 检查清单
+
+| # | 文件 | 改动 |
+|---|------|------|
+| 1 | `toolbarManager.ts` | `ButtonConfig` 接口 + 默认按钮 ×2 |
+| 2 | `desktop.ts` | 子类型 option + updateVisibility + 专属 UI |
+| 3 | `mobile.ts` | 同上 |
+| 4 | `toolbarManager.ts` | 路由分支 + 执行函数 |
+| 5 | `settings/desktop.ts` | 功能列表行 |
+| 6 | `settings/mobile.ts` | 功能列表行 |

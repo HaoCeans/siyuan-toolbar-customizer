@@ -4210,24 +4210,63 @@ async function executeToggleLock(config: ButtonConfig): Promise<void> {
 
 /**
  * 更新 toggle-lock 按钮的图标（🔒 / 🔓）
+ * 复用 createButtonElement 的图标渲染逻辑，支持 4 种类型
  */
 function updateToggleLockIcon(btn: HTMLElement, isLocked: boolean): void {
   const configId = btn.dataset.customButton
   if (!configId) return
 
-  // 从按钮配置中获取图标：lockIcon=锁定时图标，icon=解锁图标
   const cfg = currentButtonConfigs.find(b => b.id === configId)
-  const targetIcon = isLocked ? (cfg?.lockIcon || cfg?.icon || '🔒') : (cfg?.icon || '🔓')
+  if (!cfg) return
 
-  // 保留 span 子元素的结构，只更新文本
-  const existingSpan = btn.querySelector('span')
-  if (existingSpan) {
-    existingSpan.textContent = targetIcon
-	  } else {
-	    btn.innerText = targetIcon
-	    btn.style.fontSize = `${cfg?.iconSize || 20}px`
-	  }
-	}
+  const targetIcon = isLocked ? (cfg.lockIcon || cfg.icon || '🔒') : (cfg.icon || '🔓')
+
+  // 清空按钮内容，重建图标
+  btn.innerHTML = ''
+  if (targetIcon.startsWith('icon')) {
+    // 思源图标（SVG use）
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svg.setAttribute('width', `${cfg.iconSize}`)
+    svg.setAttribute('height', `${cfg.iconSize}`)
+    svg.style.cssText = 'flex-shrink: 0; display: block;'
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
+    use.setAttribute('href', `#${targetIcon}`)
+    svg.appendChild(use)
+    btn.appendChild(svg)
+  } else if (targetIcon.startsWith('lucide:')) {
+    const iconName = targetIcon.substring(7)
+    try {
+      const lucideIcons = require('lucide')
+      const IconComponent = lucideIcons[iconName]
+      if (IconComponent) {
+        const svgString = IconComponent.toSvg({ width: cfg.iconSize, height: cfg.iconSize })
+        btn.innerHTML = svgString
+        const svg = btn.querySelector('svg')
+        if (svg) svg.style.cssText = 'flex-shrink: 0; display: block;'
+      } else {
+        btn.textContent = targetIcon
+        btn.style.fontSize = `${cfg.iconSize}px`
+      }
+    } catch {
+      btn.textContent = targetIcon
+      btn.style.fontSize = `${cfg.iconSize}px`
+    }
+  } else if (/\.(png|jpg|jpeg|gif|svg)$/i.test(targetIcon)) {
+    const pluginName = 'siyuan-toolbar-customizer'
+    const imagePath = targetIcon.startsWith('/plugins/') ? targetIcon : `/plugins/${pluginName}/${targetIcon}`
+    const img = document.createElement('img')
+    img.src = imagePath
+    img.style.cssText = `width: ${cfg.iconSize}px; height: ${cfg.iconSize}px; object-fit: contain; flex-shrink: 0; display: block;`
+    btn.appendChild(img)
+  } else {
+    // Emoji 或文本
+    const iconSpan = document.createElement('span')
+    iconSpan.style.fontSize = `${cfg.iconSize}px`
+    iconSpan.style.lineHeight = '1'
+    iconSpan.textContent = targetIcon
+    btn.appendChild(iconSpan)
+  }
+}
 
 	// ===== 锁定文档时工具栏滚动隐藏/显示（仅移动端） =====
 

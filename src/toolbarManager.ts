@@ -81,6 +81,7 @@ export interface ButtonConfig {
 		  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock'; // 鲸鱼定制工具子类型
 	  unlockIcon?: string;       // 解锁图标（仅 toggle-lock 使用，默认 🔓）
 	  lockIcon?: string;         // 锁定图标（仅 toggle-lock 使用，默认 🔒）
+	  toolbarAutoHide?: boolean; // 锁定文档时工具栏上滑隐藏/下滑显示（仅 toggle-lock 使用，默认 false）
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
   viewName?: string;         // 视图名称
@@ -455,8 +456,14 @@ function isOverflowButton(id: string): boolean {
 let resizeHandler: (() => void) | null = null
 let mutationObserver: MutationObserver | null = null
 let customButtonClickHandler: ((e: Event) => void) | null = null  // 专门用于自定义按钮的点击处理
-let overflowCloseHandler: ((e: Event) => void) | null = null  // 扩展工具栏点击外部关闭监听器
+let overrideCloseHandler: ((e: Event) => void) | null = null  // 扩展工具栏点击外部关闭监听器
 let toolbarObserver: MutationObserver | null = null  // 用于监听工具栏渲染的观察器
+// 锁定文档时工具栏随滚动隐藏/显示
+let toolbarAutoHideConfigured = false       // 是否有按钮启用了此功能
+let toolbarAutoHideScrollHandler: ((e: Event) => void) | null = null  // 滚动事件处理器
+let toolbarHiddenByScroll = false           // 当前是否已隐藏
+let toolbarLastScrollTop: number | null = null  // 上次滚动位置
+let toolbarAutoHideBoundEl: HTMLElement | null = null  // 已绑定的滚动容器
 // MutationObserver 防抖用的待执行定时器（需要能在 cleanup 中清理）
 let pendingTimer: ReturnType<typeof setTimeout> | null = null
 let toolbarStyleChangeHandler: (() => void) | null = null  // 工具栏样式变化事件处理器
@@ -1264,6 +1271,9 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
 export function initCustomButtons(configs: ButtonConfig[]) {
   // 保存当前配置，用于后续重试机制
   currentButtonConfigs = configs
+
+  // 刷新工具栏滚动隐藏功能状态
+  setTimeout(() => refreshToolbarAutoHide(), 300)
 
   // 添加全局样式：移除主工具栏按钮的 focus 和 active 状态阴影（排除扩展工具栏按钮）
   if (!document.getElementById('custom-button-focus-style')) {
@@ -4154,6 +4164,8 @@ async function executeToggleLock(config: ButtonConfig): Promise<void> {
     if (config.showNotification !== false) {
       showMessage(newValue === 'true' ? '🔒 文档已锁定' : '🔓 文档已解锁', 1500, 'info')
     }
+    // 刷新工具栏滚动隐藏状态
+    refreshToolbarAutoHide()
   } catch (e) {
     console.warn('[toggle-lock] 切换失败:', e)
     showMessage('切换锁状态失败', 2000, 'error')
@@ -4179,6 +4191,96 @@ function updateToggleLockIcon(btn: HTMLElement, isLocked: boolean): void {
     btn.innerText = targetIcon
     btn.style.fontSize = `${cfg?.iconSize || 20}px`
   }
+}
+
+// ===== 锁定文档时工具栏滚动隐藏/显示 =====
+const TOOLBAR_SCROLL_HIDE_THRESHOLD = 12
+const TOOLBAR_SCROLL_COOLDOWN = 200
+let toolbarAutoHideLastToggle = 0
+
+function getProtyleContentForToolbar(): HTMLElement | null {
+  const protyle = getActiveProtyle()
+  return protyle?.contentElement || document.querySelector('.protyle-content')
+}
+
+function handleToolbarAutoHideScroll(): void {
+  const scrollEl = toolbarAutoHideBoundEl || getProtyleContentForToolbar()
+  if (!scrollEl) return
+
+  const st = scrollEl.scrollTop
+  if (toolbarLastScrollTop == null) { toolbarLastScrollTop = st; return }
+
+  const now = Date.now()
+  const delta = st - toolbarLastScrollTop
+  toolbarLastScrollTop = st
+
+  if (now - toolbarAutoHideLastToggle < TOOLBAR_SCROLL_COOLDOWN) return
+
+  if (!toolbarHiddenByScroll && delta > TOOLBAR_SCROLL_HIDE_THRESHOLD) {
+    toolbarHiddenByScroll = true
+    toolbarAutoHideLastToggle = now
+    setToolbarVisibility(false)
+  } else if (toolbarHiddenByScroll && delta < -TOOLBAR_SCROLL_HIDE_THRESHOLD) {
+    toolbarHiddenByScroll = false
+    toolbarAutoHideLastToggle = now
+    setToolbarVisibility(true)
+  }
+}
+
+function setToolbarVisibility(visible: boolean): void {
+  const toolbars = document.querySelectorAll('.protyle-breadcrumb, .protyle-breadcrumb__bar')
+  toolbars.forEach(el => {
+    const t = el as HTMLElement
+    t.style.transition = 'opacity 0.16s ease, transform 0.16s ease'
+    if (visible) {
+      t.style.opacity = '1'
+      t.style.transform = 'translateY(0)'
+      t.style.pointerEvents = ''
+    } else {
+      t.style.opacity = '0'
+      t.style.transform = 'translateY(-6px)'
+      t.style.pointerEvents = 'none'
+    }
+  })
+}
+
+/** 启动/刷新工具栏滚动隐藏监听（文档锁定+配置开启时调用） */
+export function refreshToolbarAutoHide(): void {
+  // 检查是否有 toggle-lock 按钮配置了 toolbarAutoHide
+  toolbarAutoHideConfigured = currentButtonConfigs.some(
+    b => b.type === 'author-tool' && b.authorToolSubtype === 'toggle-lock' && b.toolbarAutoHide
+  )
+
+  // 解绑旧监听
+  if (toolbarAutoHideScrollHandler && toolbarAutoHideBoundEl) {
+    toolbarAutoHideBoundEl.removeEventListener('scroll', toolbarAutoHideScrollHandler)
+    toolbarAutoHideScrollHandler = null
+    toolbarAutoHideBoundEl = null
+  }
+
+  if (!toolbarAutoHideConfigured) return
+
+  // 检查当前文档是否锁定
+  const readonlyBtn = document.querySelector('[data-type="readonly"]') as HTMLElement | null
+  const isLocked = readonlyBtn?.getAttribute('data-subtype') === 'lock'
+
+  if (!isLocked) {
+    // 未锁定时确保工具栏可见
+    if (toolbarHiddenByScroll) {
+      toolbarHiddenByScroll = false
+      setToolbarVisibility(true)
+    }
+    return
+  }
+
+  // 锁定状态：绑定滚动监听
+  const scrollEl = getProtyleContentForToolbar()
+  if (!scrollEl) return
+
+  toolbarAutoHideBoundEl = scrollEl
+  toolbarLastScrollTop = scrollEl.scrollTop
+  toolbarAutoHideScrollHandler = handleToolbarAutoHideScroll
+  scrollEl.addEventListener('scroll', toolbarAutoHideScrollHandler, { passive: true })
 }
 
 /**
@@ -5900,6 +6002,16 @@ export function cleanup() {
   delete (window as any).__mobileToolbarConfig
   delete (window as any).__mobileButtonConfigs
   delete (window as any).__toolbarManager
+
+  // 清理工具栏滚动隐藏监听
+  if (toolbarAutoHideScrollHandler && toolbarAutoHideBoundEl) {
+    toolbarAutoHideBoundEl.removeEventListener('scroll', toolbarAutoHideScrollHandler)
+    toolbarAutoHideScrollHandler = null
+    toolbarAutoHideBoundEl = null
+  }
+  toolbarAutoHideConfigured = false
+  toolbarHiddenByScroll = false
+  toolbarLastScrollTop = null
 
   // 重新设置全局工具栏管理器（cleanup 后可能被其他模块引用）
   setGlobalToolbarManager()

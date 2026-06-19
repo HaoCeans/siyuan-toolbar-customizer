@@ -23,6 +23,7 @@ import {
   initCustomButtons,
   cleanup,
   createButtonsForEditors,
+  refreshToolbarAutoHide,
   DEFAULT_BUTTONS_CONFIG,
   DEFAULT_DESKTOP_BUTTONS,
   DEFAULT_MOBILE_BUTTONS,
@@ -617,22 +618,24 @@ export default class ToolbarCustomizer extends Plugin {
       this.eventBus.off('loaded-protyle-static', this.eventBusRefreshHandler)
     }
     // 定义刷新按钮的回调函数（电脑端直接创建按钮，避免 initCustomButtons 的重复清理和延迟）
-    this.eventBusRefreshHandler = () => {
-      if (this.isMobile) {
-        // 手机端：如果禁用自定义按钮，直接返回不创建
-        if (this.mobileFeatureConfig.disableCustomButtons) {
-          return
-        }
-        // 手机端需要完整的初始化流程（包括溢出计算）
-        initCustomButtons(this.mobileButtonConfigs)
-      } else {
-        // 电脑端直接创建按钮，无需 1 秒延迟和重复清理
-        const editors = document.querySelectorAll('.protyle')
-        if (editors.length > 0) {
-          createButtonsForEditors(editors, this.desktopButtonConfigs)
-        }
-      }
-    }
+	    this.eventBusRefreshHandler = () => {
+	      if (this.isMobile) {
+	        // 手机端：如果禁用自定义按钮，直接返回不创建
+	        if (this.mobileFeatureConfig.disableCustomButtons) {
+	          return
+	        }
+	        // 手机端需要完整的初始化流程（包括溢出计算）
+	        initCustomButtons(this.mobileButtonConfigs)
+	      } else {
+	        // 电脑端直接创建按钮，无需 1 秒延迟和重复清理
+	        const editors = document.querySelectorAll('.protyle')
+	        if (editors.length > 0) {
+	          createButtonsForEditors(editors, this.desktopButtonConfigs)
+	        }
+	      }
+	      // 刷新工具栏滚动隐藏状态（切文档时锁状态可能变了）
+	      refreshToolbarAutoHide()
+	    }
     // 监听编辑器动态加载完成事件（最快触发）
     this.eventBus.on('loaded-protyle-dynamic', this.eventBusRefreshHandler)
     // 监听编辑器切换事件（切换标签页时触发）

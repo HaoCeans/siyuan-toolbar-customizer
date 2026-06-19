@@ -39,7 +39,8 @@ import {
   applyToolbarBackgroundColor,
   insertTemplate,
   showTemplateContextMenu,
-  refreshToolbarAutoHide
+  refreshToolbarAutoHide,
+  refreshKmindZenCompat
 } from './toolbarManager'
 
 // TTS 设置持久化初始化
@@ -635,6 +636,8 @@ export default class ToolbarCustomizer extends Plugin {
       }
       // 刷新工具栏滚动隐藏状态（切文档时锁状态可能变了）
       refreshToolbarAutoHide()
+      // 刷新 Kmind-Zen 兼容检测（切文档时文档树状态可能变了）
+      refreshKmindZenCompat()
     }
     // 监听编辑器动态加载完成事件（最快触发）
     this.eventBus.on('loaded-protyle-dynamic', this.eventBusRefreshHandler)

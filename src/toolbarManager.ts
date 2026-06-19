@@ -1323,7 +1323,10 @@ export function initCustomButtons(configs: ButtonConfig[]) {
     document.head.appendChild(focusStyle)
   }
 
-  // 注意：这里不要做“全局清理所有按钮”，否则在文档切换/动态刷新时会出现
+  // 立即检测一次 Kmind-Zen 兼容
+  refreshKmindZenCompat()
+
+  // 注意：这里不要做”全局清理所有按钮”，否则在文档切换/动态刷新时会出现
   // “按钮整排先消失再出现”的闪烁。按钮的增删改由 createButtonsForEditors
   // 在每个编辑器内做差异判断后局部更新即可。
 
@@ -4413,7 +4416,48 @@ function getToolbarElementsForAutoHide(): HTMLElement[] {
 	  }
 	}
 
-	/** 刷新工具栏滚动隐藏状态（切换文档/锁定文档/初始化时调用） */
+	/** 检测 Kmind-Zen 文档树是否激活，切换 body class 驱动 CSS 隐藏（仅移动端） */
+	export function refreshKmindZenCompat(): void {
+	  if (!isMobileDevice()) return
+	  if (!document.getElementById('kmind-zen-compat-style')) {
+	    const kmindStyle = document.createElement('style')
+	    kmindStyle.id = 'kmind-zen-compat-style'
+	    kmindStyle.textContent = `
+	      body.kmind-zen-active #mobile-outline-panel,
+	      body.kmind-zen-active #mobile-tabs-bar,
+	      body.kmind-zen-active #mobile-doc-nav-bar {
+	        display: none !important;
+	      }
+	      body.kmind-zen-active .protyle-breadcrumb[data-toolbar-customized],
+	      body.kmind-zen-active .protyle-breadcrumb__bar[data-toolbar-customized],
+	      body.kmind-zen-active.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]),
+	      body.kmind-zen-active.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) {
+	        display: none !important;
+	      }
+	    `
+	    document.head.appendChild(kmindStyle)
+	  }
+		  // 检测 Kmind-Zen 面板是否可见（.kmind-zen-protyle-root 为文档树根容器）
+		  _applyKmindZenState()
+	}
+
+	function _applyKmindZenState(): void {
+	  // 通过思源 API 查当前文档的 custom-kmind-zen-doctree-doc 属性
+	  const protyle = getActiveProtyle()
+	  const docId = protyle?.block?.rootID
+	  if (docId) {
+	    fetchSyncPost('/api/attr/getBlockAttrs', { id: docId }).then(resp => {
+	      const isKmindZen = resp?.data?.['custom-kmind-zen-doctree-doc'] === 'true'
+	      document.body.classList.toggle('kmind-zen-active', isKmindZen)
+	    }).catch(() => {
+	      document.body.classList.remove('kmind-zen-active')
+	    })
+	  } else {
+	    document.body.classList.remove('kmind-zen-active')
+	  }
+	}
+
+/** 刷新工具栏滚动隐藏状态（切换文档/锁定文档/初始化时调用） */
 	export function refreshToolbarAutoHide(): void {
 	  // 仅移动端生效
 	  if (!isMobileDevice()) return
@@ -6172,6 +6216,7 @@ export function cleanup() {
   toolbarAutoHideLastToggle = 0
   document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => { (el as HTMLElement).classList.remove('toolbar-scroll-hidden'); (el as HTMLElement).style.transform = 'translateZ(0) translateY(0)' })
   document.body.classList.remove('toolbar-autohide-active')
+  document.body.classList.remove('kmind-zen-active')
 
   // 清理全局变量
   delete (window as any).__mobileToolbarConfig
@@ -6191,7 +6236,8 @@ export function cleanup() {
     'custom-button-focus-style',
     'mobile-toolbar-dynamic-style',
     'popup-select-scrollbar-style',
-    'toolbar-autohide-style'
+    'toolbar-autohide-style',
+    'kmind-zen-compat-style'
   ]
   idsToRemove.forEach(id => {
     const el = document.getElementById(id)

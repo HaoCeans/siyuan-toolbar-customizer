@@ -2184,36 +2184,43 @@ function showOverflowToolbar(config: ButtonConfig) {
       })
 
       // 点击按钮执行功能
-      layerBtn.addEventListener('click', async (e) => {
-        e.stopPropagation()
-        e.preventDefault()  // 阻止默认行为，包括按钮获得焦点
+          layerBtn.addEventListener('click', async (e) => {
+	        e.stopPropagation()
+	        e.preventDefault()  // 阻止默认行为，包括按钮获得焦点
 
-        // 关闭扩展工具栏
-        document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove())
+	        // 关闭扩展工具栏
+	        document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove())
 
-        // 弹窗框模板选择特殊处理：在执行功能前先恢复焦点，保持输入法不关闭
-        const isPopupSelect = btn.type === 'author-tool' && btn.authorToolSubtype === 'popup-select'
-        if (isPopupSelect && lastActiveElement && isInputOrEditable(lastActiveElement)) {
-          lastActiveElement.focus({ preventScroll: true })
-        }
+	        // 弹窗框模板选择特殊处理：在执行功能前先恢复焦点，保持输入法不关闭
+	        const isPopupSelect = btn.type === 'author-tool' && btn.authorToolSubtype === 'popup-select'
+	        if (isPopupSelect && lastActiveElement && isInputOrEditable(lastActiveElement)) {
+	          lastActiveElement.focus({ preventScroll: true })
+	        }
 
-        // 将保存的选区传递给处理函数（使用 await 保持 async 链条）
-        await handleButtonClick(btn, savedSelection, lastActiveElement)
+	        // 将保存的选区传递给处理函数（使用 await 保持 async 链条）
+	        await handleButtonClick(btn, savedSelection, lastActiveElement)
 
-        // builtin 类型的按钮不恢复焦点，让输入法自然关闭
-        // 其他类型恢复焦点，保持输入法打开（preventScroll 防止浏览器自动滚动到顶部）
-        if (btn.type !== 'builtin') {
-          if (lastActiveElement && lastActiveElement !== document.activeElement) {
-            ;(lastActiveElement as HTMLElement).focus({ preventScroll: true })
-          }
-        }
+	        // builtin 类型的按钮不恢复焦点，让输入法自然关闭
+	        // 其他类型恢复焦点，保持输入法打开（preventScroll 防止浏览器自动滚动到顶部）
+	        if (btn.type !== 'builtin') {
+	          if (lastActiveElement && lastActiveElement !== document.activeElement) {
+	            ;(lastActiveElement as HTMLElement).focus({ preventScroll: true })
+	          }
+	        }
 
-        // 确保按钮没有焦点（使用 setTimeout 确保在其他操作之后）
-        setTimeout(() => layerBtn.blur(), 0)
-      })
+	        // 确保按钮没有焦点（使用 setTimeout 确保在其他操作之后）
+	        setTimeout(() => layerBtn.blur(), 0)
+	      })
 
-      toolbar.appendChild(layerBtn)
-    })
+	      toolbar.appendChild(layerBtn)
+
+	      // toggle-lock：根据当前文档锁状态更新图标
+	      if (btn.type === 'author-tool' && btn.authorToolSubtype === 'toggle-lock') {
+	        const readonlyBtn = document.querySelector('.protyle-breadcrumb__bar [data-type="readonly"], .protyle-breadcrumb [data-type="readonly"]') as HTMLElement
+	        const isLocked = readonlyBtn?.getAttribute('data-subtype') === 'lock'
+	        updateToggleLockIcon(layerBtn, isLocked)
+	      }
+	    })
 
     // 阻止触摸事件冒泡到 document，防止被其他 handler 意外关闭
     toolbar.addEventListener('touchstart', (e) => {
@@ -2523,23 +2530,30 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
       })
 
       // 点击执行功能
-      layerBtn.addEventListener('click', async (e) => {
-        e.stopPropagation()
-        e.preventDefault()
+          layerBtn.addEventListener('click', async (e) => {
+	        e.stopPropagation()
+	        e.preventDefault()
 
-        // 关闭扩展工具栏
-        closeDesktopOverflowToolbar(breadcrumbBar, clickedButton)
+	        // 关闭扩展工具栏
+	        closeDesktopOverflowToolbar(breadcrumbBar, clickedButton)
 
-        await handleButtonClick(btn, savedSelection, lastActiveElement)
+	        await handleButtonClick(btn, savedSelection, lastActiveElement)
+	        
+	        if (btn.type !== 'builtin' && lastActiveElement && lastActiveElement !== document.activeElement) {
+	          ;(lastActiveElement as HTMLElement).focus({ preventScroll: true })
+	        }
+	        setTimeout(() => layerBtn.blur(), 0)
+	      })
 
-        if (btn.type !== 'builtin' && lastActiveElement && lastActiveElement !== document.activeElement) {
-          ;(lastActiveElement as HTMLElement).focus({ preventScroll: true })
-        }
-        setTimeout(() => layerBtn.blur(), 0)
-      })
+	      toolbar.appendChild(layerBtn)
 
-      toolbar.appendChild(layerBtn)
-    })
+	      // toggle-lock：根据当前文档锁状态更新图标
+	      if (btn.type === 'author-tool' && btn.authorToolSubtype === 'toggle-lock') {
+	        const readonlyBtn = breadcrumbBar.querySelector('[data-type="readonly"]') as HTMLElement
+	        const isLocked = readonlyBtn?.getAttribute('data-subtype') === 'lock'
+	        updateToggleLockIcon(layerBtn, isLocked)
+	      }
+	    })
 
     breadcrumbBar.appendChild(toolbar)
   }

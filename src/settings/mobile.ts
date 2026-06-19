@@ -3587,6 +3587,16 @@ export function createMobileSettingLayout(
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">使用浏览器语音合成朗读当前文档内容，支持语速调节、段落高亮、播放控制，电脑端可选用不同语音</td>
             </tr>
             <tr style="background: var(--b3-theme-background);">
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑭</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">一键清理空块</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">自动扫描并删除当前文档中的空块（无文本的段落/标题/列表项），预览确认后批量删除</td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑮</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">文档锁定双图标<span style="color: #10b981; font-size: 11px; margin-left: 4px;">免费</span></td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">独立选择锁定🔒和解锁🔓图标，按钮自动根据当前文档的锁状态切换显示对应图标</td>
+            </tr>
+            <tr style="background: var(--b3-theme-background);">
               <td colspan="3" style="padding: 12px; text-align: center; color: var(--b3-theme-primary); font-weight: 600; font-style: italic;">持续更新中~</td>
             </tr>
           </tbody>

@@ -371,41 +371,40 @@ export function createDesktopButtonItem(
       { value: 'author-tool', label: '⑥鲸鱼定制工具箱' }
     )
   } else {
-    typeOptions.push(
-      { value: 'author-tool', label: '⑥鲸鱼定制工具箱（跳转激活）' }
-    )
+    // 未激活时：toggle-lock 按钮显示"免费试用"，其他显示"跳转激活"
+    const isFreeTrial = button.type === 'author-tool' && button.authorToolSubtype === 'toggle-lock'
+    typeOptions.push({
+      value: 'author-tool',
+      label: isFreeTrial ? '⑥鲸鱼定制工具箱（免费试用）' : '⑥鲸鱼定制工具箱（跳转激活）'
+    })
   }
 
   const typeSelectField = createDesktopSelectField('选择功能', button.type, typeOptions, (v) => {
-    // 如果选择的是鲸鱼定制工具箱但未激活，跳转到激活区域
+    // 选择鲸鱼定制工具箱但未激活：仅 toggle-lock 允许，其他跳转激活
     if (v === 'author-tool' && !context.isAuthorToolActivated()) {
-      // 立即恢复 select 的值为原来的类型
-      const selectElement = typeSelectField.querySelector('select') as HTMLSelectElement
-      if (selectElement) {
-        selectElement.value = button.type || 'builtin-refresh'
+      const isFreeTrial2 = button.authorToolSubtype === 'toggle-lock'
+      if (isFreeTrial2) {
+        // toggle-lock 免费试用：允许切换类型
+        button.type = v as any
+      } else {
+        // 其他情况：恢复原值，跳转激活页
+        const selectElement = typeSelectField.querySelector('select') as HTMLSelectElement
+        if (selectElement) { selectElement.value = button.type || 'builtin-refresh' }
+        requestAnimationFrame(() => {
+          const versionTab = document.querySelector('button[data-tab="version"]') as HTMLElement
+          if (versionTab) versionTab.click()
+        })
+        const newForm = document.createElement('div')
+        newForm.className = 'toolbar-customizer-edit-form'
+        newForm.style.cssText = editForm.style.cssText
+        newForm.style.display = item.dataset.expanded === 'true' ? 'flex' : 'none'
+        populateDesktopEditForm(newForm, button, iconSpan, infoDiv, item, renderList, context)
+        editForm.replaceWith(newForm)
+        return
       }
-    
-      // 直接点击"更新、Q 群、激活码获取"标签按钮
-      requestAnimationFrame(() => {
-        const versionTab = document.querySelector('button[data-tab="version"]') as HTMLElement
-        if (versionTab) {
-          versionTab.click()
-        } else {
-          console.warn('[Desktop Debug] version tab button not found!')
-        }
-      })
-      
-      // 不更新 button.type，但要重新渲染表单以反映原始状态
-      const newForm = document.createElement('div')
-      newForm.className = 'toolbar-customizer-edit-form'
-      newForm.style.cssText = editForm.style.cssText
-      newForm.style.display = item.dataset.expanded === 'true' ? 'flex' : 'none'
-      populateDesktopEditForm(newForm, button, iconSpan, infoDiv, item, renderList, context)
-      editForm.replaceWith(newForm)
-      return
-    }
-
+    } else {
     button.type = v as any
+    }
 
     // 保存当前展开状态
     const wasExpanded = item.dataset.expanded === 'true'
@@ -765,10 +764,15 @@ export function createDesktopButtonItem(
 	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
 	      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
 	      <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
-	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 文档锁定双图标</option>
+	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 文档锁定双图标${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
 	    `
 	    subtypeSelect.onchange = () => {
-	      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock'
+	      button.authorToolSubtype = subtypeSelect.value as any
+		      // 未激活时仅允许 toggle-lock
+		      if (!context.isAuthorToolActivated() && subtypeSelect.value !== 'toggle-lock') {
+		        subtypeSelect.value = 'toggle-lock'
+		        button.authorToolSubtype = 'toggle-lock'
+		      }
 	      // 刷新表单以显示/隐藏相关配置
 	      if ((subtypeSelect as any).refreshForm) {
         (subtypeSelect as any).refreshForm()
@@ -2219,10 +2223,15 @@ export function populateDesktopEditForm(
 	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
 	      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
 	      <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
-	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 文档锁定双图标</option>
+	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 文档锁定双图标${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
 	    `
 	    subtypeSelect.onchange = () => {
-	      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock'
+	      button.authorToolSubtype = subtypeSelect.value as any
+		      // 未激活时仅允许 toggle-lock
+		      if (!context.isAuthorToolActivated() && subtypeSelect.value !== 'toggle-lock') {
+		        subtypeSelect.value = 'toggle-lock'
+		        button.authorToolSubtype = 'toggle-lock'
+		      }
 	      ;(subtypeSelect as any).refreshForm?.()
     }
     authorToolField.appendChild(subtypeSelect)

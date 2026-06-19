@@ -238,19 +238,20 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
     platform: 'desktop',
     showNotification: false
   },
-  {
-    id: 'readonly-desktop',
-    name: '锁住文档',
-    type: 'click-sequence',
-    clickSequence: ['readonly'],
-    icon: '🔒',
-    iconSize: 18,
-    minWidth: 32,
-    marginRight: 8,
-    sort: 3,
-    platform: 'desktop',
-    showNotification: false
-  },
+	  {
+	    id: 'readonly-desktop',
+	    name: '锁住文档',
+	    type: 'author-tool',
+	    authorToolSubtype: 'toggle-lock',
+	    lockIcon: '🔒',
+	    icon: '🔓',
+	    iconSize: 18,
+	    minWidth: 32,
+	    marginRight: 8,
+	    sort: 3,
+	    platform: 'desktop',
+	    showNotification: false
+	  },
   {
     id: 'plugin-settings-desktop',
     name: '插件设置',
@@ -360,19 +361,20 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     platform: 'mobile',
     showNotification: true
   },
-  {
-    id: 'readonly-mobile',
-    name: '锁住文档',
-    type: 'builtin',
-    builtinId: 'readonly',
-    icon: '🔒',
-    iconSize: 23,
-    minWidth: 23,
-    marginRight: 10,
-    sort: 3,
-    platform: 'mobile',
-    showNotification: true
-  },
+	  {
+	    id: 'readonly-mobile',
+	    name: '锁住文档',
+	    type: 'author-tool',
+	    authorToolSubtype: 'toggle-lock',
+	    lockIcon: '🔒',
+	    icon: '🔓',
+	    iconSize: 23,
+	    minWidth: 23,
+	    marginRight: 10,
+	    sort: 3,
+	    platform: 'mobile',
+	    showNotification: true
+	  },
   {
     id: 'plugin-settings-mobile',
     name: '插件设置',

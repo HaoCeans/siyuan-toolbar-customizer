@@ -858,10 +858,15 @@ export function createMobileButtonItem(
 	        <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
 	        <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
 		        <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
-		        <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 文档锁定双图标</option>
+		        <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 文档锁定双图标${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
 	      `
 	      subtypeSelect.onchange = () => {
-	        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock'
+	        button.authorToolSubtype = subtypeSelect.value as any
+	        // 未激活时仅允许 toggle-lock
+	        if (!context.isAuthorToolActivated() && subtypeSelect.value !== 'toggle-lock') {
+	          subtypeSelect.value = 'toggle-lock'
+	          button.authorToolSubtype = 'toggle-lock'
+	        }
         ;(subtypeSelect as any).refreshForm?.()
       }
       authorToolContainer.appendChild(subtypeSelect)

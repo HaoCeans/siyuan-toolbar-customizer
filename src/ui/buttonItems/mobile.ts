@@ -858,7 +858,7 @@ export function createMobileButtonItem(
 	        <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
 	        <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
 		        <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
-		        <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 双图标切换锁定文档</option>
+		        <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 文档锁定双图标</option>
 	      `
 	      subtypeSelect.onchange = () => {
 	        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock'
@@ -1928,6 +1928,13 @@ export function createMobileButtonItem(
     if (iconSpan) updateIconDisplay(iconSpan, v)
   }, context.showIconPicker, button.iconSize)
   editForm.appendChild(iconField)
+  // 文档锁定双图标：额外显示锁定图标选择器
+  if (button.type === 'author-tool' && button.authorToolSubtype === 'toggle-lock') {
+    const lockIconField = createIconField('🔒锁定图标', button.lockIcon || '🔒', (v) => {
+      button.lockIcon = v
+    }, context.showIconPicker, button.iconSize)
+    editForm.appendChild(lockIconField)
+  }
   const iconInput = iconField.querySelector('input') as HTMLInputElement
   const iconPreview = iconField.querySelector('span') as HTMLElement
   editForm.appendChild(createInputField('图标大小', button.iconSize.toString(), '18', (v) => { button.iconSize = parseInt(v) || 18 }, 'number'))

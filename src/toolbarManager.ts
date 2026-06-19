@@ -80,6 +80,7 @@ export interface ButtonConfig {
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
 		  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock'; // 鲸鱼定制工具子类型
 	  unlockIcon?: string;       // 解锁图标（仅 toggle-lock 使用，默认 🔓）
+	  lockIcon?: string;         // 锁定图标（仅 toggle-lock 使用，默认 🔒）
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
   viewName?: string;         // 视图名称
@@ -4137,13 +4138,12 @@ async function executeToggleLock(config: ButtonConfig): Promise<void> {
  * 更新 toggle-lock 按钮的图标（🔒 / 🔓）
  */
 function updateToggleLockIcon(btn: HTMLElement, isLocked: boolean): void {
-  const icon = isLocked ? '🔒' : '🔓'
   const configId = btn.dataset.customButton
   if (!configId) return
 
-  // 从按钮配置中获取图标（locked = 主图标，unlocked = unlockIcon）
+  // 从按钮配置中获取图标：lockIcon=锁定时图标，icon=解锁图标
   const cfg = currentButtonConfigs.find(b => b.id === configId)
-  const targetIcon = isLocked ? cfg?.icon : (cfg?.unlockIcon || cfg?.icon || icon)
+  const targetIcon = isLocked ? (cfg?.lockIcon || cfg?.icon || '🔒') : (cfg?.icon || '🔓')
 
   // 保留 span 子元素的结构，只更新文本
   const existingSpan = btn.querySelector('span')

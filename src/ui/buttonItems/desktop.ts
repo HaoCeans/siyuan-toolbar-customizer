@@ -765,7 +765,7 @@ export function createDesktopButtonItem(
 	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
 	      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
 	      <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
-	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 双图标切换锁定文档</option>
+	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 文档锁定双图标</option>
 	    `
 	    subtypeSelect.onchange = () => {
 	      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock'
@@ -1629,6 +1629,12 @@ export function createDesktopButtonItem(
     // 更新显示的图标
     updateIconDisplay(iconSpan, v)
   }, context.showIconPicker, button.iconSize))
+  // 文档锁定双图标：额外显示锁定图标选择器
+  if (button.type === 'author-tool' && button.authorToolSubtype === 'toggle-lock') {
+    editForm.appendChild(createDesktopIconField('🔒锁定图标', button.lockIcon || '🔒', (v) => {
+      button.lockIcon = v
+    }, context.showIconPicker, button.iconSize))
+  }
   editForm.appendChild(createDesktopField('图标大小', button.iconSize.toString(), '18', (v) => { button.iconSize = parseInt(v) || 18 }, 'number'))
   editForm.appendChild(createDesktopField('按钮宽度', button.minWidth.toString(), '32', (v) => { button.minWidth = parseInt(v) || 32 }, 'number'))
   editForm.appendChild(createDesktopField('右边距', button.marginRight.toString(), '8', (v) => { button.marginRight = parseInt(v) || 8 }, 'number'))
@@ -2213,7 +2219,7 @@ export function populateDesktopEditForm(
 	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
 	      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
 	      <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
-	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 双图标切换锁定文档</option>
+	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 文档锁定双图标</option>
 	    `
 	    subtypeSelect.onchange = () => {
 	      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock'
@@ -3096,6 +3102,12 @@ export function populateDesktopEditForm(
     button.icon = v
     // 需要找到对应的 iconSpan 来更新，这里简化处理
   }, context.showIconPicker, button.iconSize))
+  // 文档锁定双图标：额外显示锁定图标选择器
+  if (button.type === 'author-tool' && button.authorToolSubtype === 'toggle-lock') {
+    form.appendChild(createDesktopIconField('🔒锁定图标', button.lockIcon || '🔒', (v) => {
+      button.lockIcon = v
+    }, context.showIconPicker, button.iconSize))
+  }
   form.appendChild(createDesktopField('图标大小', button.iconSize.toString(), '18', (v) => { button.iconSize = parseInt(v) || 18 }, 'number'))
   form.appendChild(createDesktopField('按钮宽度', button.minWidth.toString(), '32', (v) => { button.minWidth = parseInt(v) || 32 }, 'number'))
   form.appendChild(createDesktopField('右边距', button.marginRight.toString(), '8', (v) => { button.marginRight = parseInt(v) || 8 }, 'number'))

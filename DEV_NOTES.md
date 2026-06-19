@@ -220,9 +220,41 @@ handleToolbarAutoHideScroll()      ← 滚动事件处理器
 | 对象 | 方式 | 选择器 |
 |------|------|--------|
 | 按钮工具栏（底部/顶部） | `.toolbar-scroll-hidden` class：opacity:0 + transform 滑走 | `.protyle-breadcrumb` / `__bar` |
-| 原生顶部工具栏 | `display:none`（消除 48px 布局占位白条） | `.toolbar.toolbar--border` |
-| protyle 底部补偿间距 | padding 收回 | `body.toolbar-autohide-active .protyle` |
+| 原生顶部工具栏 | `position: absolute` + `body padding-top: 48px` 过渡（消除白条+防抖） | `.toolbar.toolbar--border` |
+| protyle 底部补偿间距 | padding 收回，带 transition | `body.toolbar-autohide-active .protyle` |
+| protyle 顶部补偿间距 | padding 收回，带 transition | `body.toolbar-autohide-active.siyuan-toolbar-top-mode .protyle` |
 | 思源状态栏 | opacity:0 | `#status` |
+
+### 原生顶部工具栏：absolute 方案（消除白条+防抖）
+
+思源原生顶栏 `.toolbar.toolbar--border` 是 `body.fn__flex-column` 的第一个 flex 子元素（48px）。任何改变它布局占位的方式都会导致内容跳变 → 滚动抖动。
+
+**解决方案**：永久让工具栏脱离布局流，用 `body padding-top` 补偿空间并加 `transition` 平滑过渡：
+
+```css
+/* ① 工具栏永远绝对定位（加载时立即生效，id: native-toolbar-absolute-style） */
+.toolbar.toolbar--border {
+    position: absolute !important;
+    top: 0; left: 0; right: 0; z-index: 10;
+}
+/* ② body 用 padding-top 补偿 48px，带 transition */
+body.fn__flex-column {
+    padding-top: 48px !important;
+    transition: padding-top 0.16s ease;
+}
+/* ③ 锁定时 padding-top 归零 + 工具栏淡出 */
+body.toolbar-autohide-active { padding-top: 0 !important; }
+body.toolbar-autohide-active .toolbar.toolbar--border {
+    opacity: 0 !important; pointer-events: none !important;
+    transition: opacity 0.16s ease;
+}
+```
+
+| 方式 | 布局变化 | 白条 | 抖动 |
+|------|---------|------|------|
+| `display: none` | 48px 消失/出现 | 无 | ❌ 剧烈 |
+| `opacity: 0`（flex 中） | 不变 | 有 | ✅ |
+| **`position: absolute`** | padding-top 渐变 | **无** | **✅ 平滑** |
 
 ### 顶部/底部模式差异
 
@@ -351,7 +383,7 @@ htmlEl.style.transform = 'translateZ(0) translateY(0)'
 - transform 必须保留 `translateZ(0)` 前缀（否则无动画）
 - 顶部/底部模式必须用 `isTop` 变量区分 transform 方向和时序
 - 恢复工具栏必须**无条件清理** class + transform + body class
-- `handleToolbarAutoHideScroll` 入口必须实时校验锁状态
+- `handleToolbarAutoHideScroll` 入口读缓存变量 `toolbarAutoHideDocLocked`，不再每帧 `querySelector`
 - 清理 class 用 `querySelectorAll('.toolbar-scroll-hidden')` 直接查找，不依赖属性选择器
 - 显示路径必须先设 `el.style.transition` 再移除 class（class 移除后 transition 丢失）
 - 顶部模式 transition 需高特异性选择器覆盖 `top-toolbar-custom-style` 的 `!important`
@@ -361,4 +393,71 @@ htmlEl.style.transform = 'translateZ(0) translateY(0)'
 - keyboardOpen 检测用 `visualViewport.height < window.innerHeight - 80`
 - `ensureToolbarAutoHideStyle()` 每次调用都重写 textContent（不用 return-early 缓存旧 CSS）
 - 新增 `body.toolbar-autohide-active` 相关 CSS 时，必须同时考虑顶部/底部两种模式
+- 原生顶栏用 `position: absolute` + `body padding-top`，禁止 `display:none`（会导致布局跳变）
 - `initCustomButtons` 中的延时调用用 500ms（等工具栏 DOM 初始化），不要用 300ms
+- hide/show 后设 250ms 静默期（`toolbarAutoHideIgnoreUntil`），忽略布局变化引发的反馈滚动
+- 隐藏/显示冷却分开：隐藏 200ms（防反馈振荡），显示 80ms（响应灵敏）
+- 锁状态缓存为 `toolbarAutoHideDocLocked`，滚动处理器读变量不查 DOM
+- 所有 setTimeout 存 `toolbarAutoHidePendingTimer`，unbind/cleanup 时 `clearTimeout` 防延时竞态
+
+### 性能优化：锁状态缓存
+
+滚动处理器原先每帧 `querySelector('[data-type="readonly"]')`，锁状态在滚动中不会变，纯浪费。改为模块变量 `toolbarAutoHideDocLocked`，仅在 `refreshToolbarAutoHide()`（切文档/锁切换时）更新。
+
+### 延时竞态防护
+
+隐藏/显示使用 `setTimeout` 错开时序（50-80ms）。解锁时如果 `refreshToolbarAutoHide` 在 setTimeout 触发前执行，清理会空跑，随后 setTimeout 仍会加上 class 导致工具栏再次隐藏。
+
+**解决方案**：所有 setTimeout 保存到 `toolbarAutoHidePendingTimer`，`unbindToolbarAutoHideScroll()` 和 `cleanup()` 中 `clearTimeout` 取消未触发的延时。回调执行后设为 `null`。
+
+### Kmind-Zen 兼容（§12）
+
+见下方独立条目。
+
+---
+
+## 12. Kmind-Zen 插件兼容 — 文档树激活时视觉隐藏悬浮面板
+
+**相关文件**: `src/toolbarManager.ts`（`refreshKmindZenCompat`、`_applyKmindZenState`）、`src/index.ts`（`eventBusRefreshHandler` 中调用）
+
+**功能**: 当 Kmind-Zen 文档树在当前文档激活时（自定义属性 `custom-kmind-zen-doctree-doc` 为 `true`），视觉隐藏悬浮大纲/标签页/文档导航/工具栏，防止层级重叠。
+
+### 检测方式
+
+通过思源 API 读取块属性，不依赖 DOM 启发式：
+
+```typescript
+fetchSyncPost('/api/attr/getBlockAttrs', { id: docId }).then(resp => {
+  const isKmindZen = resp?.data?.['custom-kmind-zen-doctree-doc'] === 'true'
+  document.body.classList.toggle('kmind-zen-active', isKmindZen)
+})
+```
+
+注意：`kmind-zen-doctree-doc` 是思源自定义块属性（存在 `data-name="custom-kmind-zen-doctree-doc"`），DOM 上没有对应 HTML 属性，不能通过 `querySelector('[data-kmind-zen-doctree-doc]')` 检测。
+
+### CSS 联动
+
+通过 `body.kmind-zen-active` class 驱动：
+
+```css
+body.kmind-zen-active #mobile-outline-panel,
+body.kmind-zen-active #mobile-tabs-bar,
+body.kmind-zen-active #mobile-doc-nav-bar { display: none !important; }
+body.kmind-zen-active .protyle-breadcrumb[data-toolbar-customized],
+body.kmind-zen-active .protyle-breadcrumb__bar[data-toolbar-customized],
+body.kmind-zen-active.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]),
+body.kmind-zen-active.siyuan-toolbar-top-mode .protyle-breadcrumb__bar:not([data-toolbar-customized]) { display: none !important; }
+```
+
+### 调用时机
+
+- `initCustomButtons()` 初始化时
+- `eventBusRefreshHandler` 每次切文档时
+- 仅移动端生效（`if (!isMobileDevice()) return`）
+
+### 规则
+
+- 必须用思源 API 读块属性，不能用 DOM 属性选择器或 `offsetParent` 等启发式
+- 样式注入在 `refreshKmindZenCompat` 自身完成，不依赖 `initCustomButtons` 的平台分支
+- cleanup 中移除 `body.kmind-zen-active` class 和样式元素 `#kmind-zen-compat-style`
+- API 调用是异步的（`.then()`），class 切换有几毫秒延迟，不影响体验

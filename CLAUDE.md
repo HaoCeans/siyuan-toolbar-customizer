@@ -715,9 +715,9 @@ handleToolbarAutoHideScroll()      ← 滚动事件处理器
 | 对象 | 方式 | 选择器 |
 |------|------|--------|
 | 按钮工具栏 | `.toolbar-scroll-hidden` class：opacity:0 + transform | `.protyle-breadcrumb` / `__bar` |
-| 原生顶部工具栏 | `display:none`（消除 48px 布局占位） | `.toolbar.toolbar--border` |
-| protyle 间距（底部） | padding-bottom 收回 | `body.toolbar-autohide-active.siyuan-toolbar-customizer-enabled .protyle` |
-| protyle 间距（顶部） | padding-top → 0 | `body.toolbar-autohide-active.siyuan-toolbar-top-mode .protyle` |
+| 原生顶部工具栏 | `position: absolute` + `body padding-top: 48px`（消除白条+防抖） | `.toolbar.toolbar--border` |
+| protyle 间距（底部） | padding-bottom 收回，带 transition | `body.toolbar-autohide-active.siyuan-toolbar-customizer-enabled .protyle` |
+| protyle 间距（顶部） | padding-top → 0，带 transition | `body.toolbar-autohide-active.siyuan-toolbar-top-mode .protyle` |
 | 思源状态栏 | opacity:0 | `#status` |
 
 #### 顶部/底部模式差异
@@ -755,8 +755,30 @@ handleToolbarAutoHideScroll()      ← 滚动事件处理器
 - 顶部模式 transform 偏移量 ≥120px（兜底可配置 top 值）
 - 恢复工具栏必须无条件清理 class + transform + body class
 - 显示路径必须先设 `el.style.transition` 再移除 class
-- `handleToolbarAutoHideScroll` 入口必须实时校验锁状态
+- `handleToolbarAutoHideScroll` 入口读缓存变量 `toolbarAutoHideDocLocked`，不再每帧 querySelector
 - 清理 class 用 `querySelectorAll('.toolbar-scroll-hidden')` 直接查找
 - 绑定滚动容器有 30 次 retry（200ms 间隔）
 - `ensureToolbarAutoHideStyle()` 每次调用都重写 textContent
 - `initCustomButtons` 中延时用 500ms，不要用 300ms
+- 所有 setTimeout 延时存 `toolbarAutoHidePendingTimer`，unbind/cleanup 时 clearTimeout 防竞态
+- 原生顶栏用 `position: absolute` + `body padding-top`，禁止 `display:none`
+- hide/show 后设静默期 250ms，忽略布局反馈滚动
+- 冷却分开：隐藏 200ms / 显示 80ms
+- 锁状态缓存为 `toolbarAutoHideDocLocked`
+
+---
+
+### 24. Kmind-Zen 插件兼容 — 文档树激活时视觉隐藏悬浮面板
+
+**相关文件**: `src/toolbarManager.ts`（`refreshKmindZenCompat`、`_applyKmindZenState`）、`src/index.ts`
+
+**检测方式**: 通过思源 API `fetchSyncPost('/api/attr/getBlockAttrs', { id: docId })` 读 `custom-kmind-zen-doctree-doc` 属性。注意这是思源自定义块属性，DOM 上没有对应 HTML 属性。
+
+**CSS 联动**: `body.kmind-zen-active` class 驱动，隐藏 `#mobile-outline-panel`、`#mobile-tabs-bar`、`#mobile-doc-nav-bar` 及所有工具栏。
+
+**调用时机**: `initCustomButtons()` 初始化 + `eventBusRefreshHandler` 每次切文档。仅移动端生效。
+
+**规则**:
+- 必须用思源 API，不能用 DOM 选择器或 `offsetParent` 等启发式
+- 样式注入在 `refreshKmindZenCompat` 自身完成
+- cleanup 中移除 class 和 `#kmind-zen-compat-style`

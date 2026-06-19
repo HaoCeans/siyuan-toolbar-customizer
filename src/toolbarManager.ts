@@ -475,8 +475,14 @@ let toolbarHiddenByScroll = false
 let toolbarLastScrollTop: number | null = null
 let toolbarScrollBindRetryTimer: ReturnType<typeof setInterval> | null = null
 const TOOLBAR_AUTOHIDE_THRESHOLD = 15
-const TOOLBAR_AUTOHIDE_COOLDOWN = 200
-let toolbarAutoHideLastToggle = 0
+const TOOLBAR_AUTOHIDE_COOLDOWN_HIDE = 200  // 隐藏冷却，防止反馈滚动触发反复切换
+const TOOLBAR_AUTOHIDE_COOLDOWN_SHOW = 80   // 显示冷却较短，响应更灵敏
+let toolbarAutoHideLastToggle = 0  // 保留向后兼容（其他地方可能引用）
+let toolbarAutoHideLastHide = 0
+let toolbarAutoHideLastShow = 0
+let toolbarAutoHideIgnoreUntil = 0  // hide/show 后的静默期，期间只跟踪位置不动作，防止布局位移引发的反馈滚动
+let toolbarAutoHideDocLocked = false  // 缓存当前文档锁状态，滚动处理器直接读，避免每帧 querySelector
+let toolbarAutoHidePendingTimer: ReturnType<typeof setTimeout> | null = null  // 跟踪隐藏/显示的延时定时器
 const toolbarCheckTimers = new Map<Element, ReturnType<typeof setTimeout>>()  // [已弃用] 保留兼容，不再写入
 
 // 导出工具栏管理器对象
@@ -1280,7 +1286,29 @@ export function initCustomButtons(configs: ButtonConfig[]) {
   // 延时刷新工具栏滚动隐藏状态（等工具栏 DOM 初始化完毕）
   setTimeout(() => refreshToolbarAutoHide(), 500)
 
-  // 添加全局样式：移除主工具栏按钮的 focus 和 active 状态阴影（排除扩展工具栏按钮）
+  // 添加全局样式：将原生顶栏提出布局流，用 body padding-top 补偿（消除白条+抖动）
+  if (!document.getElementById('native-toolbar-absolute-style')) {
+    const absStyle = document.createElement('style')
+    absStyle.id = 'native-toolbar-absolute-style'
+    absStyle.textContent = `
+      @media (max-width: 768px) {
+        /* 原生顶栏永远脱离布局流，不参与 flex 布局 */
+        .toolbar.toolbar--border {
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          z-index: 10 !important;
+        }
+        /* body 用 padding-top 补偿工具栏空间，transition 平滑过渡 */
+        body.fn__flex-column {
+          padding-top: 48px !important;
+          transition: padding-top 0.16s ease !important;
+        }
+      }
+    `
+    document.head.appendChild(absStyle)
+  }
   if (!document.getElementById('custom-button-focus-style')) {
     const focusStyle = document.createElement('style')
     focusStyle.id = 'custom-button-focus-style'
@@ -4245,13 +4273,15 @@ function ensureToolbarAutoHideStyle(): void {
     body.siyuan-toolbar-top-mode .protyle-breadcrumb__bar.toolbar-scroll-hidden {
       transition: opacity 0.2s ease-out, transform 0.2s ease-out !important;
     }
-    /* 工具栏隐藏时，同步收回 protyle 补偿间距（底部模式） */
+    /* 工具栏隐藏时，同步收回 protyle 补偿间距（底部模式），加过渡防抖动 */
     body.toolbar-autohide-active.siyuan-toolbar-customizer-enabled .protyle {
       padding-bottom: env(safe-area-inset-bottom) !important;
+      transition: padding-bottom 0.16s ease !important;
     }
-    /* 工具栏隐藏时，同步收回 protyle 补偿间距（顶部模式） */
+    /* 工具栏隐藏时，同步收回 protyle 补偿间距（顶部模式），加过渡防抖动 */
     body.toolbar-autohide-active.siyuan-toolbar-top-mode .protyle {
       padding-top: 0 !important;
+      transition: padding-top 0.2s ease-out !important;
     }
     /* 工具栏隐藏时，同步隐藏思源底部状态栏 */
     body.toolbar-autohide-active #status {
@@ -4259,9 +4289,16 @@ function ensureToolbarAutoHideStyle(): void {
       pointer-events: none !important;
       transition: opacity 0.16s ease !important;
     }
-    /* 工具栏隐藏时，同步隐藏思源原生顶部工具栏（display:none 消除 48px 布局占位白条） */
-    body.toolbar-autohide-active .toolbar.toolbar--border {
-      display: none !important;
+    /* 工具栏隐藏时：body padding-top 归零 + 原生顶栏透明（仅移动端） */
+    @media (max-width: 768px) {
+      body.toolbar-autohide-active {
+        padding-top: 0 !important;
+      }
+      body.toolbar-autohide-active .toolbar.toolbar--border {
+        opacity: 0 !important;
+        pointer-events: none !important;
+        transition: opacity 0.16s ease !important;
+      }
     }
   `
   if (!style.parentElement) {
@@ -4284,9 +4321,8 @@ function getToolbarElementsForAutoHide(): HTMLElement[] {
 		/** 处理滚动事件 */
 		function handleToolbarAutoHideScroll(): void {
 		  if (!toolbarAutoHideConfigured) return
-		  // 实时校验文档锁状态，防止解锁后残留事件仍操作工具栏
-		  const readonlyBtn = document.querySelector('[data-type="readonly"]') as HTMLElement | null
-		  if (!readonlyBtn || readonlyBtn.getAttribute('data-subtype') !== 'lock') {
+		  // 读缓存的锁状态（refreshToolbarAutoHide 切文档/锁切换时更新），省掉每帧 querySelector
+		  if (!toolbarAutoHideDocLocked) {
 		    // 文档已解锁，立即恢复工具栏
 		    if (toolbarHiddenByScroll) {
 		      toolbarHiddenByScroll = false
@@ -4300,13 +4336,17 @@ function getToolbarElementsForAutoHide(): HTMLElement[] {
 		    }
 		    return
 		  }
+		  // 静默期内只跟踪滚动位置，不执行动作（防止布局变化产生的反馈滚动）
+		  const now = Date.now()
+		  const scrollEl = toolbarAutoHideBoundEl || getMobileScrollElementForToolbar()
+		  if (now < toolbarAutoHideIgnoreUntil) {
+		    toolbarLastScrollTop = scrollEl?.scrollTop ?? null
+		    return
+		  }
 		  if (isKeyboardOpenForToolbar()) return
 
-	  const scrollEl = toolbarAutoHideBoundEl || getMobileScrollElementForToolbar()
-	  if (!scrollEl) return
-
-	  const now = Date.now()
-	  const st = scrollEl.scrollTop
+		  const st = scrollEl?.scrollTop
+		  if (st == null) return
 
 	  if (toolbarLastScrollTop == null) {
 	    toolbarLastScrollTop = st
@@ -4316,62 +4356,73 @@ function getToolbarElementsForAutoHide(): HTMLElement[] {
 	  const delta = st - toolbarLastScrollTop
 	  toolbarLastScrollTop = st
 
-	  if (now - toolbarAutoHideLastToggle < TOOLBAR_AUTOHIDE_COOLDOWN) return
+	  // 隐藏：检查距上次显示是否够 200ms（防止反馈滚动触发反复切换）
+  if (!toolbarHiddenByScroll && delta > TOOLBAR_AUTOHIDE_THRESHOLD && now - toolbarAutoHideLastShow < TOOLBAR_AUTOHIDE_COOLDOWN_HIDE) return
+  // 显示：检查距上次隐藏是否够 80ms（响应灵敏）
+  if (toolbarHiddenByScroll && delta < -TOOLBAR_AUTOHIDE_THRESHOLD && now - toolbarAutoHideLastHide < TOOLBAR_AUTOHIDE_COOLDOWN_SHOW) return
 
-	  if (!toolbarHiddenByScroll && delta > TOOLBAR_AUTOHIDE_THRESHOLD) {
-	    // 上滑 → 隐藏
-	    toolbarHiddenByScroll = true
-	    toolbarAutoHideLastToggle = now
-	    const isTop = document.body.classList.contains('siyuan-toolbar-top-mode')
+  if (!toolbarHiddenByScroll && delta > TOOLBAR_AUTOHIDE_THRESHOLD) {
+    // 上滑 → 隐藏
+    toolbarHiddenByScroll = true
+    toolbarAutoHideLastHide = now
+    toolbarAutoHideIgnoreUntil = now + 250  // 静默 250ms，待 padding 过渡完
+    toolbarLastScrollTop = st  // 以当前滚动位置为新基准
+    const isTop = document.body.classList.contains('siyuan-toolbar-top-mode')
 	    const slideTransform = isTop
 	      ? 'translateZ(0) translateY(calc(-100% - 120px))'
 	      : 'translateZ(0) translateY(calc(100% + 8px))'
-	    if (isTop) {
-	      // 顶部模式：先滑走我们的工具栏，再隐藏原生顶栏
-	      getToolbarElementsForAutoHide().forEach(el => {
-	        el.classList.add('toolbar-scroll-hidden')
-	        el.style.transform = slideTransform
-	      })
-	      setTimeout(() => {
-	        document.body.classList.add('toolbar-autohide-active')
-	      }, 80)
-	    } else {
-	      // 底部模式：先收 protyle 间距 + 状态栏，再滑走工具栏
-	      document.body.classList.add('toolbar-autohide-active')
-	      setTimeout(() => {
-	        getToolbarElementsForAutoHide().forEach(el => {
-	          el.classList.add('toolbar-scroll-hidden')
-	          el.style.transform = slideTransform
-	        })
-	      }, 50)
-	    }
-	  } else if (toolbarHiddenByScroll && delta < -TOOLBAR_AUTOHIDE_THRESHOLD) {
-	    // 下滑 → 显示
-	    toolbarHiddenByScroll = false
-	    toolbarAutoHideLastToggle = now
-	    const isTop = document.body.classList.contains('siyuan-toolbar-top-mode')
-	    if (isTop) {
-	      // 顶部模式：先恢复原生顶栏，再滑入我们的工具栏
-	      document.body.classList.remove('toolbar-autohide-active')
-	      setTimeout(() => {
-	        document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
-	          const htmlEl = el as HTMLElement
-	          htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
-	          htmlEl.classList.remove('toolbar-scroll-hidden')
-	          htmlEl.style.transform = 'translateZ(0) translateY(0)'
-	        })
-	      }, 50)
-	    } else {
-	      // 底部模式：先滑回工具栏，再恢复 protyle 间距 + 状态栏
-	      document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
-	        const htmlEl = el as HTMLElement
-	        htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
-	        htmlEl.classList.remove('toolbar-scroll-hidden')
-	        htmlEl.style.transform = 'translateZ(0) translateY(0)'
-	      })
-	      setTimeout(() => {
-	        document.body.classList.remove('toolbar-autohide-active')
-	      }, 80)
+		    if (isTop) {
+		      // 顶部模式：先滑走工具栏，再隐藏原生顶栏
+		      getToolbarElementsForAutoHide().forEach(el => {
+		        el.classList.add('toolbar-scroll-hidden')
+		        el.style.transform = slideTransform
+		      })
+		      toolbarAutoHidePendingTimer = setTimeout(() => {
+		        toolbarAutoHidePendingTimer = null
+		        document.body.classList.add('toolbar-autohide-active')
+		      }, 80)
+		    } else {
+		      // 底部模式：先收 protyle 间距 + 状态栏，再滑走工具栏
+		      document.body.classList.add('toolbar-autohide-active')
+		      toolbarAutoHidePendingTimer = setTimeout(() => {
+		        toolbarAutoHidePendingTimer = null
+		        getToolbarElementsForAutoHide().forEach(el => {
+		          el.classList.add('toolbar-scroll-hidden')
+		          el.style.transform = slideTransform
+		        })
+		      }, 50)
+		    }
+		  } else if (toolbarHiddenByScroll && delta < -TOOLBAR_AUTOHIDE_THRESHOLD) {
+		    // 下滑 → 显示
+		    toolbarHiddenByScroll = false
+		    toolbarAutoHideLastShow = now
+		    toolbarAutoHideIgnoreUntil = now + 250
+		    toolbarLastScrollTop = st
+		    const isTop = document.body.classList.contains('siyuan-toolbar-top-mode')
+		    if (isTop) {
+		      // 顶部模式：先恢复原生顶栏，再滑入工具栏
+		      document.body.classList.remove('toolbar-autohide-active')
+		      toolbarAutoHidePendingTimer = setTimeout(() => {
+		        toolbarAutoHidePendingTimer = null
+		        document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
+		          const htmlEl = el as HTMLElement
+		          htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
+		          htmlEl.classList.remove('toolbar-scroll-hidden')
+		          htmlEl.style.transform = 'translateZ(0) translateY(0)'
+		        })
+		      }, 50)
+		    } else {
+		      // 底部模式：先滑回工具栏，再恢复 protyle 间距 + 状态栏
+		      document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
+		        const htmlEl = el as HTMLElement
+		        htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
+		        htmlEl.classList.remove('toolbar-scroll-hidden')
+		        htmlEl.style.transform = 'translateZ(0) translateY(0)'
+		      })
+		      toolbarAutoHidePendingTimer = setTimeout(() => {
+		        toolbarAutoHidePendingTimer = null
+		        document.body.classList.remove('toolbar-autohide-active')
+		      }, 80)
 	    }
 	  }
 	}
@@ -4404,17 +4455,22 @@ function getToolbarElementsForAutoHide(): HTMLElement[] {
 	  }, 200)
 	}
 
-	function unbindToolbarAutoHideScroll(): void {
-	  if (toolbarAutoHideScrollHandler && toolbarAutoHideBoundEl) {
-	    toolbarAutoHideBoundEl.removeEventListener('scroll', toolbarAutoHideScrollHandler)
-	  }
-	  toolbarAutoHideScrollHandler = null
-	  toolbarAutoHideBoundEl = null
-	  if (toolbarScrollBindRetryTimer) {
-	    clearInterval(toolbarScrollBindRetryTimer)
-	    toolbarScrollBindRetryTimer = null
-	  }
-	}
+function unbindToolbarAutoHideScroll(): void {
+  if (toolbarAutoHideScrollHandler && toolbarAutoHideBoundEl) {
+    toolbarAutoHideBoundEl.removeEventListener('scroll', toolbarAutoHideScrollHandler)
+  }
+  toolbarAutoHideScrollHandler = null
+  toolbarAutoHideBoundEl = null
+  if (toolbarScrollBindRetryTimer) {
+    clearInterval(toolbarScrollBindRetryTimer)
+    toolbarScrollBindRetryTimer = null
+  }
+  // 取消未触发的延时（防止解锁后 setTimeout 仍加上 class）
+  if (toolbarAutoHidePendingTimer) {
+    clearTimeout(toolbarAutoHidePendingTimer)
+    toolbarAutoHidePendingTimer = null
+  }
+}
 
 	/** 检测 Kmind-Zen 文档树是否激活，切换 body class 驱动 CSS 隐藏（仅移动端） */
 	export function refreshKmindZenCompat(): void {
@@ -4478,6 +4534,7 @@ function getToolbarElementsForAutoHide(): HTMLElement[] {
   // 检查当前文档是否锁定
   const readonlyBtn = document.querySelector('[data-type="readonly"]') as HTMLElement | null
   const isLocked = readonlyBtn?.getAttribute('data-subtype') === 'lock'
+  toolbarAutoHideDocLocked = isLocked  // 缓存供滚动处理器读取，省去每帧 querySelector
 
   if (!isLocked) {
     unbindToolbarAutoHideScroll()
@@ -6214,6 +6271,14 @@ export function cleanup() {
   toolbarHiddenByScroll = false
   toolbarLastScrollTop = null
   toolbarAutoHideLastToggle = 0
+  toolbarAutoHideLastHide = 0
+  toolbarAutoHideLastShow = 0
+  toolbarAutoHideIgnoreUntil = 0
+  toolbarAutoHideDocLocked = false
+  if (toolbarAutoHidePendingTimer) {
+    clearTimeout(toolbarAutoHidePendingTimer)
+    toolbarAutoHidePendingTimer = null
+  }
   document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => { (el as HTMLElement).classList.remove('toolbar-scroll-hidden'); (el as HTMLElement).style.transform = 'translateZ(0) translateY(0)' })
   document.body.classList.remove('toolbar-autohide-active')
   document.body.classList.remove('kmind-zen-active')
@@ -6237,7 +6302,8 @@ export function cleanup() {
     'mobile-toolbar-dynamic-style',
     'popup-select-scrollbar-style',
     'toolbar-autohide-style',
-    'kmind-zen-compat-style'
+    'kmind-zen-compat-style',
+    'native-toolbar-absolute-style'
   ]
   idsToRemove.forEach(id => {
     const el = document.getElementById(id)

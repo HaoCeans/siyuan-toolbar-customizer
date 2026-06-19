@@ -1939,24 +1939,6 @@ export function createMobileButtonItem(
       button.lockIcon = v
     }, context.showIconPicker, button.iconSize)
     editForm.appendChild(lockIconField)
-    // 锁定时工具栏随滚动隐藏
-    const autoHideItem = document.createElement('div')
-    autoHideItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0;'
-    const autoHideLabel = document.createElement('label')
-    autoHideLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
-    autoHideLabel.textContent = '锁定时工具栏滚动隐藏'
-    const autoHideSwitch = document.createElement('input')
-    autoHideSwitch.type = 'checkbox'
-    autoHideSwitch.className = 'b3-switch'
-    autoHideSwitch.checked = button.toolbarAutoHide ?? false
-    autoHideSwitch.onchange = () => { button.toolbarAutoHide = autoHideSwitch.checked }
-    autoHideItem.appendChild(autoHideLabel)
-    autoHideItem.appendChild(autoHideSwitch)
-    editForm.appendChild(autoHideItem)
-    const autoHideHint = document.createElement('div')
-    autoHideHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    autoHideHint.textContent = '💡 文档锁定时，上滑隐藏工具栏、下滑显示'
-    editForm.appendChild(autoHideHint)
   }
   const iconInput = iconField.querySelector('input') as HTMLInputElement
   const iconPreview = iconField.querySelector('span') as HTMLElement

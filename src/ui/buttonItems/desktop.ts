@@ -1638,24 +1638,6 @@ export function createDesktopButtonItem(
     editForm.appendChild(createDesktopIconField('🔒锁定图标', button.lockIcon || '🔒', (v) => {
       button.lockIcon = v
     }, context.showIconPicker, button.iconSize))
-    // 锁定时工具栏随滚动隐藏
-    const autoHideItem = document.createElement('div')
-    autoHideItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0;'
-    const autoHideLabel = document.createElement('label')
-    autoHideLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
-    autoHideLabel.textContent = '锁定时工具栏滚动隐藏'
-    const autoHideSwitch = document.createElement('input')
-    autoHideSwitch.type = 'checkbox'
-    autoHideSwitch.className = 'b3-switch'
-    autoHideSwitch.checked = button.toolbarAutoHide ?? false
-    autoHideSwitch.onchange = () => { button.toolbarAutoHide = autoHideSwitch.checked }
-    autoHideItem.appendChild(autoHideLabel)
-    autoHideItem.appendChild(autoHideSwitch)
-    editForm.appendChild(autoHideItem)
-    const autoHideHint = document.createElement('div')
-    autoHideHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-bottom: 4px;'
-    autoHideHint.textContent = '💡 文档锁定时，上滑隐藏工具栏、下滑显示（与悬浮面板一致）'
-    editForm.appendChild(autoHideHint)
   }
   editForm.appendChild(createDesktopField('图标大小', button.iconSize.toString(), '18', (v) => { button.iconSize = parseInt(v) || 18 }, 'number'))
   editForm.appendChild(createDesktopField('按钮宽度', button.minWidth.toString(), '32', (v) => { button.minWidth = parseInt(v) || 32 }, 'number'))
@@ -3134,24 +3116,6 @@ export function populateDesktopEditForm(
     form.appendChild(createDesktopIconField('🔒锁定图标', button.lockIcon || '🔒', (v) => {
       button.lockIcon = v
     }, context.showIconPicker, button.iconSize))
-    // 锁定时工具栏随滚动隐藏
-    const autoHideItem = document.createElement('div')
-    autoHideItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0;'
-    const autoHideLabel = document.createElement('label')
-    autoHideLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
-    autoHideLabel.textContent = '锁定时工具栏滚动隐藏'
-    const autoHideSwitch = document.createElement('input')
-    autoHideSwitch.type = 'checkbox'
-    autoHideSwitch.className = 'b3-switch'
-    autoHideSwitch.checked = button.toolbarAutoHide ?? false
-    autoHideSwitch.onchange = () => { button.toolbarAutoHide = autoHideSwitch.checked }
-    autoHideItem.appendChild(autoHideLabel)
-    autoHideItem.appendChild(autoHideSwitch)
-    form.appendChild(autoHideItem)
-    const autoHideHint = document.createElement('div')
-    autoHideHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-bottom: 4px;'
-    autoHideHint.textContent = '💡 文档锁定时，上滑隐藏工具栏、下滑显示（与悬浮面板一致）'
-    form.appendChild(autoHideHint)
   }
   form.appendChild(createDesktopField('图标大小', button.iconSize.toString(), '18', (v) => { button.iconSize = parseInt(v) || 18 }, 'number'))
   form.appendChild(createDesktopField('按钮宽度', button.minWidth.toString(), '32', (v) => { button.minWidth = parseInt(v) || 32 }, 'number'))

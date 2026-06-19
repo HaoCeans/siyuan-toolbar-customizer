@@ -857,10 +857,11 @@ export function createMobileButtonItem(
         <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 前一篇/后一篇文档</option>
 	        <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
 	        <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
-	        <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
+		        <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
+		        <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 双图标切换锁定文档</option>
 	      `
 	      subtypeSelect.onchange = () => {
-	        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks'
+	        button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock'
         ;(subtypeSelect as any).refreshForm?.()
       }
       authorToolContainer.appendChild(subtypeSelect)
@@ -1827,7 +1828,7 @@ export function createMobileButtonItem(
           scrollDocConfigDiv.style.display = 'none'
           imageUploadConfigDiv.style.display = 'flex'
 	          floatOpacityConfigDiv.style.display = 'none'
-	        } else if (subtype === 'clear-empty-blocks') {
+		        } else if (subtype === 'clear-empty-blocks' || subtype === 'toggle-lock') {
 	          docConfigDiv.style.display = 'none'
 	          dbConfigDiv.style.display = 'none'
 	          diaryConfigDiv.style.display = 'none'

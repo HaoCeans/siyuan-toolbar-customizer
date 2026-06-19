@@ -765,9 +765,10 @@ export function createDesktopButtonItem(
 	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
 	      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
 	      <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
+	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 双图标切换锁定文档</option>
 	    `
 	    subtypeSelect.onchange = () => {
-	      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks'
+	      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock'
 	      // 刷新表单以显示/隐藏相关配置
 	      if ((subtypeSelect as any).refreshForm) {
         (subtypeSelect as any).refreshForm()
@@ -1595,7 +1596,7 @@ export function createDesktopButtonItem(
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
         img1UploadConfigDiv.style.display = 'flex'
-	    } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts' || subtype === 'clear-empty-blocks') {
+	    } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts' || subtype === 'clear-empty-blocks' || subtype === 'toggle-lock') {
 	      docConfigDiv.style.display = 'none'
 	      dbConfigDiv.style.display = 'none'
 	      diaryConfigDiv.style.display = 'none'
@@ -2212,9 +2213,10 @@ export function populateDesktopEditForm(
 	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
 	      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
 	      <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
+	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 双图标切换锁定文档</option>
 	    `
 	    subtypeSelect.onchange = () => {
-	      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks'
+	      button.authorToolSubtype = subtypeSelect.value as 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock'
 	      ;(subtypeSelect as any).refreshForm?.()
     }
     authorToolField.appendChild(subtypeSelect)
@@ -3063,7 +3065,7 @@ export function populateDesktopEditForm(
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
         img2UploadConfigDiv.style.display = 'flex'
-	      } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts' || subtype === 'clear-empty-blocks') {
+	      } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts' || subtype === 'clear-empty-blocks' || subtype === 'toggle-lock') {
 	        docConfigDiv.style.display = 'none'
 	        dbConfigDiv.style.display = 'none'
 	        diaryConfigDiv.style.display = 'none'

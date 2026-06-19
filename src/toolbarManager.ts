@@ -78,7 +78,8 @@ export interface ButtonConfig {
   targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
   mobileTargetDocId?: string; // 打开指定ID块：目标块ID（移动端），支持文档ID或块ID
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
-	  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks'; // 作者工具子类型：open-doc=打开指定ID块, database=数据库悬浮弹窗, diary=日记, life-log=叶归LifeLog适配, popup-select=弹窗框模板选择, button-sequence=连续点击自定义按钮, scroll-doc=滚动文档顶部或底部, image-upload=图片快捷导入日记, mobile-tabs=手机端标签页Tab, mobile-outline=手机端悬浮大纲, doc-nav=手机端前一篇/后一篇文档, slide-comment=滑动快速批注, tts=文档朗读, clear-empty-blocks=一键清理空块
+		  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock'; // 鲸鱼定制工具子类型
+	  unlockIcon?: string;       // 解锁图标（仅 toggle-lock 使用，默认 🔓）
   dbBlockId?: string;        // 数据库块ID
   dbId?: string;             // 数据库ID（属性视图ID）
   viewName?: string;         // 视图名称
@@ -4067,6 +4068,84 @@ function executeTTS() {
 }
 
 /**
+ * 执行双图标切换锁定文档（toggle-lock）
+ * 
+ * 点击后切换当前文档的锁状态：
+ *   解锁 → 锁（data-subtype="lock", 图标🔒）
+ *   锁   → 解锁（data-subtype="unlock", 图标🔓）
+ * 
+ * 图标会随文档切换自动更新：监听 switch-protyle 事件，
+ * 根据新文档的锁状态渲染对应图标。
+ */
+async function executeToggleLock(config: ButtonConfig): Promise<void> {
+  const protyle = getActiveProtyle()
+  if (!protyle?.block?.rootID) {
+    showMessage('未找到当前文档', 2000, 'info')
+    return
+  }
+  const docId = protyle.block.rootID
+
+  try {
+    // 1. 读取当前锁状态
+    const getResp = await fetchSyncPost('/api/attr/getBlockAttrs', { id: docId })
+    const isLocked = getResp?.data?.['custom-sy-readonly'] === 'true'
+    const newValue = isLocked ? 'false' : 'true'
+
+    // 2. 写入新状态
+    await fetchSyncPost('/api/attr/setBlockAttrs', {
+      id: docId,
+      attrs: { 'custom-sy-readonly': newValue }
+    })
+
+    // 3. 更新 DOM 中的锁按钮状态（与思源原生保持一致）
+    const readonlyBtn = document.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]')
+    if (readonlyBtn) {
+      const useEl = readonlyBtn.querySelector('use') as SVGUseElement | null
+      if (useEl) {
+        useEl.setAttribute('xlink:href', newValue === 'true' ? '#iconLock' : '#iconUnlock')
+        useEl.setAttribute('href', newValue === 'true' ? '#iconLock' : '#iconUnlock')
+      }
+      readonlyBtn.setAttribute('data-subtype', newValue === 'true' ? 'lock' : 'unlock')
+    }
+
+    // 4. 更新自定义按钮图标
+    const customBtn = document.querySelector(`[data-custom-button="${config.id}"]`) as HTMLElement | null
+    if (customBtn) {
+      updateToggleLockIcon(customBtn, newValue === 'true')
+    }
+
+    if (config.showNotification !== false) {
+      showMessage(newValue === 'true' ? '🔒 文档已锁定' : '🔓 文档已解锁', 1500, 'info')
+    }
+  } catch (e) {
+    console.warn('[toggle-lock] 切换失败:', e)
+    showMessage('切换锁状态失败', 2000, 'error')
+  }
+}
+
+/**
+ * 更新 toggle-lock 按钮的图标（🔒 / 🔓）
+ */
+function updateToggleLockIcon(btn: HTMLElement, isLocked: boolean): void {
+  const icon = isLocked ? '🔒' : '🔓'
+  const configId = btn.dataset.customButton
+  if (!configId) return
+
+  // 从按钮配置中获取图标（locked = 主图标，unlocked = unlockIcon）
+  const cfg = currentButtonConfigs.find(b => b.id === configId)
+  const targetIcon = isLocked ? cfg?.icon : (cfg?.unlockIcon || cfg?.icon || icon)
+
+  // 保留 span 子元素的结构，只更新文本
+  const existingSpan = btn.querySelector('span')
+  if (existingSpan) {
+    existingSpan.textContent = targetIcon
+  } else {
+    btn.innerText = targetIcon
+    btn.style.fontSize = `${cfg?.iconSize || 20}px`
+  }
+}
+
+/**
  * 一键清理当前文档的空块
  * 
  * 扫描当前活动编辑器中的空块（无文本、无内嵌媒体、无子块的段落/标题/列表项），
@@ -4294,13 +4373,19 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
 	    return
 	  }
 
-	  // ⑭一键清理当前文档的空块
-	  if (subtype === 'clear-empty-blocks') {
-	    await executeClearEmptyBlocks()
-	    return
-	  }
+		  // ⑭一键清理当前文档的空块
+		  if (subtype === 'clear-empty-blocks') {
+		    await executeClearEmptyBlocks()
+		    return
+		  }
 
-	  // 打开指定ID块类型（默认）
+		  // ⑮双图标切换锁定文档
+		  if (subtype === 'toggle-lock') {
+		    await executeToggleLock(config)
+		    return
+		  }
+
+		  // 打开指定ID块类型（默认）
   const frontend = getFrontend()
   const isMobile = frontend === 'mobile' || frontend === 'browser-mobile'
 

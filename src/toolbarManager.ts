@@ -1494,9 +1494,19 @@ export function createButtonsForEditors(editors: NodeListOf<Element>, configs: B
       if (index === 0) {
         button.classList.add('first-custom-button')
       }
-      readonlyBtn.insertAdjacentElement('beforebegin', button)
-    })
-  })
+	      readonlyBtn.insertAdjacentElement('beforebegin', button)
+	    })
+
+	    // 为 toggle-lock 类型的按钮初始化图标（根据当前文档锁状态）
+	    const toggleLockBtns = editor.querySelectorAll<HTMLElement>('[data-custom-button]')
+	    toggleLockBtns.forEach(btn => {
+	      const btnConfig = configs.find(c => c.id === btn.dataset.customButton)
+	      if (btnConfig?.type === 'author-tool' && btnConfig.authorToolSubtype === 'toggle-lock') {
+	        const isLocked = (readonlyBtn as HTMLElement)?.getAttribute('data-subtype') === 'lock'
+	        updateToggleLockIcon(btn, isLocked)
+	      }
+	    })
+	  })
 }
 
 /**

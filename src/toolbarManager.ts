@@ -1460,7 +1460,17 @@ export function createButtonsForEditors(editors: NodeListOf<Element>, configs: B
     if (existingButtons.length > 0 && existingButtons.length === buttonsToAdd.length) {
       const existingIds = new Set(Array.from(existingButtons).map(btn => (btn as HTMLElement).dataset.customButton))
       const allMatch = buttonsToAdd.every(b => existingIds.has(b.id))
-      if (allMatch) return // 按钮已存在且配置匹配，跳过
+      if (allMatch) {
+        // 按钮无需重建，但仍需更新 toggle-lock 图标（切文档时锁状态变了）
+        existingButtons.forEach(btn => {
+          const btnConfig = configs.find(c => c.id === (btn as HTMLElement).dataset.customButton)
+          if (btnConfig?.type === 'author-tool' && btnConfig.authorToolSubtype === 'toggle-lock') {
+            const isLocked = (readonlyBtn as HTMLElement)?.getAttribute('data-subtype') === 'lock'
+            updateToggleLockIcon(btn as HTMLElement, isLocked)
+          }
+        })
+        return
+      }
     }
 
     // 清理旧的插件按钮和分割线

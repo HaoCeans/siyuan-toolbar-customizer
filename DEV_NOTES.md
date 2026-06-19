@@ -182,3 +182,183 @@ min-height: 45 !important;
 **规则**:
 - 凡「最小值可为 0」的滑杆，初始值解析一律用 `parseLengthSliderInt` 或等价的 `Number.isNaN` 判断，禁止 `parseInt(...) || fallback`
 - 计数类（重试毫秒等）若最小值为 0，同样注意不要用 `||` 吞掉 0
+
+---
+
+## 11. 锁定时工具栏滚动隐藏（toolbarAutoHide）
+
+**相关文件**: `src/toolbarManager.ts`（`refreshToolbarAutoHide`、`handleToolbarAutoHideScroll` 及辅助函数）、`src/index.ts`（`eventBusRefreshHandler` 中调用）、`src/ui/buttonItems/desktop.ts`、`src/ui/buttonItems/mobile.ts`
+
+**功能**: toggle-lock 按钮打开「锁定时工具栏滚动隐藏」后，移动端文档锁定时，上滑隐藏工具栏、下滑显示，实现全屏沉浸阅读。
+
+### 设计原则
+
+- **纯视觉隐藏，不动 DOM 结构**：不删元素、不改变加载流程，只用 CSS class + transform
+- **仅移动端生效**：`refreshToolbarAutoHide()` 首行 `if (!isMobileDevice()) return`
+- **默认关闭**：`ButtonConfig.toolbarAutoHide` 默认 `undefined`/`false`
+
+### 架构
+
+```
+refreshToolbarAutoHide()           ← 总入口，由以下时机调用：
+  ├─ initCustomButtons()           ← 初始化后 500ms 延时
+  ├─ executeToggleLock()           ← 点击锁定/解锁按钮后
+  ├─ eventBusRefreshHandler()      ← 切换文档时
+  └─ cleanup()                     ← 卸载时清理
+
+handleToolbarAutoHideScroll()      ← 滚动事件处理器
+  ├─ 入口检查：toolbarAutoHideConfigured + 实时锁状态校验
+  ├─ delta > 15px → 隐藏：body class 先加(50ms后工具栏滑走)
+  ├─ delta < -15px → 显示：工具栏先滑回(80ms后 body class 移除)
+  └─ 键盘弹出时暂停（isKeyboardOpenForToolbar）
+```
+
+### 隐藏/显示的三层联动
+
+所有联动通过 `body.toolbar-autohide-active` class 驱动，一条规则控制全貌：
+
+| 对象 | 方式 | 选择器 |
+|------|------|--------|
+| 按钮工具栏（底部/顶部） | `.toolbar-scroll-hidden` class：opacity:0 + transform 滑走 | `.protyle-breadcrumb` / `__bar` |
+| 原生顶部工具栏 | `display:none`（消除 48px 布局占位白条） | `.toolbar.toolbar--border` |
+| protyle 底部补偿间距 | padding 收回 | `body.toolbar-autohide-active .protyle` |
+| 思源状态栏 | opacity:0 | `#status` |
+
+### 顶部/底部模式差异
+
+```typescript
+const isTop = document.body.classList.contains('siyuan-toolbar-top-mode')
+// 底部模式：translateZ(0) translateY(calc(100% + 8px))  向下藏
+// 顶部模式：translateZ(0) translateY(calc(-100% - 8px)) 向上藏
+```
+
+### transform 动画关键
+
+工具栏自身 CSS 有 `transform: translateZ(0)`（硬件加速）。如果覆盖成 `translateY(...)`，两个不同 transform 函数之间 CSS transition 无法插值 → 直接跳变无动画。
+
+**正确做法**：所有 transform 保留 `translateZ(0)` 前缀：
+```
+隐藏：translateZ(0) translateY(calc(±100% ± 8px))
+显示：translateZ(0) translateY(0)  ← 不能清空为 ''
+```
+
+### 解锁/关闭功能时的恢复
+
+**必须无条件清理**，不能用 `if (toolbarHiddenByScroll)` 包住。变量状态可能与实际 DOM 不一致（反复锁定/解锁后），导致 toolbar-scroll-hidden class 残留。
+
+```typescript
+// ✅ 正确：无条件清理
+toolbarHiddenByScroll = false
+document.querySelectorAll('.toolbar-scroll-hidden').forEach(el => {
+  el.classList.remove('toolbar-scroll-hidden')
+  el.style.transform = 'translateZ(0) translateY(0)'
+})
+document.body.classList.remove('toolbar-autohide-active')
+
+// ❌ 错误：有条件清理（变量可能失步）
+if (toolbarHiddenByScroll) { ... }
+```
+
+**清理路径**用 `document.querySelectorAll('.toolbar-scroll-hidden')` 直接按 class 查找，不依赖 `getToolbarElementsForAutoHide()`（该函数按 `data-toolbar-customized` 属性查找，DOM 重建后可能返回空）。
+
+### 滚动处理器内的实时锁校验
+
+`handleToolbarAutoHideScroll` 入口处必须实时读取 DOM 中的锁状态：
+
+```typescript
+const readonlyBtn = document.querySelector('[data-type="readonly"]')
+if (!readonlyBtn || readonlyBtn.getAttribute('data-subtype') !== 'lock') {
+  // 文档已解锁，立即恢复工具栏
+  if (toolbarHiddenByScroll) { /* 清理 class + transform + body class */ }
+  return
+}
+```
+
+防止反复锁定/解锁后，延迟回调或残留事件在文档解锁后仍操作工具栏。
+
+### 隐藏动画时序（底部 vs 顶部）
+
+底部模式：
+```
+隐藏（上滑）:
+  t=0ms    body class 加入 → protyle 间距收回 + 状态栏淡出
+  t=50ms   工具栏 class 加入 → 工具栏向下滑走
+
+显示（下滑）:
+  t=0ms    工具栏 class 移除 → 工具栏向上滑入
+  t=80ms   body class 移除 → protyle 间距恢复 + 状态栏淡入
+```
+
+顶部模式（**时序相反**，因为原生顶栏在上方、我们的工具栏在下方）：
+```
+隐藏（上滑）:
+  t=0ms    我们先向上滑走（原生顶栏还在，当背景）
+  t=80ms   body class 加入 → 原生顶栏隐藏 + protyle 间距收回
+
+显示（下滑）:
+  t=0ms    body class 移除 → 原生顶栏先出现
+  t=50ms   我们再向下滑入
+```
+
+**原则**：始终让用户视觉上感觉工具栏是平滑过渡的。底部模式「先藏环境再藏自己」，顶部模式「先藏自己再藏上方」——避免工具栏突然跳到新位置再动画。
+
+### 顶部工具栏 transition 特异性
+
+顶部工具栏 CSS（`top-toolbar-custom-style`）有 `transition: top 0.3s ease !important`，特异性 (0,2,1) 高于通用 `.toolbar-scroll-hidden` 的 (0,2,0)。需要追加高特异性规则覆盖为 `ease-out 0.2s`：
+
+```css
+body.siyuan-toolbar-top-mode .protyle-breadcrumb.toolbar-scroll-hidden {  /* (0,3,0) */
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out !important;
+}
+```
+
+### 显示路径的 transition 要内联设置
+
+class 移除后 transition 跟着消失，显示时 transform 会直接跳回原位。**所有显示/解锁路径必须在 classList.remove 前设置 `el.style.transition`**：
+
+```typescript
+htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
+htmlEl.classList.remove('toolbar-scroll-hidden')
+htmlEl.style.transform = 'translateZ(0) translateY(0)'
+```
+
+### 顶部工具栏 transform 偏移量
+
+顶部工具栏是 `position: fixed; top: 50px`（可配置），`translateY(-100%)` 只移动自身高度，大部分还留在屏幕里。必须加上足够大的偏移：
+
+```
+底部: translateZ(0) translateY(calc(100% + 8px))    ← 向下推出
+顶部: translateZ(0) translateY(calc(-100% - 120px))  ← 向上推出（120px 兜底 top 偏移）
+```
+
+### 模块级变量清单
+
+| 变量 | 说明 |
+|------|------|
+| `toolbarAutoHideConfigured` | 是否有按钮启用此功能 |
+| `toolbarAutoHideScrollHandler` | 滚动事件处理器引用 |
+| `toolbarAutoHideBoundEl` | 已绑定滚动的元素 |
+| `toolbarHiddenByScroll` | 当前是否已滚动隐藏 |
+| `toolbarLastScrollTop` | 上次滚动位置 |
+| `toolbarScrollBindRetryTimer` | 滚动容器绑定重试定时器 |
+| `toolbarAutoHideLastToggle` | 上次切换时间戳（防抖） |
+
+所有变量在 `cleanup()` 中重置。
+
+### 规则
+
+- 隐藏必须是 **CSS class + transform**，不写 inline `opacity`/`display`（防止覆盖初始化流程）
+- transform 必须保留 `translateZ(0)` 前缀（否则无动画）
+- 顶部/底部模式必须用 `isTop` 变量区分 transform 方向和时序
+- 恢复工具栏必须**无条件清理** class + transform + body class
+- `handleToolbarAutoHideScroll` 入口必须实时校验锁状态
+- 清理 class 用 `querySelectorAll('.toolbar-scroll-hidden')` 直接查找，不依赖属性选择器
+- 显示路径必须先设 `el.style.transition` 再移除 class（class 移除后 transition 丢失）
+- 顶部模式 transition 需高特异性选择器覆盖 `top-toolbar-custom-style` 的 `!important`
+- 顶部模式 transform 偏移量需 ≥120px（兜底可配置的 `top` 值）
+- 隐藏时序：底部「环境先、工具栏后」；顶部「工具栏先、环境后」
+- 绑定滚动容器时有 30 次 retry（200ms 间隔），防止 DOM 未就绪
+- keyboardOpen 检测用 `visualViewport.height < window.innerHeight - 80`
+- `ensureToolbarAutoHideStyle()` 每次调用都重写 textContent（不用 return-early 缓存旧 CSS）
+- 新增 `body.toolbar-autohide-active` 相关 CSS 时，必须同时考虑顶部/底部两种模式
+- `initCustomButtons` 中的延时调用用 500ms（等工具栏 DOM 初始化），不要用 300ms

@@ -38,7 +38,8 @@ import {
   setGlobalToolbarManager,
   applyToolbarBackgroundColor,
   insertTemplate,
-  showTemplateContextMenu
+  showTemplateContextMenu,
+  refreshToolbarAutoHide
 } from './toolbarManager'
 
 // TTS 设置持久化初始化
@@ -632,6 +633,8 @@ export default class ToolbarCustomizer extends Plugin {
           createButtonsForEditors(editors, this.desktopButtonConfigs)
         }
       }
+      // 刷新工具栏滚动隐藏状态（切文档时锁状态可能变了）
+      refreshToolbarAutoHide()
     }
     // 监听编辑器动态加载完成事件（最快触发）
     this.eventBus.on('loaded-protyle-dynamic', this.eventBusRefreshHandler)

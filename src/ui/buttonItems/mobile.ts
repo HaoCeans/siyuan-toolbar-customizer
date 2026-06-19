@@ -858,7 +858,7 @@ export function createMobileButtonItem(
 	        <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
 	        <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
 		        <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
-		        <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 文档锁定双图标${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
+		        <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 沉浸阅读模式${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
 	      `
 	      subtypeSelect.onchange = () => {
 	        button.authorToolSubtype = subtypeSelect.value as any
@@ -1933,12 +1933,39 @@ export function createMobileButtonItem(
     if (iconSpan) updateIconDisplay(iconSpan, v)
   }, context.showIconPicker, button.iconSize)
   editForm.appendChild(iconField)
-  // 文档锁定双图标：额外显示锁定图标选择器
+  // 沉浸阅读模式：额外显示锁定图标选择器
   if (button.type === 'author-tool' && button.authorToolSubtype === 'toggle-lock') {
+    // 功能说明卡片
+    const descTitle = document.createElement('div')
+    descTitle.style.cssText = 'font-size: 12px; font-weight: 600; color: var(--b3-theme-primary); margin-bottom: 6px;'
+    descTitle.textContent = '📋 功能说明'
+    editForm.appendChild(descTitle)
+    const descBox = document.createElement('div')
+    descBox.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); background: var(--b3-theme-primary-lightest); border: 1px solid var(--b3-theme-primary-light); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; line-height: 1.6;'
+    descBox.innerHTML = '🔒 <b>锁定文档</b>：防止误编辑，按钮显示锁定图标<br>📱 <b>滚动隐藏</b>：锁定后上滑自动隐藏工具栏，全屏沉浸阅读<br>🔓 <b>再次点击</b>：解锁文档，恢复工具栏'
+    editForm.appendChild(descBox)
     const lockIconField = createIconField('🔒锁定图标', button.lockIcon || '🔒', (v) => {
       button.lockIcon = v
     }, context.showIconPicker, button.iconSize)
     editForm.appendChild(lockIconField)
+    // 锁定时工具栏滚动隐藏开关
+    const autoHideItem = document.createElement('div')
+    autoHideItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0;'
+    const autoHideLabel = document.createElement('label')
+    autoHideLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
+    autoHideLabel.textContent = '🔽 锁定时工具栏滚动隐藏'
+    const autoHideSwitch = document.createElement('input')
+    autoHideSwitch.type = 'checkbox'
+    autoHideSwitch.className = 'b3-switch'
+    autoHideSwitch.checked = button.toolbarAutoHide ?? false
+    autoHideSwitch.onchange = () => { button.toolbarAutoHide = autoHideSwitch.checked }
+    autoHideItem.appendChild(autoHideLabel)
+    autoHideItem.appendChild(autoHideSwitch)
+    editForm.appendChild(autoHideItem)
+    const autoHideHint = document.createElement('div')
+    autoHideHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); opacity: 0.7; margin-bottom: 4px;'
+    autoHideHint.textContent = '文档锁定时，上滑隐藏工具栏、下滑显示'
+    editForm.appendChild(autoHideHint)
   }
   const iconInput = iconField.querySelector('input') as HTMLInputElement
   const iconPreview = iconField.querySelector('span') as HTMLElement

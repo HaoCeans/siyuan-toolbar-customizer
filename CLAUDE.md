@@ -677,3 +677,86 @@ interface TTSSettings {
 - API 模式滑杆读取必须用 `parseFloat()`，禁止 `parseInt()`
 - `fetchSiliconFlowTTS` 的 speed 参数已经是硅基流动原生范围（0.25-4.0），只需 `Math.max(0.25, Math.min(4.0, speed))` clamp，**禁止**用百度公式转换
 - 新增 TTS 引擎或参数时，对照硅基流动 API 文档确认参数范围，不要假设与百度一致
+
+---
+
+### 23. 锁定时工具栏滚动隐藏（toolbarAutoHide）
+
+**相关文件**: `src/toolbarManager.ts`（`refreshToolbarAutoHide`、`handleToolbarAutoHideScroll` 及辅助函数）、`src/index.ts`（`eventBusRefreshHandler` 中调用）、`src/ui/buttonItems/desktop.ts`、`src/ui/buttonItems/mobile.ts`
+
+**功能**: toggle-lock 按钮打开「锁定时工具栏滚动隐藏」后，移动端文档锁定时，上滑隐藏工具栏、下滑显示，实现全屏沉浸阅读。
+
+#### 设计原则
+
+- **纯视觉隐藏，不动 DOM 结构**：不删元素、不改变加载流程，只用 CSS class + transform
+- **仅移动端生效**：`refreshToolbarAutoHide()` 首行 `if (!isMobileDevice()) return`
+- **默认关闭**：`ButtonConfig.toolbarAutoHide` 默认 `undefined`/`false`
+
+#### 架构
+
+```
+refreshToolbarAutoHide()           ← 总入口，由以下时机调用：
+  ├─ initCustomButtons()           ← 初始化后 500ms 延时
+  ├─ executeToggleLock()           ← 点击锁定/解锁按钮后
+  ├─ eventBusRefreshHandler()      ← 切换文档时
+  └─ cleanup()                     ← 卸载时清理
+
+handleToolbarAutoHideScroll()      ← 滚动事件处理器
+  ├─ 入口检查：toolbarAutoHideConfigured + 实时锁状态校验
+  ├─ delta > 15px → 隐藏：body class 先加(50ms后工具栏滑走)
+  ├─ delta < -15px → 显示：工具栏先滑回(80ms后 body class 移除)
+  └─ 键盘弹出时暂停（isKeyboardOpenForToolbar）
+```
+
+#### 隐藏/显示的四层联动
+
+所有联动通过 `body.toolbar-autohide-active` class 驱动：
+
+| 对象 | 方式 | 选择器 |
+|------|------|--------|
+| 按钮工具栏 | `.toolbar-scroll-hidden` class：opacity:0 + transform | `.protyle-breadcrumb` / `__bar` |
+| 原生顶部工具栏 | `display:none`（消除 48px 布局占位） | `.toolbar.toolbar--border` |
+| protyle 间距（底部） | padding-bottom 收回 | `body.toolbar-autohide-active.siyuan-toolbar-customizer-enabled .protyle` |
+| protyle 间距（顶部） | padding-top → 0 | `body.toolbar-autohide-active.siyuan-toolbar-top-mode .protyle` |
+| 思源状态栏 | opacity:0 | `#status` |
+
+#### 顶部/底部模式差异
+
+| | 底部模式 | 顶部模式 |
+|---|---|---|
+| 选择器 | `[data-toolbar-customized]` | `body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized])` |
+| transform | `translateY(calc(100% + 8px))` | `translateY(calc(-100% - 120px))`（需 120px 兜底 top 偏移） |
+| 隐藏时序 | t=0 环境 → t=50 工具栏 | t=0 工具栏先 → t=80 环境 |
+| 显示时序 | t=0 工具栏 → t=80 环境 | t=0 环境 → t=50 工具栏 |
+| transition | 0.16s ease（通用） | 0.2s ease-out（覆盖 top-toolbar-custom-style 的 !important） |
+
+#### transform 动画关键
+
+工具栏自身 CSS 有 `transform: translateZ(0)`。**必须保留 `translateZ(0)` 前缀**否则 transition 无法插值。显示路径必须在 classList.remove 前设 `el.style.transition`（class 移除后 transition 丢失）。
+
+#### 解锁/关闭功能时的恢复
+
+**必须无条件清理** class + transform + body class，不能用 `if (toolbarHiddenByScroll)` 包住。清理路径用 `querySelectorAll('.toolbar-scroll-hidden')` 直接按 class 查找。
+
+#### 滚动处理器内的实时锁校验
+
+`handleToolbarAutoHideScroll` 入口必须实时读取 DOM 锁状态，非 lock 则立即恢复工具栏。
+
+#### ensureToolbarAutoHideStyle 必须每次重写
+
+不能 return-early（旧 CSS 缓存会导致新规则不生效）。
+
+#### 规则
+
+- 隐藏必须是 CSS class + transform，不写 inline `opacity`/`display`
+- transform 必须保留 `translateZ(0)` 前缀
+- 顶部/底部模式用 `isTop` 区分 transform 方向、时序、transition
+- 顶部模式 transition 需高特异性选择器覆盖 `top-toolbar-custom-style`
+- 顶部模式 transform 偏移量 ≥120px（兜底可配置 top 值）
+- 恢复工具栏必须无条件清理 class + transform + body class
+- 显示路径必须先设 `el.style.transition` 再移除 class
+- `handleToolbarAutoHideScroll` 入口必须实时校验锁状态
+- 清理 class 用 `querySelectorAll('.toolbar-scroll-hidden')` 直接查找
+- 绑定滚动容器有 30 次 retry（200ms 间隔）
+- `ensureToolbarAutoHideStyle()` 每次调用都重写 textContent
+- `initCustomButtons` 中延时用 500ms，不要用 300ms

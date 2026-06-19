@@ -3593,8 +3593,8 @@ export function createMobileSettingLayout(
             </tr>
             <tr>
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑮</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">文档锁定双图标<span style="color: #10b981; font-size: 11px; margin-left: 4px;">免费</span></td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">独立选择锁定🔒和解锁🔓图标，按钮自动根据当前文档的锁状态切换显示对应图标</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">⑮ 沉浸阅读模式<span style="color: #10b981; font-size: 11px; margin-left: 4px;">免费</span></td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">🔒一键锁定文档防误编辑 + 📱上滑自动隐藏工具栏，全屏沉浸阅读；可独立选择锁定/解锁图标，支持锁定后工具栏滚动隐藏</td>
             </tr>
             <tr style="background: var(--b3-theme-background);">
               <td colspan="3" style="padding: 12px; text-align: center; color: var(--b3-theme-primary); font-weight: 600; font-style: italic;">持续更新中~</td>

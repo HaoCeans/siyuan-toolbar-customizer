@@ -1289,29 +1289,6 @@ export function initCustomButtons(configs: ButtonConfig[]) {
   // 延时刷新工具栏滚动隐藏状态（等工具栏 DOM 初始化完毕）
   setTimeout(() => refreshToolbarAutoHide(), 500)
 
-  // 添加全局样式：将原生顶栏提出布局流，用 body padding-top 补偿（消除白条+抖动）
-  if (!document.getElementById('native-toolbar-absolute-style')) {
-    const absStyle = document.createElement('style')
-    absStyle.id = 'native-toolbar-absolute-style'
-    absStyle.textContent = `
-      @media (max-width: 768px) {
-        /* 原生顶栏永远脱离布局流，不参与 flex 布局 */
-        .toolbar.toolbar--border {
-          position: absolute !important;
-          top: 0 !important;
-          left: 0 !important;
-          right: 0 !important;
-          z-index: 10 !important;
-        }
-        /* body 用 padding-top 补偿工具栏空间，transition 平滑过渡 */
-        body.fn__flex-column {
-          padding-top: 48px !important;
-          transition: padding-top 0.16s ease !important;
-        }
-      }
-    `
-    document.head.appendChild(absStyle)
-  }
   if (!document.getElementById('custom-button-focus-style')) {
     const focusStyle = document.createElement('style')
     focusStyle.id = 'custom-button-focus-style'
@@ -4379,20 +4356,21 @@ function ensureToolbarAutoHideStyle(): void {
       pointer-events: none !important;
       transition: opacity 0.16s ease !important;
     }
-    /* 原生顶栏白条：锁定时始终归零，不跟滚动联动 */
-    @media (max-width: 768px) {
-      body.toolbar-locked {
-        padding-top: 0 !important;
-      }
-    }
-    /* 工具栏隐藏时：原生顶栏淡出（跟滚动联动） */
-    @media (max-width: 768px) {
-      body.toolbar-autohide-active .toolbar.toolbar--border {
-        opacity: 0 !important;
-        pointer-events: none !important;
-        transition: opacity 0.16s ease !important;
-      }
-    }
+	    /* 原生顶栏：仅在锁住+滚动隐藏时脱离布局流消除白条，其他情况保持原生 flex */
+	    @media (max-width: 768px) {
+	      body.toolbar-locked.toolbar-autohide-active .toolbar.toolbar--border {
+	        position: absolute !important;
+	        top: 0 !important;
+	        left: 0 !important;
+	        right: 0 !important;
+	        z-index: 10 !important;
+	        opacity: 0 !important;
+	        pointer-events: none !important;
+	      }
+	      body.toolbar-locked.toolbar-autohide-active {
+	        padding-top: 0 !important;
+	      }
+	    }
   `
   if (!style.parentElement) {
     document.head.appendChild(style)

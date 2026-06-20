@@ -225,50 +225,48 @@ handleToolbarAutoHideScroll()      ← 滚动事件处理器
 | protyle 顶部补偿间距 | padding 收回，带 transition | `body.toolbar-autohide-active.siyuan-toolbar-top-mode .protyle` |
 | 思源状态栏 | opacity:0 | `#status` |
 
-### 原生顶部工具栏：absolute 方案（消除白条+防抖）
+### 原生顶部工具栏：仅在「锁住+隐藏」时脱离布局流
 
 思源原生顶栏 `.toolbar.toolbar--border` 是 `body.fn__flex-column` 的第一个 flex 子元素（48px）。任何改变它布局占位的方式都会导致内容跳变 → 滚动抖动。
 
-**解决方案**：永久让工具栏脱离布局流，用 `body padding-top` 补偿空间并加 `transition` 平滑过渡。
+**关键认知**：`position: absolute` 会把工具栏永久钉在 body 上方，脱离 flex 流 → 左右滑动/滚动都一动不动。因此**不能全局 absolute**，只能按需生效。
 
-**关键设计：白条空间和工具栏本身分开控制**：
-
-| class | 控制 | 何时生效 |
-|---|---|---|
-| `toolbar-locked` | **白条空间** `padding-top: 0` | 锁定时**始终** |
-| `toolbar-autohide-active` | **原生工具栏** `opacity: 0` | 上滑隐藏/下滑显示 |
+**解决方案**：`position: absolute` 仅写到 **`toolbar-locked` 和 `toolbar-autohide-active` 同时成立** 的状态里。其他所有情况工具栏保持原生 flex 行为。
 
 ```css
-/* ① 工具栏永远绝对定位（加载时立即生效，id: native-toolbar-absolute-style） */
-body.fn__flex-column {
-    padding-top: 48px !important;
-    transition: padding-top 0.16s ease;
-}
-.toolbar.toolbar--border {
-    position: absolute !important;
-    top: 0; left: 0; right: 0; z-index: 10;
-}
+/* 默认：什么都不动，保持思源原生 flex 行为（左右滑动/滚动正常） */
+/* .toolbar.toolbar--border — 无自定义样式 */
 
-/* ② 锁定时白条归零（toolbar-locked class，不跟滚动联动） */
-body.toolbar-locked {
-    padding-top: 0 !important;
-}
-
-/* ③ 滚动隐藏时工具栏淡出（toolbar-autohide-active class，跟滚动联动） */
-body.toolbar-autohide-active .toolbar.toolbar--border {
-    opacity: 0 !important; pointer-events: none !important;
-    transition: opacity 0.16s ease;
+/* 仅在"锁住 + 上滑隐藏"时脱离布局流消除白条 */
+/* (id: toolbar-autohide-style，由 ensureToolbarAutoHideStyle() 注入) */
+@media (max-width: 768px) {
+    body.toolbar-locked.toolbar-autohide-active .toolbar.toolbar--border {
+        position: absolute !important;
+        top: 0; left: 0; right: 0; z-index: 10;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+    body.toolbar-locked.toolbar-autohide-active {
+        padding-top: 0 !important;
+    }
 }
 ```
 
-**锁定时**：白条（48px 空白）`padding-top: 0` 全程生效；工具栏本身仍根据上滑/下滑动态 `opacity` 显隐。
-**解锁时**：`toolbar-locked` 移除 → `padding-top` 从 0 平滑过渡回 48px；工具栏不再跟随滚动。
+**各状态行为**：
 
-| 方式 | 布局变化 | 白条 | 抖动 |
-|------|---------|------|------|
-| `display: none` | 48px 消失/出现 | 无 | ❌ 剧烈 |
-| `opacity: 0`（flex 中） | 不变 | 有 | ✅ |
-| **`position: absolute` + 分开控制** | padding-top 渐变 | **无** | **✅ 平滑** |
+| 状态 | `toolbar-locked` | `toolbar-autohide-active` | 原生顶栏行为 |
+|------|:--:|:--:|------|
+| 正常编辑 | ❌ | ❌ | 原生 flex，左右滑/滚动正常 |
+| 正常编辑，上滑 | ❌ | ✅ | 原生 flex，白条存在但不抖 |
+| 锁住，工具栏可见 | ✅ | ❌ | 原生 flex，左右滑正常 |
+| **锁住 + 上滑隐藏** | ✅ | ✅ | **absolute + hidden，无白条** |
+
+**⚠️ 已废弃的历史方案**（勿回退）：
+
+| 方案 | 问题 |
+|------|------|
+| 全局 `position: absolute` + `padding-top` 补偿（`native-toolbar-absolute-style`） | 工具栏永久脱离 flex → 左右滑动时一动不动 |
+| `body.toolbar-locked` 和 `body.toolbar-autohide-active` 分开控制 | 白条归零和工具栏隐藏各自独立，无组合状态的 absolute |
 
 ### 顶部/底部模式差异
 
@@ -407,7 +405,7 @@ htmlEl.style.transform = 'translateZ(0) translateY(0)'
 - keyboardOpen 检测用 `visualViewport.height < window.innerHeight - 80`
 - `ensureToolbarAutoHideStyle()` 每次调用都重写 textContent（不用 return-early 缓存旧 CSS）
 - 新增 `body.toolbar-autohide-active` 相关 CSS 时，必须同时考虑顶部/底部两种模式
-- 原生顶栏白条空间（`padding-top`）和工具栏本身（`opacity`）**分开控制**：锁定时 padding 始终归零，工具栏仍跟滚动联动
+- 原生顶栏 `position: absolute` **仅在** `toolbar-locked` + `toolbar-autohide-active` 同时成立时生效，其他状态保持原生 flex（避免左右滑/滚动异常）
 - `initCustomButtons` 中的延时调用用 500ms（等工具栏 DOM 初始化），不要用 300ms
 - hide/show 后设 250ms 静默期（`toolbarAutoHideIgnoreUntil`），忽略布局变化引发的反馈滚动
 - 隐藏/显示冷却分开：隐藏 200ms（防反馈振荡），显示 80ms（响应灵敏）

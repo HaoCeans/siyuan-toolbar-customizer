@@ -715,7 +715,7 @@ handleToolbarAutoHideScroll()      ← 滚动事件处理器
 | 对象 | 方式 | 选择器 |
 |------|------|--------|
 | 按钮工具栏 | `.toolbar-scroll-hidden` class：opacity:0 + transform | `.protyle-breadcrumb` / `__bar` |
-| 原生顶部工具栏 | 仅在 `toolbar-locked` + `toolbar-autohide-active` 同时成立时 `position: absolute`，其他状态保持原生 flex | `body.toolbar-locked.toolbar-autohide-active .toolbar.toolbar--border` |
+| 原生顶部工具栏 | 锁定时 toolbar `relative+z-index:1` 浮于上层，下一兄弟 `margin-top: -48px` 瞬时上移吃白条；上滑叠加 `opacity: 0` 淡出。`>` 限定仅 body 直属 | `body.toolbar-locked > .toolbar.toolbar--border + *` |
 | protyle 间距（底部） | padding-bottom 收回，带 transition | `body.toolbar-autohide-active.siyuan-toolbar-customizer-enabled .protyle` |
 | protyle 间距（顶部） | padding-top → 0，带 transition | `body.toolbar-autohide-active.siyuan-toolbar-top-mode .protyle` |
 | 思源状态栏 | opacity:0 | `#status` |
@@ -761,7 +761,7 @@ handleToolbarAutoHideScroll()      ← 滚动事件处理器
 - `ensureToolbarAutoHideStyle()` 每次调用都重写 textContent
 - `initCustomButtons` 中延时用 500ms，不要用 300ms
 - 所有 setTimeout 延时存 `toolbarAutoHidePendingTimer`，unbind/cleanup 时 clearTimeout 防竞态
-- 原生顶栏：`position: absolute` **仅**在 `toolbar-locked` + `toolbar-autohide-active` 同时成立时生效，其他状态保持原生 flex（避免左右滑/滚动异常）
+- 原生顶栏：锁定时 toolbar `relative+z-index:1` + 下一兄弟 `margin-top: -48px` 瞬时上移吃白条，上滑叠加 `opacity: 0` 淡出。不碰 toolbar 的 position 流，`>` 限定仅 body 直属。margin 不加 transition（移动端卡顿）
 - hide/show 后设静默期 250ms，忽略布局反馈滚动
 - 冷却分开：隐藏 200ms / 显示 80ms
 - 锁状态缓存为 `toolbarAutoHideDocLocked`

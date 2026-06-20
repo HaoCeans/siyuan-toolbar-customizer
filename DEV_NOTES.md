@@ -229,32 +229,46 @@ handleToolbarAutoHideScroll()      ← 滚动事件处理器
 
 思源原生顶栏 `.toolbar.toolbar--border` 是 `body.fn__flex-column` 的第一个 flex 子元素（48px）。任何改变它布局占位的方式都会导致内容跳变 → 滚动抖动。
 
-**解决方案**：永久让工具栏脱离布局流，用 `body padding-top` 补偿空间并加 `transition` 平滑过渡：
+**解决方案**：永久让工具栏脱离布局流，用 `body padding-top` 补偿空间并加 `transition` 平滑过渡。
+
+**关键设计：白条空间和工具栏本身分开控制**：
+
+| class | 控制 | 何时生效 |
+|---|---|---|
+| `toolbar-locked` | **白条空间** `padding-top: 0` | 锁定时**始终** |
+| `toolbar-autohide-active` | **原生工具栏** `opacity: 0` | 上滑隐藏/下滑显示 |
 
 ```css
 /* ① 工具栏永远绝对定位（加载时立即生效，id: native-toolbar-absolute-style） */
-.toolbar.toolbar--border {
-    position: absolute !important;
-    top: 0; left: 0; right: 0; z-index: 10;
-}
-/* ② body 用 padding-top 补偿 48px，带 transition */
 body.fn__flex-column {
     padding-top: 48px !important;
     transition: padding-top 0.16s ease;
 }
-/* ③ 锁定时 padding-top 归零 + 工具栏淡出 */
-body.toolbar-autohide-active { padding-top: 0 !important; }
+.toolbar.toolbar--border {
+    position: absolute !important;
+    top: 0; left: 0; right: 0; z-index: 10;
+}
+
+/* ② 锁定时白条归零（toolbar-locked class，不跟滚动联动） */
+body.toolbar-locked {
+    padding-top: 0 !important;
+}
+
+/* ③ 滚动隐藏时工具栏淡出（toolbar-autohide-active class，跟滚动联动） */
 body.toolbar-autohide-active .toolbar.toolbar--border {
     opacity: 0 !important; pointer-events: none !important;
     transition: opacity 0.16s ease;
 }
 ```
 
+**锁定时**：白条（48px 空白）`padding-top: 0` 全程生效；工具栏本身仍根据上滑/下滑动态 `opacity` 显隐。
+**解锁时**：`toolbar-locked` 移除 → `padding-top` 从 0 平滑过渡回 48px；工具栏不再跟随滚动。
+
 | 方式 | 布局变化 | 白条 | 抖动 |
 |------|---------|------|------|
 | `display: none` | 48px 消失/出现 | 无 | ❌ 剧烈 |
 | `opacity: 0`（flex 中） | 不变 | 有 | ✅ |
-| **`position: absolute`** | padding-top 渐变 | **无** | **✅ 平滑** |
+| **`position: absolute` + 分开控制** | padding-top 渐变 | **无** | **✅ 平滑** |
 
 ### 顶部/底部模式差异
 
@@ -393,7 +407,7 @@ htmlEl.style.transform = 'translateZ(0) translateY(0)'
 - keyboardOpen 检测用 `visualViewport.height < window.innerHeight - 80`
 - `ensureToolbarAutoHideStyle()` 每次调用都重写 textContent（不用 return-early 缓存旧 CSS）
 - 新增 `body.toolbar-autohide-active` 相关 CSS 时，必须同时考虑顶部/底部两种模式
-- 原生顶栏用 `position: absolute` + `body padding-top`，禁止 `display:none`（会导致布局跳变）
+- 原生顶栏白条空间（`padding-top`）和工具栏本身（`opacity`）**分开控制**：锁定时 padding 始终归零，工具栏仍跟滚动联动
 - `initCustomButtons` 中的延时调用用 500ms（等工具栏 DOM 初始化），不要用 300ms
 - hide/show 后设 250ms 静默期（`toolbarAutoHideIgnoreUntil`），忽略布局变化引发的反馈滚动
 - 隐藏/显示冷却分开：隐藏 200ms（防反馈振荡），显示 80ms（响应灵敏）
@@ -595,3 +609,67 @@ ButtonConfig 的字段会在 JSON 导出/导入中自动保留，无需额外处
 | 4 | `toolbarManager.ts` | 路由分支 + 执行函数 |
 | 5 | `settings/desktop.ts` | 功能列表行 |
 | 6 | `settings/mobile.ts` | 功能列表行 |
+
+---
+
+## 14. toggle-lock 竞态条件与 DOM 作用域
+
+**相关文件**: `src/toolbarManager.ts`（`executeToggleLock`、`updateNativeReadonlyBtn`、`toggleLockWriteQueue`）
+
+**历史 bug**: 桌面端沉浸阅读模式下，快速连续点击锁/解锁按钮时，图标偶尔不切换，或延迟很久才变；切换到另一个文档后点击可能完全无反应。
+
+### 根因分析
+
+**问题1 — API 竞态**：原实现通过 `await getBlockAttrs` 读锁状态，再用 `await setBlockAttrs` 写入。两次点击间隔 < API 往返时间时，第二次 `getBlockAttrs` 读到旧值，两次写入相同值 → 图标不切换。
+
+```
+点击1: getBlockAttrs → false → setBlockAttrs(true)   ⏳等待内核处理
+点击2: getBlockAttrs → false（旧值！）→ setBlockAttrs(true)  ❌ 写相同值
+```
+
+**问题2 — DOM 作用域泄漏**：原实现用 `document.querySelector('[data-type="readonly"]')` 全局查询原生只读按钮。思源多标签页场景下，后台标签的编辑器 DOM 依然存在，全局查询可能命中**其他标签页**的按钮 → 读到错误的锁状态 → toggle 变成 no-op。
+
+### 修复方案
+
+**1）DOM 同步读取代替 API 异步读取**：从当前编辑器的原生只读按钮 `data-subtype` 属性读取锁状态，同步、零延迟、永远准确：
+
+```typescript
+// ✅ 限定在当前 protyle.element 内查找
+const editorEl = protyle.element
+const readonlyBtn = editorEl.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]')
+const isLocked = readonlyBtn?.getAttribute('data-subtype') === 'lock'
+
+// ❌ 不要全局查询（多标签页会串台）
+const readonlyBtn = document.querySelector('[data-type="readonly"]')
+```
+
+**2）乐观 UI 更新**：点击瞬间立即切换图标（`updateNativeReadonlyBtn` + `updateToggleLockIcon`），不等 API 响应。写入失败时自动回滚。
+
+**3）串行写入队列**：所有 `setBlockAttrs` 调用通过 `toggleLockWriteQueue` 排队：
+
+```typescript
+let toggleLockWriteQueue: Promise<void> = Promise.resolve()
+
+// 在 executeToggleLock 中：
+const previous = toggleLockWriteQueue
+let resolve: () => void
+toggleLockWriteQueue = new Promise<void>(r => { resolve = r })
+
+await previous  // 等待之前所有写入完成
+await fetchSyncPost('/api/attr/setBlockAttrs', { ... })
+// ...
+resolve!()  // 释放队列给下一个
+```
+
+### 辅助函数
+
+`updateNativeReadonlyBtn(readonlyBtn, locked)` — 封装原生按钮 DOM 更新（SVG use 的 xlink:href/href + data-subtype 属性），`executeToggleLock` 和错误回滚共用。
+
+### 规则
+
+- toggle-lock 读状态**必须**用 DOM（`data-subtype` 属性），不能用 API `getBlockAttrs`（异步竞态）
+- 所有 DOM 查询**必须**限定在 `protyle.element` 内，禁止用 `document.querySelector` 全局查（多标签页串台）
+- 图标更新**必须**是乐观的（先切换再写 API），写失败再回滚
+- API 写入**必须**通过 `toggleLockWriteQueue` 排队，防止并发写入竞态
+- `cleanup()` 中无需清理 `toggleLockWriteQueue`（Promise 链会被 GC 回收）
+- 新增异步操作如果涉及读-改-写模式且可能被快速连续触发，参照此模式：同步读 + 乐观更新 + 串行写

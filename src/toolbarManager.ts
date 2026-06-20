@@ -485,6 +485,9 @@ let toolbarAutoHideDocLocked = false  // 缓存当前文档锁状态，滚动处
 let toolbarAutoHidePendingTimer: ReturnType<typeof setTimeout> | null = null  // 跟踪隐藏/显示的延时定时器
 const toolbarCheckTimers = new Map<Element, ReturnType<typeof setTimeout>>()  // [已弃用] 保留兼容，不再写入
 
+// ===== toggle-lock 串行写入队列（防止快速连续点击导致竞态） =====
+let toggleLockWriteQueue: Promise<void> = Promise.resolve()
+
 // 导出工具栏管理器对象
 export const toolbarManager = {
   executeButton: async (config: ButtonConfig) => {
@@ -4151,11 +4154,29 @@ function executeTTS() {
 }
 
 /**
-	 * 执行沉浸阅读模式切换（toggle-lock）
-	 * 
-	 * 点击后切换当前文档的锁状态：
-	 *   解锁 → 锁（data-subtype="lock", 图标🔒）
-	 *   锁   → 解锁（data-subtype="unlock", 图标🔓）
+ * 更新思源原生只读按钮的 DOM 状态（图标 + data-subtype 属性）
+ */
+function updateNativeReadonlyBtn(readonlyBtn: Element | null, locked: boolean): void {
+  if (!readonlyBtn) return
+  const useEl = readonlyBtn.querySelector('use') as SVGUseElement | null
+  if (useEl) {
+    useEl.setAttribute('xlink:href', locked ? '#iconLock' : '#iconUnlock')
+    useEl.setAttribute('href', locked ? '#iconLock' : '#iconUnlock')
+  }
+  readonlyBtn.setAttribute('data-subtype', locked ? 'lock' : 'unlock')
+}
+
+/**
+ * 执行沉浸阅读模式切换（toggle-lock）
+ * 
+ * 点击后切换当前文档的锁状态：
+ *   解锁 → 锁（data-subtype="lock", 图标🔒）
+ *   锁   → 解锁（data-subtype="unlock", 图标🔓）
+ * 
+ * 采用乐观 UI 更新 + 串行写入队列，消除快速连续点击的竞态条件：
+ *   - 图标在点击瞬间立即切换（乐观更新），无需等待 API 响应
+ *   - API 写入串行排队（toggleLockWriteQueue），确保顺序正确
+ *   - 写入失败时自动回滚图标到实际状态
  * 
  * 图标会随文档切换自动更新：监听 switch-protyle 事件，
  * 根据新文档的锁状态渲染对应图标。
@@ -4168,43 +4189,73 @@ async function executeToggleLock(config: ButtonConfig): Promise<void> {
   }
   const docId = protyle.block.rootID
 
-  try {
-    // 1. 读取当前锁状态
-    const getResp = await fetchSyncPost('/api/attr/getBlockAttrs', { id: docId })
-    const isLocked = getResp?.data?.['custom-sy-readonly'] === 'true'
-    const newValue = isLocked ? 'false' : 'true'
+	  // 1. 读取当前锁状态 —— 优先从当前编辑器 DOM 读取（同步，无竞态）
+	  //    必须限定在 protyle.element 内，否则多标签页场景会读到其他编辑器的按钮
+	  const editorEl = protyle.element as HTMLElement | undefined
+	  let readonlyBtn: Element | null = null
+	  if (editorEl) {
+	    readonlyBtn = editorEl.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]')
+	      || editorEl.querySelector('.protyle-breadcrumb [data-type="readonly"]')
+	  }
+	  // 兜底：全局查询（兼容 protyle.element 不可用的极端情况）
+	  if (!readonlyBtn) {
+	    readonlyBtn = document.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]')
+	  }
 
-    // 2. 写入新状态
+	  let isLocked: boolean
+	  if (readonlyBtn) {
+	    isLocked = readonlyBtn.getAttribute('data-subtype') === 'lock'
+	  } else {
+	    // DOM 不可用时回退到 API 读取
+	    try {
+	      const getResp = await fetchSyncPost('/api/attr/getBlockAttrs', { id: docId })
+	      isLocked = getResp?.data?.['custom-sy-readonly'] === 'true'
+	    } catch {
+	      showMessage('读取文档锁状态失败', 2000, 'error')
+	      return
+	    }
+	  }
+
+	  const newLocked = !isLocked
+	  const newValue = newLocked ? 'true' : 'false'
+
+	  // 2. 乐观更新 DOM —— 立即切换图标，无需等待 API
+	  updateNativeReadonlyBtn(readonlyBtn, newLocked)
+	  //    自定义按钮也限定在当前编辑器内查找，避免多标签页串台
+	  const customBtn = (editorEl
+	    ? editorEl.querySelector(`[data-custom-button="${config.id}"]`)
+	    : document.querySelector(`[data-custom-button="${config.id}"]`)) as HTMLElement | null
+	  if (customBtn) {
+	    updateToggleLockIcon(customBtn, newLocked)
+	  }
+
+  // 3. 串行写入 API（排队确保顺序，消除竞态）
+  const previous = toggleLockWriteQueue
+  let resolve: () => void
+  toggleLockWriteQueue = new Promise<void>(r => { resolve = r })
+
+  try {
+    await previous // 等待之前所有未完成的写入
     await fetchSyncPost('/api/attr/setBlockAttrs', {
       id: docId,
       attrs: { 'custom-sy-readonly': newValue }
     })
-
-    // 3. 更新 DOM 中的锁按钮状态（与思源原生保持一致）
-    const readonlyBtn = document.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]')
-    if (readonlyBtn) {
-      const useEl = readonlyBtn.querySelector('use') as SVGUseElement | null
-      if (useEl) {
-        useEl.setAttribute('xlink:href', newValue === 'true' ? '#iconLock' : '#iconUnlock')
-        useEl.setAttribute('href', newValue === 'true' ? '#iconLock' : '#iconUnlock')
-      }
-      readonlyBtn.setAttribute('data-subtype', newValue === 'true' ? 'lock' : 'unlock')
-    }
-
-    // 4. 更新自定义按钮图标
-    const customBtn = document.querySelector(`[data-custom-button="${config.id}"]`) as HTMLElement | null
-    if (customBtn) {
-      updateToggleLockIcon(customBtn, newValue === 'true')
-    }
+    // DOM 已在上面乐观更新，这里不再重复更新
 
     if (config.showNotification !== false) {
-      showMessage(newValue === 'true' ? '🔒 文档已锁定' : '🔓 文档已解锁', 1500, 'info')
+      showMessage(newLocked ? '🔒 文档已锁定' : '🔓 文档已解锁', 1500, 'info')
     }
-    // 刷新工具栏滚动隐藏状态
     refreshToolbarAutoHide()
   } catch (e) {
+    // 4. 写入失败 —— 回滚图标到实际状态
+    updateNativeReadonlyBtn(readonlyBtn, isLocked)
+    if (customBtn) {
+      updateToggleLockIcon(customBtn, isLocked)
+    }
     console.warn('[toggle-lock] 切换失败:', e)
     showMessage('切换锁状态失败', 2000, 'error')
+  } finally {
+    resolve!()
   }
 }
 
@@ -4328,11 +4379,14 @@ function ensureToolbarAutoHideStyle(): void {
       pointer-events: none !important;
       transition: opacity 0.16s ease !important;
     }
-    /* 工具栏隐藏时：body padding-top 归零 + 原生顶栏透明（仅移动端） */
+    /* 原生顶栏白条：锁定时始终归零，不跟滚动联动 */
     @media (max-width: 768px) {
-      body.toolbar-autohide-active {
+      body.toolbar-locked {
         padding-top: 0 !important;
       }
+    }
+    /* 工具栏隐藏时：原生顶栏淡出（跟滚动联动） */
+    @media (max-width: 768px) {
       body.toolbar-autohide-active .toolbar.toolbar--border {
         opacity: 0 !important;
         pointer-events: none !important;
@@ -4567,6 +4621,7 @@ function unbindToolbarAutoHideScroll(): void {
     toolbarHiddenByScroll = false
     document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => { const htmlEl = el as HTMLElement; htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'; htmlEl.classList.remove('toolbar-scroll-hidden'); htmlEl.style.transform = 'translateZ(0) translateY(0)' })
     document.body.classList.remove('toolbar-autohide-active')
+    document.body.classList.remove('toolbar-locked')
     return
   }
 
@@ -4574,6 +4629,8 @@ function unbindToolbarAutoHideScroll(): void {
   const readonlyBtn = document.querySelector('[data-type="readonly"]') as HTMLElement | null
   const isLocked = readonlyBtn?.getAttribute('data-subtype') === 'lock'
   toolbarAutoHideDocLocked = isLocked  // 缓存供滚动处理器读取，省去每帧 querySelector
+  // 锁定时始终隐藏原生顶栏（不跟滚动联动），解锁时恢复
+  document.body.classList.toggle('toolbar-locked', isLocked)
 
   if (!isLocked) {
     unbindToolbarAutoHideScroll()
@@ -6321,6 +6378,7 @@ export function cleanup() {
   document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => { (el as HTMLElement).classList.remove('toolbar-scroll-hidden'); (el as HTMLElement).style.transform = 'translateZ(0) translateY(0)' })
   document.body.classList.remove('toolbar-autohide-active')
   document.body.classList.remove('kmind-zen-active')
+  document.body.classList.remove('toolbar-locked')
 
   // 清理全局变量
   delete (window as any).__mobileToolbarConfig

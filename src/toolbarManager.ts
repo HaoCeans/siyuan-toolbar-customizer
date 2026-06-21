@@ -5068,6 +5068,76 @@ async function executeImageUpload(config: ButtonConfig) {
 }
 
 /**
+ * 关闭 LifeLog 确认弹窗（支持键盘左右选 + Enter 确认）
+ */
+function showCloseConfirmDialog(): Promise<boolean> {
+  return new Promise(resolve => {
+    const overlay = document.createElement('div')
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);'
+    const box = document.createElement('div')
+    box.style.cssText = 'background:var(--b3-theme-background);border-radius:14px;padding:24px;min-width:280px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.25);'
+    box.innerHTML = '<div style="font-size:16px;font-weight:600;margin-bottom:8px;color:var(--b3-theme-on-background)">关闭 LifeLog？</div><div style="font-size:13px;color:var(--b3-theme-on-surface-light);margin-bottom:20px">输入框内有未保存的内容，确定要关闭吗？</div>'
+    const btnRow = document.createElement('div')
+    btnRow.style.cssText = 'display:flex;gap:10px;justify-content:center;'
+    const cancelBtn = document.createElement('button')
+    cancelBtn.textContent = '取消'
+    cancelBtn.style.cssText = 'padding:8px 24px;border-radius:8px;border:1px solid var(--b3-border-color);background:var(--b3-theme-surface);color:var(--b3-theme-on-surface);cursor:pointer;font-size:14px;outline:none;'
+    const okBtn = document.createElement('button')
+    okBtn.textContent = '关闭'
+    okBtn.style.cssText = 'padding:8px 24px;border-radius:8px;border:none;background:var(--b3-theme-primary);color:#fff;cursor:pointer;font-size:14px;outline:none;'
+    btnRow.appendChild(cancelBtn)
+    btnRow.appendChild(okBtn)
+    box.appendChild(btnRow)
+    overlay.appendChild(box)
+    document.body.appendChild(overlay)
+
+    let resolved = false
+    const close = (result: boolean) => {
+      if (resolved) return
+      resolved = true
+      window.removeEventListener('keydown', onKey, true)
+      overlay.remove()
+      resolve(result)
+    }
+    cancelBtn.onclick = () => close(false)
+    okBtn.onclick = () => close(true)
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(false) })
+
+    // 键盘：高亮选中，不依赖按钮 focus（避免被思源编辑器抢走焦点）
+    let focusedIdx = 0
+    const updateHighlight = () => {
+      cancelBtn.style.background = focusedIdx === 0 ? 'var(--b3-theme-primary)' : 'var(--b3-theme-surface)'
+      cancelBtn.style.color = focusedIdx === 0 ? '#fff' : 'var(--b3-theme-on-surface)'
+      cancelBtn.style.border = focusedIdx === 0 ? 'none' : '1px solid var(--b3-border-color)'
+      okBtn.style.background = focusedIdx === 1 ? 'var(--b3-theme-primary)' : 'var(--b3-theme-surface)'
+      okBtn.style.color = focusedIdx === 1 ? '#fff' : 'var(--b3-theme-on-surface)'
+      okBtn.style.border = focusedIdx === 1 ? 'none' : '1px solid var(--b3-border-color)'
+    }
+    updateHighlight()
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.stopImmediatePropagation()
+        focusedIdx = e.key === 'ArrowLeft'
+          ? (focusedIdx - 1 + 2) % 2
+          : (focusedIdx + 1) % 2
+        updateHighlight()
+      } else if (e.key === 'Enter') {
+        e.stopImmediatePropagation()
+        close(focusedIdx === 1)
+      } else if (e.key === 'Escape') {
+        e.stopImmediatePropagation()
+        close(false)
+      }
+      // 其余所有键一律拦截，不传给思源编辑器
+      e.preventDefault()
+      e.stopImmediatePropagation()
+    }
+    window.addEventListener('keydown', onKey, true)
+  })
+}
+
+/**
  * 叶归 LifeLog 合并对话框：分类选择 + 输入内容（苹果风格）
  */
 async function showLifelogDialog(categories: string[], opts?: { fontSize?: number; padding?: number; hPadding?: number; inputFontSize?: number }): Promise<{ category: string; content: string } | null> {
@@ -5114,7 +5184,7 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
       background: var(--b3-theme-surface); color: var(--b3-theme-on-surface);
       font-size: ${inputFontSize}px; outline: none; box-sizing: border-box; width: calc(100% - 32px);
       transition: border-color 0.2s, box-shadow 0.2s;
-      height: 120px; min-height: 60px; max-height: 300px;
+      height: 160px; min-height: 80px; max-height: 360px;
       overflow-y: auto; resize: vertical;
       white-space: pre-wrap; word-wrap: break-word;
       line-height: 1.5;
@@ -5158,12 +5228,12 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
       catBtns.push(btn);
       catWrap.appendChild(btn);
     });
-    // 自适应缩小字号：文字超宽时缩小而非省略
+    // 自适应缩小字号：文字超宽时缩小而非省略（不低于 9px）
     catBtns.forEach((btn) => {
       requestAnimationFrame(() => {
         if (btn.scrollWidth > btn.clientWidth) {
           const scale = btn.clientWidth / btn.scrollWidth;
-          const baseFontSize = 13;
+          const baseFontSize = catFontSize;
           btn.style.fontSize = `${Math.max(9, baseFontSize * scale)}px`;
         }
       });
@@ -5194,10 +5264,19 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
       updateCatHighlight();
     };
 
-    // 输入框键盘事件：Enter发送，Escape关闭，Shift+方向键 选分类
+    // 输入框键盘事件：Enter发送，Escape关闭（有内容时确认），Shift+方向键 选分类
     // Enter 在 textarea 中正常换行，箭头键正常移动光标
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { e.preventDefault(); cleanup(); resolve(null); }
+    input.addEventListener('keydown', async (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        const text = input.value.trim();
+        if (text) {
+          // 有内容 → 弹出确认框
+          const confirmed = await showCloseConfirmDialog()
+          if (!confirmed) { input.focus(); return }
+        }
+        cleanup(); resolve(null);
+      }
       else if ((e.key === 'Enter') && (e.ctrlKey || e.metaKey || e.shiftKey)) {
         e.preventDefault();
         const text = input.value.trim();
@@ -5282,7 +5361,12 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
     }
     document.body.appendChild(overlay);
 
-    setTimeout(() => { if (document.contains(input)) input.focus(); }, 50);
+    setTimeout(() => {
+      if (document.contains(input)) {
+        input.focus()
+        input.setSelectionRange(input.value.length, input.value.length)
+      }
+    }, 100);
 
     overlay.addEventListener('mousedown', (e) => {
       if (e.target === overlay) { cleanup(); resolve(null); }
@@ -5290,18 +5374,42 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
 
     const cleanup = () => {
       overlay.remove();
+      if (activeLifelogCleanup === cleanup) {
+        activeLifelogCleanup = null
+        activeLifelogInput = null
+      }
       if (activeElement && document.contains(activeElement)) {
         try { activeElement.focus({ preventScroll: true }); } catch { /* ignore */ }
       }
       };
+    // 注册全局状态，供快捷键再次按下时关闭
+    activeLifelogCleanup = cleanup
+    activeLifelogInput = input as HTMLTextAreaElement
   });
 }
 
 /**
  * 桌面端叶归LifeLog全局快捷键：弹出分类+内容对话框，追加到指定笔记本日记
+ * 再按一次关闭（同 ESC），输入框有内容时提示确认
  */
+let activeLifelogCleanup: (() => void) | null = null
+let activeLifelogInput: HTMLTextAreaElement | null = null
+
 export async function triggerDesktopLifelogGlobalCapture(): Promise<void> {
   if (isMobileDevice()) return
+
+  // 已有打开的弹窗 → 关闭
+  if (activeLifelogCleanup) {
+    const hasContent = activeLifelogInput && activeLifelogInput.value.trim().length > 0
+    if (hasContent) {
+      const confirmed = await showCloseConfirmDialog()
+      if (!confirmed) return
+    }
+    activeLifelogCleanup()
+    activeLifelogCleanup = null
+    activeLifelogInput = null
+    return
+  }
 
   // 从桌面端按钮配置中查找第一个开启了全局快捷键的 life-log 按钮
   const desktopConfigs: ButtonConfig[] = pluginInstance?.desktopButtonConfigs || []

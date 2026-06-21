@@ -40,7 +40,8 @@ import {
   insertTemplate,
   showTemplateContextMenu,
   refreshToolbarAutoHide,
-  refreshKmindZenCompat
+  refreshKmindZenCompat,
+  triggerDesktopLifelogGlobalCapture
 } from './toolbarManager'
 
 // TTS 设置持久化初始化
@@ -536,16 +537,24 @@ export default class ToolbarCustomizer extends Plugin {
     }
 
     if (!this.isMobile) {
-      this.addCommand({
-        langKey: 'quickNoteGlobalCapture',
-        langText: '一键记事（全局捕获）',
-        hotkey: '⌥⇧N',
-        globalCallback: () => {
-          void triggerDesktopQuickNoteGlobalCapture()
-        },
-      })
-    }
-  }
+	      this.addCommand({
+	        langKey: 'quickNoteGlobalCapture',
+	        langText: '一键记事（全局捕获）',
+	        hotkey: '⌥⇧N',
+	        globalCallback: () => {
+	          void triggerDesktopQuickNoteGlobalCapture()
+	        },
+	      })
+	      this.addCommand({
+	        langKey: 'lifelogGlobalCapture',
+	        langText: '叶归LifeLog（全局捕获）',
+	        hotkey: '⌥⇧L',
+	        globalCallback: () => {
+	          void triggerDesktopLifelogGlobalCapture()
+	        },
+	      })
+	    }
+	  }
 
   /** 插件启动时清理上次残留的草稿块（重启前未 cancelDraft 的情况） */
   private cleanupOrphanDraftBlocks(): void {

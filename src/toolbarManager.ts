@@ -98,7 +98,10 @@ export interface ButtonConfig {
   lifeLogCategories?: string[]; // 叶归LifeLog适配：分类选项列表
   lifeLogNotebookId?: string; // 叶归LifeLog适配：目标笔记本ID
   lifeLogCatFontSize?: number; // 叶归LifeLog适配：分类按钮字体大小（px，默认14）
-  lifeLogCatPadding?: number; // 叶归LifeLog适配：分类按钮内边距（px，默认8）
+  lifeLogCatPadding?: number; // 叶归LifeLog适配：分类按钮上下边距（px，默认8）
+  lifeLogCatHPadding?: number; // 叶归LifeLog适配：分类按钮左右边距（px，默认4）
+  lifelogGlobalCaptureEnabled?: boolean; // 叶归LifeLog：电脑端全局快捷键开关
+  lifeLogInputFontSize?: number; // 叶归LifeLog适配：输入框字体大小（px，默认14）
   imageUploadMode?: 'manual' | 'daily-note'; // 图片快捷导入：插入模式（manual=手动位置, daily-note=日记底部）
   imageUploadNotebookId?: string; // 图片快捷导入：日记模式目标笔记本ID
   cardContainerHeight?: string; // 卡片模式容器高度
@@ -1037,7 +1040,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
 
             /* 防止编辑器内容被遮挡 - 仅在启用底部工具栏且工具栏显示时应用 */
             body.siyuan-toolbar-customizer-enabled .protyle {
-              padding-bottom: calc(${config.toolbarHeight} + env(safe-area-inset-bottom) + 10px) !important;
+              padding-bottom: calc(${config.toolbarHeight} + env(safe-area-inset-bottom) + 3px) !important;
             }
 
             /* 使用思源原生的隐藏类 */
@@ -4561,9 +4564,8 @@ function unbindToolbarAutoHideScroll(): void {
 	    const kmindStyle = document.createElement('style')
 	    kmindStyle.id = 'kmind-zen-compat-style'
 	    kmindStyle.textContent = `
-	      body.kmind-zen-active #mobile-outline-panel,
-	      body.kmind-zen-active #mobile-tabs-bar,
-	      body.kmind-zen-active #mobile-doc-nav-bar {
+		      body.kmind-zen-active #mobile-outline-panel,
+		      body.kmind-zen-active #mobile-tabs-bar {
 	        display: none !important;
 	      }
 	      body.kmind-zen-active .protyle-breadcrumb[data-toolbar-customized],
@@ -4764,7 +4766,12 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
     // 桌面端：苹果风格合并对话框
     try {
       const categories = config.lifeLogCategories || ['学习', '工作', '生活']
-      const result = await showLifelogDialog(categories)
+      const result = await showLifelogDialog(categories, {
+        fontSize: config.lifeLogCatFontSize,
+        padding: config.lifeLogCatPadding,
+        hPadding: config.lifeLogCatHPadding,
+        inputFontSize: config.lifeLogInputFontSize
+      })
 
       if (result) {
         const { category, content: inputContent } = result
@@ -4799,10 +4806,10 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
       console.warn('[叶归LifeLog适配] 执行失败:', error)
       Notify.showErrorCommandCannotExecute('叶归LifeLog适配')
     }
-    return
-  }
+	    return
+	  }
 
-  // ⑧图片快捷导入日记
+	  // ⑧图片快捷导入日记
   if (subtype === 'image-upload') {
     await executeImageUpload(config)
     return
@@ -5063,7 +5070,11 @@ async function executeImageUpload(config: ButtonConfig) {
 /**
  * 叶归 LifeLog 合并对话框：分类选择 + 输入内容（苹果风格）
  */
-async function showLifelogDialog(categories: string[]): Promise<{ category: string; content: string } | null> {
+async function showLifelogDialog(categories: string[], opts?: { fontSize?: number; padding?: number; hPadding?: number; inputFontSize?: number }): Promise<{ category: string; content: string } | null> {
+  const catFontSize = opts?.fontSize ?? 14
+  const catPadding = opts?.padding ?? 8
+  const catHPadding = opts?.hPadding ?? 4
+  const inputFontSize = opts?.inputFontSize ?? 14
   return new Promise((resolve) => {
     const activeElement = document.activeElement as HTMLElement;
 
@@ -5078,7 +5089,7 @@ async function showLifelogDialog(categories: string[]): Promise<{ category: stri
 
     const box = document.createElement('div');
     box.style.cssText = `
-      width: min(360px, 85vw);
+      width: min(${360 + catHPadding * categories.length * 2}px, 90vw);
       background: var(--b3-theme-background);
       border-radius: 14px; overflow: hidden;
       box-shadow: 0 8px 40px rgba(0,0,0,0.2);
@@ -5101,7 +5112,7 @@ async function showLifelogDialog(categories: string[]): Promise<{ category: stri
       margin: 0 16px 12px; padding: 10px 12px;
       border: 1px solid var(--b3-border-color); border-radius: 8px;
       background: var(--b3-theme-surface); color: var(--b3-theme-on-surface);
-      font-size: 14px; outline: none; box-sizing: border-box; width: calc(100% - 32px);
+      font-size: ${inputFontSize}px; outline: none; box-sizing: border-box; width: calc(100% - 32px);
       transition: border-color 0.2s, box-shadow 0.2s;
       height: 120px; min-height: 60px; max-height: 300px;
       overflow-y: auto; resize: vertical;
@@ -5129,12 +5140,14 @@ async function showLifelogDialog(categories: string[]): Promise<{ category: stri
       const btn = document.createElement('button');
       btn.textContent = cat;
       btn.style.cssText = `
-        font-size: 13px; padding: 8px 4px; border: none;
+        font-size: ${catFontSize}px; padding: ${catPadding}px ${catHPadding}px; border: none;
         border-radius: 10px; cursor: pointer;
         transition: background 0.15s, color 0.15s, transform 0.15s;
         background: ${normalBg};
         color: ${activeColor};
         text-align: center; white-space: nowrap;
+        overflow: hidden; text-overflow: ellipsis;
+        min-width: 0;
       `;
       btn.onclick = () => {
         selectedIdx = idx;
@@ -5181,7 +5194,7 @@ async function showLifelogDialog(categories: string[]): Promise<{ category: stri
       updateCatHighlight();
     };
 
-    // 输入框键盘事件：Ctrl+Enter 发送，Escape 关闭
+    // 输入框键盘事件：Enter发送，Escape关闭，Shift+方向键 选分类
     // Enter 在 textarea 中正常换行，箭头键正常移动光标
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { e.preventDefault(); cleanup(); resolve(null); }
@@ -5192,6 +5205,13 @@ async function showLifelogDialog(categories: string[]): Promise<{ category: stri
         if (!focusOnCat) { enterCatMode(0); }
         cleanup();
         resolve({ category: categories[selectedIdx], content: text });
+      }
+      // Shift+方向键 选择分类
+      else if (e.shiftKey) {
+        if (e.key === 'ArrowUp') { e.preventDefault(); selectedIdx = (selectedIdx - colCount + categories.length) % categories.length; enterCatMode(selectedIdx); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); selectedIdx = (selectedIdx + colCount) % categories.length; enterCatMode(selectedIdx); }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); selectedIdx = (selectedIdx - 1 + categories.length) % categories.length; enterCatMode(selectedIdx); }
+        else if (e.key === 'ArrowRight') { e.preventDefault(); selectedIdx = (selectedIdx + 1) % categories.length; enterCatMode(selectedIdx); }
       }
     });
 
@@ -5273,8 +5293,73 @@ async function showLifelogDialog(categories: string[]): Promise<{ category: stri
       if (activeElement && document.contains(activeElement)) {
         try { activeElement.focus({ preventScroll: true }); } catch { /* ignore */ }
       }
-    };
+      };
   });
+}
+
+/**
+ * 桌面端叶归LifeLog全局快捷键：弹出分类+内容对话框，追加到指定笔记本日记
+ */
+export async function triggerDesktopLifelogGlobalCapture(): Promise<void> {
+  if (isMobileDevice()) return
+
+  // 从桌面端按钮配置中查找第一个开启了全局快捷键的 life-log 按钮
+  const desktopConfigs: ButtonConfig[] = pluginInstance?.desktopButtonConfigs || []
+  const lifelogConfig = desktopConfigs.find(
+    (btn: ButtonConfig) => btn.authorToolSubtype === 'life-log' && btn.lifelogGlobalCaptureEnabled
+  )
+  if (!lifelogConfig) {
+    // 检查是否存在 life-log 按钮但未开启快捷键
+    const hasLifeLogButton = desktopConfigs.some((btn: ButtonConfig) => btn.authorToolSubtype === 'life-log')
+    if (hasLifeLogButton) {
+      Notify.showErrorCommandCannotExecute('请在叶归LifeLog按钮设置中开启「全局快捷键」开关')
+    }
+    return
+  }
+
+  const categories = lifelogConfig?.lifeLogCategories?.length
+    ? lifelogConfig.lifeLogCategories
+    : ['学习', '工作', '生活']
+  const notebookId = lifelogConfig?.lifeLogNotebookId || ''
+
+  try {
+    const result = await showLifelogDialog(categories, {
+      fontSize: lifelogConfig.lifeLogCatFontSize,
+      padding: lifelogConfig.lifeLogCatPadding,
+      hPadding: lifelogConfig.lifeLogCatHPadding,
+      inputFontSize: lifelogConfig.lifeLogInputFontSize
+    })
+    if (!result) return
+
+    const { category, content: inputContent } = result
+    const now = new Date()
+    const hours = String(now.getHours()).padStart(2, '0')
+    const minutes = String(now.getMinutes()).padStart(2, '0')
+    const formattedContent = `${hours}:${minutes} ${category}：${inputContent}\n`
+
+    if (!notebookId) {
+      Notify.showErrorCommandCannotExecute('请先在叶归LifeLog按钮中配置笔记本ID')
+      return
+    }
+
+    try {
+      const response = await fetchSyncPost('/api/block/appendDailyNoteBlock', {
+        data: formattedContent,
+        dataType: 'markdown',
+        notebook: notebookId,
+      })
+      if (response.code === 0) {
+        Notify.showInfoCopySuccess()
+      } else {
+        await appendToDailyNoteAlternative(notebookId, formattedContent, true)
+      }
+    } catch {
+      await appendToDailyNoteAlternative(notebookId, formattedContent, true)
+    }
+  } catch (error) {
+    console.warn('[叶归LifeLog全局] 执行失败:', error)
+    Notify.showErrorCommandCannotExecute('叶归LifeLog')
+  }
 }
 
 /**

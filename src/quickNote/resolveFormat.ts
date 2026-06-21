@@ -20,7 +20,7 @@ export function resolveQuickNoteInputFormat(isFromButton: boolean): QuickNoteInp
 
   // 电脑端：格式统一读「电脑端设置 → 一键记事」全局配置
   if (isDesktopClient()) {
-    format = pluginInstance?.mobileFeatureConfig?.quickNoteInputFormat || DEFAULT_QUICK_NOTE_INPUT_FORMAT
+    format = pluginInstance?.desktopFeatureConfig?.quickNoteInputFormat || DEFAULT_QUICK_NOTE_INPUT_FORMAT
     if (format === 'block' && !isAuthorToolActivated()) {
       return 'plain'
     }

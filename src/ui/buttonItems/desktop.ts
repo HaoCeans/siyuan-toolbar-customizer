@@ -1010,7 +1010,7 @@ export function createDesktopButtonItem(
 
     // 分类按钮内边距
     const paddingLabel = document.createElement('label')
-    paddingLabel.textContent = '📐 分类按钮内边距（px）'
+    paddingLabel.textContent = '📐 分类按钮上下边距（px）'
     paddingLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
     lifeLogConfigDiv.appendChild(paddingLabel)
 
@@ -1023,6 +1023,56 @@ export function createDesktopButtonItem(
     paddingInput.style.cssText = 'font-size: 13px; width: 80px;'
     paddingInput.onchange = () => { button.lifeLogCatPadding = Number(paddingInput.value) || 8 }
     lifeLogConfigDiv.appendChild(paddingInput)
+
+    // 分类按钮左右边距
+    const hPaddingLabel = document.createElement('label')
+    hPaddingLabel.textContent = '↔️ 分类按钮左右边距（px）'
+    hPaddingLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
+    lifeLogConfigDiv.appendChild(hPaddingLabel)
+
+    const hPaddingInput = document.createElement('input')
+    hPaddingInput.type = 'number'
+    hPaddingInput.className = 'b3-text-field'
+    hPaddingInput.min = '2'
+    hPaddingInput.max = '32'
+    hPaddingInput.value = String(button.lifeLogCatHPadding ?? 4)
+    hPaddingInput.style.cssText = 'font-size: 13px; width: 80px;'
+    hPaddingInput.onchange = () => { button.lifeLogCatHPadding = Number(hPaddingInput.value) || 4 }
+    lifeLogConfigDiv.appendChild(hPaddingInput)
+
+    // 输入框字体大小
+    const inputFontSizeLabel = document.createElement('label')
+    inputFontSizeLabel.textContent = '📝 输入框字体大小（px）'
+    inputFontSizeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
+    lifeLogConfigDiv.appendChild(inputFontSizeLabel)
+
+    const inputFontSizeInput = document.createElement('input')
+    inputFontSizeInput.type = 'number'
+    inputFontSizeInput.className = 'b3-text-field'
+    inputFontSizeInput.min = '10'
+    inputFontSizeInput.max = '24'
+    inputFontSizeInput.value = String(button.lifeLogInputFontSize ?? 14)
+    inputFontSizeInput.style.cssText = 'font-size: 13px; width: 80px;'
+    inputFontSizeInput.onchange = () => { button.lifeLogInputFontSize = Number(inputFontSizeInput.value) || 14 }
+    lifeLogConfigDiv.appendChild(inputFontSizeInput)
+
+    // 全局快捷键开关（独立卡片式，突出显示）
+    const globalCaptureCard = document.createElement('div')
+    globalCaptureCard.style.cssText = 'margin-top: 12px; padding: 12px; border: 1.5px solid var(--b3-theme-primary); border-radius: 10px; background: var(--b3-theme-primary-lightest, rgba(0,122,255,0.04));'
+    const globalCaptureLabel = document.createElement('label')
+    globalCaptureLabel.style.cssText = 'display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; cursor: pointer; color: var(--b3-theme-on-background);'
+    const globalCaptureCheckbox = document.createElement('input')
+    globalCaptureCheckbox.type = 'checkbox'
+    globalCaptureCheckbox.checked = button.lifelogGlobalCaptureEnabled === true
+    globalCaptureCheckbox.onchange = () => { button.lifelogGlobalCaptureEnabled = globalCaptureCheckbox.checked }
+    globalCaptureLabel.appendChild(globalCaptureCheckbox)
+    globalCaptureLabel.appendChild(document.createTextNode('⌨️ 启用全局快捷键 Alt Shift L'))
+    globalCaptureCard.appendChild(globalCaptureLabel)
+    const captureHint = document.createElement('div')
+    captureHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: 6px; margin-left: 26px;'
+    captureHint.textContent = '开启后，在任何界面按 Alt Shift L 即可呼出 LifeLog 对话框。如需修改快捷键，请在电脑端快捷键配置（Keymap）中搜索「叶归LifeLog」。弹窗内快捷键：Shift+方向键 选分类，Shift+Enter 发送，Esc 关闭'
+    globalCaptureCard.appendChild(captureHint)
+    lifeLogConfigDiv.appendChild(globalCaptureCard)
 
     authorToolField.appendChild(lifeLogConfigDiv)
 
@@ -2680,7 +2730,7 @@ export function populateDesktopEditForm(
 
     // 分类按钮内边距
     const paddingLabel = document.createElement('label')
-    paddingLabel.textContent = '📐 分类按钮内边距（px）'
+    paddingLabel.textContent = '📐 分类按钮上下边距（px）'
     paddingLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
     lifeLogConfigDiv.appendChild(paddingLabel)
 
@@ -2693,6 +2743,56 @@ export function populateDesktopEditForm(
     paddingInput.style.cssText = 'font-size: 13px; width: 80px;'
     paddingInput.onchange = () => { button.lifeLogCatPadding = Number(paddingInput.value) || 8 }
     lifeLogConfigDiv.appendChild(paddingInput)
+
+    // 分类按钮左右边距
+    const hPaddingLabel = document.createElement('label')
+    hPaddingLabel.textContent = '↔️ 分类按钮左右边距（px）'
+    hPaddingLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
+    lifeLogConfigDiv.appendChild(hPaddingLabel)
+
+    const hPaddingInput = document.createElement('input')
+    hPaddingInput.type = 'number'
+    hPaddingInput.className = 'b3-text-field'
+    hPaddingInput.min = '2'
+    hPaddingInput.max = '32'
+    hPaddingInput.value = String(button.lifeLogCatHPadding ?? 4)
+    hPaddingInput.style.cssText = 'font-size: 13px; width: 80px;'
+    hPaddingInput.onchange = () => { button.lifeLogCatHPadding = Number(hPaddingInput.value) || 4 }
+    lifeLogConfigDiv.appendChild(hPaddingInput)
+
+    // 输入框字体大小
+    const inputFontSizeLabel = document.createElement('label')
+    inputFontSizeLabel.textContent = '📝 输入框字体大小（px）'
+    inputFontSizeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
+    lifeLogConfigDiv.appendChild(inputFontSizeLabel)
+
+    const inputFontSizeInput = document.createElement('input')
+    inputFontSizeInput.type = 'number'
+    inputFontSizeInput.className = 'b3-text-field'
+    inputFontSizeInput.min = '10'
+    inputFontSizeInput.max = '24'
+    inputFontSizeInput.value = String(button.lifeLogInputFontSize ?? 14)
+    inputFontSizeInput.style.cssText = 'font-size: 13px; width: 80px;'
+    inputFontSizeInput.onchange = () => { button.lifeLogInputFontSize = Number(inputFontSizeInput.value) || 14 }
+    lifeLogConfigDiv.appendChild(inputFontSizeInput)
+
+    // 全局快捷键开关（独立卡片式，突出显示）
+    const globalCaptureCard = document.createElement('div')
+    globalCaptureCard.style.cssText = 'margin-top: 12px; padding: 12px; border: 1.5px solid var(--b3-theme-primary); border-radius: 10px; background: var(--b3-theme-primary-lightest, rgba(0,122,255,0.04));'
+    const globalCaptureLabel = document.createElement('label')
+    globalCaptureLabel.style.cssText = 'display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; cursor: pointer; color: var(--b3-theme-on-background);'
+    const globalCaptureCheckbox = document.createElement('input')
+    globalCaptureCheckbox.type = 'checkbox'
+    globalCaptureCheckbox.checked = button.lifelogGlobalCaptureEnabled === true
+    globalCaptureCheckbox.onchange = () => { button.lifelogGlobalCaptureEnabled = globalCaptureCheckbox.checked }
+    globalCaptureLabel.appendChild(globalCaptureCheckbox)
+    globalCaptureLabel.appendChild(document.createTextNode('⌨️ 启用全局快捷键 Alt Shift L'))
+    globalCaptureCard.appendChild(globalCaptureLabel)
+    const captureHint = document.createElement('div')
+    captureHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: 6px; margin-left: 26px;'
+    captureHint.textContent = '开启后，在任何界面按 Alt Shift L 即可呼出 LifeLog 对话框。如需修改快捷键，请在电脑端快捷键配置（Keymap）中搜索「叶归LifeLog」。弹窗内快捷键：Shift+方向键 选分类，Shift+Enter 发送，Esc 关闭'
+    globalCaptureCard.appendChild(captureHint)
+    lifeLogConfigDiv.appendChild(globalCaptureCard)
 
     authorToolField.appendChild(lifeLogConfigDiv)
 

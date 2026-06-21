@@ -1050,7 +1050,7 @@ export function createMobileButtonItem(
 
       // 分类按钮内边距
       const paddingLabel = document.createElement('label')
-      paddingLabel.textContent = '📐 分类按钮内边距（px）'
+      paddingLabel.textContent = '📐 分类按钮上下边距（px）'
       paddingLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
       lifeLogConfigDiv.appendChild(paddingLabel)
 
@@ -1063,6 +1063,22 @@ export function createMobileButtonItem(
       paddingInput.style.cssText = 'font-size: 13px; width: 80px;'
       paddingInput.onchange = () => { button.lifeLogCatPadding = Number(paddingInput.value) || 8 }
       lifeLogConfigDiv.appendChild(paddingInput)
+
+      // 输入框字体大小
+      const inputFontSizeLabel = document.createElement('label')
+      inputFontSizeLabel.textContent = '📝 输入框字体大小（px）'
+      inputFontSizeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
+      lifeLogConfigDiv.appendChild(inputFontSizeLabel)
+
+      const inputFontSizeInput = document.createElement('input')
+      inputFontSizeInput.type = 'number'
+      inputFontSizeInput.className = 'b3-text-field'
+      inputFontSizeInput.min = '10'
+      inputFontSizeInput.max = '24'
+      inputFontSizeInput.value = String(button.lifeLogInputFontSize ?? 14)
+      inputFontSizeInput.style.cssText = 'font-size: 13px; width: 80px;'
+      inputFontSizeInput.onchange = () => { button.lifeLogInputFontSize = Number(inputFontSizeInput.value) || 14 }
+      lifeLogConfigDiv.appendChild(inputFontSizeInput)
 
       authorToolContainer.appendChild(lifeLogConfigDiv)
 

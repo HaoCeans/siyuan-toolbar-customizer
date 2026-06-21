@@ -698,18 +698,16 @@ function injectStyles(): void {
     .outline-icon-h5 { background: rgba(255,45,85,0.55); }
     .outline-icon-h6 { background: rgba(175,82,222,0.55); }
     /* 标题文字 */
-    .outline-text {
-      flex: 1;
-      font-size: 13px;
-      font-weight: 500;
-      color: #1c1c1e;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      line-height: 1.3;
-      letter-spacing: -0.2px;
-      transition: color 0.15s ease;
-    }
+	    .outline-text {
+	      flex: 1;
+	      font-size: 13px;
+	      font-weight: 500;
+	      color: #1c1c1e;
+	      word-break: break-word;
+	      line-height: 1.3;
+	      letter-spacing: -0.2px;
+	      transition: color 0.15s ease;
+	    }
     /* 子标题容器 */
     .outline-children {
       overflow: hidden;

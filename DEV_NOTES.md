@@ -677,3 +677,202 @@ resolve!()  // 释放队列给下一个
 - API 写入**必须**通过 `toggleLockWriteQueue` 排队，防止并发写入竞态
 - `cleanup()` 中无需清理 `toggleLockWriteQueue`（Promise 链会被 GC 回收）
 - 新增异步操作如果涉及读-改-写模式且可能被快速连续触发，参照此模式：同步读 + 乐观更新 + 串行写
+
+## 15. 记事弹窗块模式图片插入
+
+### 概览
+
+`src/quickNote/imageInsert.ts` — 统一图片上传+插入模块。支持：
+- **弹窗内图片按钮** → 选择文件 → 上传 → 插入块模式编辑器光标处
+- **Ctrl+V 粘贴图片** → 上传 → 插入光标处
+- **多张图片** → 全部上传后一次 `execCommand` 插入
+- **纯文本模式** → 回退到原始行为（追加到日记 + 关闭弹窗）
+
+块模式插入仅在 `authorToolSubtype === 'image-upload'` 且弹窗为块格式时生效。
+
+### 关键设计
+
+#### 1）光标定位：物理锚点 + mousedown 预存
+
+**坑**：点击按钮 → 文件选择器打开 → 编辑器失焦 → Selection/Range 丢失。移动端更严重，`touchstart` 先于 `mousedown` 触发导致键盘提前收起。
+
+**方案**：不依赖 Selection 状态，改用两阶段光标捕获：
+
+```
+阶段① mousedown/touchstart → preSaveBlockCursor()
+  在事件链最早时机 cloneRange() 保存到模块变量
+  （此时编辑器肯定还没失焦）
+
+阶段② click → pickAndInsertImages → plantBlockAnchor()
+  优先使用预存的 preSavedBlockRange
+  次选当前 window.getSelection()
+  末选 collapse(true) 兜底（弹窗刚开无光标 → 顶部）
+```
+
+`createClonedButton` 中（`windowDetector.ts:1346`）：
+
+```typescript
+clonedBtn.addEventListener('mousedown', (e) => {
+  e.preventDefault();
+  if (buttonConfig.type === 'author-tool' && buttonConfig.authorToolSubtype === 'image-upload') {
+    preSaveBlockCursor();  // ← 第一时间快照
+  }
+});
+clonedBtn.addEventListener('touchstart', (e) => {
+  e.preventDefault();
+  if (buttonConfig.type === 'author-tool' && buttonConfig.authorToolSubtype === 'image-upload') {
+    preSaveBlockCursor();
+  }
+}, { passive: false });  // passive: false 才能 preventDefault
+```
+
+#### 2）Protyle 多块定位：不能用 querySelector('[contenteditable="true"]')
+
+**坑**：Protyle 每个块都有独立的 `[contenteditable="true"]` 元素，`querySelector` 永远返回**第一个块**的编辑器。光标在第二个块时，锚点会错误地种进第一个块。
+
+```html
+<div data-node-id="block1"><div contenteditable="true">光标在这里</div></div>
+<div data-node-id="block2"><div contenteditable="true">← querySelector 永远命中这个</div></div>
+```
+
+**方案**：`findEditElFromSelection()` / `findEditElFromNode()` 从 Selection/DOM 节点**向上遍历**找到所在的 contenteditable：
+
+```typescript
+function findEditElFromSelection(handleElement: HTMLElement): HTMLElement | null {
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0) return null
+  const container = sel.getRangeAt(0).commonAncestorContainer
+  let node: Node | null = container
+  while (node && node !== handleElement) {
+    if (node instanceof HTMLElement && node.contentEditable === 'true') {
+      return node  // ← 返回光标所在的那个块
+    }
+    node = node.parentNode
+  }
+  return null
+}
+```
+
+`plantBlockAnchor`、`preSaveBlockCursor`、`insertImagesAtBlockAnchor` 全部使用此方法定位。
+
+#### 3）插入走 Protyle 管线：execCommand('insertHTML')
+
+**坑**：直接 `insertBefore`/`appendChild` 修改 DOM → Protyle 检测到"外部"变更 → 回退 → 图片闪现后消失。
+
+**方案**：`document.execCommand('insertHTML')` 触发 `beforeinput` 事件 → Protyle 事务管线接管 → DOM 被 Protyle "认可"。
+
+```typescript
+// insertImagesAtBlockAnchor 中：
+// ① 从锚点定位 → 创建 range
+const cursorRange = document.createRange()
+cursorRange.setStartBefore(anchor)
+cursorRange.collapse(true)
+
+// ② 移除锚点（range 还保留着位置引用）
+anchor.remove()
+
+// ③ range 写入 DOM Selection
+editEl.focus()
+sel.addRange(cursorRange)
+
+// ④ 一次 execCommand 插入所有图片（支持多选）
+const allHtml = assetPaths.map(p => PROTYLE_IMAGE_HTML(p)).join('')
+document.execCommand('insertHTML', false, allHtml)
+
+// ⑤ 插入后 blur 阻止键盘弹起
+editEl.blur()
+```
+
+**注意**：`execCommand` 前必须先移除锚点并重设 Selection，否则 Protyle 内部光标可能不在锚点位置（尤其移动端失焦后 Protyle 内部光标归零）。
+
+#### 4）粘贴：捕获阶段 + stopImmediatePropagation
+
+粘贴图片时，在 `contenteditable` 上以捕获阶段注册监听器（`addEventListener('paste', handler, true)`），检测到图片后 `e.stopImmediatePropagation()` 阻断 Protyle 原生 paste 处理器。
+
+```typescript
+// installImagePasteHandler 中：
+targetEl.addEventListener('paste', pasteHandler, true)  // capture 阶段
+
+// handleImagePaste 中：
+e.preventDefault()
+e.stopImmediatePropagation()  // 阻断 Protyle 原生监听器
+```
+
+#### 5）Protyle 标准图片 DOM
+
+插入的 HTML 使用 Protyle 内置 textmark 格式，`data-type="img"` 是 Lute 内置图片标记，`BlockDOM2Tree` 凭此识别：
+
+```typescript
+const PROTYLE_IMAGE_HTML = (url: string) =>
+  `<span contenteditable="false" data-type="img" class="img">` +
+    `<span>\u200b</span>` +                            // 零宽空格，光标占位
+    `<span>` +
+      `<span class="protyle-action protyle-icons">` +
+        `<span class="protyle-icon protyle-icon--img">` +
+          `<svg><use xlink:href="#iconImage"/></svg>` +  // SVG 图标
+        `</span>` +
+      `</span>` +
+    `</span>` +
+    `<img src="${url}" data-src="${url}"/>` +           // 图片 + data-src
+  `</span>`
+```
+
+#### 6）上传带 docRootId 指定笔记本
+
+`uploadImageFile(file, docId)` 将 `formData.append('id', docId)` 传入 `/api/asset/upload`，图片存入正确笔记本的 `data/{boxID}/assets/` 目录。
+
+- 块模式：`docRootId` 从 `wrapper.dataset.qnoteDocRootId` 读取（`blockInput.ts:187` 设置）
+- 纯文本模式：`notebookId` 从 `wrapper.dataset.qnoteNotebookId` 读取（`inputArea.ts:142` 设置）
+
+#### 7）多张图片一次插入
+
+所有图片上传完成后拼接 HTML，一次 `execCommand` 全部插入，避免逐张插入时锚点被第一张移除导致后续图片找不到位置。
+
+#### 8）纯文本模式回退
+
+`handleButtonClick`（`windowDetector.ts:1903`）中检测 `isPlainTextarea()`：
+
+```
+块模式弹窗打开 → pickAndInsertImages()（新流程）
+纯文本弹窗打开 → originalBtn.dispatchEvent(click) → executeImageUpload → 追加日记 → closeNoteDialogImmediately
+弹窗未打开     → originalBtn.dispatchEvent(click) → executeImageUpload → 追加日记
+```
+
+### 涉及的模块
+
+| 文件 | 职责 |
+|------|------|
+| `src/quickNote/imageInsert.ts` | 核心：上传、锚点、插入、粘贴处理、光标预存 |
+| `src/windowDetector.ts` | 弹窗按钮 mousedown/touchstart 预存光标、handleButtonClick 分发、粘贴处理器安装/卸载 |
+| `src/quickNote/blockInput.ts` | 暴露 `docRootId` 到 `wrapper.dataset`、`hasWysiwygText` 检测图片元素 |
+| `src/quickNote/inputArea.ts` | 暴露 `notebookId` 到纯文本 `wrapper.dataset` |
+| `src/toolbarManager.ts` | `executeImageUpload` 保持不变（弹窗外按钮 + 纯文本回退使用） |
+
+### 规则
+
+- 光标定位**必须**在 mousedown/touchstart 阶段预存（`preSaveBlockCursor`），不能等到 click
+- 查找 contenteditable **必须**从 Selection/DOM 节点向上遍历（`findEditElFromSelection`/`findEditElFromNode`），**禁止**使用 `querySelector('[contenteditable="true"]')`（多块命中错误块）
+- 块模式插入**必须**使用 `execCommand('insertHTML')`，**禁止**直接 DOM 操作（会被 Protyle 回退）
+- 多张图片**必须**全部上传后再一次 `execCommand` 插入（单张插入会移除锚点导致后续定位失败）
+- 插入后**必须**阻止输入法/键盘弹出：
+  - 块模式：`execCommand` 后调 `editEl.blur()`（`execCommand` 会隐式聚焦编辑器）
+  - 纯文本模式：`finalizeTextareaInsertion` 不得调 `textarea.focus()`
+- 粘贴**必须**捕获阶段 + `stopImmediatePropagation` 阻断 Protyle 原生处理器（仅图片粘贴时阻断，纯文本粘贴直接放行）
+- 纯文本模式**必须**回退到原始 `executeImageUpload` 流程（追加日记 + 关闭弹窗）
+- 块模式图片 DOM **必须**使用标准 Protyle 结构（`data-type="img"` + `protyle-icons` + `data-src`），否则 Protyle 不识别
+- 所有新增代码**必须**包 try-catch（`installImagePasteHandler`、`preSaveBlockCursor`、`handleButtonClick` 图片分支），异常不阻断弹窗创建和按钮交互
+
+### 性能影响
+
+整个图片插入模块是纯事件驱动的，无常驻定时器或轮询，对性能无感知影响：
+
+| 操作 | 触发时机 | 开销 |
+|------|---------|------|
+| `installImagePasteHandler` | 弹窗创建时注册监听器 | 一次性的 `addEventListener`，微小 |
+| 粘贴事件检查 | 每次 Ctrl+V | `clipboardData.files.length` 检查，微秒级 |
+| `preSaveBlockCursor` | 图片按钮 mousedown/touchstart | `cloneRange()` + DOM 向上遍历（≤10层），微秒级 |
+| `findEditElFromSelection` | 同上 | DOM 向上遍历，微秒级 |
+| `handleButtonClick` 图片分支 | 弹窗内每次按钮点击 | 一次字符串比较（`authorSubtype === 'image-upload'`），不匹配时几乎零开销 |
+| `hasWysiwygText` 图片检测 | `getContent()` 调用时 | 一次 `querySelector`，在编辑器 DOM 范围内，毫秒级 |
+| `execCommand('insertHTML')` | 图片上传完成后 | 浏览器原生编辑命令，Protyle 同步处理，通常 <50ms |
+| 多图上传 | 文件选择器 onchange | 并发 `fetch` 上传，总时间取决于网络，不阻塞 UI |

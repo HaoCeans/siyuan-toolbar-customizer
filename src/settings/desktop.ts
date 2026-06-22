@@ -1014,7 +1014,7 @@ export function createDesktopSettingLayout(
             <tr>
               <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑧</td>
               <td style="padding: 10px; font-weight: 500;">图片快捷导入日记</td>
-              <td style="padding: 10px; color: var(--b3-theme-on-surface);">一键选择图片导入到每日笔记，自动追加到日记末尾，记录生活更便捷</td>
+              <td style="padding: 10px; color: var(--b3-theme-on-surface);">一键选择图片导入到每日笔记，自动追加到日记末尾。若开启「一键记事 → 思源块编辑模式」，点击按钮可将图片直接插入记事弹窗编辑器光标处，支持多选、连续插入</td>
             </tr>
             <tr style="background: var(--b3-theme-background);">
               <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑨</td>

@@ -3559,7 +3559,7 @@ export function createMobileSettingLayout(
             <tr>
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑧</td>
               <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">图片快捷导入日记</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">选择图片快速导入日记，支持手动定位或自动追加，图片管理更便捷</td>
+              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">选择图片快速导入日记，支持手动定位或自动追加。若开启「一键记事 → 思源块编辑模式」，点击按钮可将图片直接插入记事弹窗编辑器光标处，支持多选、连续插入</td>
             </tr>
             <tr style="background: var(--b3-theme-background);">
               <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑨</td>

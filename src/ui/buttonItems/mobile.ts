@@ -1344,6 +1344,9 @@ export function createMobileButtonItem(
         <div style="font-size: 12px; color: #60a5fa; margin-bottom: 8px;">
           📸 <strong>使用说明：</strong>选择本地图片后自动上传并插入到今日日记底部
         </div>
+        <div style="font-size: 11px; color: var(--b3-theme-on-surface-light); background: var(--b3-theme-surface-light); padding: 6px 10px; border-radius: 6px; margin-bottom: 10px; line-height: 1.5;">
+          💡 <strong>记事弹窗插入：</strong>若在「一键记事」中开启<strong>思源块编辑模式</strong>，点击图片按钮会直接插入到弹窗编辑器光标位置（支持多选、连续插入），不再追加到日记。
+        </div>
       `
       imageUploadConfigDiv.appendChild(imageUploadDesc)
 

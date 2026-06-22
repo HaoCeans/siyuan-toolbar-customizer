@@ -84,7 +84,13 @@ export function isBlockInputFormat(format: string | undefined): boolean {
 }
 
 function hasWysiwygText(editor: Protyle): boolean {
-  return !!(editor.protyle.wysiwyg.element.textContent ?? '').replace(/\u200b/g, '').trim()
+  const wysiwyg = editor.protyle.wysiwyg.element
+  // 文本内容（排除零宽空格）
+  const text = (wysiwyg.textContent ?? '').replace(/\u200b/g, '').trim()
+  if (text) return true
+  // 图片元素（纯图片块也有内容）
+  if (wysiwyg.querySelector('img, [data-type="img"]')) return true
+  return false
 }
 
 async function resetDraftBlock(
@@ -177,6 +183,8 @@ export async function createBlockInputHandle(
   if (loaded) {
     mountEl.style.display = 'flex'
     wrapper.appendChild(mountEl)
+    // 暴露 docRootId 供图片上传模块指定资源存入正确笔记本
+    wrapper.dataset.qnoteDocRootId = state.docRootId
   } else {
     loadingEl.textContent = '加载编辑块失败'
     wrapper.appendChild(loadingEl)

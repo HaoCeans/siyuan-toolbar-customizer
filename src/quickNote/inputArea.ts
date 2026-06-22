@@ -139,6 +139,11 @@ function createPlainInputHandle(options: QuickNoteInputAreaOptions): QuickNoteIn
 
   wrapper.appendChild(textarea)
 
+  // 暴露 notebookId 供图片上传模块指定资源存入正确笔记本
+  if (options.saveTarget?.notebookId) {
+    wrapper.dataset.qnoteNotebookId = options.saveTarget.notebookId
+  }
+
   return {
     element: wrapper,
     format: 'plain',

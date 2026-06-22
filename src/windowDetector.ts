@@ -22,6 +22,7 @@ import {
   toggleDesktopQuickNoteBlockWindow,
 } from './quickNote/quickNoteBlockWindow';
 import { createQuoteOverlay } from './quickNote/quoteOverlay';
+import { pickAndInsertImages, installImagePasteHandler, preSaveBlockCursor } from './quickNote/imageInsert';
 import { fetchSyncPost } from 'siyuan';
 
 export type QuickNoteOpenSource = 'auto' | 'button' | 'globalHotkey';
@@ -63,6 +64,9 @@ let heightCheckTimer: ReturnType<typeof setInterval> | null = null;
 
 // 金句占位 overlay 清理句柄
 let quoteOverlayCleanup: (() => void) | null = null;
+
+// 图片粘贴处理器清理句柄
+let pasteCleanup: (() => void) | null = null;
 
 // 叶归Lifelog 模式状态
 let isLifelogMode = false;
@@ -370,6 +374,11 @@ async function teardownQuickNoteDialog(dialog: HTMLElement, closeMobile: boolean
     quoteOverlayCleanup()
     quoteOverlayCleanup = null
   }
+  // 清理图片粘贴处理器
+  if (pasteCleanup) {
+    try { pasteCleanup() } catch (e) { /* ignore */ }
+    pasteCleanup = null
+  }
   isNoteDialogShowing = false;
   isQuickNoteDialogMinimized = false;
   needsInitialFocus = false;
@@ -515,6 +524,14 @@ async function showNoteInputDialogDesktop(
   });
   setActiveQuickNoteInput(inputHandle);
   noteSection.appendChild(inputHandle.element);
+
+  // 安装图片粘贴处理器
+  try {
+    pasteCleanup?.()
+    pasteCleanup = installImagePasteHandler(inputHandle)
+  } catch (e) {
+    console.warn('[QuickNote] 安装粘贴处理器失败:', e)
+  }
 
   const hint = document.createElement('div');
   hint.style.cssText = `
@@ -818,6 +835,14 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
   });
   setActiveQuickNoteInput(inputHandle);
   noteSection.appendChild(inputHandle.element);
+
+  // 安装图片粘贴处理器
+  try {
+    pasteCleanup?.()
+    pasteCleanup = installImagePasteHandler(inputHandle)
+  } catch (e) {
+    console.warn('[QuickNote] 安装粘贴处理器失败:', e)
+  }
 
   // 金句占位 overlay（输入法未打开 + 空输入时随机展示文档段落）
   quoteOverlayCleanup?.()
@@ -1335,7 +1360,18 @@ function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null, 
   // 阻止 mousedown 导致的焦点转移，保持 textarea/contenteditable 选区不丢失
   clonedBtn.addEventListener('mousedown', (e) => {
     e.preventDefault();
+    // 图片按钮：在最早时机预存光标，此时编辑器肯定还没失焦
+    if (buttonConfig.type === 'author-tool' && buttonConfig.authorToolSubtype === 'image-upload') {
+      try { preSaveBlockCursor() } catch { /* ignore */ }
+    }
   });
+  // 图片按钮额外防 touchstart（移动端先于 mousedown 触发，防止键盘提前收起导致失焦）
+  if (buttonConfig.type === 'author-tool' && buttonConfig.authorToolSubtype === 'image-upload') {
+    clonedBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      try { preSaveBlockCursor() } catch { /* ignore */ }
+    }, { passive: false });
+  }
 
   // 获取配置的按钮样式
   const useCustomStyle = pluginInstance?.mobileFeatureConfig?.useCustomButtonStyle || false;
@@ -1869,6 +1905,34 @@ async function handleButtonClick(
         pendingLifelogConfig = buttonConfig;
         const nbId = buttonConfig.lifeLogNotebookId || pluginInstance?.mobileFeatureConfig?.quickNoteNotebookId || '';
         void showNoteInputDialogMobile(nbId);
+      }
+      return;
+    }
+
+    // 图片快捷导入：仅在块模式弹窗中插入编辑器，纯文本模式走原流程（追加到日记 + 关弹窗）
+    if (buttonConfig.type === 'author-tool' && buttonConfig.authorToolSubtype === 'image-upload') {
+      try {
+        const noteDialog = getQuickNoteDialogElement();
+        if (noteDialog) {
+          const activeInput = getActiveQuickNoteInput();
+          if (activeInput && !activeInput.isPlainTextarea()) {
+            // 块模式：插入到弹窗编辑器，不关闭弹窗
+            await pickAndInsertImages();
+          } else {
+            // 纯文本模式：回退到原始工具栏按钮行为（追加到日记）
+            if (originalBtn) {
+              originalBtn.dispatchEvent(new MouseEvent('click', { bubbles: false, cancelable: true, view: window }));
+            }
+            void closeNoteDialogImmediately();
+          }
+        } else {
+          // 弹窗未打开：回退到原始工具栏按钮行为（追加到日记）
+          if (originalBtn) {
+            originalBtn.dispatchEvent(new MouseEvent('click', { bubbles: false, cancelable: true, view: window }));
+          }
+        }
+      } catch (e) {
+        console.warn('[QuickNote] 图片插入失败:', e)
       }
       return;
     }

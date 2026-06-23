@@ -26,6 +26,7 @@ import { destroyEdgeTTSEngine, destroyGoogleTTSEngine } from "./tts/edgeTtsEngin
 import { showConfirmDialog } from "./ui/dialog";
 // API 工具
 import { deleteBlock } from "./api";
+import { uploadImageFile, insertProtyleImageAtCaret } from "./quickNote/imageInsert";
 
 // ===== 插件实例（用于需要 app 参数的 API 调用） =====
 export let pluginInstance: any = null;
@@ -4811,7 +4812,7 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
 
 	  // ⑧图片快捷导入日记
   if (subtype === 'image-upload') {
-    await executeImageUpload(config)
+    await executeImageUpload(config, savedSelection, lastActiveElement)
     return
   }
 
@@ -4972,7 +4973,87 @@ function minutesToHHMM(minutes: number): string {
 /**
  * ⑧图片快捷导入日记
  */
-async function executeImageUpload(config: ButtonConfig) {
+/**
+ * 追加图片 markdown 到日记底部（原有逻辑，工具栏无光标时使用）
+ */
+async function appendToDailyNote(config: ButtonConfig, uploadedPath: string): Promise<void> {
+  const notebookId = config.imageUploadNotebookId
+  if (!notebookId) {
+    Notify.showErrorCommandCannotExecute('请先配置笔记本ID')
+    return
+  }
+
+  const imageMarkdown = `![](${uploadedPath})\n`
+  const appendResponse = await fetch('/api/block/appendDailyNoteBlock', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      data: imageMarkdown,
+      dataType: 'markdown',
+      notebook: notebookId
+    })
+  })
+  const appendResult = await appendResponse.json()
+
+  if (appendResult.code === 0) {
+    if (config.showNotification) {
+      Notify.showInfoCopySuccess()
+    }
+  } else {
+    Notify.showErrorCommandCannotExecute('追加到日记失败: ' + (appendResult.msg || ''))
+  }
+}
+
+async function executeImageUpload(config: ButtonConfig, preSavedRange: Range | null = null, preSavedActiveEl: HTMLElement | null = null) {
+  // ===== 优先使用 mousedown/touchstart 阶段预存的光标（最可靠） =====
+  let savedRange: Range | null = preSavedRange
+  let savedEditEl: HTMLElement | null = null
+
+  if (savedRange && preSavedActiveEl) {
+    // 从预存的 activeElement 向上找 contenteditable
+    let node: Node | null = preSavedActiveEl
+    while (node) {
+      if (node instanceof HTMLElement && node.contentEditable === 'true') {
+        savedEditEl = node
+        break
+      }
+      node = node.parentNode
+    }
+  }
+
+  // 如果 preSavedActiveEl 找不到，从 Range 的 commonAncestor 向上找
+  if (savedRange && !savedEditEl) {
+    let node: Node | null = savedRange.commonAncestorContainer
+    while (node && node !== document.body) {
+      if (node instanceof HTMLElement && node.contentEditable === 'true') {
+        savedEditEl = node
+        break
+      }
+      node = node.parentNode
+    }
+  }
+
+  // 兜底：当前 document.activeElement
+  if (!savedEditEl) {
+    const activeEl = document.activeElement
+    if (activeEl) {
+      const protyleEl = activeEl.closest?.('.protyle') as HTMLElement | null
+      if (protyleEl) {
+        const editEl = protyleEl.querySelector<HTMLElement>('[contenteditable="true"]')
+        if (editEl && editEl.contains(activeEl)) {
+          const sel = window.getSelection()
+          if (sel && sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0)
+            if (editEl.contains(range.commonAncestorContainer)) {
+              savedRange = range.cloneRange()
+              savedEditEl = editEl
+            }
+          }
+        }
+      }
+    }
+  }
+
   // 创建文件选择器
   const fileInput = document.createElement('input')
   fileInput.type = 'file'
@@ -4980,80 +5061,38 @@ async function executeImageUpload(config: ButtonConfig) {
   fileInput.style.display = 'none'
   document.body.appendChild(fileInput)
 
-  fileInput.onchange = async () => {
-    // 清除图片选择器标记，恢复一键记事弹窗的正常触发
-    ;(window as any).__imagePickerActive = false
-    const file = fileInput.files?.[0]
-    document.body.removeChild(fileInput)
-    if (!file) return
+	  fileInput.onchange = async () => {
+	    // 清除图片选择器标记，恢复一键记事弹窗的正常触发
+	    ;(window as any).__imagePickerActive = false
+	    const file = fileInput.files?.[0]
+	    document.body.removeChild(fileInput)
+	    if (!file) return
 
-    try {
-      // 上传图片到思源资源库
-      // 字段名必须是 file[]（对应思源内核 form.File["file[]"]）
-      const formData = new FormData()
-      formData.append('file[]', file)
+	    try {
+	      // 上传图片到思源资源库
+	      const uploadedPath = await uploadImageFile(file)
 
-      // 使用原生 fetch，避免 fetchSyncPost 的 processMessage 触发 UI 刷新
-      const httpResponse = await fetch('/api/asset/upload', {
-        method: 'POST',
-        body: formData
-      })
-      const response = await httpResponse.json()
-
-      if (response.code !== 0) {
-        console.error('[图片快捷导入] 上传失败:', response)
-        Notify.showErrorCommandCannotExecute('图片上传失败: ' + (response.msg || ''))
-        return
-      }
-
-      // 思源返回 succMap 格式: { "filename.jpg": "assets/xxx-xxx.jpg" }
-      const succMap = response.data?.succMap
-      if (!succMap || Object.keys(succMap).length === 0) {
-        console.error('[图片快捷导入] succMap 为空:', response.data)
-        Notify.showErrorCommandCannotExecute('图片上传失败: 无返回路径')
-        return
-      }
-
-      const uploadedPath = Object.values(succMap)[0] as string
-
-      if (!uploadedPath) {
-        Notify.showErrorCommandCannotExecute('图片上传失败: 路径为空')
-        return
-      }
-
-      // 插入到日记底部
-      const notebookId = config.imageUploadNotebookId
-      if (!notebookId) {
-        Notify.showErrorCommandCannotExecute('请先配置笔记本ID')
-        return
-      }
-
-      const imageMarkdown = `![](${uploadedPath})\n`
-
-      // 使用原生 fetch 调用，避免 fetchSyncPost 的 processMessage 触发 UI 刷新导致滚动位置重置
-      const appendResponse = await fetch('/api/block/appendDailyNoteBlock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          data: imageMarkdown,
-          dataType: 'markdown',
-          notebook: notebookId
-        })
-      })
-      const appendResult = await appendResponse.json()
-
-      if (appendResult.code === 0) {
-        if (config.showNotification) {
-          Notify.showInfoCopySuccess()
-        }
-      } else {
-        Notify.showErrorCommandCannotExecute('追加到日记失败: ' + (appendResult.msg || ''))
-      }
-    } catch (error) {
-      console.warn('[图片快捷导入日记] 执行失败:', error)
-      Notify.showErrorCommandCannotExecute('图片导入失败')
-    }
-  }
+	      if (savedRange && savedEditEl && document.body.contains(savedEditEl)) {
+	        // ===== 有光标 → 插入到光标位置 =====
+	        try {
+	          insertProtyleImageAtCaret(savedEditEl, savedRange, uploadedPath)
+	          if (config.showNotification) {
+	            Notify.showInfoCopySuccess()
+	          }
+	        } catch (e) {
+	          console.warn('[图片快捷导入] 光标插入失败，回退日记追加:', e)
+	          // 光标插入失败 → 回退到底部追加
+	          await appendToDailyNote(config, uploadedPath)
+	        }
+	      } else {
+	        // ===== 无光标 → 追加到日记底部（原有逻辑） =====
+	        await appendToDailyNote(config, uploadedPath)
+	      }
+	    } catch (error) {
+	      console.warn('[图片快捷导入日记] 执行失败:', error)
+	      Notify.showErrorCommandCannotExecute('图片导入失败')
+	    }
+	  }
 
   // 标记图片选择器激活，防止切后台时触发一键记事弹窗
   ;(window as any).__imagePickerActive = true

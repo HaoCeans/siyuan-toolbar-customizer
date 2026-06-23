@@ -72,6 +72,23 @@ const PROTYLE_IMAGE_HTML = (url: string) =>
     `<img src="${url}" data-src="${url}"/>` +
   `</span>`
 
+/**
+ * 在指定 Range 位置插入标准 Protyle 图片 DOM。
+ * 供工具栏按钮复用：保存光标 Range → 选图上传 → 调用此函数插入。
+ * @param editEl - 目标 contenteditable 元素
+ * @param caretRange - 保存的光标 Range（会在插入前被还原到 Selection）
+ * @param assetPath - 资源路径如 "assets/xxx.jpg"
+ */
+export function insertProtyleImageAtCaret(editEl: HTMLElement, caretRange: Range, assetPath: string): void {
+  editEl.focus()
+  const sel = window.getSelection()
+  if (!sel) return
+  sel.removeAllRanges()
+  sel.addRange(caretRange)
+  document.execCommand('insertHTML', false, PROTYLE_IMAGE_HTML(assetPath))
+  editEl.blur()
+}
+
 // ==================== 光标预存（mousedown/touchstart 阶段捕获） ====================
 
 /** mousedown/touchstart 时保存的块模式光标快照，供 plantBlockAnchor 优先使用 */

@@ -6,7 +6,7 @@
 import { Protyle } from 'siyuan'
 import type { QuickNoteInputAreaOptions, QuickNoteInputHandle } from './inputArea'
 import { destroyQuickNoteProtyle } from './protyleIsolate'
-import { createQuickNoteDraftBlock, deleteQuickNoteDraftBlock } from './kernelBlock'
+import { createQuickNoteDraftBlock, deleteQuickNoteDraftBlock, blockExistsInKernel } from './kernelBlock'
 import {
   installKernelProtyleGuards,
   loadSingleBlockIntoProtyle,
@@ -201,6 +201,19 @@ export async function createBlockInputHandle(
       return { format: 'block', dom: '' }
     },
     saveToTarget: async () => {
+      // 预检查：长时间挂后台后 draft block 可能已被内核清理
+      if (!(await blockExistsInKernel(state.rootBlockId))) {
+        const newId = await createQuickNoteDraftBlock(options.saveTarget!)
+        if (newId) {
+          // 用新块 ID 替换 Protyle DOM 中的旧 ID
+          const tops = getLiveWysiwygTopBlocks(editor.protyle.wysiwyg.element)
+          for (const el of tops) {
+            el.setAttribute('data-node-id', newId)
+          }
+          state.rootBlockId = newId
+          state.docRootId = newId
+        }
+      }
       const ok = await persistQuickNoteToKernel(editor, state)
       if (ok) savedToKernel = true
       return ok

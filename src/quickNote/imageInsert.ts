@@ -345,7 +345,10 @@ export async function pickAndInsertImages(): Promise<boolean> {
     let settled = false
 
     const cleanup = () => {
-      ;(window as any).__imagePickerActive = false
+      // 延迟清除标记：handleVisibilityChange 在文件选择器关闭后可能
+      // 立即尝试恢复焦点 → 导致 blur() 后键盘被重新拉起。
+      // 保持标记 true 的时长 > visibilitychange 触发窗口，使其直接 return。
+      setTimeout(() => { ;(window as any).__imagePickerActive = false }, 500)
       try { document.body.removeChild(fileInput) } catch { /* ignore */ }
     }
 

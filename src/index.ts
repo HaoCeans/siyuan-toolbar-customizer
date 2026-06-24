@@ -507,8 +507,8 @@ export default class ToolbarCustomizer extends Plugin {
           } else {
             showMessage('欢迎使用本插件🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦伺服浏览器\n⑧最近文档', 0, 'info')
           }
-          // 只设置标记，不立即写入，等待用户保存设置时一并写入
-          this._pendingWelcomeSave = true
+          // 立即写入标记，不再依赖用户打开设置面板
+          this.saveData('hasShownWelcome', true).catch(() => { /* ignore */ })
         }, 2000)
       }
     } catch (error) {

@@ -5058,35 +5058,42 @@ async function executeImageUpload(config: ButtonConfig, preSavedRange: Range | n
   const fileInput = document.createElement('input')
   fileInput.type = 'file'
   fileInput.accept = 'image/*'
+  fileInput.multiple = true
   fileInput.style.display = 'none'
   document.body.appendChild(fileInput)
 
 	  fileInput.onchange = async () => {
 	    // 清除图片选择器标记，恢复一键记事弹窗的正常触发
 	    ;(window as any).__imagePickerActive = false
-	    const file = fileInput.files?.[0]
+	    const files = fileInput.files
 	    document.body.removeChild(fileInput)
-	    if (!file) return
+	    if (!files || files.length === 0) return
 
 	    try {
-	      // 上传图片到思源资源库
-	      const uploadedPath = await uploadImageFile(file)
-
 	      if (savedRange && savedEditEl && document.body.contains(savedEditEl)) {
-	        // ===== 有光标 → 插入到光标位置 =====
+	        // ===== 有光标 → 全部上传后一次性插入到光标位置 =====
 	        try {
-	          insertProtyleImageAtCaret(savedEditEl, savedRange, uploadedPath)
+	          const paths: string[] = []
+	          for (let i = 0; i < files.length; i++) {
+	            paths.push(await uploadImageFile(files[i]))
+	          }
+	          insertProtyleImageAtCaret(savedEditEl, savedRange, paths)
 	          if (config.showNotification) {
 	            Notify.showInfoCopySuccess()
 	          }
 	        } catch (e) {
 	          console.warn('[图片快捷导入] 光标插入失败，回退日记追加:', e)
-	          // 光标插入失败 → 回退到底部追加
-	          await appendToDailyNote(config, uploadedPath)
+	          for (let i = 0; i < files.length; i++) {
+	            const path = await uploadImageFile(files[i])
+	            await appendToDailyNote(config, path)
+	          }
 	        }
 	      } else {
-	        // ===== 无光标 → 追加到日记底部（原有逻辑） =====
-	        await appendToDailyNote(config, uploadedPath)
+	        // ===== 无光标 → 逐张追加到日记底部 =====
+	        for (let i = 0; i < files.length; i++) {
+	          const path = await uploadImageFile(files[i])
+	          await appendToDailyNote(config, path)
+	        }
 	      }
 	    } catch (error) {
 	      console.warn('[图片快捷导入日记] 执行失败:', error)
@@ -5102,8 +5109,11 @@ async function executeImageUpload(config: ButtonConfig, preSavedRange: Range | n
     try { document.body.removeChild(fileInput) } catch { /* ignore */ }
   })
   fileInput.click()
-  // 安全兜底：30秒后自动清除标记（防止 onchange/cancel 均不触发的极端情况）
-  setTimeout(() => { ;(window as any).__imagePickerActive = false }, 30000)
+  // 安全兜底：30秒后自动清除标记 + 移除 input 节点（防止 onchange/cancel 均不触发的极端情况）
+  setTimeout(() => {
+    ;(window as any).__imagePickerActive = false
+    try { document.body.removeChild(fileInput) } catch { /* ignore */ }
+  }, 30000)
 }
 
 /**
@@ -5189,7 +5199,7 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
 
     const overlay = document.createElement('div');
     overlay.style.cssText = `
-      position: fixed; inset: 0; z-index: 2147483647;
+      position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2147483647;
       display: flex; align-items: center; justify-content: center;
       background: rgba(0,0,0,0.4); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
       animation: tc-ll-fade-in 0.15s ease-out;
@@ -5198,23 +5208,26 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
 
     const box = document.createElement('div');
     box.style.cssText = `
-      width: min(${360 + catHPadding * categories.length * 2}px, 90vw);
+      width: min(${360 + catHPadding * categories.length * 2}px, 90vw, 600px);
+      max-height: 90vh;
       background: var(--b3-theme-background);
-      border-radius: 14px; overflow: hidden;
+      border-radius: 14px;
       box-shadow: 0 8px 40px rgba(0,0,0,0.2);
       animation: tc-ll-scale-in 0.2s ease-out;
+      display: flex; flex-direction: column; overflow: hidden;
     `;
 
-    // 标题
+    // 标题（最后才收缩）
     const title = document.createElement('div');
     title.textContent = '📒 LifeLog';
     title.style.cssText = `
       padding: 18px 16px 12px; font-size: 17px; font-weight: 600;
       color: var(--b3-theme-on-background); text-align: center;
+      flex: 0 1 auto; min-height: 0; overflow: hidden;
     `;
     box.appendChild(title);
 
-    // 输入框（多行文本域，支持长文本自动换行+滚动条）
+    // 输入框（弹性伸缩，小窗口收缩、大窗口扩展）
     const input = document.createElement('textarea');
     input.placeholder = '例如：写插件';
     input.style.cssText = `
@@ -5223,7 +5236,7 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
       background: var(--b3-theme-surface); color: var(--b3-theme-on-surface);
       font-size: ${inputFontSize}px; outline: none; box-sizing: border-box; width: calc(100% - 32px);
       transition: border-color 0.2s, box-shadow 0.2s;
-      height: 160px; min-height: 80px; max-height: 360px;
+      flex: 1 1 120px; min-height: 60px;
       overflow-y: auto; resize: vertical;
       white-space: pre-wrap; word-wrap: break-word;
       line-height: 1.5;
@@ -5231,12 +5244,13 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
     `;
     box.appendChild(input);
 
-    // 分类按钮区域（网格布局，等宽对齐）
+    // 分类按钮区域（第二优先收缩）
     const catWrap = document.createElement('div');
     const colCount = Math.max(2, Math.min(categories.length, 4));
     catWrap.style.cssText = `
       display: grid; grid-template-columns: repeat(${colCount}, 1fr);
       gap: 8px; padding: 0 16px 12px;
+      flex: 0 1 auto; min-height: 0; overflow-y: auto;
     `;
     const normalBg = 'var(--b3-theme-surface)';
     const activeColor = 'var(--b3-theme-on-background)';
@@ -5257,6 +5271,7 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
         text-align: center; white-space: nowrap;
         overflow: hidden; text-overflow: ellipsis;
         min-width: 0;
+        display: flex; align-items: center; justify-content: center;
       `;
       btn.onclick = () => {
         selectedIdx = idx;
@@ -5356,9 +5371,9 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
     sep.style.cssText = `margin: 0 16px; border-top: 0.5px solid var(--b3-border-color);`;
     box.appendChild(sep);
 
-    // 按钮容器
+    // 按钮容器（最后才收缩）
     const btnRow = document.createElement('div');
-    btnRow.style.cssText = `display: flex; gap: 8px; padding: 4px 16px 16px;`;
+    btnRow.style.cssText = `display: flex; gap: 8px; padding: 4px 16px 16px; flex: 0 1 auto; min-height: 0; overflow: hidden;`;
 
     const cancelBtn = document.createElement('button');
     cancelBtn.textContent = '取消';
@@ -5436,6 +5451,8 @@ let activeLifelogInput: HTMLTextAreaElement | null = null
 
 export async function triggerDesktopLifelogGlobalCapture(): Promise<void> {
   if (isMobileDevice()) return
+  // 多窗口环境下只有聚焦的窗口响应全局快捷键，避免所有窗口同时弹出
+  if (!document.hasFocus()) return
 
   // 已有打开的弹窗 → 关闭
   if (activeLifelogCleanup) {

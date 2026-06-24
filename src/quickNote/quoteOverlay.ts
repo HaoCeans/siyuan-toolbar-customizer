@@ -62,9 +62,14 @@ function hasInputContent(handle: QuickNoteInputHandle): boolean {
     const textarea = handle.element.querySelector('textarea') as HTMLTextAreaElement | null
     return !!(textarea?.value.trim())
   }
-  // 块格式：检查 wysiwyg 中是否有实质文字
-  const editEl = handle.element.querySelector('[contenteditable="true"]') as HTMLElement | null
-  return !!(editEl?.textContent?.replace(/​/g, '').trim())
+  // 块格式：检查 wysiwyg 中是否有实质文字或图片元素
+  const wysiwyg = handle.element.querySelector('.protyle-wysiwyg') as HTMLElement | null
+  if (!wysiwyg) return false
+  const text = (wysiwyg.textContent ?? '').replace(/\u200b/g, '').trim()
+  if (text) return true
+  // 图片元素也算有内容（防止金句 overlay 遮挡图片）
+  if (wysiwyg.querySelector('img, [data-type="img"]')) return true
+  return false
 }
 
 // ===== 导出 =====

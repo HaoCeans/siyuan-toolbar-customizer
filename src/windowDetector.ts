@@ -22,7 +22,7 @@ import {
   toggleDesktopQuickNoteBlockWindow,
 } from './quickNote/quickNoteBlockWindow';
 import { createQuoteOverlay } from './quickNote/quoteOverlay';
-import { pickAndInsertImages, installImagePasteHandler, preSaveBlockCursor } from './quickNote/imageInsert';
+import { pickAndInsertImages, installImagePasteHandler, preSaveBlockCursor, clearPreSavedBlockCursor } from './quickNote/imageInsert';
 import { fetchSyncPost } from 'siyuan';
 
 export type QuickNoteOpenSource = 'auto' | 'button' | 'globalHotkey';
@@ -379,6 +379,8 @@ async function teardownQuickNoteDialog(dialog: HTMLElement, closeMobile: boolean
     try { pasteCleanup() } catch (e) { /* ignore */ }
     pasteCleanup = null
   }
+  // 清除预存的光标引用（防止持有已分离的编辑器 DOM）
+  clearPreSavedBlockCursor()
   isNoteDialogShowing = false;
   isQuickNoteDialogMinimized = false;
   needsInitialFocus = false;

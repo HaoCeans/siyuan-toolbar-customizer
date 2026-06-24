@@ -73,19 +73,22 @@ const PROTYLE_IMAGE_HTML = (url: string) =>
   `</span>`
 
 /**
- * 在指定 Range 位置插入标准 Protyle 图片 DOM。
+ * 在指定 Range 位置插入标准 Protyle 图片 DOM（支持多张）。
+ * 多张图片拼接后一次 `execCommand` 插入，保证光标位置正确。
  * 供工具栏按钮复用：保存光标 Range → 选图上传 → 调用此函数插入。
  * @param editEl - 目标 contenteditable 元素
- * @param caretRange - 保存的光标 Range（会在插入前被还原到 Selection）
- * @param assetPath - 资源路径如 "assets/xxx.jpg"
+ * @param caretRange - 保存的光标 Range
+ * @param assetPath - 资源路径或路径数组
  */
-export function insertProtyleImageAtCaret(editEl: HTMLElement, caretRange: Range, assetPath: string): void {
+export function insertProtyleImageAtCaret(editEl: HTMLElement, caretRange: Range, assetPath: string | string[]): void {
+  const paths = Array.isArray(assetPath) ? assetPath : [assetPath]
   editEl.focus()
   const sel = window.getSelection()
   if (!sel) return
   sel.removeAllRanges()
   sel.addRange(caretRange)
-  document.execCommand('insertHTML', false, PROTYLE_IMAGE_HTML(assetPath))
+  const allHtml = paths.map(p => PROTYLE_IMAGE_HTML(p)).join('')
+  document.execCommand('insertHTML', false, allHtml)
   editEl.blur()
 }
 
@@ -141,6 +144,14 @@ export function preSaveBlockCursor(): void {
   if (!editEl.contains(range.commonAncestorContainer)) return
   preSavedBlockRange = range.cloneRange()
   preSavedEditEl = editEl
+}
+
+/**
+ * 清除预存的光标引用（弹窗关闭时调用，防止持有已分离的编辑器 DOM）。
+ */
+export function clearPreSavedBlockCursor(): void {
+  preSavedBlockRange = null
+  preSavedEditEl = null
 }
 
 // ==================== 锚点标记 ====================
@@ -327,12 +338,25 @@ function getUploadDocId(handle: QuickNoteInputHandle): string | undefined {
 
 // ==================== 文件选择器 ====================
 
+/** 重入锁：防止快速双击图片按钮导致多个文件选择器同时打开 */
+let isPicking = false
+
 /**
  * 打开文件选择器，上传选中图片并插入弹窗编辑器光标处。
  * 支持多选（multiple），不关闭弹窗。
  * @returns 是否成功插入至少一张图片
  */
 export async function pickAndInsertImages(): Promise<boolean> {
+  if (isPicking) return false  // 重入锁：已有选择器在等待
+  isPicking = true
+  try {
+    return await doPickAndInsertImages()
+  } finally {
+    isPicking = false
+  }
+}
+
+async function doPickAndInsertImages(): Promise<boolean> {
   const handle = getActiveQuickNoteInput()
   if (!handle) return false
 
@@ -355,7 +379,7 @@ export async function pickAndInsertImages(): Promise<boolean> {
     const fileInput = document.createElement('input')
     fileInput.type = 'file'
     fileInput.accept = 'image/*'
-    fileInput.multiple = true
+    // fileInput.multiple = true  // 暂时关闭多选，需要时取消注释即可
     fileInput.style.display = 'none'
     document.body.appendChild(fileInput)
 
@@ -466,12 +490,13 @@ export async function handleImagePaste(e: ClipboardEvent): Promise<boolean> {
 
   if (imageFiles.length === 0) return false
 
-  // 有图片 → 阻止默认粘贴 + 阻断 Protyle 原生监听器
-  e.preventDefault()
-  e.stopImmediatePropagation()
-
+  // 先验证有可用的插入目标，再阻止默认粘贴（防止 handle 为 null 时图片被静默丢弃）
   const handle = getActiveQuickNoteInput()
   if (!handle) return false
+
+  // 有图片 + 有目标 → 阻止默认粘贴 + 阻断 Protyle 原生监听器
+  e.preventDefault()
+  e.stopImmediatePropagation()
 
   const isPlain = handle.isPlainTextarea()
   const textarea = isPlain ? handle.element.querySelector('textarea') : null

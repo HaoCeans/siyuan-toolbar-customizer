@@ -159,6 +159,7 @@ export interface FeatureConfig {
   quickNoteGlobalCaptureEnabled?: boolean
   quickNoteOverflowToolbarEnabled?: boolean
   quickNoteToolbarVisible?: boolean
+  quickNoteFontSize?: number  // 电脑端弹窗字体大小（独立于手机端）
   quickNoteBlockWindowPersist?: boolean  // 块格式弹窗后台常驻
 }
 

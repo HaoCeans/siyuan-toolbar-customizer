@@ -230,7 +230,7 @@ function createInsertPositionSection(context: DesktopQuickNoteSettingsContext): 
 }
 
 function createFontSizeSection(context: DesktopQuickNoteSettingsContext): HTMLElement {
-  const config = context.mobileFeatureConfig
+  const config = context.desktopFeatureConfig as Record<string, any>
   const section = document.createElement('div')
   section.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
@@ -257,7 +257,7 @@ function createFontSizeSection(context: DesktopQuickNoteSettingsContext): HTMLEl
     config.quickNoteFontSize = value
   }
   slider.onchange = () => {
-    void context.saveMobileConfig()
+    void context.saveDesktopConfig()
   }
 
   row.appendChild(label)

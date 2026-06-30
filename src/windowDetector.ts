@@ -1649,12 +1649,6 @@ function renderButtons(
     wrapper.appendChild(overflowPanel)
   }
   container.appendChild(wrapper)
-
-  // 开关工具栏：关掉时隐藏整个按钮区域（默认显示）
-  const toolbarVisible = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteToolbarVisible !== false
-  if (!toolbarVisible) {
-    wrapper.style.display = 'none'
-  }
 }
 
 /**

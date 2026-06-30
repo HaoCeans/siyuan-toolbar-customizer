@@ -7,12 +7,10 @@ import { pluginInstance } from '../toolbarManager'
 
 const WIN_W = 600, WIN_H = 500, BOUNDS_KEY = '__qn_block_window_bounds'
 const QUICKNOTE_TITLE = '⚡ 快捷记事'
-let qnWinId: number | null = null
-
-const HIDE_CSS = '.layout-tab-bar,.protyle-title,.protyle-background,.protyle-breadcrumb,.protyle-scroll,#status{display:none!important}'
+const BASE_HIDE = '.layout-tab-bar,.protyle-title,.protyle-background,.protyle-scroll,#status{display:none!important}'
+const BREADCRUMB_HIDE = '.protyle-breadcrumb{display:none!important}'
 const DRAG_CSS = '#qn-drag-handle{position:fixed;top:0;left:0;width:50%;height:36px;z-index:9999;-webkit-app-region:drag;cursor:grab}'
-const HIDE_JS = `(function(){var s=document.createElement('style');s.textContent=${JSON.stringify(HIDE_CSS+DRAG_CSS)};document.head.appendChild(s);var d=document.createElement('div');d.id='qn-drag-handle';d.title='拖动窗口';document.body.appendChild(d)})()`
-const TITLE_JS = `(function(){var t=${JSON.stringify(QUICKNOTE_TITLE)};document.title=t;Object.defineProperty(document,'title',{get:function(){return t},set:function(){return t}})})()`
+let qnWinId: number | null = null
 
 function getBW(): any { try { return (window as any).require?.('@electron/remote')?.BrowserWindow ?? null } catch { return null } }
 function getMainId(): number | null { try { return (window as any).require?.('@electron/remote')?.getCurrentWindow?.()?.id ?? null } catch { return null } }
@@ -57,11 +55,16 @@ function createOneWindow(blockId: string): boolean {
     }]))
     const url = window.location.protocol + '//' + window.location.host + '/stage/build/app/window.html?' + vPart + 'json=' + json
 
-    // 事件注册在 loadURL 之前，确保不遗漏
-    win.webContents.on('dom-ready', () => { win.webContents.executeJavaScript(HIDE_JS).catch(() => {}) })
+    // ★ 根据开关动态构建 CSS：工具栏开时保留面包屑，关时隐藏
+    const toolbarOn = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteToolbarVisible !== false
+    const hideCSS = BASE_HIDE + (toolbarOn ? '' : BREADCRUMB_HIDE) + DRAG_CSS
+    const hideJS = `(function(){var s=document.createElement('style');s.textContent=${JSON.stringify(hideCSS)};document.head.appendChild(s);var d=document.createElement('div');d.id='qn-drag-handle';d.title='拖动窗口';document.body.appendChild(d)})()`
+    const titleJS = `(function(){var t=${JSON.stringify(QUICKNOTE_TITLE)};document.title=t;Object.defineProperty(document,'title',{get:function(){return t},set:function(){return t}})})()`
+
+    win.webContents.on('dom-ready', () => { win.webContents.executeJavaScript(hideJS).catch(()=>{}) })
     win.webContents.once('did-finish-load', () => {
-      win.webContents.executeJavaScript(HIDE_JS).catch(() => {})
-      win.webContents.executeJavaScript(TITLE_JS).catch(() => {})
+      win.webContents.executeJavaScript(hideJS).catch(()=>{})
+      win.webContents.executeJavaScript(titleJS).catch(()=>{})
       try { win.setTitle(QUICKNOTE_TITLE) } catch {}
       win.show(); win.focus()
     })

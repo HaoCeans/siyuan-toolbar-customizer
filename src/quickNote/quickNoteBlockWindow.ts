@@ -9,8 +9,9 @@ const WIN_W = 600, WIN_H = 500, BOUNDS_KEY = '__qn_block_window_bounds'
 const QUICKNOTE_TITLE = '⚡ 快捷记事'
 let qnWinId: number | null = null
 
-const HIDE_CSS = '.layout-tab-bar,.protyle-title,.protyle-background,.protyle-breadcrumb,.protyle-scroll,#status,.toolbar__window,#pinWindow,#minWindow,#maxWindow,#restoreWindow,#closeWindow{display:none!important}'
-const HIDE_JS = `(function(){var s=document.createElement('style');s.textContent=${JSON.stringify(HIDE_CSS)};document.head.appendChild(s)})()`
+const HIDE_CSS = '.layout-tab-bar,.protyle-title,.protyle-background,.protyle-breadcrumb,.protyle-scroll,#status{display:none!important}'
+const DRAG_CSS = '#qn-drag-handle{position:fixed;top:0;left:0;width:50%;height:36px;z-index:9999;-webkit-app-region:drag;cursor:grab}'
+const HIDE_JS = `(function(){var s=document.createElement('style');s.textContent=${JSON.stringify(HIDE_CSS+DRAG_CSS)};document.head.appendChild(s);var d=document.createElement('div');d.id='qn-drag-handle';d.title='拖动窗口';document.body.appendChild(d)})()`
 const TITLE_JS = `(function(){var t=${JSON.stringify(QUICKNOTE_TITLE)};document.title=t;Object.defineProperty(document,'title',{get:function(){return t},set:function(){return t}})})()`
 
 function getBW(): any { try { return (window as any).require?.('@electron/remote')?.BrowserWindow ?? null } catch { return null } }
@@ -38,7 +39,8 @@ function createOneWindow(blockId: string): boolean {
     const bounds = getBounds()
     const win = new BW({
       show: false, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height,
-      minWidth: 300, minHeight: 200, alwaysOnTop: true, frame: true,
+      minWidth: 300, minHeight: 200, alwaysOnTop: true,
+      frame: false,
       title: QUICKNOTE_TITLE, webPreferences: { contextIsolation: false, nodeIntegration: true },
     })
     qnWinId = win.id

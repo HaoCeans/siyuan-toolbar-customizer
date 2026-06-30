@@ -17,7 +17,6 @@ import {
   type QuickNoteFloatSaveResult,
 } from './quickNote/quickNoteFloatWindow';
 import {
-  openDesktopQuickNoteBlockWindow,
   shouldUseDesktopQuickNoteBlockWindow,
   toggleDesktopQuickNoteBlockWindow,
 } from './quickNote/quickNoteBlockWindow';
@@ -2533,7 +2532,7 @@ export function triggerLifelogQuickNote(buttonConfig: any): void {
 
 // 防抖：全局快捷键可能短时间内触发多次，导致先最小化再立刻弹出
 let lastToggleTimestamp = 0;
-const TOGGLE_DEBOUNCE_MS = 400;
+const TOGGLE_DEBOUNCE_MS = 150;
 
 /** 电脑端：全局快捷键 / 按钮 — 纯文本悬浮窗 或 块格式 openWindow */
 export async function triggerDesktopQuickNoteCapture(isFromButton = false): Promise<void> {
@@ -2550,8 +2549,8 @@ export async function triggerDesktopQuickNoteCapture(isFromButton = false): Prom
   if (!captureSettings.globalCaptureEnabled && !isFromButton) return;
 
   if (shouldUseDesktopQuickNoteBlockWindow(isFromButton)) {
-    await toggleDesktopQuickNoteBlockWindow(isFromButton);
-    return;
+    await toggleDesktopQuickNoteBlockWindow(isFromButton)
+    return
   }
 
   const source = isFromButton ? 'button' : 'globalHotkey';

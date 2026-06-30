@@ -64,6 +64,7 @@ import {
   handleQuickNoteFloatCommand,
   isQuickNoteFloatSaveFromButton,
 } from './quickNote/quickNoteFloatWindow'
+import { destroyDesktopQuickNoteBlockWindow } from './quickNote/quickNoteBlockWindow'
 
 // 导入 StressThreshold 清理函数
 import {
@@ -191,6 +192,7 @@ export default class ToolbarCustomizer extends Plugin {
     quickNotePasteClipboardOnOpen: false, // 电脑端：打开捕获窗时粘贴剪贴板
     quickNoteOverflowToolbarEnabled: false, // 电脑端：记事弹窗内显示插件扩展工具栏
     quickNoteInputFormat: 'plain' as 'plain' | 'block', // 电脑端：一键记事输入格式（独立于手机端）
+    quickNoteBlockWindowPersist: false, // 块格式弹窗后台常驻：默认关闭
   }
 
   // 手机端小功能配置
@@ -490,7 +492,7 @@ export default class ToolbarCustomizer extends Plugin {
             await this.saveData('v3MigrationAsked', true)
             // 重载界面
             setTimeout(() => {
-              fetchSyncPost('/api/system/reloadUI', {})
+              fetchSyncPost('/api/ui/reloadUI', {})
             }, 1000)
           } else {
             // 用户选择保留配置
@@ -853,6 +855,7 @@ export default class ToolbarCustomizer extends Plugin {
 
   onunload() {
     destroyQuickNoteFloatWindow()
+    destroyDesktopQuickNoteBlockWindow()
     try { delete (window as any).__quickNoteFloatCommand } catch { /* ignore */ }
 
     // 清理资源
@@ -1059,7 +1062,7 @@ n    // 清理桌面端标签页Tab资源
         showMessage('设置已保存，正在重载...', 2000, 'info')
 
         // 使用官方 API 重载界面
-        await fetchSyncPost('/api/system/reloadUI', {})
+        await fetchSyncPost('/api/ui/reloadUI', {})
       }
     })
 

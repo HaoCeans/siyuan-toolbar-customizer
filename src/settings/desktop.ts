@@ -160,6 +160,7 @@ export interface FeatureConfig {
   quickNoteMinimizeAfterSend?: boolean
   quickNotePasteClipboardOnOpen?: boolean
   quickNoteOverflowToolbarEnabled?: boolean
+  quickNoteBlockWindowPersist?: boolean  // 块格式弹窗后台常驻
 }
 
 /**
@@ -406,10 +407,10 @@ export function createDesktopSettingLayout(
   const preloadStyle = document.createElement('style')
   preloadStyle.id = 'toolbar-customizer-preload-hide'
   preloadStyle.textContent = `
-    .b3-dialog__content .config__item {
+    .b3-dialog__content .config-item {
       display: none !important;
     }
-    .b3-dialog__content .config__item[data-tab-group="desktop"] {
+    .b3-dialog__content .config-item[data-tab-group="desktop"] {
       display: block !important;
     }
   `
@@ -755,7 +756,7 @@ export function createDesktopSettingLayout(
         }
 
         showMessage('导入成功，正在重载...', 2000, 'info')
-        await fetchSyncPost('/api/system/reloadUI', {})
+        await fetchSyncPost('/api/ui/reloadUI', {})
       }
 
       fileInput.onchange = async () => {
@@ -959,104 +960,97 @@ export function createDesktopSettingLayout(
         border-radius: 8px;
         box-sizing: border-box;
       `
-      whaleFunctionListContainer.innerHTML = `
-        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（14项）</div>
-        <div style="font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>
-        <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-          <thead>
-            <tr style="background: var(--b3-theme-primary-lightest);">
-              <th style="padding: 10px; text-align: center; border-bottom: 2px solid var(--b3-border-color); width: 36px;">序号</th>
-              <th style="padding: 10px; text-align: left; border-bottom: 2px solid var(--b3-border-color);">功能名称</th>
-              <th style="padding: 10px; text-align: left; border-bottom: 2px solid var(--b3-border-color);">功能说明</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⓪</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">一键记事弹窗块格式</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键记事弹窗支持思源块格式输入，富文本编辑，插入标题、列表、代码块等<br/><a href="javascript:void(0)" onclick="(function(){var btn=document.querySelector('button[data-tab=&quot;desktop&quot;]');if(btn)btn.click();setTimeout(function(){var el=document.getElementById('quick-note-format-section-desktop');if(!el)return;el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('jump-highlight');void el.offsetWidth;el.classList.add('jump-highlight');setTimeout(function(){el.classList.remove('jump-highlight')},2000)},300)})()" style="color: var(--b3-theme-primary); font-size: 12px; text-decoration: underline;">👉 点击跳转到设置项</a></td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">①</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">连续点击自定义按钮</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键自动执行多个按钮操作，告别重复点击，工作流自动化</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">②</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">打开指定ID块</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">瞬间跳转到任意文档任意位置，精准定位，省时省力</td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">③</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">数据库悬浮弹窗</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">悬浮窗口快速查看数据库，无需切换页面，数据触手可及</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">④</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">日记底部</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键直达日记末尾，快速追加内容，记录生活点滴</td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑤</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">叶归LifeLog适配</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">与LifeLog插件深度整合，时间记录更智能，生活管理更高效</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑥</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">弹窗框模板选择</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">弹出式模板选择器，快速插入常用内容，写作效率倍增</td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑦</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">滚动文档顶部或底部</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键直达文档首尾，长文档浏览更轻松，阅读体验升级</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑧</td>
-              <td style="padding: 10px; font-weight: 500;">图片快捷导入日记</td>
-              <td style="padding: 10px; color: var(--b3-theme-on-surface);">一键选择图片导入到每日笔记，自动追加到日记末尾。若开启「一键记事 → 思源块编辑模式」，点击按钮可将图片直接插入记事弹窗编辑器光标处，支持多选、连续插入</td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑨</td>
-              <td style="padding: 10px; font-weight: 500;">悬浮标签页Tab</td>
-              <td style="padding: 10px; color: var(--b3-theme-on-surface);">桌面端多文档快速切换，悬浮Tab栏，自动管理</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑩</td>
-              <td style="padding: 10px; font-weight: 500;">悬浮大纲</td>
-              <td style="padding: 10px; color: var(--b3-theme-on-surface);">桌面端左侧悬浮大纲面板，标题快速跳转，实时跟踪当前位置，阅读长文必备</td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑪</td>
-              <td style="padding: 10px; font-weight: 500;">前一篇/后一篇文档</td>
-              <td style="padding: 10px; color: var(--b3-theme-on-surface);">桌面端底部悬浮导航栏，按文件树顺序浏览文档，前后翻页，阅读笔记更流畅</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑫</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">滑动快速批注</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键开启/关闭鲸鱼快速批注插件的滑动批注模式，手指滑动即可标注文字👉需要先下载鲸鱼快速批注插件</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑬</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">文档朗读</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">使用浏览器语音合成朗读当前文档内容，支持语速调节、段落高亮、播放控制，电脑端可选用不同语音</td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑭</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">一键清理空块</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">自动扫描并删除当前文档中的空块（无文本的段落/标题/列表项），预览确认后批量删除</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑮</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">⑮ 沉浸阅读模式<span style="color: #10b981; font-size: 11px; margin-left: 4px;">免费</span></td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">🔒一键锁定文档防误编辑 + 📱上滑自动隐藏工具栏，全屏沉浸阅读；可独立选择锁定/解锁图标，支持锁定后工具栏滚动隐藏</td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td colspan="3" style="padding: 12px; text-align: center; color: var(--b3-theme-primary); font-weight: 600; font-style: italic;">持续更新中~</td>
-            </tr>
-          </tbody>
-        </table>
-      `
+	      whaleFunctionListContainer.innerHTML = `
+	        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（17项）</div>
+	        <div style="font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>
+	      `
+
+		      interface __TabData { key: string; label: string; sub: string; icon: string; rows: string[] }
+		      const __activated = context.isAuthorToolActivated()
+		      const __allRows = [
+	        rowTr('⓪', '一键记事弹窗块格式', '一键记事弹窗支持思源块格式输入，富文本编辑，插入标题、列表、代码块等' +
+	          '<a href="javascript:void(0)" onclick="(function(){var b=document.querySelector(\'button[data-tab=desktop]\');b&&b.click();setTimeout(function(){var el=document.getElementById(\'quick-note-format-section-desktop\');if(!el)return;el.scrollIntoView({behavior:\'smooth\',block:\'center\'});el.classList.remove(\'jump-highlight\');void el.offsetWidth;el.classList.add(\'jump-highlight\');setTimeout(function(){el.classList.remove(\'jump-highlight\')},2000)},300)})()" style="color:var(--b3-theme-primary);font-size:12px;text-decoration:underline;margin-left:8px;">👉设置</a>'),
+	        rowTr('①', '连续点击自定义按钮', '一键自动执行多个按钮操作，告别重复点击，工作流自动化'),
+	        rowTr('②', '打开指定ID块', '精准跳转到任意文档任意位置，省时省力'),
+	        rowTr('③', '数据库悬浮弹窗', '悬浮窗口快速查看数据库，无需切换页面，数据触手可及'),
+	        rowTr('④', '日记底部', '一键直达日记末尾，快速追加内容，记录生活点滴'),
+	        rowTr('⑤', '叶归LifeLog适配', '与LifeLog插件深度整合，时间记录更智能，生活管理更高效'),
+	        rowTr('⑥', '弹窗框模板选择', '弹出式模板选择器，快速插入常用内容，写作效率倍增'),
+	        rowTr('⑦', '滚动文档顶部或底部', '一键直达文档首尾，长文档浏览更轻松'),
+	        rowTr('⑧', '图片快捷导入日记', '一键选择图片导入笔记。若开启思源块编辑模式，可插入记事弹窗编辑器光标处'),
+		        rowTr('⑨', '悬浮标签页Tab', '多文档快速切换，悬浮Tab栏，自动管理'),
+		        rowTr('⑩', '悬浮大纲', '左侧悬浮大纲面板，标题快速跳转，阅读长文必备'),
+		        rowTr('⑪', '前一篇/后一篇文档', '底部悬浮导航栏，按文件树顺序浏览文档'),
+		        rowTr('⑫', '滑动快速批注', __activated
+		          ? '配合「鲸鱼快速批注」插件，手指滑动即可标注文字' +
+		            '<br/><button onclick="var a=window.open(\'https://github.com/HaoCeans/siyuan-comment/releases/download/v1.0.0/siyuan-comment.zip\');alert(\'① 请到思源工作空间的 data/plugins/ 目录下，新建 siyuan-comment 文件夹\\n② 将下载的压缩包解压到 siyuan-comment 文件夹\\n③ 重载思源，在插件市场搜索「鲸鱼快速批注」打开插件\\n\\n如遇问题请进QQ群：1018010924\')" style="margin-top:4px;padding:4px 12px;border-radius:6px;border:none;background:var(--b3-theme-primary);color:#fff;cursor:pointer;font-size:12px;outline:none;transition:opacity 0.2s;">⬇️ 下载最新版</button>'
+		          : '配合「鲸鱼快速批注」插件，手指滑动即可标注文字（🔒 激活后可用）'
+		        ),
+	        rowTr('⑬', '文档朗读', '使用浏览器语音合成朗读当前文档，支持语速调节、段落高亮'),
+	        rowTr('⑭', '一键清理空块', '自动扫描并删除文档中空块（无文本段落/标题/列表项），预览确认后批量删除'),
+	        rowTr('⑮', '沉浸阅读模式<span style="color:#10b981;font-size:11px;margin-left:4px;">免费</span>', '🔒一键锁定文档防误编辑 + 上滑自动隐藏工具栏，全屏沉浸阅读'),
+	        rowTr('⑯', '快速添加附件', '📎选择任意文件上传，可自定义名称，图片支持压缩；有光标插光标处，无光标追加日记（记事弹窗中不生效）'),
+	      ]
+
+	      function rowTr(num: string, name: string, desc: string): string {
+	        return `<tr>
+	          <td style="padding:10px 4px;text-align:center;color:var(--b3-theme-primary);font-weight:500;">${num}</td>
+	          <td style="padding:10px;font-weight:500;">${name}</td>
+	          <td style="padding:10px;color:var(--b3-theme-on-surface);font-size:12px;">${desc}</td>
+	        </tr>`
+	      }
+
+	      const __tabs: __TabData[] = [
+	        { key: 'all', label: '全部功能', sub: '17项', icon: '📋', rows: __allRows },
+	        { key: 'reading', label: '批注阅读', sub: '6项', icon: '📖', rows: [__allRows[9], __allRows[10], __allRows[11], __allRows[13], __allRows[15], __allRows[12]] },
+	        { key: 'notes', label: '笔记与日记', sub: '5项', icon: '✍️', rows: [__allRows[0], __allRows[4], __allRows[5], __allRows[8], __allRows[16]] },
+	        { key: 'edit', label: '编辑提效', sub: '3项', icon: '⚡', rows: [__allRows[1], __allRows[6], __allRows[14]] },
+	        { key: 'nav', label: '导航与浏览', sub: '3项', icon: '🧭', rows: [__allRows[2], __allRows[3], __allRows[7]] },
+	      ]
+
+	      const __tabBar = document.createElement('div')
+	      __tabBar.style.cssText = 'display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;'
+	      whaleFunctionListContainer.appendChild(__tabBar)
+
+	      const __containers: Record<string, HTMLElement> = {}
+	      __tabs.forEach(t => {
+	        const btn = document.createElement('button')
+	        btn.style.cssText = 'display:flex;align-items:center;gap:4px;padding:7px 14px;border-radius:8px;border:1px solid var(--b3-border-color);background:var(--b3-theme-surface);color:var(--b3-theme-on-surface);cursor:pointer;font-size:13px;outline:none;white-space:nowrap;transition:all 0.15s;'
+	        btn.innerHTML = `${t.icon} ${t.label} <span style="font-size:11px;opacity:0.6;">${t.sub}</span>`
+	        __tabBar.appendChild(btn)
+
+	        const wrap = document.createElement('div')
+	        wrap.style.display = 'none'
+	        wrap.innerHTML = `
+	          <table style="width:100%;font-size:13px;border-collapse:collapse;margin-top:8px;">
+	            <thead>
+	              <tr style="background:var(--b3-theme-primary-lightest);">
+	                <th style="padding:10px;text-align:center;width:36px;">序号</th>
+	                <th style="padding:10px;text-align:left;">功能名称</th>
+	                <th style="padding:10px;text-align:left;">功能说明</th>
+	              </tr>
+	            </thead>
+	            <tbody>${t.rows.join('')}</tbody>
+	          </table>
+	          <div style="padding:12px;text-align:center;color:var(--b3-theme-primary);font-style:italic;font-size:13px;">持续更新中~</div>
+	        `
+	        whaleFunctionListContainer.appendChild(wrap)
+	        __containers[t.key] = wrap
+
+	        btn.onclick = () => {
+	          Object.values(__containers).forEach(c => c.style.display = 'none')
+	          wrap.style.display = ''
+	          __tabBar.querySelectorAll('button').forEach(b => {
+	            b.style.background = 'var(--b3-theme-surface)'
+	            b.style.color = 'var(--b3-theme-on-surface)'
+	            b.style.borderColor = 'var(--b3-border-color)'
+	          })
+	          btn.style.background = 'var(--b3-theme-primary)'
+	          btn.style.color = '#fff'
+	          btn.style.borderColor = 'var(--b3-theme-primary)'
+	        }
+	      })
+	      ;(__tabBar.querySelector('button') as HTMLElement)?.click()
       whaleToolboxContainer.appendChild(whaleFunctionListContainer)
             
       container.appendChild(whaleToolboxContainer)
@@ -1079,7 +1073,7 @@ export function createDesktopSettingLayout(
             
       const featureMethod3 = document.createElement('div')
       featureMethod3.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background;'
-      featureMethod3.textContent = '3. 本插件的免费功能，已经占据95%，如果您仍然需要单独定制功能，请私聊作者，为您私人定制！完成后，按钮将加入工具箱。'
+      featureMethod3.textContent = '3. 本插件的免费功能，已经占据80%，如果您仍然需要单独定制功能，请私聊作者，为您私人定制！完成后，按钮将加入工具箱。'
             
       featureBox.appendChild(featureTitle)
       featureBox.appendChild(featureMethod1)
@@ -1096,96 +1090,77 @@ export function createDesktopSettingLayout(
       activationTitle.style.cssText = 'font-size: 20px; font-weight: bold; color: #722ed1; margin-bottom: 16px; text-align: center; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);'
       activationTitle.textContent = '激活码方案与权益说明'
       activationBox.appendChild(activationTitle)
-                  
-      // 正价支持方案
-      const regularSection = document.createElement('div')
-      regularSection.style.cssText = 'margin-bottom: 20px; padding: 12px; background: rgba(82, 196, 26, 0.05); border-radius: 6px; border-left: 3px solid #52c41a;'
-                  
-      const regularTitle = document.createElement('div')
-      regularTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #52c41a; margin-bottom: 10px;'
-      regularTitle.textContent = '1️⃣ 正价支持方案（原价 99 元）'
-      regularSection.appendChild(regularTitle)
-                  
-      const regularContent = document.createElement('div')
-      regularContent.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); line-height: 1.6;'
-      regularContent.innerHTML = `
-        <div style="margin-bottom: 8px;"><strong>包含内容：</strong></div>
-        <div style="margin-bottom: 6px;">• <strong>永久激活码（电脑、手机均可用）</strong></div>
-        <div style="margin-bottom: 6px;">• <strong>无限次自动化代码实现（作者帮写）</strong></div>
-        <div style="margin-left: 16px; margin-bottom: 6px; font-size: 13px;">• 对应功能：⑤ 自动化模拟点击（高难度功能）</div>
-        <div style="margin-bottom: 6px;">• <strong>1 次定制化需求（作者实现）</strong></div>
-        <div style="margin-left: 16px; margin-bottom: 4px; font-size: 13px;">• 功能可使用您的名字命名</div>
-        <div style="margin-left: 16px; font-size: 13px;">• 根据需求，作者在能力与合理范围内进行评估，尽最大可能满足！</div>
-      `
-      regularSection.appendChild(regularContent)
-      activationBox.appendChild(regularSection)
-                  
-      // 限时优惠方案
-      const discountSection = document.createElement('div')
-      discountSection.style.cssText = 'margin-bottom: 20px; padding: 12px; background: rgba(255, 107, 53, 0.05); border-radius: 6px; border-left: 3px solid #ff6b35;'
-                  
-      const discountTitle = document.createElement('div')
-      discountTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #ff6b35; margin-bottom: 10px;'
-      discountTitle.textContent = '2️⃣ 限时优惠方案（限量 50 个，送完即止）'
-      discountSection.appendChild(discountTitle)
-                  
-      // 普通优惠
-      const normalDiscount = document.createElement('div')
-      normalDiscount.style.cssText = 'margin-bottom: 12px; padding: 8px; background: rgba(255, 107, 53, 0.1); border-radius: 4px;'
-      normalDiscount.innerHTML = `
-        <div style="font-size: 15px; font-weight: bold; color: #ff6b35; margin-bottom: 6px;">① 普通优惠价：19.8 元（2 折）</div>
-        <div style="font-size: 13px; color: var(--b3-theme-on-background); margin-bottom: 4px;">• <strong>永久激活码（电脑、手机均可用）</strong></div>
-        <div style="font-size: 13px; color: var(--b3-theme-on-background); margin-bottom: 4px;">• <strong>1 次自动化代码实现（作者帮写）</strong></div>
-        <div style="margin-left: 16px; font-size: 12px;">• 对应功能：⑤ 自动化模拟点击（高难度功能）</div>
-      `
-      discountSection.appendChild(normalDiscount)
-                  
-      // 学生优惠
-      const studentDiscount = document.createElement('div')
-      studentDiscount.style.cssText = 'padding: 8px; background: rgba(255, 107, 53, 0.1); border-radius: 4px;'
-      studentDiscount.innerHTML = `
-        <div style="font-size: 15px; font-weight: bold; color: #ff6b35; margin-bottom: 6px;">② 学生优惠价：9.9 元（1 折）</div>
-        <div style="font-size: 13px; color: var(--b3-theme-on-background); margin-bottom: 4px;">• <strong>永久激活码（电脑、手机均可用）</strong></div>
-        <div style="font-size: 13px; color: var(--b3-theme-on-background);">• 备注：进群私聊群主，<strong>简单提供可证明学生身份的信息</strong></div>
-      `
-      discountSection.appendChild(studentDiscount)
-      activationBox.appendChild(discountSection)
-                  
-      // 免费获取方案
-      const freeSection = document.createElement('div')
-      freeSection.style.cssText = 'margin-bottom: 16px; padding: 12px; background: rgba(24, 144, 255, 0.05); border-radius: 6px; border-left: 3px solid #1890ff;'
-                  
-      const freeTitle = document.createElement('div')
-      freeTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #1890ff; margin-bottom: 8px;'
-      freeTitle.textContent = '3️⃣ 免费获取方案'
-      freeSection.appendChild(freeTitle)
-                  
-      const freeContent = document.createElement('div')
-      freeContent.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); line-height: 1.6;'
-      freeContent.innerHTML = `
-        <div style="margin-bottom: 6px;">1. 如果您只是想进群交流、体验功能或观望插件发展方向，也非常欢迎进群沟通交流～我会不定期随缘赠送激活码。</div>
-        <div>2. 对于在群聊中活跃度较高的小伙伴，我会视情况赠送永久激活码。</div>
-      `
-      freeSection.appendChild(freeContent)
-      activationBox.appendChild(freeSection)
-                  
-      // 说明
-      const noticeSection = document.createElement('div')
-      noticeSection.style.cssText = 'padding: 12px; background: rgba(114, 46, 209, 0.05); border-radius: 6px; border-left: 3px solid #722ed1;'
-                  
-      const noticeTitle = document.createElement('div')
-      noticeTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #722ed1; margin-bottom: 12px;'
-      noticeTitle.textContent = '说明'
-      noticeSection.appendChild(noticeTitle)
-                  
-      const noticeList = document.createElement('div')
-      noticeList.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); line-height: 1.6;'
-      noticeList.innerHTML = `
-        <div style="margin-bottom: 8px;">1. 👇打赏支持后，进群私聊作者获取激活码；相关权益也均在群聊中@作者实现。</div>
-        <div>2. 后续随着《鲸鱼定制工具箱》功能持续增加、复杂度提升，是否推出新的优惠或调整获取规则，将视情况而定，如有变化，会提前在群内说明。</div>
-      `
-      noticeSection.appendChild(noticeList)
-      activationBox.appendChild(noticeSection)
+	                  
+	      // 正价支持方案
+	      const regularSection = document.createElement('div')
+	      regularSection.style.cssText = 'margin-bottom: 20px; padding: 12px; background: rgba(82, 196, 26, 0.05); border-radius: 6px; border-left: 3px solid #52c41a;'
+	                  
+	      const regularTitle = document.createElement('div')
+	      regularTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #52c41a; margin-bottom: 10px;'
+	      regularTitle.textContent = '1️⃣ 正价支持方案（原价 99 元）'
+	      regularSection.appendChild(regularTitle)
+	                  
+	      const regularContent = document.createElement('div')
+	      regularContent.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); line-height: 1.6;'
+	      regularContent.innerHTML = `
+	        <div style="margin-bottom: 8px;"><strong>包含内容：</strong></div>
+	        <div style="margin-bottom: 6px;">• <strong>鲸鱼定制工具箱永久激活码（电脑+手机）</strong></div>
+	        <div style="margin-bottom: 6px;">• <strong>鲸鱼快速批注插件永久激活码（电脑+手机）</strong></div>
+	        <div style="margin-bottom: 6px;">• <strong>无限次自动化代码实现（作者帮写）</strong></div>
+	        <div style="margin-bottom: 6px;">• <strong>1 次定制化需求（作者实现）</strong></div>
+	        <div style="margin-left: 16px; margin-bottom: 4px; font-size: 13px;">• 功能可使用您的名字命名</div>
+	        <div style="margin-left: 16px; font-size: 13px;">• 根据需求，作者在能力与合理范围内进行评估，尽最大可能满足！</div>
+	      `
+	      regularSection.appendChild(regularContent)
+	      activationBox.appendChild(regularSection)
+	                  
+	      // 限时优惠方案
+	      const discountSection = document.createElement('div')
+	      discountSection.style.cssText = 'margin-bottom: 20px; padding: 12px; background: rgba(255, 107, 53, 0.05); border-radius: 6px; border-left: 3px solid #ff6b35;'
+	                  
+	      const discountTitle = document.createElement('div')
+	      discountTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #ff6b35; margin-bottom: 10px;'
+	      discountTitle.textContent = '2️⃣ 限时优惠方案（限量 20 个，送完即止）'
+	      discountSection.appendChild(discountTitle)
+	                  
+	      // 普通优惠
+	      const normalDiscount = document.createElement('div')
+	      normalDiscount.style.cssText = 'margin-bottom: 12px; padding: 8px; background: rgba(255, 107, 53, 0.1); border-radius: 4px;'
+	      normalDiscount.innerHTML = `
+	        <div style="font-size: 15px; font-weight: bold; color: #ff6b35; margin-bottom: 6px;">① 普通优惠价：79.2 元（8 折）</div>
+	        <div style="font-size: 13px; color: var(--b3-theme-on-background); margin-bottom: 4px;">• <strong>鲸鱼定制工具箱永久激活码（电脑+手机）</strong></div>
+	        <div style="font-size: 13px; color: var(--b3-theme-on-background);">• <strong>鲸鱼快速批注插件永久激活码（电脑+手机）</strong></div>
+	      `
+	      discountSection.appendChild(normalDiscount)
+	                  
+	      // 学生优惠
+	      const studentDiscount = document.createElement('div')
+	      studentDiscount.style.cssText = 'padding: 8px; background: rgba(255, 107, 53, 0.1); border-radius: 4px;'
+	      studentDiscount.innerHTML = `
+	        <div style="font-size: 15px; font-weight: bold; color: #ff6b35; margin-bottom: 6px;">② 学生优惠价：19.8 元（2 折）</div>
+	        <div style="font-size: 13px; color: var(--b3-theme-on-background); margin-bottom: 4px;">• <strong>鲸鱼定制工具箱永久激活码（电脑+手机）</strong></div>
+	        <div style="font-size: 13px; color: var(--b3-theme-on-background);">• 备注：进群私聊群主，提供可证明在读学生身份的信息</div>
+	      `
+	      discountSection.appendChild(studentDiscount)
+	      activationBox.appendChild(discountSection)
+	                  
+	      // 说明
+	      const noticeSection = document.createElement('div')
+	      noticeSection.style.cssText = 'padding: 12px; background: rgba(114, 46, 209, 0.05); border-radius: 6px; border-left: 3px solid #722ed1;'
+	                  
+	      const noticeTitle = document.createElement('div')
+	      noticeTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #722ed1; margin-bottom: 12px;'
+	      noticeTitle.textContent = '说明'
+	      noticeSection.appendChild(noticeTitle)
+	                  
+	      const noticeList = document.createElement('div')
+	      noticeList.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-background); line-height: 1.6;'
+	      noticeList.innerHTML = `
+	        <div style="margin-bottom: 8px;">1. 👇打赏支持后，进群私聊作者获取激活码；相关权益也均在群聊中@作者实现。</div>
+	        <div>2. 后续随着《鲸鱼定制工具箱》功能持续增加、复杂度提升，是否推出新的优惠或调整获取规则，将视情况而定，如有变化，会提前在群内说明。</div>
+	      `
+	      noticeSection.appendChild(noticeList)
+	      activationBox.appendChild(noticeSection)
             
       container.appendChild(activationBox)
             

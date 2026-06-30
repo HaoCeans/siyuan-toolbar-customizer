@@ -365,6 +365,65 @@ export function createMobileSettingLayout(
   setting: Setting,
   context: MobileSettingsContext
 ): void {
+	  // === v3.7 适配：手机端设置面板 ===
+	  // 默认所有设置项改为纵向堆叠（标题上、内容下铺满居中），解决手机端整体偏左。
+	  // 两项例外保持横向一行：① 裸开关（input.b3-switch）② 标记了 whale-row-layout 的项。
+	  if (!document.getElementById('toolbar-customizer-mobile-center')) {
+	    const style = document.createElement('style')
+	    style.id = 'toolbar-customizer-mobile-center'
+	    style.textContent = `
+	      [data-plugin-dialog="toolbar-customizer"] .b3-dialog__container {
+	        max-width: 100% !important;
+	      }
+      /* 默认全部纵向堆叠（裸 input 除外，如 b3-switch 保持原生外观） */
+      [data-plugin-dialog="toolbar-customizer"] .config-item {
+        flex-direction: column !important;
+        align-items: stretch !important;
+      }
+      [data-plugin-dialog="toolbar-customizer"] .config-item > .fn__flex-1 {
+        width: 100% !important;
+        flex: none !important;
+      }
+      [data-plugin-dialog="toolbar-customizer"] .config-item > .fn__space {
+        display: none !important;
+      }
+      [data-plugin-dialog="toolbar-customizer"] .config-item > .fn__flex-center:not(input),
+      [data-plugin-dialog="toolbar-customizer"] .config-item > .fn__flex-center.fn__size200:not(input) {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        justify-content: flex-start !important;
+        align-items: stretch !important;
+        margin-top: 8px;
+      }
+      /* 例外①：裸开关保持横向一行（不覆写宽度，让 b3-switch 原生样式生效） */
+      [data-plugin-dialog="toolbar-customizer"] .config-item:has(> input.b3-switch) {
+        flex-direction: row !important;
+        align-items: center !important;
+      }
+      [data-plugin-dialog="toolbar-customizer"] .config-item:has(> input.b3-switch) > .fn__space {
+        display: block !important;
+        flex: none !important;
+        width: 12px !important;
+        min-width: 12px !important;
+      }
+	      /* 例外②：标记项保持横向一行 */
+	      [data-plugin-dialog="toolbar-customizer"] .config-item:has(.whale-row-layout) {
+	        flex-direction: row !important;
+	        align-items: center !important;
+	      }
+	      [data-plugin-dialog="toolbar-customizer"] .config-item:has(.whale-row-layout) > .fn__space {
+	        display: block !important;
+	      }
+	      [data-plugin-dialog="toolbar-customizer"] .config-item:has(.whale-row-layout) > .fn__flex-center,
+	      [data-plugin-dialog="toolbar-customizer"] .config-item:has(.whale-row-layout) > .fn__flex-center.fn__size200 {
+	        width: auto !important;
+	        margin-top: 0 !important;
+	      }
+	    `
+	    document.head.appendChild(style)
+	  }
+
   // === 自定义滑杆组件 ===
   const createCustomSlider = (
     labelText: string,
@@ -375,6 +434,7 @@ export function createMobileSettingLayout(
     onSave: (value: number) => Promise<void>
   ): HTMLElement => {
     const container = document.createElement('div');
+    container.className = 'whale-slider-row';
     container.style.cssText = 'display: flex; align-items: center; gap: 12px; width: 100%; padding: 4px 0;';
 
     const label = document.createElement('span');
@@ -532,6 +592,7 @@ export function createMobileSettingLayout(
     onSave: (value: number) => Promise<void>
   ): HTMLElement => {
     const container = document.createElement('div');
+    container.className = 'whale-slider-row';
     container.style.cssText = 'display: flex; align-items: center; gap: 12px; width: 100%; padding: 4px 0;';
 
     // 滑杆容器 - 更大以容纳滑块
@@ -1443,7 +1504,7 @@ export function createMobileSettingLayout(
     title: '⑤工具栏层级',
     description: '💡值越大，越不容易被遮挡。默认5，显示在设置上层为512（顶部和底部通用）',
     createActionElement: () => {
-      const currentValue = context.mobileConfig.toolbarZIndex ?? 512;
+      const currentValue = context.mobileConfig.toolbarZIndex ?? 5;
       
       const slider = createCustomSliderWithoutLabel(
         currentValue,
@@ -1524,14 +1585,14 @@ export function createMobileSettingLayout(
 
           // 动态显示/隐藏整个配置分区
           document.querySelectorAll('.top-toolbar-section').forEach(el => {
-            const parent = el.closest('.b3-dialog__content .config__item') as HTMLElement
+            const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
             if (parent) {
               parent.style.display = isTop ? '' : 'none'
             }
           })
 
           document.querySelectorAll('.bottom-toolbar-section').forEach(el => {
-            const parent = el.closest('.b3-dialog__content .config__item') as HTMLElement
+            const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
             if (parent) {
               parent.style.display = isBottom ? '' : 'none'
             }
@@ -1541,7 +1602,7 @@ export function createMobileSettingLayout(
           const updateSectionVisibility = (className: string, show: boolean) => {
             document.querySelectorAll(className).forEach(el => {
               const input = el as HTMLInputElement
-              const item = input.closest('.b3-dialog__content .config__item') as HTMLElement
+              const item = input.closest('.b3-dialog__content .config-item') as HTMLElement
               if (item) {
                 item.style.display = show ? '' : 'none'
               }
@@ -1569,14 +1630,14 @@ export function createMobileSettingLayout(
         const isBottom = context.mobileConfig.enableBottomToolbar
 
         document.querySelectorAll('.top-toolbar-section').forEach(el => {
-          const parent = el.closest('.b3-dialog__content .config__item') as HTMLElement
+          const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
           if (parent) {
             parent.style.display = isTop ? '' : 'none'
           }
         })
 
         document.querySelectorAll('.bottom-toolbar-section').forEach(el => {
-          const parent = el.closest('.b3-dialog__content .config__item') as HTMLElement
+          const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
           if (parent) {
             parent.style.display = isBottom ? '' : 'none'
           }
@@ -1585,7 +1646,7 @@ export function createMobileSettingLayout(
         const updateSectionVisibility = (className: string, show: boolean) => {
           document.querySelectorAll(className).forEach(el => {
             const input = el as HTMLInputElement
-            const item = input.closest('.b3-dialog__content .config__item') as HTMLElement
+            const item = input.closest('.b3-dialog__content .config-item') as HTMLElement
             if (item) {
               item.style.display = show ? '' : 'none'
             }
@@ -1602,7 +1663,7 @@ export function createMobileSettingLayout(
   })
 
   // === 顶部工具栏专用配置（作为子分区） ===
-  // 子分区标题项，使用思源原生的 config__item 结构
+  // 子分区标题项，使用思源原生的 config-item 结构
   setting.addItem({
     title: '',
     description: '',
@@ -1747,7 +1808,7 @@ export function createMobileSettingLayout(
   })
 
   // === 底部工具栏专用配置（作为子分区） ===
-  // 子分区标题项，使用思源原生的 config__item 结构
+  // 子分区标题项，使用思源原生的 config-item 结构
   setting.addItem({
     title: '',
     description: '',
@@ -3414,7 +3475,7 @@ export function createMobileSettingLayout(
       }
 
       headerRow.appendChild(titleEl)
-      headerRow.appendChild(statusEl)
+      // 已激活状态移到重新激活按钮左侧，不放在标题行
       container.appendChild(headerRow)
 
       // 说明文字
@@ -3479,6 +3540,7 @@ export function createMobileSettingLayout(
           // 隐藏按钮容器
           btnContainer.style.display = 'none'
         }
+        btnContainer.appendChild(statusEl)
         btnContainer.appendChild(reActivateBtn)
 
         container.appendChild(btnContainer)
@@ -3490,7 +3552,7 @@ export function createMobileSettingLayout(
     }
   })
 
-  // 鲸鱼定制工具箱功能列表说明
+  // 鲸鱼定制工具箱功能列表说明（手机端 5 标签）
   setting.addItem({
     title: '',
     description: '',
@@ -3505,103 +3567,89 @@ export function createMobileSettingLayout(
         box-sizing: border-box;
       `
       container.innerHTML = `
-        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（14项）</div>
+        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（15项）</div>
         <div style="font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>
-        <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-          <thead>
-            <tr style="background: var(--b3-theme-primary-lightest);">
-              <th style="padding: 10px; text-align: center; border-bottom: 2px solid var(--b3-border-color); width: 36px;">序号</th>
-              <th style="padding: 10px; text-align: left; border-bottom: 2px solid var(--b3-border-color);">功能名称</th>
-              <th style="padding: 10px; text-align: left; border-bottom: 2px solid var(--b3-border-color);">功能说明</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⓪</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">一键记事弹窗块格式</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键记事弹窗支持思源块格式输入，富文本编辑，插入标题、列表、代码块等<br/><a href="javascript:void(0)" onclick="(function(){var el=document.getElementById('quick-note-format-section');if(!el)return;el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('jump-highlight');void el.offsetWidth;el.classList.add('jump-highlight');setTimeout(function(){el.classList.remove('jump-highlight')},2000)})()" style="color: var(--b3-theme-primary); font-size: 12px; text-decoration: underline;">👉 点击跳转到设置项</a></td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">①</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">连续点击自定义按钮</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键自动执行多个按钮操作，告别重复点击，工作流自动化</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">②</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">打开指定ID块</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">瞬间跳转到任意文档任意位置，精准定位，省时省力</td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">③</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">数据库悬浮弹窗</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">悬浮窗口快速查看数据库，无需切换页面，数据触手可及</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">④</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">日记底部</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键直达日记末尾，快速追加内容，记录生活点滴</td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑤</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">叶归LifeLog适配</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">与LifeLog插件深度整合，时间记录更智能，生活管理更高效</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑥</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">弹窗框模板选择</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">弹出式模板选择器，快速插入常用内容，写作效率倍增</td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑦</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">滚动文档顶部或底部</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键直达文档首尾，长文档浏览更轻松，阅读体验升级</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑧</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">图片快捷导入日记</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">选择图片快速导入日记，支持手动定位或自动追加。若开启「一键记事 → 思源块编辑模式」，点击按钮可将图片直接插入记事弹窗编辑器光标处，支持多选、连续插入</td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑨</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">手机端悬浮标签页Tab</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">手机端多文档快速切换，苹果风格悬浮Tab栏，自动管理，告别反复返回</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑩</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">手机端悬浮大纲</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">左侧悬浮大纲面板，标题快速跳转，实时跟踪当前位置，阅读长文必备</td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑪</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">手机端前一篇/后一篇文档</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">底部悬浮导航栏，按文件树顺序浏览文档，前后翻页，阅读笔记更流畅</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑫</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">滑动快速批注</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">一键开启/关闭鲸鱼快速批注插件的滑动批注模式，手指滑动即可标注文字👉需要先下载鲸鱼快速批注插件</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑬</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">文档朗读</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">使用浏览器语音合成朗读当前文档内容，支持语速调节、段落高亮、播放控制，电脑端可选用不同语音</td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑭</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">一键清理空块</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">自动扫描并删除当前文档中的空块（无文本的段落/标题/列表项），预览确认后批量删除</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px 4px; border-bottom: 1px solid var(--b3-border-color); text-align: center; color: var(--b3-theme-primary); font-weight: 500;">⑮</td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); font-weight: 500;">⑮ 沉浸阅读模式<span style="color: #10b981; font-size: 11px; margin-left: 4px;">免费</span></td>
-              <td style="padding: 10px; border-bottom: 1px solid var(--b3-border-color); color: var(--b3-theme-on-surface);">🔒一键锁定文档防误编辑 + 📱上滑自动隐藏工具栏，全屏沉浸阅读；可独立选择锁定/解锁图标，支持锁定后工具栏滚动隐藏</td>
-            </tr>
-            <tr style="background: var(--b3-theme-background);">
-              <td colspan="3" style="padding: 12px; text-align: center; color: var(--b3-theme-primary); font-weight: 600; font-style: italic;">持续更新中~</td>
-            </tr>
-          </tbody>
-        </table>
       `
+
+      const __activated = context.isAuthorToolActivated()
+      const rowTr = (num: string, name: string, desc: string): string => `<tr>
+          <td style="padding:10px 4px;text-align:center;color:var(--b3-theme-primary);font-weight:500;">${num}</td>
+          <td style="padding:10px;font-weight:500;">${name}</td>
+          <td style="padding:10px;color:var(--b3-theme-on-surface);font-size:12px;">${desc}</td>
+        </tr>`
+
+      const __allRows = [
+        rowTr('⓪', '一键记事弹窗块格式', '一键记事弹窗支持思源块格式输入，富文本编辑，插入标题、列表、代码块等' +
+          '<a href="javascript:void(0)" onclick="(function(){var el=document.getElementById(\'quick-note-format-section\');if(!el)return;el.scrollIntoView({behavior:\'smooth\',block:\'center\'});el.classList.remove(\'jump-highlight\');void el.offsetWidth;el.classList.add(\'jump-highlight\');setTimeout(function(){el.classList.remove(\'jump-highlight\')},2000)})()" style="color:var(--b3-theme-primary);font-size:12px;text-decoration:underline;margin-left:8px;">👉设置</a>'),
+        rowTr('①', '连续点击自定义按钮', '一键自动执行多个按钮操作，告别重复点击，工作流自动化'),
+        rowTr('②', '打开指定ID块', '精准跳转到任意文档任意位置，省时省力'),
+        rowTr('③', '数据库悬浮弹窗', '悬浮窗口快速查看数据库，无需切换页面，数据触手可及'),
+        rowTr('④', '日记底部', '一键直达日记末尾，快速追加内容，记录生活点滴'),
+        rowTr('⑤', '叶归LifeLog适配', '与LifeLog插件深度整合，时间记录更智能，生活管理更高效'),
+        rowTr('⑥', '弹窗框模板选择', '弹出式模板选择器，快速插入常用内容，写作效率倍增'),
+        rowTr('⑦', '滚动文档顶部或底部', '一键直达文档首尾，长文档浏览更轻松'),
+        rowTr('⑧', '图片快捷导入日记', '一键选择图片导入笔记。若开启思源块编辑模式，可插入记事弹窗编辑器光标处'),
+        rowTr('⑨', '手机端悬浮标签页Tab', '手机端多文档快速切换，苹果风格悬浮Tab栏，自动管理，告别反复返回'),
+        rowTr('⑩', '手机端悬浮大纲', '左侧悬浮大纲面板，标题快速跳转，实时跟踪当前位置，阅读长文必备'),
+        rowTr('⑪', '手机端前一篇/后一篇文档', '底部悬浮导航栏，按文件树顺序浏览文档，前后翻页，阅读更流畅'),
+        rowTr('⑫', '滑动快速批注', __activated ? '配合「鲸鱼快速批注」插件，手指滑动即可标注文字' : '配合「鲸鱼快速批注」插件，手指滑动即可标注文字（🔒 激活后可用）'),
+        rowTr('⑬', '文档朗读', '使用浏览器语音合成朗读当前文档，支持语速调节、段落高亮'),
+        rowTr('⑭', '一键清理空块', '自动扫描并删除文档中空块（无文本段落/标题/列表项），预览确认后批量删除'),
+        rowTr('⑮', '沉浸阅读模式<span style="color:#10b981;font-size:11px;margin-left:4px;">免费</span>', '🔒一键锁定文档防误编辑 + 📱上滑自动隐藏工具栏，全屏沉浸阅读'),
+      ]
+
+      interface __TabData { key: string; label: string; sub: string; icon: string; rows: string[] }
+      const __tabs: __TabData[] = [
+        { key: 'all', label: '全部功能', sub: '15项', icon: '📋', rows: __allRows },
+        { key: 'reading', label: '批注阅读', sub: '6项', icon: '📖', rows: [__allRows[9], __allRows[10], __allRows[11], __allRows[13], __allRows[15], __allRows[12]] },
+        { key: 'notes', label: '笔记与日记', sub: '4项', icon: '✍️', rows: [__allRows[0], __allRows[4], __allRows[5], __allRows[8]] },
+        { key: 'edit', label: '编辑提效', sub: '3项', icon: '⚡', rows: [__allRows[1], __allRows[6], __allRows[14]] },
+        { key: 'nav', label: '导航与浏览', sub: '3项', icon: '🧭', rows: [__allRows[2], __allRows[3], __allRows[7]] },
+      ]
+
+      const __tabBar = document.createElement('div')
+      __tabBar.style.cssText = 'display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;'
+      container.appendChild(__tabBar)
+
+      const __containers: Record<string, HTMLElement> = {}
+      __tabs.forEach(t => {
+        const btn = document.createElement('button')
+        btn.style.cssText = 'display:flex;align-items:center;gap:4px;padding:7px 14px;border-radius:8px;border:1px solid var(--b3-border-color);background:var(--b3-theme-surface);color:var(--b3-theme-on-surface);cursor:pointer;font-size:13px;outline:none;white-space:nowrap;transition:all 0.15s;'
+        btn.innerHTML = `${t.icon} ${t.label} <span style="font-size:11px;opacity:0.6;">${t.sub}</span>`
+        __tabBar.appendChild(btn)
+
+        const wrap = document.createElement('div')
+        wrap.style.display = 'none'
+        wrap.innerHTML = `
+          <table style="width:100%;font-size:13px;border-collapse:collapse;margin-top:8px;">
+            <thead>
+              <tr style="background:var(--b3-theme-primary-lightest);">
+                <th style="padding:10px;text-align:center;width:36px;">序号</th>
+                <th style="padding:10px;text-align:left;">功能名称</th>
+                <th style="padding:10px;text-align:left;">功能说明</th>
+              </tr>
+            </thead>
+            <tbody>${t.rows.join('')}</tbody>
+          </table>
+          <div style="padding:12px;text-align:center;color:var(--b3-theme-primary);font-style:italic;font-size:13px;">持续更新中~</div>
+        `
+        container.appendChild(wrap)
+        __containers[t.key] = wrap
+
+        btn.onclick = () => {
+          Object.values(__containers).forEach(c => c.style.display = 'none')
+          wrap.style.display = ''
+          __tabBar.querySelectorAll('button').forEach(b => {
+            b.style.background = 'var(--b3-theme-surface)'
+            b.style.color = 'var(--b3-theme-on-surface)'
+            b.style.borderColor = 'var(--b3-border-color)'
+          })
+          btn.style.background = 'var(--b3-theme-primary)'
+          btn.style.color = '#fff'
+          btn.style.borderColor = 'var(--b3-theme-primary)'
+        }
+      })
+      ;(__tabBar.querySelector('button') as HTMLElement)?.click()
       return container
     }
   })

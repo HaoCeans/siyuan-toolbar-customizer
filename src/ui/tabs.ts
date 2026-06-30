@@ -38,7 +38,7 @@ export function injectTabSwitcher(): void {
     if (!dialogContent) return
 
     // 检查是否有设置项，如果没有则等待更长时间
-    const configItems = dialogContent.querySelectorAll('.config__item')
+    const configItems = dialogContent.querySelectorAll('.config-item')
     if (configItems.length === 0) {
       // 设置项还没创建，再等待一段时间（有最大重试次数限制）
       tabSwitcherAttempts++
@@ -67,19 +67,19 @@ export function injectTabSwitcher(): void {
     injectedStyle = style  // 保存引用
     style.textContent = `
       /* 隐藏标题和间距，让它们不占空间 */
-      .b3-dialog__content .config__item > .fn__flex-1 {
+      .b3-dialog__content .config-item > .fn__flex-1 {
         display: none !important;
       }
-      .b3-dialog__content .config__item > .fn__space {
+      .b3-dialog__content .config-item > .fn__space {
         display: none !important;
       }
-      .b3-dialog__content .config__item > .fn__flex-column {
+      .b3-dialog__content .config-item > .fn__flex-column {
         width: 100% !important;
         max-width: none !important;
       }
       /* 覆盖宽度限制类，让内容容器与父容器同宽 */
-      .b3-dialog__content .config__item > .fn__size200,
-      .b3-dialog__content .config__item > .fn__flex-center.fn__size200 {
+      .b3-dialog__content .config-item > .fn__size200,
+      .b3-dialog__content .config-item > .fn__flex-center.fn__size200 {
         width: 100% !important;
         max-width: none !important;
         min-width: auto !important;
@@ -219,7 +219,7 @@ export function injectTabSwitcher(): void {
 
       // 显示/隐藏对应的配置项
       // 遍历所有配置项，根据 toolbar-customizer-content 的 data-tabGroup 属性切换显示
-      const allConfigItems = dialogContent.querySelectorAll('.config__item')
+      const allConfigItems = dialogContent.querySelectorAll('.config-item')
       allConfigItems.forEach(configItem => {
         const contentEl = configItem.querySelector('.toolbar-customizer-content')
         if (contentEl) {

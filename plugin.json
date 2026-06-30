@@ -2,8 +2,8 @@
   "name": "siyuan-toolbar-customizer",
   "author": "whale🐋",
   "url": "https://github.com/HaoCeans/siyuan-toolbar-customizer",
-  "version": "3.3.7",
-  "minAppVersion": "3.0.0",
+  "version": "3.7.0",
+  "minAppVersion": "3.7.0",
   "backends": [
     "all"
   ],
@@ -13,15 +13,15 @@
   "disabledInPublish": true,
   "displayName": {
     "default": "SiYuan Mobile Enhancer",
-    "zh_CN": "思源手机端增强"
+    "zh-CN": "思源手机端增强"
   },
   "description": {
     "default": "Quick note on app switch, click automation, quick access to built-in features, date templates, mobile shortcuts. Supports both mobile and desktop! Replace Quicker, FV, Notion automation within SiYuan!",
-    "zh_CN": "一键记事，手机端全流程解决方案。操作一步到位，重塑思源笔记移动端体验。自启动一键记事、一键按钮直达、定制化工具栏按钮、自动化模拟点击、手机快捷键使用、手写模板插入、思源内置功能选择等。手机端、电脑端均支持。可在思源内基本替换Quicker、FV悬浮球、notion自动化、宏命令等。"
+    "zh-CN": "一键记事，手机端全流程解决方案。操作一步到位，重塑思源笔记移动端体验。自启动一键记事、一键按钮直达、定制化工具栏按钮、自动化模拟点击、手机快捷键使用、手写模板插入、思源内置功能选择等。手机端、电脑端均支持。可在思源内基本替换Quicker、FV悬浮球、notion自动化、宏命令等。"
   },
   "readme": {
     "default": "README.md",
-    "zh_CN": "README_zh_CN.md"
+    "zh-CN": "README_zh_CN.md"
   },
   "funding": {
     "custom": []

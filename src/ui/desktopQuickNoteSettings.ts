@@ -345,7 +345,7 @@ export function createDesktopQuickNoteSettingsSection(
     const cfg = desktopCfg as any
     const currentIds: string[] = cfg.quickNoteButtonIds || []
     const allButtons = (pluginInstance?.desktopButtonConfigs || [])
-      .filter((b: any) => b.enabled !== false && b.id !== 'overflow-button-desktop')
+      .filter((b: any) => b.id !== 'overflow-button-desktop')
       .sort((a: any, b: any) => (a.sort ?? 0) - (b.sort ?? 0))
     if (allButtons.length === 0) {
       btnList.innerHTML = '<div style="font-size:12px;color:#999;padding:8px">暂无可选按钮</div>'
@@ -364,7 +364,7 @@ export function createDesktopQuickNoteSettingsSection(
         </label>
       `).join('')}</div>`
     btnList.querySelectorAll('input').forEach(cb => cb.addEventListener('change', doSave))
-    document.getElementById('qn-toggle-all')?.addEventListener('click', () => {
+    btnList.querySelector('#qn-toggle-all')?.addEventListener('click', () => {
       const allChecked = [...btnList.querySelectorAll<HTMLInputElement>('input')].every(c => c.checked)
       btnList.querySelectorAll<HTMLInputElement>('input').forEach(c => { c.checked = !allChecked })
       doSave()
@@ -376,9 +376,13 @@ export function createDesktopQuickNoteSettingsSection(
     const ids: string[] = []
     btnList.querySelectorAll<HTMLInputElement>('input:checked').forEach(c => ids.push(c.dataset.bid!))
     const allButtons = (pluginInstance?.desktopButtonConfigs || [])
-      .filter((b: any) => b.enabled !== false && b.id !== 'overflow-button-desktop')
+      .filter((b: any) => b.id !== 'overflow-button-desktop')
     cfg.quickNoteButtonIds = ids.length === allButtons.length ? [] : ids
-    buildBtnList()
+    // 只刷新按钮文本，不重建整个列表
+    const toggleBtn = btnList.querySelector('#qn-toggle-all')
+    if (toggleBtn) {
+      toggleBtn.textContent = ids.length === allButtons.length ? '取消全选' : '全选'
+    }
   }
 
   buildBtnList()

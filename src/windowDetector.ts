@@ -1520,18 +1520,17 @@ function renderButtons(
   overflowButtonId = 'overflow-button-mobile',
   overflowMode: 'all' | 'split' = 'all',
 ): void {
-  const enabledConfigs = buttonConfigs.filter(btn => btn.enabled !== false)
-
+  // quickNoteButtonIds 已控制显隐，不再重复过滤 enabled
   let configsToRender: any[]
   let overflowConfigs: any[] = []
   let overflowBtnConfig: any | null = null
 
   if (overflowMode === 'split') {
-    overflowBtnConfig = enabledConfigs.find(btn => btn.id === overflowButtonId) ?? null
-    configsToRender = enabledConfigs.filter(
+    overflowBtnConfig = buttonConfigs.find(btn => btn.id === overflowButtonId) ?? null
+    configsToRender = buttonConfigs.filter(
       btn => btn.id !== overflowButtonId && (btn.overflowLevel ?? 0) === 0,
     )
-    overflowConfigs = enabledConfigs.filter(
+    overflowConfigs = buttonConfigs.filter(
       btn => btn.id !== overflowButtonId && (btn.overflowLevel ?? 0) > 0,
     )
     if (overflowBtnConfig && overflowConfigs.length > 0) {
@@ -1545,7 +1544,7 @@ function renderButtons(
       overflowBtnConfig = null
     }
   } else {
-    configsToRender = enabledConfigs.filter(btn => btn.id !== overflowButtonId)
+    configsToRender = buttonConfigs.filter(btn => btn.id !== overflowButtonId)
   }
 
   const wrapper = document.createElement('div')

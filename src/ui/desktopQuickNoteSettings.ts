@@ -281,7 +281,7 @@ export function createDesktopQuickNoteSettingsSection(
 
   const desktopCfg = context.desktopFeatureConfig
 
-  box.appendChild(createSubTitle('⑤记事弹窗扩展工具栏'))
+  box.appendChild(createSubTitle('④记事弹窗扩展工具栏'))
   const overflowHint = createHint(
     '开关工具栏：控制弹窗内是否显示面包屑导航。',
   )
@@ -301,7 +301,7 @@ export function createDesktopQuickNoteSettingsSection(
   divider.style.cssText = 'height: 1px; background: rgba(59, 130, 246, 0.2); margin: 4px 0;'
   box.appendChild(divider)
 
-  box.appendChild(createSubTitle('⑥全局快捷键（独立悬浮窗）'))
+  box.appendChild(createSubTitle('⑤全局快捷键（独立悬浮窗）'))
   const captureHint = createHint(
     '默认 Alt+Shift+N，可在思源「设置 → 快捷键 → 插件」修改；再按一次关闭。思源需保持运行（可最小化到托盘）。',
   )

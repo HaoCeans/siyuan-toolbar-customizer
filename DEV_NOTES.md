@@ -25,13 +25,22 @@
 - CSS `-webkit-app-region: drag` 使该区域可拖拽窗口
 - 避免 `body{-webkit-app-region:drag}` 因为会阻止编辑器内容区的点击
 
-**隐藏的 UI 元素**：
-- `.layout-tab-bar` - 标签栏
-- `.protyle-title` - 标题
-- `.protyle-background` - 背景
-- `.protyle-breadcrumb` - 面包屑
-- `.protyle-scroll` - 滚动条
-- `#status` - 状态栏
+**隐藏的 UI 元素**（记事弹窗内 window.html 的 DOM 结构）：
+
+| # | 元素 | 作用 |
+|---|------|------|
+| ① | `.layout-tab-bar` | 顶部标签页切换栏 |
+| ② | `.protyle-title` | 文档标题区 |
+| ③ | `.protyle-background` | 编辑器背景装饰 |
+| ④ | `.protyle-breadcrumb` | 面包屑导航（目录路径，受「开关工具栏」控制显隐） |
+| ⑤ | `.protyle-scroll` | 编辑器滚动条 |
+| ⑥ | `#status` | 底部状态栏（字数、同步等） |
+| ⑦ | `.protyle-wysiwyg` | 编辑器输入区（**不隐藏**——用户输入区域） |
+
+HIDE_CSS 常量：
+- `BASE_HIDE`：①~③+⑤⑥ 始终隐藏
+- `BREADCRUMB_HIDE`：④ 条件隐藏（开关工具栏关闭时）
+- `BREADCRUMB_SHOW`：④ 条件显示 + `margin-top:25px`（开关工具栏打开时）
 
 **保留的按钮**（用于窗口控制）：
 - `.toolbar__window` / `#pinWindow` / `#minWindow` / `#maxWindow` / `#restoreWindow` / `#closeWindow`

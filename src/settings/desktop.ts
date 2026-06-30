@@ -159,7 +159,6 @@ export interface FeatureConfig {
   quickNoteGlobalCaptureEnabled?: boolean
   quickNoteOverflowToolbarEnabled?: boolean
   quickNoteToolbarVisible?: boolean
-  quickNoteButtonIds?: string[]  // 一键记事弹窗显示的按钮ID（空=全部）
   quickNoteBlockWindowPersist?: boolean  // 块格式弹窗后台常驻
 }
 

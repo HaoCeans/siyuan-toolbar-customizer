@@ -1520,17 +1520,18 @@ function renderButtons(
   overflowButtonId = 'overflow-button-mobile',
   overflowMode: 'all' | 'split' = 'all',
 ): void {
-  // quickNoteButtonIds 已控制显隐，不再重复过滤 enabled
+  const enabledConfigs = buttonConfigs.filter(btn => btn.enabled !== false)
+
   let configsToRender: any[]
   let overflowConfigs: any[] = []
   let overflowBtnConfig: any | null = null
 
   if (overflowMode === 'split') {
-    overflowBtnConfig = buttonConfigs.find(btn => btn.id === overflowButtonId) ?? null
-    configsToRender = buttonConfigs.filter(
+    overflowBtnConfig = enabledConfigs.find(btn => btn.id === overflowButtonId) ?? null
+    configsToRender = enabledConfigs.filter(
       btn => btn.id !== overflowButtonId && (btn.overflowLevel ?? 0) === 0,
     )
-    overflowConfigs = buttonConfigs.filter(
+    overflowConfigs = enabledConfigs.filter(
       btn => btn.id !== overflowButtonId && (btn.overflowLevel ?? 0) > 0,
     )
     if (overflowBtnConfig && overflowConfigs.length > 0) {
@@ -1544,7 +1545,7 @@ function renderButtons(
       overflowBtnConfig = null
     }
   } else {
-    configsToRender = buttonConfigs.filter(btn => btn.id !== overflowButtonId)
+    configsToRender = enabledConfigs.filter(btn => btn.id !== overflowButtonId)
   }
 
   const wrapper = document.createElement('div')
@@ -2034,12 +2035,7 @@ function copyBottomToolbarButtons(container: HTMLElement) {
 function copyDesktopQuickNoteToolbarButtons(container: HTMLElement, useOverflowSplit = false) {
   try {
     const buttonConfigs = pluginInstance?.desktopButtonConfigs || [];
-    // 弹窗按钮选择：按 quickNoteButtonIds 过滤
-    const btnIds = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteButtonIds
-    const filteredConfigs = (btnIds && btnIds.length > 0)
-      ? buttonConfigs.filter((b: any) => btnIds.includes(b.id))
-      : buttonConfigs
-    if (filteredConfigs.length === 0) {
+    if (buttonConfigs.length === 0) {
       const noButtonsMsg = document.createElement('div');
       noButtonsMsg.textContent = '暂无电脑端按钮配置';
       noButtonsMsg.style.cssText = 'font-size: 12px; color: #999; text-align: center; padding: 12px;';
@@ -2051,7 +2047,7 @@ function copyDesktopQuickNoteToolbarButtons(container: HTMLElement, useOverflowS
     const isDark = isSiyuanDarkMode();
     renderButtons(
       container,
-      filteredConfigs,
+      buttonConfigs,
       sortMethod,
       isDark,
       'overflow-button-desktop',

@@ -191,6 +191,7 @@ export default class ToolbarCustomizer extends Plugin {
     quickNoteMinimizeAfterSend: false,    // 电脑端：发送后最小化思源
     quickNotePasteClipboardOnOpen: false, // 电脑端：打开捕获窗时粘贴剪贴板
     quickNoteOverflowToolbarEnabled: false, // 电脑端：记事弹窗内显示插件扩展工具栏
+    quickNoteToolbarVisible: true, // 电脑端：记事弹窗开关工具栏
     quickNoteInputFormat: 'plain' as 'plain' | 'block', // 电脑端：一键记事输入格式（独立于手机端）
     quickNoteBlockWindowPersist: false, // 块格式弹窗后台常驻：默认关闭
   }

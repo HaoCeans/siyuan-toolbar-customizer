@@ -46,12 +46,13 @@ export function createDesktopQuickNoteButtonHint(): HTMLElement {
 
 export interface DesktopQuickNoteSettingsContext {
   mobileFeatureConfig: Record<string, unknown>
-  desktopFeatureConfig: {
-    quickNoteGlobalCaptureEnabled?: boolean
-    quickNoteMinimizeAfterSend?: boolean
-    quickNotePasteClipboardOnOpen?: boolean
-    quickNoteOverflowToolbarEnabled?: boolean
-  }
+      desktopFeatureConfig: {
+        quickNoteGlobalCaptureEnabled?: boolean
+        quickNoteMinimizeAfterSend?: boolean
+        quickNotePasteClipboardOnOpen?: boolean
+        quickNoteOverflowToolbarEnabled?: boolean
+        quickNoteToolbarVisible?: boolean
+      }
   isAuthorToolActivated: () => boolean
   saveMobileConfig: () => Promise<void>
   saveDesktopConfig: () => Promise<void>
@@ -330,6 +331,13 @@ export function createDesktopQuickNoteSettingsSection(
   overflowHint.style.background = 'rgba(255,255,255,0.35)'
   overflowHint.style.borderRadius = '6px'
   box.appendChild(overflowHint)
+  box.appendChild(
+    context.createSwitchItem(
+      '开关工具栏',
+      desktopCfg.quickNoteToolbarVisible !== false,
+      (v) => { desktopCfg.quickNoteToolbarVisible = v },
+    ),
+  )
   box.appendChild(
     context.createSwitchItem(
       '弹窗内启用扩展工具栏分层',

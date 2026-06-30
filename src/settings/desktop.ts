@@ -157,8 +157,6 @@ export interface FeatureConfig {
   authorCode?: string
   authorActivated?: boolean
   quickNoteGlobalCaptureEnabled?: boolean
-  quickNoteMinimizeAfterSend?: boolean
-  quickNotePasteClipboardOnOpen?: boolean
   quickNoteOverflowToolbarEnabled?: boolean
   quickNoteToolbarVisible?: boolean
   quickNoteBlockWindowPersist?: boolean  // 块格式弹窗后台常驻

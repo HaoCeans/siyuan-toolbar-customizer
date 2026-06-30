@@ -30,20 +30,14 @@ export function minimizeSiyuanMainWindow(): void {
 
 export function getDesktopQuickNoteCaptureSettings(): {
   globalCaptureEnabled: boolean
-  minimizeAfterSend: boolean
-  pasteClipboardOnOpen: boolean
   overflowToolbarEnabled: boolean
 } {
   const cfg = pluginInstance?.desktopFeatureConfig as {
     quickNoteGlobalCaptureEnabled?: boolean
-    quickNoteMinimizeAfterSend?: boolean
-    quickNotePasteClipboardOnOpen?: boolean
     quickNoteOverflowToolbarEnabled?: boolean
   } | undefined
   return {
     globalCaptureEnabled: cfg?.quickNoteGlobalCaptureEnabled !== false,
-    minimizeAfterSend: cfg?.quickNoteMinimizeAfterSend === true,
-    pasteClipboardOnOpen: cfg?.quickNotePasteClipboardOnOpen === true,
     overflowToolbarEnabled: cfg?.quickNoteOverflowToolbarEnabled === true,
   }
 }

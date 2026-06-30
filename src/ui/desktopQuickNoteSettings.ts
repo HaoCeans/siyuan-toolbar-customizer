@@ -48,8 +48,6 @@ export interface DesktopQuickNoteSettingsContext {
   mobileFeatureConfig: Record<string, unknown>
       desktopFeatureConfig: {
         quickNoteGlobalCaptureEnabled?: boolean
-        quickNoteMinimizeAfterSend?: boolean
-        quickNotePasteClipboardOnOpen?: boolean
         quickNoteOverflowToolbarEnabled?: boolean
         quickNoteToolbarVisible?: boolean
       }
@@ -364,20 +362,6 @@ export function createDesktopQuickNoteSettingsSection(
       '启用全局快捷键捕获',
       desktopCfg.quickNoteGlobalCaptureEnabled !== false,
       (v) => { desktopCfg.quickNoteGlobalCaptureEnabled = v },
-    ),
-  )
-  box.appendChild(
-    context.createSwitchItem(
-      '打开时自动粘贴剪贴板',
-      desktopCfg.quickNotePasteClipboardOnOpen === true,
-      (v) => { desktopCfg.quickNotePasteClipboardOnOpen = v },
-    ),
-  )
-  box.appendChild(
-    context.createSwitchItem(
-      '发送后最小化思源',
-      desktopCfg.quickNoteMinimizeAfterSend === true,
-      (v) => { desktopCfg.quickNoteMinimizeAfterSend = v },
     ),
   )
 

@@ -188,8 +188,6 @@ export default class ToolbarCustomizer extends Plugin {
     authorActivated: false,     // 鲸鱼定制工具箱是否已激活
     authorCode: '',              // 鲸鱼定制工具箱激活码
     quickNoteGlobalCaptureEnabled: true,  // 电脑端：全局快捷键唤起一键记事
-    quickNoteMinimizeAfterSend: false,    // 电脑端：发送后最小化思源
-    quickNotePasteClipboardOnOpen: false, // 电脑端：打开捕获窗时粘贴剪贴板
     quickNoteOverflowToolbarEnabled: false, // 电脑端：记事弹窗内显示插件扩展工具栏
     quickNoteToolbarVisible: true, // 电脑端：记事弹窗开关工具栏
     quickNoteInputFormat: 'plain' as 'plain' | 'block', // 电脑端：一键记事输入格式（独立于手机端）

@@ -94,5 +94,5 @@ export function destroyDesktopQuickNoteBlockWindow(): void {
 }
 
 export function shouldUseDesktopQuickNoteBlockWindow(isFromButton = false): boolean {
-  try { return (pluginInstance?.mobileFeatureConfig as any)?.quickNoteInputFormat === 'block' } catch { return false }
+  try { return (pluginInstance?.desktopFeatureConfig as any)?.quickNoteInputFormat === 'block' } catch { return false }
 }

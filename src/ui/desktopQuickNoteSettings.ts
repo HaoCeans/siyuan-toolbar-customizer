@@ -3,6 +3,7 @@
  */
 
 import { createDesktopQuickNoteFormatField } from './quickNoteFormatField'
+import { pluginInstance } from '../toolbarManager'
 
 export const DESKTOP_QUICK_NOTE_SECTION_ID = 'desktop-quick-note-settings-section'
 
@@ -322,8 +323,7 @@ export function createDesktopQuickNoteSettingsSection(
 
   box.appendChild(createSubTitle('⑤记事弹窗扩展工具栏'))
   const overflowHint = createHint(
-    '关：弹窗内平铺显示全部快捷按钮。开：与主工具栏一致，仅显示主栏按钮 +「⋯」展开扩展层。'
-    + '不影响思源编辑区主界面；主界面扩展工具栏请在「电脑端 → 按钮列表 → 扩展工具栏」配置。',
+    '选择哪些按钮显示在记事弹窗中（不选或全选 = 显示全部）。勾选后点击按钮区域外即保存。',
   )
   overflowHint.style.padding = '8px 10px'
   overflowHint.style.background = 'rgba(255,255,255,0.35)'
@@ -336,13 +336,52 @@ export function createDesktopQuickNoteSettingsSection(
       (v) => { desktopCfg.quickNoteToolbarVisible = v },
     ),
   )
-  box.appendChild(
-    context.createSwitchItem(
-      '弹窗内启用扩展工具栏分层',
-      desktopCfg.quickNoteOverflowToolbarEnabled === true,
-      (v) => { desktopCfg.quickNoteOverflowToolbarEnabled = v },
-    ),
-  )
+
+  // 按钮选择列表
+  const btnList = document.createElement('div')
+  box.appendChild(btnList)
+
+  function buildBtnList() {
+    const cfg = desktopCfg as any
+    const currentIds: string[] = cfg.quickNoteButtonIds || []
+    const allButtons = (pluginInstance?.desktopButtonConfigs || [])
+      .filter((b: any) => b.enabled !== false && b.id !== 'overflow-button-desktop')
+      .sort((a: any, b: any) => (a.sort ?? 0) - (b.sort ?? 0))
+    if (allButtons.length === 0) {
+      btnList.innerHTML = '<div style="font-size:12px;color:#999;padding:8px">暂无可选按钮</div>'
+      return
+    }
+    const isAll = currentIds.length === 0 || currentIds.length === allButtons.length
+    btnList.innerHTML = `
+      <div style="margin-bottom:6px;font-size:12px;color:var(--b3-theme-on-surface-light)">
+        全部按钮（${allButtons.length} 个）
+        <button class="b3-button b3-button--text" style="font-size:11px;padding:2px 8px;margin-left:8px" id="qn-toggle-all">${isAll ? '取消全选' : '全选'}</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${allButtons.map((b: any) => `
+        <label style="display:flex;align-items:center;gap:4px;padding:4px 8px;border:1px solid var(--b3-border-color);border-radius:4px;cursor:pointer;font-size:12px;user-select:none">
+          <input type="checkbox" ${currentIds.length === 0 || currentIds.includes(b.id) ? 'checked' : ''} data-bid="${b.id}">
+          <span>${b.name || b.id}</span>
+        </label>
+      `).join('')}</div>`
+    btnList.querySelectorAll('input').forEach(cb => cb.addEventListener('change', doSave))
+    document.getElementById('qn-toggle-all')?.addEventListener('click', () => {
+      const allChecked = [...btnList.querySelectorAll<HTMLInputElement>('input')].every(c => c.checked)
+      btnList.querySelectorAll<HTMLInputElement>('input').forEach(c => { c.checked = !allChecked })
+      doSave()
+    })
+  }
+
+  function doSave() {
+    const cfg = desktopCfg as any
+    const ids: string[] = []
+    btnList.querySelectorAll<HTMLInputElement>('input:checked').forEach(c => ids.push(c.dataset.bid!))
+    const allButtons = (pluginInstance?.desktopButtonConfigs || [])
+      .filter((b: any) => b.enabled !== false && b.id !== 'overflow-button-desktop')
+    cfg.quickNoteButtonIds = ids.length === allButtons.length ? [] : ids
+    buildBtnList()
+  }
+
+  buildBtnList()
 
   const divider = document.createElement('div')
   divider.style.cssText = 'height: 1px; background: rgba(59, 130, 246, 0.2); margin: 4px 0;'

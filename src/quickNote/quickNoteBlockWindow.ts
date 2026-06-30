@@ -9,6 +9,7 @@ const WIN_W = 600, WIN_H = 500, BOUNDS_KEY = '__qn_block_window_bounds'
 const QUICKNOTE_TITLE = '⚡ 快捷记事'
 const BASE_HIDE = '.layout-tab-bar,.protyle-title,.protyle-background,.protyle-scroll,#status{display:none!important}'
 const BREADCRUMB_HIDE = '.protyle-breadcrumb{display:none!important}'
+const BREADCRUMB_SHOW = '.protyle-breadcrumb{margin-top:25px!important}'
 const DRAG_CSS = '#qn-drag-handle{position:fixed;top:0;left:0;width:50%;height:36px;z-index:9999;-webkit-app-region:drag;cursor:grab}'
 let qnWinId: number | null = null
 
@@ -57,7 +58,7 @@ function createOneWindow(blockId: string): boolean {
 
     // ★ 根据开关动态构建 CSS：工具栏开时保留面包屑，关时隐藏
     const toolbarOn = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteToolbarVisible !== false
-    const hideCSS = BASE_HIDE + (toolbarOn ? '' : BREADCRUMB_HIDE) + DRAG_CSS
+    const hideCSS = BASE_HIDE + (toolbarOn ? BREADCRUMB_SHOW : BREADCRUMB_HIDE) + DRAG_CSS
     const hideJS = `(function(){var s=document.createElement('style');s.textContent=${JSON.stringify(hideCSS)};document.head.appendChild(s);var d=document.createElement('div');d.id='qn-drag-handle';d.title='拖动窗口';document.body.appendChild(d)})()`
     const titleJS = `(function(){var t=${JSON.stringify(QUICKNOTE_TITLE)};document.title=t;Object.defineProperty(document,'title',{get:function(){return t},set:function(){return t}})})()`
 

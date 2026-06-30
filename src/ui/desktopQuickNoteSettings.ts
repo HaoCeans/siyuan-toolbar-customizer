@@ -229,43 +229,6 @@ function createInsertPositionSection(context: DesktopQuickNoteSettingsContext): 
   return section
 }
 
-function createFontSizeSection(context: DesktopQuickNoteSettingsContext): HTMLElement {
-  const config = context.desktopFeatureConfig as Record<string, any>
-  const section = document.createElement('div')
-  section.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
-
-  section.appendChild(createSubTitle('④弹窗输入框字体大小'))
-
-  const row = document.createElement('div')
-  row.style.cssText = 'display: flex; align-items: center; gap: 12px;'
-
-  const label = document.createElement('span')
-  label.style.cssText = 'font-size: 13px; min-width: 72px;'
-
-  const slider = document.createElement('input')
-  slider.type = 'range'
-  slider.min = '12'
-  slider.max = '30'
-  slider.step = '1'
-  const current = Number(config.quickNoteFontSize) || 18
-  slider.value = String(current)
-  label.textContent = `${current}px`
-
-  slider.oninput = () => {
-    const value = parseInt(slider.value, 10)
-    label.textContent = `${value}px`
-    config.quickNoteFontSize = value
-  }
-  slider.onchange = () => {
-    void context.saveDesktopConfig()
-  }
-
-  row.appendChild(label)
-  row.appendChild(slider)
-  section.appendChild(row)
-  return section
-}
-
 /** 电脑端设置底部完整配置区 */
 export function createDesktopQuickNoteSettingsSection(
   context: DesktopQuickNoteSettingsContext,
@@ -315,8 +278,6 @@ export function createDesktopQuickNoteSettingsSection(
   })
   formatField.id = 'quick-note-format-section-desktop'
   box.appendChild(formatField)
-
-  box.appendChild(createFontSizeSection(context))
 
   const desktopCfg = context.desktopFeatureConfig
 

@@ -16,7 +16,7 @@ import { toggleVisibility as toggleMobileDocNav } from "./ui/mobileDocNav";
 import { toggleVisibility as toggleDesktopDocNav } from "./ui/desktopDocNav";
 import { isDesktopQuickNoteOverflowToolbarEnabled } from "./quickNote/desktopCapture";
 // TTS 朗读模块
-import { showTTSOptionsDesktop } from "./tts/desktopPanel";
+import { showTTSOptionsDesktop, cleanupDesktopTTS } from "./tts/desktopPanel";
 import { showTTSOptionsMobile, cleanupMobileTTS } from "./tts/mobilePanel";
 import { destroyTTSEngine } from "./tts/ttsEngine";
 import { destroyHttpTTSEngine } from "./tts/httpTtsEngine";
@@ -6664,6 +6664,7 @@ export function cleanup() {
   destroyEdgeTTSEngine()
   destroyGoogleTTSEngine()
   cleanupMobileTTS()
+  cleanupDesktopTTS()
 
   // 重置模块级变量
   currentButtonConfigs = []

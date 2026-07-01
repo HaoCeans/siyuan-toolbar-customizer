@@ -160,7 +160,6 @@ export default class ToolbarCustomizer extends Plugin {
   private _quickNoteTextareaDomLogged = false
 
   // 待保存的欢迎标记（延迟到用户保存设置时写入）
-  private _pendingWelcomeSave = false
 
   // 动态获取当前平台的按钮配置
   get buttonConfigs(): ButtonConfig[] {
@@ -203,6 +202,7 @@ export default class ToolbarCustomizer extends Plugin {
     disableCustomButtons: false,// 禁用所有自定义按钮
     disableMobileSwipe: true,   // 手机端禁止左右滑动弹出
     showMobileLineBreakButton: false, // 顶部工具栏云同步左侧显示 H 换行按钮
+    hideStatusBar: true,         // 手机端隐藏底部状态条 #status
     disableFileTree: true,      // 禁止右滑弹出文档树
     disableSettingMenu: true,   // 禁止左滑弹出设置菜单
     showAllNotifications: true, // 一键开启所有按钮右上角提示
@@ -1024,7 +1024,7 @@ export default class ToolbarCustomizer extends Plugin {
           desktopGlobalButtonChanged ||
           mobileGlobalButtonChanged
 
-        if (!hasAnyChange && !this._pendingWelcomeSave) {
+        if (!hasAnyChange) {
           showMessage('配置无变化，未保存', 3000, 'info')
           await new Promise(r => setTimeout(r, 100))
           return
@@ -1051,12 +1051,6 @@ export default class ToolbarCustomizer extends Plugin {
         }
         if (mobileGlobalButtonChanged) {
           await this.saveData('mobileGlobalButtonConfig', this.mobileGlobalButtonConfig)
-        }
-
-        // 如果有待保存的欢迎标记，一并保存
-        if (this._pendingWelcomeSave) {
-          await this.saveData('hasShownWelcome', true)
-          this._pendingWelcomeSave = false
         }
 
         showMessage('设置已保存，正在重载...', 2000, 'info')
@@ -1331,6 +1325,15 @@ export default class ToolbarCustomizer extends Plugin {
           padding: 0 !important;
           overflow: hidden !important;
           pointer-events: none !important;
+        }
+      `
+    }
+
+    // ⑦手机端状态条隐藏
+    if (this.isMobile && this.mobileFeatureConfig.hideStatusBar !== false) {
+      styleContent += `
+        #status {
+          display: none !important;
         }
       `
     }

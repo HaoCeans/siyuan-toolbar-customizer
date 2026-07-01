@@ -3400,6 +3400,24 @@ export function createMobileSettingLayout(
     }
   })
 
+  setting.addItem({
+    title: '⑦手机端状态条隐藏',
+    description: '💡隐藏手机端底部的状态条（含同步状态、字数统计等）。默认开启。',
+    createActionElement: () => {
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'b3-switch'
+      toggle.checked = context.mobileFeatureConfig.hideStatusBar !== false
+      toggle.style.cssText = 'transform: scale(1.2);'
+      toggle.onchange = async () => {
+        context.mobileFeatureConfig.hideStatusBar = toggle.checked
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+        context.applyFeatures()
+      }
+      return toggle
+    }
+  })
+
   // === 使用帮助 ===
   createGroupTitle('6️⃣ ','手机端关闭与激活码')
 

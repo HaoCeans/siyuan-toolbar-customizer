@@ -19,19 +19,16 @@ function getBW(): any { try { return (window as any).require?.('@electron/remote
 function getMainId(): number | null { try { return (window as any).require?.('@electron/remote')?.getCurrentWindow?.()?.id ?? null } catch { return null } }
 function loadBounds(): any { try { const r = localStorage.getItem(BOUNDS_KEY); return r ? JSON.parse(r) : null } catch { return null } }
 function saveBounds(win: any): void { try { if (!win || win.isDestroyed?.()) return; const b = win.getBounds?.(); if (b) localStorage.setItem(BOUNDS_KEY, JSON.stringify(b)) } catch {} }
+
+let _saveBoundsTimer: ReturnType<typeof setTimeout> | null = null
+function saveBoundsThrottled(win: any): void {
+  if (_saveBoundsTimer) return
+  _saveBoundsTimer = setTimeout(() => { _saveBoundsTimer = null; saveBounds(win) }, 300)
+}
 function getBounds() {
   const s = loadBounds(); if (s) return s
   try { const sc = (window as any).require?.('@electron/remote')?.screen?.getPrimaryDisplay?.(); if (sc) { const { width: sw, height: sh } = sc.workAreaSize; return { x: Math.round((sw - WIN_W) / 2), y: Math.round((sh - WIN_H) / 2), width: WIN_W, height: WIN_H } } } catch {}
   return { x: 100, y: 100, width: WIN_W, height: WIN_H }
-}
-
-/** 强制删除当前草稿块（插件卸载等场景），不检查内容 */
-async function _cleanupCurrentDraft(): Promise<void> {
-  const id = _currentDraftBlockId
-  _currentDraftBlockId = null
-  if (id) {
-    await deleteQuickNoteDraftBlock(id)
-  }
 }
 
 function _clearDraftTracking(): void {
@@ -66,9 +63,9 @@ function createOneWindow(blockId: string): boolean {
     // 清除旧窗口可能残留的空标志
     try { localStorage.removeItem(BLOCK_EMPTY_KEY) } catch {}
 
-    win.on('close', () => saveBounds(win))
-    win.on('resize', () => saveBounds(win))
-    win.on('move', () => saveBounds(win))
+    win.on('close', () => { if (_saveBoundsTimer) { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = null } saveBounds(win) })
+    win.on('resize', () => saveBoundsThrottled(win))
+    win.on('move', () => saveBoundsThrottled(win))
     // 窗口销毁后：读 localStorage 判断 Protyle 是否为空，空块从内核删除
     win.on('closed', () => {
       const closingBlockId = _currentDraftBlockId
@@ -121,6 +118,7 @@ function createOneWindow(blockId: string): boolean {
       }
       if(!hookCloseBtn()){var t=setInterval(function(){if(hookCloseBtn())clearInterval(t)},300);setTimeout(function(){clearInterval(t)},5000)}
       window.addEventListener('beforeunload',function(){
+        if(window.__qnPollTimer){clearInterval(window.__qnPollTimer);window.__qnPollTimer=null}
         try{
           var ws=window.siyuan&&window.siyuan.ws;
           if(ws&&ws.ws&&ws.ws.readyState===1){
@@ -138,7 +136,7 @@ function createOneWindow(blockId: string): boolean {
       win.webContents.executeJavaScript(closeHookJS).catch(()=>{})
       // 轮询 Protyle 是否为空，写入 localStorage 供 closed 事件判断是否删草稿块
       win.webContents.executeJavaScript(
-        `setInterval(function(){var w=document.querySelector('.protyle-wysiwyg');var e=!w||(w.textContent||'').replace(/\\u200b/g,'').trim().length===0;try{localStorage.setItem('${BLOCK_EMPTY_KEY}',e?'1':'0')}catch(ex){}},500)`
+        `window.__qnPollTimer=setInterval(function(){var w=document.querySelector('.protyle-wysiwyg');var e=!w||(w.textContent||'').replace(/\\u200b/g,'').trim().length===0;try{localStorage.setItem('${BLOCK_EMPTY_KEY}',e?'1':'0')}catch(ex){}},500)`
       ).catch(()=>{})
       try { win.setTitle(QUICKNOTE_TITLE) } catch {}
       win.show(); win.focus()
@@ -169,9 +167,16 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
 }
 
 export function destroyDesktopQuickNoteBlockWindow(): void {
+  // 先捕获草稿块 ID，再销毁窗口（防止 closed 事件异步执行时 _currentDraftBlockId 已被清空）
+  const draftToDelete = _currentDraftBlockId
+  _currentDraftBlockId = null
   try { const BW = getBW(), mainId = getMainId(); if (BW) { for (const w of (BW.getAllWindows?.() || [])) { try { if (!w || w.isDestroyed?.() || w.id === mainId) continue; if ((w.getTitle?.() || '') === QUICKNOTE_TITLE) w.destroy?.() } catch {} } } } catch {}
   qnWinId = null
-  _clearDraftTracking()
+  // 作为兜底：如果窗口 closed 事件中未删块，这里直接删（插件卸载时内容不重要）
+  if (draftToDelete) {
+    deleteQuickNoteDraftBlock(draftToDelete).catch(() => {})
+  }
+  if (_saveBoundsTimer) { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = null }
 }
 
 export function shouldUseDesktopQuickNoteBlockWindow(isFromButton = false): boolean {

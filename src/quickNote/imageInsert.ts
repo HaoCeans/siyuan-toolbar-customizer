@@ -12,6 +12,29 @@
 import { getActiveQuickNoteInput } from './session'
 import type { QuickNoteInputHandle } from './inputArea'
 
+// ==================== 插件卸载兜底清理 ====================
+
+/** 当前活跃的文件选择器引用（用于 onunload 兜底清理） */
+let _activeFileInput: HTMLInputElement | null = null
+let _activeFileInputCleanup: (() => void) | null = null
+
+/**
+ * 强制清理可能残留的文件选择器。
+ * 插件卸载时调用，防止 fileInput 泄漏在 body 中。
+ */
+export function cleanupImagePicker(): void {
+  // 重置标志，防止 handleVisibilityChange 误触发
+  ;(window as any).__imagePickerActive = false
+  if (_activeFileInputCleanup) {
+    try { _activeFileInputCleanup() } catch { /* ignore */ }
+    _activeFileInputCleanup = null
+  }
+  if (_activeFileInput) {
+    try { document.body.removeChild(_activeFileInput) } catch { /* ignore */ }
+    _activeFileInput = null
+  }
+}
+
 // ==================== 上传 ====================
 
 /**
@@ -376,22 +399,37 @@ async function doPickAndInsertImages(): Promise<boolean> {
     // 标记激活，防止切后台时 handleVisibilityChange 误触发弹窗
     ;(window as any).__imagePickerActive = true
 
-    const fileInput = document.createElement('input')
-    fileInput.type = 'file'
-    fileInput.accept = 'image/*'
-    // fileInput.multiple = true  // 暂时关闭多选，需要时取消注释即可
-    fileInput.style.display = 'none'
-    document.body.appendChild(fileInput)
+	    const fileInput = document.createElement('input')
+	    fileInput.type = 'file'
+	    fileInput.accept = 'image/*'
+	    // fileInput.multiple = true  // 暂时关闭多选，需要时取消注释即可
+	    fileInput.style.display = 'none'
+	    document.body.appendChild(fileInput)
 
-    let settled = false
+	    // 注册到模块级，供 onunload 兜底清理
+	    _activeFileInput = fileInput
 
-    const cleanup = () => {
-      // 延迟清除标记：handleVisibilityChange 在文件选择器关闭后可能
-      // 立即尝试恢复焦点 → 导致 blur() 后键盘被重新拉起。
-      // 保持标记 true 的时长 > visibilitychange 触发窗口，使其直接 return。
-      setTimeout(() => { ;(window as any).__imagePickerActive = false }, 500)
-      try { document.body.removeChild(fileInput) } catch { /* ignore */ }
-    }
+	    let settled = false
+
+	    const cleanup = () => {
+	      // 延迟清除标记：handleVisibilityChange 在文件选择器关闭后可能
+	      // 立即尝试恢复焦点 → 导致 blur() 后键盘被重新拉起。
+	      // 保持标记 true 的时长 > visibilitychange 触发窗口，使其直接 return。
+	      setTimeout(() => { ;(window as any).__imagePickerActive = false }, 500)
+	      try { document.body.removeChild(fileInput) } catch { /* ignore */ }
+	      if (_activeFileInput === fileInput) {
+	        _activeFileInput = null
+	        _activeFileInputCleanup = null
+	      }
+	    }
+
+	    // 注册 cleanup 供 onunload 强制调用（兜底：用户选了文件但插件被卸载）
+	    _activeFileInputCleanup = () => {
+	      if (settled) return
+	      settled = true
+	      window.removeEventListener('focus', onWindowFocus)
+	      cleanup()
+	    }
 
     const finish = (ok: boolean) => {
       if (settled) return

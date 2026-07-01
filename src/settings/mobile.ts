@@ -15,6 +15,21 @@ import { createMobileQuickNoteFormatField } from '../ui/quickNoteFormatField'
 import { calculateButtonOverflow, getToolbarAvailableWidth, getButtonWidth } from '../toolbarManager'
 
 /**
+ * 活跃的滑杆拖拽清理函数集合。
+ * 滑杆拖拽时向 document 注册 pointermove/pointerup/pointercancel 监听器，
+ * 如果在拖拽过程中触发重渲染（innerHTML=''），这些监听器会残留。
+ * 此集合存储每个活跃拖拽的 upHandler，重渲染前强制执行清理。
+ */
+const _activeSliderDrags = new Set<() => void>()
+
+function flushSliderDrags(): void {
+  for (const fn of _activeSliderDrags) {
+    try { fn() } catch { /* ignore */ }
+  }
+  _activeSliderDrags.clear()
+}
+
+/**
  * 从 "12px" / "12" 解析滑杆初始整数值。0 为合法值，禁止写成 parseInt(x) || fallback（会把 0 当成缺省）。
  */
 function parseLengthSliderInt(raw: unknown, fallback: number): number {
@@ -520,41 +535,43 @@ export function createMobileSettingLayout(
       return newValue;
     };
 
-    const handlePointerDown = (e: PointerEvent) => {
-      isDragging = true;
-      sliderRect = sliderContainer.getBoundingClientRect();
-      thumb.style.cursor = 'grabbing';
-      thumb.style.transform = 'translate(-50%, -50%) scale(1.15)';
-      thumb.style.boxShadow = '0 3px 8px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2)';
-      e.preventDefault();
+	    const handlePointerDown = (e: PointerEvent) => {
+	      isDragging = true;
+	      sliderRect = sliderContainer.getBoundingClientRect();
+	      thumb.style.cursor = 'grabbing';
+	      thumb.style.transform = 'translate(-50%, -50%) scale(1.15)';
+	      thumb.style.boxShadow = '0 3px 8px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2)';
+	      e.preventDefault();
 
-      const moveHandler = (e: PointerEvent) => {
-        if (isDragging) {
-          updateSlider(e.clientX);
-        }
-      };
+	      const moveHandler = (e: PointerEvent) => {
+	        if (isDragging) {
+	          updateSlider(e.clientX);
+	        }
+	      };
 
-      const upHandler = async () => {
-        if (isDragging) {
-          isDragging = false;
-          thumb.style.cursor = 'grab';
-          thumb.style.transform = 'translate(-50%, -50%)';
-          thumb.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15)';
-          try {
-            await onSave(currentValue);
-          } catch (e) {
-            console.warn('[Slider] onSave failed:', e);
-          }
-        }
-        document.removeEventListener('pointermove', moveHandler);
-        document.removeEventListener('pointerup', upHandler);
-        document.removeEventListener('pointercancel', upHandler);
-      };
+	      const upHandler = async () => {
+	        if (isDragging) {
+	          isDragging = false;
+	          thumb.style.cursor = 'grab';
+	          thumb.style.transform = 'translate(-50%, -50%)';
+	          thumb.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.25), 0 1px 2px rgba(0, 0, 0, 0.15)';
+	          try {
+	            await onSave(currentValue);
+	          } catch (e) {
+	            console.warn('[Slider] onSave failed:', e);
+	          }
+	        }
+	        _activeSliderDrags.delete(upHandler)
+	        document.removeEventListener('pointermove', moveHandler);
+	        document.removeEventListener('pointerup', upHandler);
+	        document.removeEventListener('pointercancel', upHandler);
+	      };
 
-      document.addEventListener('pointermove', moveHandler);
-      document.addEventListener('pointerup', upHandler);
-      document.addEventListener('pointercancel', upHandler);
-    };
+	      _activeSliderDrags.add(upHandler)
+	      document.addEventListener('pointermove', moveHandler);
+	      document.addEventListener('pointerup', upHandler);
+	      document.addEventListener('pointercancel', upHandler);
+	    };
 
     thumb.addEventListener('pointerdown', handlePointerDown);
 
@@ -702,11 +719,13 @@ export function createMobileSettingLayout(
             console.warn('[Slider] onSave failed:', e);
           }
         }
+        _activeSliderDrags.delete(upHandler)
         document.removeEventListener('pointermove', moveHandler);
         document.removeEventListener('pointerup', upHandler);
         document.removeEventListener('pointercancel', upHandler);
       };
 
+      _activeSliderDrags.add(upHandler)
       document.addEventListener('pointermove', moveHandler);
       document.addEventListener('pointerup', upHandler);
       document.addEventListener('pointercancel', upHandler);
@@ -867,6 +886,7 @@ export function createMobileSettingLayout(
       let lastAddedButtonId: string | null = null
 
       const renderList = () => {
+        flushSliderDrags()
         listContainer.innerHTML = ''
         const sortedButtons = [...context.buttonConfigs].sort((a, b) => a.sort - b.sort)
 

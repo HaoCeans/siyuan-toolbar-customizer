@@ -13,7 +13,7 @@ import {
   type TTSController,
 } from './httpTtsEngine'
 import { applyFloatPanelBackground, observeSiYuanThemeMode } from '../ui/floatPanelBackground'
-import { createIconButton, updateButtonIcon, injectSliderStyles, lucideSvg } from './ttsIconHelper'
+import { createIconButton, updateButtonIcon, injectSliderStyles, removeSliderStyles, lucideSvg } from './ttsIconHelper'
 import * as Notify from '../notification'
 import { pluginInstance } from '../toolbarManager'
 import { navigateToAdjacentDoc } from '../ui/desktopDocNav'
@@ -54,6 +54,7 @@ export function cleanupDesktopTTS(): void {
   removePlaybackBar()
   destroyTTSEngine()
   destroyHttpTTSEngine()
+  removeSliderStyles()
 }
 
 // ─── 阶段一：选项面板 ────────────────────────────────────

@@ -1414,9 +1414,12 @@ export function initCustomButtons(configs: ButtonConfig[]) {
 }
 
 function cleanupCustomButtons() {
-  // 清理旧的插件按钮
+  // 标记所有按钮为已销毁状态，让事件回调中的闭包引用作废
   const oldButtons = document.querySelectorAll('[data-custom-button]')
-  oldButtons.forEach(btn => btn.remove())
+  oldButtons.forEach(btn => {
+    ;(btn as HTMLElement).dataset.toolbarDestroyed = 'true'
+    btn.remove()
+  })
   // 清理分割线
   const oldDividers = document.querySelectorAll('[data-toolbar-divider]')
   oldDividers.forEach(div => div.remove())
@@ -1787,12 +1790,15 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     })
   }
 
-  // 绑定点击事件
-  button.addEventListener('click', async (e) => {
-    e.stopPropagation()
+	  // 绑定点击事件
+	  button.addEventListener('click', async (e) => {
+	    e.stopPropagation()
 
-    // 扩展工具栏按钮特殊处理（toggle 扩展工具栏）
-    if (isOverflowButton(config.id)) {
+	    // 按钮已被清理（cleanupCustomButtons 设置了 dataset），直接返回避免闭包泄漏
+	    if (button.dataset.toolbarDestroyed === 'true') return
+
+	    // 扩展工具栏按钮特殊处理（toggle 扩展工具栏）
+	    if (isOverflowButton(config.id)) {
       button.blur()
       if (lastActiveElement && isInputOrEditable(lastActiveElement)) {
         lastActiveElement.focus({ preventScroll: true })
@@ -4579,20 +4585,26 @@ function unbindToolbarAutoHideScroll(): void {
 	    document.head.appendChild(kmindStyle)
 	  }
 		  // 检测 Kmind-Zen 面板是否可见（.kmind-zen-protyle-root 为文档树根容器）
-		  _applyKmindZenState()
+			  void _applyKmindZenState()
 	}
 
-	function _applyKmindZenState(): void {
+	let _kmindZenPending = false
+	async function _applyKmindZenState(): Promise<void> {
+	  if (_kmindZenPending) return
 	  // 通过思源 API 查当前文档的 custom-kmind-zen-doctree-doc 属性
 	  const protyle = getActiveProtyle()
 	  const docId = protyle?.block?.rootID
 	  if (docId) {
-	    fetchSyncPost('/api/attr/getBlockAttrs', { id: docId }).then(resp => {
+	    _kmindZenPending = true
+	    try {
+	      const resp = await fetchSyncPost('/api/attr/getBlockAttrs', { id: docId })
 	      const isKmindZen = resp?.data?.['custom-kmind-zen-doctree-doc'] === 'true'
 	      document.body.classList.toggle('kmind-zen-active', isKmindZen)
-	    }).catch(() => {
+	    } catch {
 	      document.body.classList.remove('kmind-zen-active')
-	    })
+	    } finally {
+	      _kmindZenPending = false
+	    }
 	  } else {
 	    document.body.classList.remove('kmind-zen-active')
 	  }

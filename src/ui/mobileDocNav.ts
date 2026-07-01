@@ -51,6 +51,7 @@ let currentDocPath: string | null = null  // 当前文档的父目录路径
 let prevDoc: { id: string; title: string } | null = null
 let nextDoc: { id: string; title: string } | null = null
 let isLoading = false
+let refreshRequestId = 0  // 用于 refreshAdjacentDocs 请求去重
 
 let lastDocNavFloatOpacity: number | undefined
 let themeModeUnsubscribe: (() => void) | null = null
@@ -351,6 +352,10 @@ function updateNavButtons(): void {
 }
 
 async function refreshAdjacentDocs(): Promise<void> {
+  // 请求去重：如果已有正在执行的请求，跳过；同时记录 ID 防止过期响应
+  if (isLoading) return
+  const reqId = ++refreshRequestId
+
   // 尝试从 protyle 回读 currentDocId
   if (!currentDocId) {
     const protyle = (window as any).siyuan?.mobile?.editor?.protyle
@@ -367,6 +372,7 @@ async function refreshAdjacentDocs(): Promise<void> {
   // loading 期间不刷新按钮 UI，避免闪烁
 
   const docInfo = await fetchDocInfo()
+  if (reqId !== refreshRequestId) { isLoading = false; return }
   if (!docInfo?.notebookId) {
     console.warn('[文档导航] 无法获取文档信息')
     isLoading = false
@@ -378,6 +384,7 @@ async function refreshAdjacentDocs(): Promise<void> {
   currentDocPath = docInfo.parentPath
 
   const result = await fetchAdjacentDocsByFiletree(currentNotebookId, currentDocPath, currentDocId)
+  if (reqId !== refreshRequestId) { isLoading = false; return }
   prevDoc = result.prev
   nextDoc = result.next
 

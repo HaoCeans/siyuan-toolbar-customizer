@@ -304,6 +304,8 @@ export function createBlockFormatSettingsPlaceholder(): HTMLElement {
   container.style.cssText =
     'padding: 10px 12px; background: rgba(139, 92, 246, 0.08); border: 1px dashed rgba(139, 92, 246, 0.45); border-radius: 6px; font-size: 12px; color: var(--b3-theme-on-surface-light); line-height: 1.5;'
   container.innerHTML =
-    '🧩 <strong style="color: #8b5cf6;">思源块格式</strong>：弹窗内直接编辑内核块，Enter 可多段落/列表，发送时逐块写入文档。'
+    '🧩 <strong style="color: #8b5cf6;">思源块格式</strong>：弹窗内直接编辑内核块，Enter 可多段落/列表，发送时逐块写入文档。' +
+    '<br>⚠️ <span style="color: #e67e22;">注意：块格式为了能够丝滑地打开和使用，会加载完整 Protyle 编辑器到独立窗口，预计额外占用约 400MB 运存。关窗后释放。</span>' +
+    '<br><span style="color: #999;">仅在打开窗口时产生运存占用，关闭窗口即销毁，不持续占用。</span>'
   return container
 }

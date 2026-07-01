@@ -12,31 +12,34 @@
       height: 100%;
       overflow: hidden;
       background: transparent;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif;
+      -webkit-font-smoothing: antialiased;
     }
     :root {
       color-scheme: light dark;
       --panel-bg: rgba(255, 255, 255, 0.97);
-      --panel-border: rgba(0, 0, 0, 0.08);
+      --panel-border: rgba(0, 0, 0, 0.06);
       --text: #1f2937;
-      --muted: #6b7280;
+      --muted: #9ca3af;
       --input-bg: #f9fafb;
       --input-border: #e5e7eb;
       --primary: #3b82f6;
       --primary-hover: #2563eb;
-      --ghost-bg: rgba(0, 0, 0, 0.05);
-      --qnote-action-font-size: 14px;
+      --ghost-bg: rgba(0, 0, 0, 0.04);
+      --ghost-hover: rgba(0, 0, 0, 0.08);
+      --qnote-action-font-size: 13px;
     }
     html[data-theme-mode="dark"] {
-      --panel-bg: rgba(30, 30, 36, 0.96);
-      --panel-border: rgba(255, 255, 255, 0.08);
+      --panel-bg: rgba(28, 28, 32, 0.96);
+      --panel-border: rgba(255, 255, 255, 0.06);
       --text: #e5e7eb;
-      --muted: #9ca3af;
-      --input-bg: #111827;
-      --input-border: #374151;
+      --muted: #6b7280;
+      --input-bg: #16161a;
+      --input-border: #2a2a30;
       --primary: #2E7BBF;
       --primary-hover: #3b82f6;
-      --ghost-bg: rgba(255, 255, 255, 0.08);
+      --ghost-bg: rgba(255, 255, 255, 0.06);
+      --ghost-hover: rgba(255, 255, 255, 0.10);
     }
     #app {
       width: 100vw;
@@ -53,96 +56,118 @@
       flex-direction: column;
       background: var(--panel-bg);
       border: 1px solid var(--panel-border);
-      border-radius: 10px;
+      border-radius: 12px;
       overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
     }
     .qnote-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 5px 8px 4px;
+      padding: 7px 10px 5px;
       -webkit-app-region: drag;
       cursor: move;
       user-select: none;
     }
     .qnote-title {
-      font-size: var(--qnote-action-font-size);
+      font-size: 13px;
       font-weight: 600;
       color: var(--text);
+      opacity: 0.85;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      letter-spacing: 0.01em;
     }
     .qnote-close {
-      width: 20px;
-      height: 20px;
+      width: 22px;
+      height: 22px;
       border: none;
-      border-radius: 6px;
-      background: var(--ghost-bg);
+      border-radius: 50%;
+      background: transparent;
       color: var(--muted);
       cursor: pointer;
       -webkit-app-region: no-drag;
-      font-size: 14px;
+      font-size: 15px;
       line-height: 1;
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, color 0.15s;
     }
-    .qnote-close:hover { color: var(--text); }
+    .qnote-close:hover {
+      background: var(--ghost-hover);
+      color: var(--text);
+    }
     .qnote-body {
       flex: 1;
       display: flex;
       flex-direction: column;
-      padding: 0 8px 4px;
+      padding: 0 10px 6px;
       min-height: 0;
       -webkit-app-region: no-drag;
     }
     textarea {
       flex: 1;
       width: 100%;
-      min-height: 48px;
+      min-height: 52px;
       resize: none;
       border: 1px solid var(--input-border);
-      border-radius: 6px;
+      border-radius: 8px;
       background: var(--input-bg);
       color: var(--text);
-      padding: 6px 8px;
-      font-size: var(--qnote-font-size, 12px);
-      line-height: 1.4;
+      padding: 8px 10px;
+      font-size: var(--qnote-font-size, 14px);
+      line-height: 1.5;
       outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    textarea::placeholder {
+      color: var(--muted);
+      opacity: 0.6;
     }
     textarea:focus {
       border-color: var(--primary);
-      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
     }
     .qnote-hint {
       display: none;
     }
     .qnote-actions {
       display: flex;
-      gap: 6px;
-      padding: 0 8px 8px;
+      gap: 8px;
+      padding: 0 10px 10px;
       -webkit-app-region: no-drag;
     }
     button.action {
       flex: 1;
-      height: 24px;
-      border-radius: 6px;
+      height: 28px;
+      border-radius: 7px;
       border: none;
       font-size: var(--qnote-action-font-size);
       font-weight: 500;
       cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    button.action:active {
+      transform: scale(0.97);
     }
     .btn-cancel {
       background: var(--ghost-bg);
       color: var(--text);
     }
+    .btn-cancel:hover { background: var(--ghost-hover); }
     .btn-save {
       background: var(--primary);
       color: #fff;
+      font-weight: 600;
     }
     .btn-save:hover { background: var(--primary-hover); }
+    .btn-save:disabled { opacity: 0.5; cursor: default; }
     .status {
       min-height: 0;
-      padding: 0 8px 2px;
+      padding: 0 10px 3px;
       font-size: 10px;
       color: var(--muted);
       text-align: center;
@@ -158,13 +183,13 @@
 </head>
 <body>
   <div id="app">
-    <div class="qnote-panel">
-      <div class="qnote-header">
+	    <div class="qnote-panel">
+	      <div class="qnote-header">
         <div class="qnote-title" id="title">⚡ 记事</div>
         <button class="qnote-close" id="closeBtn" title="关闭">×</button>
       </div>
       <div class="qnote-body">
-        <textarea id="input" placeholder="记一笔…"></textarea>
+	        <textarea id="input" placeholder=""></textarea>
         <div class="qnote-hint"><kbd>Shift+Enter</kbd> 发送 · <kbd>Esc</kbd> 取消</div>
       </div>
       <div class="status" id="status"></div>

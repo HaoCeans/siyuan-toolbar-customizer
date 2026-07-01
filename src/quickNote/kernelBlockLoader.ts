@@ -207,7 +207,7 @@ export function installKernelProtyleGuards(
           await reloadBlock()
         }
       })()
-    }, 64)
+    }, 300)
   })
   observer.observe(editor.protyle.wysiwyg.element, { childList: true, subtree: false })
 

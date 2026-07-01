@@ -202,3 +202,10 @@ export function injectSliderStyles(): void {
   document.head.appendChild(style)
   sliderStylesInjected = true
 }
+
+/** 移除 injectSliderStyles 注入的 <style> 元素，TTS 模块卸载时调用 */
+export function removeSliderStyles(): void {
+  const el = document.getElementById('tts-apple-slider-style')
+  if (el) el.remove()
+  sliderStylesInjected = false
+}

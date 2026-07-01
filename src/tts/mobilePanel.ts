@@ -15,7 +15,7 @@ import {
   SF_VOICES, getTTSSettings, saveTTSSettings, getSFAPIConfig, saveSFAPIConfig,
   ensureHighlightStyle, type TTSController,
 } from './httpTtsEngine'
-import { createIconButton, updateButtonIcon, injectSliderStyles, lucideSvg } from './ttsIconHelper'
+import { createIconButton, updateButtonIcon, injectSliderStyles, removeSliderStyles, lucideSvg } from './ttsIconHelper'
 
 // ═══════════════════════════════════════════════════════════════
 // 手机端 UI
@@ -48,6 +48,7 @@ export async function showTTSOptionsMobile(): Promise<void> {
 export function cleanupMobileTTS(): void {
   removeOverlay(); removeBar(); removeVis()
   destroyHttpTTSEngine()
+  removeSliderStyles()
 }
 
 // ─── 面板 ──

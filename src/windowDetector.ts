@@ -503,7 +503,7 @@ async function showNoteInputDialogDesktop(
     font-weight: 600;
   `;
 
-  const fontSize = getQuickNoteFontSize();
+  const fontSize = getQuickNoteFontSize(true);
 
   const noteSection = document.createElement('div');
   noteSection.style.cssText = captureMode
@@ -818,7 +818,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
   let inputFormat = resolveQuickNoteInputFormat(isFromButton);
   // Lifelog 模式强制纯文本
   if (pendingLifelogConfig) inputFormat = 'plain';
-  const fontSize = getQuickNoteFontSize();
+  const fontSize = getQuickNoteFontSize(true);
   const placeholder = documentId
     ? (isAppleStyle ? '追加到文档' : '请输入要追加到文档的内容...')
     : (isAppleStyle ? '' : '请输入您的日记内容...');
@@ -1745,7 +1745,7 @@ async function switchToLifelogMode(buttonConfig: any): Promise<void> {
       }
       oldHandle.destroy();
       const isDark = isSiyuanDarkMode();
-      const fontSize = getQuickNoteFontSize();
+      const fontSize = getQuickNoteFontSize(true);
       const newHandle = await createQuickNoteInputArea({
         format: 'plain', isMobile: true, isDark, fontSize, placeholder: '请输入内容...',
       });
@@ -2618,7 +2618,5 @@ export function getQuickNoteFloatTitle(isFromButton: boolean): string {
 }
 
 export function getQuickNoteFloatPlaceholder(isFromButton: boolean): string {
-  const { documentId, saveType } = resolveQuickNoteTargetConfig(isFromButton);
-  if (saveType === 'document' && documentId) return '请输入要追加到文档的内容…';
-  return '记一笔…';
+  return '';
 }

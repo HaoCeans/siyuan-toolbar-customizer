@@ -41,8 +41,8 @@ let preCreateTimer: ReturnType<typeof setTimeout> | null = null
 let lastFloatToggleTime = 0
 const FLOAT_TOGGLE_COOLDOWN_MS = 500
 
-const WIN_W = 200
-const WIN_H = 168
+const WIN_W = 280
+const WIN_H = 180
 const FLOAT_MIN_W = 160
 const FLOAT_MIN_H = 120
 const QUICKNOTE_FLOAT_WINDOW_ELECTRON_ID_KEY = '__quickNoteFloatWindowElectronId'
@@ -204,8 +204,8 @@ function applyFloatWindowVisibility(win: any, visible: boolean): void {
       const essential = {
         isDark: deps?.isDarkMode() ?? false,
         title: deps?.getFloatTitle() ?? '⚡ 记事',
-        placeholder: deps?.getPlaceholder() ?? '记一笔…',
-        fontSize: getQuickNoteFontSize(),
+        placeholder: deps?.getPlaceholder() ?? '',
+        fontSize: getQuickNoteFontSize(false),
       }
       pushFloatState(essential)
       if (win.isMinimized?.()) win.restore()
@@ -391,9 +391,11 @@ function createFloatWindow(): void {
     const html = getFloatWindowHtml()
     floatWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
 
+    floatWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+
     floatWindow.webContents.once('did-finish-load', async () => {
       applyFloatWindowBounds(floatWindow)
-      await syncFloatState()  // 确保主题/标题等状态在隐藏前已推送完毕
+      await syncFloatState()  // 确保主题/标题等状态在显示前已推送完毕
       applyFloatWindowVisibility(floatWindow, floatWindowWantsVisible)
     })
   } catch (e) {
@@ -416,8 +418,8 @@ async function buildFloatStatePayload(extra?: Record<string, unknown>): Promise<
   return {
     isDark: deps?.isDarkMode() ?? false,
     title: deps?.getFloatTitle() ?? '⚡ 记事',
-    placeholder: deps?.getPlaceholder() ?? '记一笔…',
-    fontSize: getQuickNoteFontSize(),
+    placeholder: deps?.getPlaceholder() ?? '',
+    fontSize: getQuickNoteFontSize(false),
     initialText,
     focus: true,
     ...extra,

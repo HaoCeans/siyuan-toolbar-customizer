@@ -65,6 +65,7 @@ import {
   isQuickNoteFloatSaveFromButton,
 } from './quickNote/quickNoteFloatWindow'
 import { destroyDesktopQuickNoteBlockWindow } from './quickNote/quickNoteBlockWindow'
+import { cleanupImagePicker } from './quickNote/imageInsert'
 
 // 导入 StressThreshold 清理函数
 import {
@@ -209,7 +210,7 @@ export default class ToolbarCustomizer extends Plugin {
     authorCode: '',             // 鲸鱼定制工具箱激活码
     popupConfig: 'bothModes' as const, // 弹窗配置：'disabled'|'smallWindowOnly'|'bothModes'
     quickNoteNotebookId: '',     // 自启动一键记事默认笔记本ID
-    quickNoteFontSize: 18,       // 弹窗输入框字体大小（px）
+    quickNoteFontSize: 14,       // 弹窗输入框字体大小（px）
     quickNoteSortMethod: 'bottomToolbar' as const, // 弹窗按钮排序方法：'topToolbar'|'bottomToolbar'
     quickNoteButtonHeight: 32,    // 弹窗按钮高度（px）
     quickNoteQuoteDocId: '',      // 金句占位文档 ID（留空关闭）
@@ -854,6 +855,7 @@ export default class ToolbarCustomizer extends Plugin {
   onunload() {
     destroyQuickNoteFloatWindow()
     destroyDesktopQuickNoteBlockWindow()
+    cleanupImagePicker()
     try { delete (window as any).__quickNoteFloatCommand } catch { /* ignore */ }
 
     // 清理资源
@@ -874,7 +876,7 @@ export default class ToolbarCustomizer extends Plugin {
     // 清理手机端文档导航资源
     cleanupMobileDocNav()
 
-n    // 清理桌面端标签页Tab资源
+    // 清理桌面端标签页Tab资源
     cleanupDesktopTabs()
 
     // 清理桌面端悬浮大纲资源
@@ -1558,6 +1560,10 @@ n    // 清理桌面端标签页Tab资源
     const style = document.getElementById('toolbar-customizer-feature-style')
     if (style) {
       style.remove()
+    }
+    const hlStyle = document.getElementById('toolbar-customizer-jump-highlight-style')
+    if (hlStyle) {
+      hlStyle.remove()
     }
   }
 }

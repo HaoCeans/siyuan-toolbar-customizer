@@ -78,6 +78,7 @@ let lastTabsFloatOpacity: number | undefined
 let currentCollapseStyle: 'preview' | 'minimal' = 'preview'
 let themeModeUnsubscribe: (() => void) | null = null
 let collapseStyleSavedHandler: (() => void) | null = null
+let navigateRequestId = 0  // 用于 navigateEditorToTab 请求去重
 
 let boundScrollEl: HTMLElement | null = null
 let scrollBindRetryTimer: ReturnType<typeof setInterval> | null = null
@@ -149,9 +150,14 @@ function getMobileEditorRootDocId(): string | undefined {
 
 /** 用思源 API 打开该 Tab 对应文档，并恢复滚动、绑定滚动监听 */
 async function navigateEditorToTab(tab: TabItem): Promise<void> {
+  // 请求去重：记录当前请求 ID，响应返回后检查是否仍是最新
+  const reqId = ++navigateRequestId
+
   // 先验证文档是否仍存在（同步删除后 docId 可能失效）
   try {
     const info: any = await fetchSyncPost('/api/block/getBlockInfo', { id: tab.docId })
+    // 如果已有更新的请求，丢弃本次响应
+    if (reqId !== navigateRequestId) return
     if (info?.code === 3 || !info?.data) {
       showMessage(`文档已被删除，已移除该标签页`, 2500, 'info')
       removeTab(tab.id)
@@ -164,6 +170,9 @@ async function navigateEditorToTab(tab: TabItem): Promise<void> {
       return
     }
   } catch { /* 验证失败不阻塞，尝试打开 */ }
+
+  // 再次检查是否已有更新请求
+  if (reqId !== navigateRequestId) return
 
   try {
     openMobileFileById(pluginInstance?.app, tab.docId)

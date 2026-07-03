@@ -14,13 +14,14 @@ const DRAG_CSS = '#qn-drag-handle{position:fixed;top:0;left:0;width:50%;height:3
 const BLOCK_EMPTY_KEY = '__qn_block_empty'  // localStorage key：Protyle 是否为空
 let qnWinId: number | null = null
 let _currentDraftBlockId: string | null = null
+let _hideTimer: ReturnType<typeof setTimeout> | null = null  // 隐藏后 5 秒自动清理
+let _saveBoundsTimer: ReturnType<typeof setTimeout> | null = null
 
 function getBW(): any { try { return (window as any).require?.('@electron/remote')?.BrowserWindow ?? null } catch { return null } }
 function getMainId(): number | null { try { return (window as any).require?.('@electron/remote')?.getCurrentWindow?.()?.id ?? null } catch { return null } }
 function loadBounds(): any { try { const r = localStorage.getItem(BOUNDS_KEY); return r ? JSON.parse(r) : null } catch { return null } }
 function saveBounds(win: any): void { try { if (!win || win.isDestroyed?.()) return; const b = win.getBounds?.(); if (b) localStorage.setItem(BOUNDS_KEY, JSON.stringify(b)) } catch {} }
 
-let _saveBoundsTimer: ReturnType<typeof setTimeout> | null = null
 function saveBoundsThrottled(win: any): void {
   if (_saveBoundsTimer) return
   _saveBoundsTimer = setTimeout(() => { _saveBoundsTimer = null; saveBounds(win) }, 300)
@@ -35,74 +36,27 @@ function _clearDraftTracking(): void {
   _currentDraftBlockId = null
 }
 
-export function resolveSaveTarget(isFromButton: boolean): QuickNoteSaveTarget {
-  const g: any = pluginInstance?.mobileFeatureConfig ?? {}
-  const t: any = (window as any).__pluginInstance?.mobileFeatureConfig
-  const cfg = (isFromButton && t) ? t : g
-  return { saveType: cfg?.quickNoteSaveType || 'daily', notebookId: cfg?.quickNoteNotebookId || '', documentId: cfg?.quickNoteDocumentId || '', insertPosition: cfg?.quickNoteInsertPosition || 'bottom' }
+function _buildBlockUrl(blockId: string): string {
+  const version = new URL(window.location.href).searchParams.get('v') || ''
+  const vPart = version ? 'v=' + encodeURIComponent(version) + '&' : ''
+  const json = encodeURIComponent(JSON.stringify([{
+    title: QUICKNOTE_TITLE, pin: true, active: true,
+    instance: 'Tab', action: 'Tab',
+    children: { blockId, rootId: blockId, mode: 'wysiwyg', instance: 'Editor', action: ['cb-get-focus'] },
+  }]))
+  return window.location.protocol + '//' + window.location.host + '/stage/build/app/window.html?' + vPart + 'json=' + json
 }
 
-function createOneWindow(blockId: string): boolean {
-  // 销毁所有同标题旧窗口 + 清理旧草稿块
-  try { const BW = getBW(), mainId = getMainId(); if (BW) { for (const w of (BW.getAllWindows?.() || [])) { try { if (!w || w.isDestroyed?.() || w.id === mainId) continue; if ((w.getTitle?.() || '') === QUICKNOTE_TITLE) w.destroy?.() } catch {} } } } catch {}
-  // 清理上一次可能残留的草稿块（用户通过关闭按钮关闭窗口时不会清理）
-  _clearDraftTracking()
-
-  const BW = getBW()
-  if (!BW) { showMessage('无法创建窗口', 3000, 'error'); return false }
-  try {
-    const bounds = getBounds()
-    const win = new BW({
-      show: false, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height,
-      minWidth: 300, minHeight: 200, alwaysOnTop: true,
-      frame: false,
-      title: QUICKNOTE_TITLE, webPreferences: { contextIsolation: false, nodeIntegration: true },
-    })
-    qnWinId = win.id
-    _currentDraftBlockId = blockId
-    // 清除旧窗口可能残留的空标志
-    try { localStorage.removeItem(BLOCK_EMPTY_KEY) } catch {}
-
-    win.on('close', () => { if (_saveBoundsTimer) { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = null } saveBounds(win) })
-    win.on('resize', () => saveBoundsThrottled(win))
-    win.on('move', () => saveBoundsThrottled(win))
-    // 窗口销毁后：读 localStorage 判断 Protyle 是否为空，空块从内核删除
-    win.on('closed', () => {
-      const closingBlockId = _currentDraftBlockId
-      _currentDraftBlockId = null
-      if (qnWinId === win.id) qnWinId = null
-
-      let isEmpty = true
-      try {
-        isEmpty = localStorage.getItem(BLOCK_EMPTY_KEY) !== '0'
-        localStorage.removeItem(BLOCK_EMPTY_KEY)
-      } catch {}
-
-      if (isEmpty && closingBlockId) {
-        deleteQuickNoteDraftBlock(closingBlockId).catch(() => {})
-      }
-    })
-
-    const version = new URL(window.location.href).searchParams.get('v') || ''
-    const vPart = version ? 'v=' + encodeURIComponent(version) + '&' : ''
-    const json = encodeURIComponent(JSON.stringify([{
-      title: QUICKNOTE_TITLE, pin: true, active: true,
-      instance: 'Tab', action: 'Tab',
-      children: { blockId, rootId: blockId, mode: 'wysiwyg', instance: 'Editor', action: ['cb-get-focus'] },
-    }]))
-    const url = window.location.protocol + '//' + window.location.host + '/stage/build/app/window.html?' + vPart + 'json=' + json
-
-    // ★ 根据开关动态构建 CSS：工具栏开时保留面包屑，关时隐藏
-    const toolbarOn = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteToolbarVisible !== false
-    const hideCSS = BASE_HIDE + (toolbarOn ? BREADCRUMB_SHOW : BREADCRUMB_HIDE) + DRAG_CSS
-    const hideJS = `(function(){
+function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string } {
+  const toolbarOn = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteToolbarVisible !== false
+  const hideCSS = BASE_HIDE + (toolbarOn ? BREADCRUMB_SHOW : BREADCRUMB_HIDE) + DRAG_CSS
+  return {
+    hideJS: `(function(){
       var s=document.createElement('style');s.textContent=${JSON.stringify(hideCSS)};document.head.appendChild(s);
       var d=document.createElement('div');d.id='qn-drag-handle';d.title='拖动窗口';document.body.appendChild(d);
-    })()`
-    const titleJS = `(function(){var t=${JSON.stringify(QUICKNOTE_TITLE)};document.title=t;Object.defineProperty(document,'title',{get:function(){return t},set:function(){return t}})})()`
-    // 接管关闭按钮：确保销毁 BrowserWindow（SiYuan 原生 × 可能只关 Tab 不关窗口）
-    // + 关闭前发送 closews 让内核清理 WebSocket 资源
-    const closeHookJS = `(function(){
+    })()`,
+    titleJS: `(function(){var t=${JSON.stringify(QUICKNOTE_TITLE)};document.title=t;Object.defineProperty(document,'title',{get:function(){return t},set:function(){return t}})})()`,
+    closeHookJS: `(function(){
       function forceClose(){
         try{
           var remote=require('@electron/remote');
@@ -127,21 +81,62 @@ function createOneWindow(blockId: string): boolean {
           }
         }catch(e){}
       });
-    })()`
+    })()`,
+    pollJS: `window.__qnPollTimer=setInterval(function(){var w=document.querySelector('.protyle-wysiwyg');var e=!w||(w.textContent||'').replace(/\\u200b/g,'').trim().length===0;try{localStorage.setItem('${BLOCK_EMPTY_KEY}',e?'1':'0')}catch(ex){}},500)`,
+  }
+}
 
-    win.webContents.on('dom-ready', () => { win.webContents.executeJavaScript(hideJS).catch(()=>{}) })
-    win.webContents.once('did-finish-load', () => {
-      win.webContents.executeJavaScript(hideJS).catch(()=>{})
-      win.webContents.executeJavaScript(titleJS).catch(()=>{})
-      win.webContents.executeJavaScript(closeHookJS).catch(()=>{})
-      // 轮询 Protyle 是否为空，写入 localStorage 供 closed 事件判断是否删草稿块
-      win.webContents.executeJavaScript(
-        `window.__qnPollTimer=setInterval(function(){var w=document.querySelector('.protyle-wysiwyg');var e=!w||(w.textContent||'').replace(/\\u200b/g,'').trim().length===0;try{localStorage.setItem('${BLOCK_EMPTY_KEY}',e?'1':'0')}catch(ex){}},500)`
-      ).catch(()=>{})
-      try { win.setTitle(QUICKNOTE_TITLE) } catch {}
-      win.show(); win.focus()
+function _injectScripts(win: any, scripts: { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string }, show: boolean): void {
+  win.webContents.executeJavaScript(scripts.hideJS).catch(()=>{})
+  win.webContents.executeJavaScript(scripts.titleJS).catch(()=>{})
+  win.webContents.executeJavaScript(scripts.closeHookJS).catch(()=>{})
+  win.webContents.executeJavaScript(scripts.pollJS).catch(()=>{})
+  try { win.setTitle(QUICKNOTE_TITLE) } catch {}
+  if (show) { win.show(); win.focus() }
+}
+
+export function resolveSaveTarget(isFromButton: boolean): QuickNoteSaveTarget {
+  const g: any = pluginInstance?.mobileFeatureConfig ?? {}
+  const t: any = (window as any).__pluginInstance?.mobileFeatureConfig
+  const cfg = (isFromButton && t) ? t : g
+  return { saveType: cfg?.quickNoteSaveType || 'daily', notebookId: cfg?.quickNoteNotebookId || '', documentId: cfg?.quickNoteDocumentId || '', insertPosition: cfg?.quickNoteInsertPosition || 'bottom' }
+}
+
+function createOneWindow(blockId: string): boolean {
+  // 销毁所有同标题旧窗口
+  try { const BW = getBW(), mainId = getMainId(); if (BW) { for (const w of (BW.getAllWindows?.() || [])) { try { if (!w || w.isDestroyed?.() || w.id === mainId) continue; if ((w.getTitle?.() || '') === QUICKNOTE_TITLE) w.destroy?.() } catch {} } } } catch {}
+  _clearDraftTracking()
+
+  const BW = getBW()
+  if (!BW) { showMessage('无法创建窗口', 3000, 'error'); return false }
+  try {
+    const bounds = getBounds()
+    const win = new BW({
+      show: false, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height,
+      minWidth: 300, minHeight: 200, alwaysOnTop: true,
+      frame: false,
+      title: QUICKNOTE_TITLE, webPreferences: { contextIsolation: false, nodeIntegration: true },
     })
-    win.loadURL(url)
+    qnWinId = win.id
+    _currentDraftBlockId = blockId
+    try { localStorage.removeItem(BLOCK_EMPTY_KEY) } catch {}
+
+    win.on('close', () => { if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null } if (_saveBoundsTimer) { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = null } saveBounds(win) })
+    win.on('resize', () => saveBoundsThrottled(win))
+    win.on('move', () => saveBoundsThrottled(win))
+    win.on('closed', () => {
+      const closingBlockId = _currentDraftBlockId
+      _currentDraftBlockId = null
+      if (qnWinId === win.id) qnWinId = null
+      let isEmpty = true
+      try { isEmpty = localStorage.getItem(BLOCK_EMPTY_KEY) !== '0'; localStorage.removeItem(BLOCK_EMPTY_KEY) } catch {}
+      if (isEmpty && closingBlockId) { deleteQuickNoteDraftBlock(closingBlockId).catch(() => {}) }
+    })
+
+    const scripts = _getInjectionScripts()
+    win.webContents.on('dom-ready', () => { win.webContents.executeJavaScript(scripts.hideJS).catch(()=>{}) })
+    win.webContents.once('did-finish-load', () => _injectScripts(win, scripts, true))
+    win.loadURL(_buildBlockUrl(blockId))
     return true
   } catch (e) { showMessage('创建窗口失败', 3000, 'error'); return false }
 }
@@ -151,9 +146,49 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
   const mainId = getMainId()
   let found = false
   for (const w of (BW.getAllWindows?.() || [])) {
-    try { if (!w || w.isDestroyed?.() || w.id === mainId) continue; if (w.id !== qnWinId) continue; found = true; if (typeof w.isVisible === 'function' && w.isVisible()) { w.hide(); return true } w.show(); w.focus(); return true } catch {}
+    try { if (!w || w.isDestroyed?.() || w.id === mainId) continue; if (w.id !== qnWinId) continue; found = true;
+      if (typeof w.isVisible === 'function' && w.isVisible()) {
+        // 隐藏窗口，X 秒后清空内容换新块（窗口不销毁，旧块保留为笔记）
+        w.hide()
+        if (_hideTimer) clearTimeout(_hideTimer)
+        const delay = ((pluginInstance?.desktopFeatureConfig as any)?.quickNoteBlockAutoCleanup ?? 5) * 1000
+        _hideTimer = setTimeout(async () => {
+          _hideTimer = null
+          const target = resolveSaveTarget(false)
+          const newId = await createQuickNoteDraftBlock(target)
+          if (!newId) return
+          _currentDraftBlockId = newId
+          try { localStorage.removeItem(BLOCK_EMPTY_KEY) } catch {}
+          // 拿新块 HTML 直接注入 Protyle，不重载页面
+          try {
+            const resp = await fetchSyncPost('/api/filetree/getDoc', { id: newId, mode: 0, size: 102400 })
+            if (resp?.code === 0 && resp?.data?.content) {
+              const html = JSON.stringify(resp.data.content)
+              w.webContents.executeJavaScript(`
+                (function(){
+                  var w=document.querySelector('.protyle-wysiwyg');
+                  if(!w)return;
+                  w.innerHTML=${html};
+                  try{
+                    var tabs=window.siyuan&&window.siyuan.layout&&window.siyuan.layout.center&&window.siyuan.layout.center.tabs;
+                    if(tabs)for(var i=0;i<tabs.length;i++){
+                      var p=tabs[i].model&&tabs[i].model.editor&&tabs[i].model.editor.protyle;
+                      if(p){p.block.id='${newId}';p.block.rootID='${newId}';break}
+                    }
+                  }catch(e){}
+                })()
+              `).catch(()=>{})
+            }
+          } catch {}
+        }, delay)
+        return true
+      }
+      // 还没到 5 秒又摁了快捷键：取消清理，恢复编辑
+      if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null }
+      w.show(); w.focus(); return true
+    } catch {}
   }
-  // 找不到窗口（用户通过关闭按钮关闭了旧窗口）：清理残留的跟踪变量
+  // 找不到窗口：清理跟踪，创建新窗口
   if (!found) {
     qnWinId = null
     _clearDraftTracking()
@@ -177,6 +212,7 @@ export function destroyDesktopQuickNoteBlockWindow(): void {
     deleteQuickNoteDraftBlock(draftToDelete).catch(() => {})
   }
   if (_saveBoundsTimer) { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = null }
+  if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null }
 }
 
 export function shouldUseDesktopQuickNoteBlockWindow(isFromButton = false): boolean {

@@ -191,6 +191,7 @@ export default class ToolbarCustomizer extends Plugin {
     quickNoteToolbarVisible: true, // 电脑端：记事弹窗开关工具栏
     quickNoteInputFormat: 'plain' as 'plain' | 'block', // 电脑端：一键记事输入格式（独立于手机端）
     quickNoteBlockWindowPersist: false, // 块格式弹窗后台常驻：默认关闭
+    quickNoteBlockAutoCleanup: 5,  // 块格式弹窗隐藏后 X 秒自动清理草稿块（0=不自动清理）
   }
 
   // 手机端小功能配置

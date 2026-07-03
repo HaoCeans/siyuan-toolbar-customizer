@@ -86,13 +86,6 @@ export function patchQuickNoteProtyleResize(editor: Protyle): void {
   }
 }
 
-function isForeignDocumentInjection(wysiwyg: HTMLElement, rootBlockId: string): boolean {
-  const top = getLiveWysiwygTopBlocks(wysiwyg)
-  if (top.length >= FOREIGN_BLOCK_THRESHOLD) return true
-  if (top.length <= 1) return false
-  return !wysiwyg.querySelector(`div[data-node-id="${rootBlockId}"]`)
-}
-
 export function sealSingleBlockProtyle(
   editor: Protyle,
   rootBlockId: string,
@@ -198,12 +191,16 @@ export function installKernelProtyleGuards(
       void (async () => {
         scheduled = false
         const wysiwyg = editor.protyle.wysiwyg.element
-        if (!isForeignDocumentInjection(wysiwyg, state.rootBlockId)) {
+        // 仅当块数异常多（≥12）才认为是外部文档注入，需要干预
+        // data-node-id 在编辑中可能被 Protyle 重新分配，不能用它判断是否"外来"
+        const tops = getLiveWysiwygTopBlocks(wysiwyg)
+        if (tops.length < FOREIGN_BLOCK_THRESHOLD) {
           clampQuickNoteContentScroll(editor)
           return
         }
-        sealSingleBlockProtyle(editor, state.rootBlockId, state.docRootId)
-        if (isForeignDocumentInjection(wysiwyg, state.rootBlockId)) {
+        sealSingleBlockProtyle(editor, state.rootBlockId, state.docRootId, { pruneSiblings: false })
+        const tops2 = getLiveWysiwygTopBlocks(wysiwyg)
+        if (tops2.length >= FOREIGN_BLOCK_THRESHOLD) {
           await reloadBlock()
         }
       })()

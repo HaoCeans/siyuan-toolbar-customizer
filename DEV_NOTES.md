@@ -54,6 +54,16 @@ HIDE_CSS 常量：
 - 后台常驻（close→hide） - `@electron/remote` 代理失效导致窗口叠加
 - 预创建 - 与 toggle 竞态创建多个窗口
 
+**快捷键隐藏后自动清理方案**：
+
+- 窗口**不销毁**，进程常驻。隐藏后 X 秒（可配置 `desktopFeatureConfig.quickNoteBlockAutoCleanup`，默认 5 秒，0=不清理）自动执行：
+  1. `createQuickNoteDraftBlock` 创建新空草稿块（旧块不删，WebSocket 已把内容同步到内核，旧块即用户笔记）
+  2. `fetchSyncPost('/api/filetree/getDoc')` 拿新块 HTML
+  3. `executeJavaScript` 把 `.protyle-wysiwyg` 的 `innerHTML` 替换为新块内容，同时更新 Protyle 内部 `block.id` / `block.rootID`
+- 为何不 `win.loadURL` 重载：重载时 `window.html` 可能恢复标签状态导致加载整个文档而非单块
+- 为何不 `win.destroy` 重建：销毁重建需起新渲染进程，打开慢（~1s）；替换内容毫秒级
+- 5 秒内再摁快捷键 → 取消定时器 → `w.show()` 恢复编辑
+
 ---
 
 ## 手机端顶部工具栏 → #status 上漂问题

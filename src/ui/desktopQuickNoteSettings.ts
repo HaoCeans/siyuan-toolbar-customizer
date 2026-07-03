@@ -297,11 +297,46 @@ export function createDesktopQuickNoteSettingsSection(
     ),
   )
 
+  // 块格式弹窗自动清理时间
+  box.appendChild(createSubTitle('⑤块格式弹窗自动清理'))
+  const cleanupHint = createHint(
+    '快捷键隐藏块格式弹窗后，等待 X 秒自动删除草稿块并销毁窗口。设为 0 则不自动清理（隐藏后一直保留）。内容在编辑时已通过 WebSocket 实时写入，不用担心丢失。',
+  )
+  cleanupHint.style.padding = '8px 10px'
+  cleanupHint.style.background = 'rgba(255,255,255,0.35)'
+  cleanupHint.style.borderRadius = '6px'
+  box.appendChild(cleanupHint)
+
+  const cleanupRow = document.createElement('div')
+  cleanupRow.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 4px 0;'
+  const cleanupLabel = document.createElement('span')
+  cleanupLabel.textContent = '自动清理时间：'
+  cleanupLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
+  const cleanupInput = document.createElement('input')
+  cleanupInput.type = 'number'
+  cleanupInput.min = '0'
+  cleanupInput.max = '120'
+  cleanupInput.value = String(desktopCfg.quickNoteBlockAutoCleanup ?? 5)
+  cleanupInput.style.cssText = 'width: 60px; padding: 4px 8px; border: 1px solid var(--b3-border-color); border-radius: 4px; font-size: 13px; text-align: center;'
+  const cleanupUnit = document.createElement('span')
+  cleanupUnit.textContent = '秒（0 = 不自动清理）'
+  cleanupUnit.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light);'
+  cleanupInput.onchange = async () => {
+    const v = Math.max(0, Math.min(120, parseInt(cleanupInput.value) || 5))
+    cleanupInput.value = String(v)
+    ;(desktopCfg as any).quickNoteBlockAutoCleanup = v
+    await context.saveDesktopConfig()
+  }
+  cleanupRow.appendChild(cleanupLabel)
+  cleanupRow.appendChild(cleanupInput)
+  cleanupRow.appendChild(cleanupUnit)
+  box.appendChild(cleanupRow)
+
   const divider = document.createElement('div')
   divider.style.cssText = 'height: 1px; background: rgba(59, 130, 246, 0.2); margin: 4px 0;'
   box.appendChild(divider)
 
-  box.appendChild(createSubTitle('⑤全局快捷键（独立悬浮窗）'))
+  box.appendChild(createSubTitle('⑥全局快捷键（独立悬浮窗）'))
   const captureHint = createHint(
     '默认 Alt+Shift+N，可在思源「设置 → 快捷键 → 插件」修改；再按一次关闭。思源需保持运行（可最小化到托盘）。',
   )

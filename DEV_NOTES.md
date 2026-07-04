@@ -64,6 +64,40 @@ HIDE_CSS 常量：
 - 为何不 `win.destroy` 重建：销毁重建需起新渲染进程，打开慢（~1s）；替换内容毫秒级
 - 5 秒内再摁快捷键 → 取消定时器 → `w.show()` 恢复编辑
 
+**弹窗与主窗口焦点冲突（hash 路由机制）**：
+
+- **症状**：记事弹窗打开时，主窗口文档树点击今日日记，焦点被切到弹窗而非在主窗口打开日记。
+
+- **根因（Electron 主进程层）**：
+  1. 主窗口点击日记 → `openFileById()` 本地没匹配
+  2. → `ipcRenderer.invoke("siyuan-open-file", { rootID })` 发到 Electron 主进程
+  3. → 主进程 `BrowserWindow.getAllWindows().find(w => w.hash.split("\u200b").includes(rootID))`
+  4. → 弹窗的 hash 包含日记 rootID → 匹配 → `w.focus()` ❌
+
+  - hash 来源：`app/src/window/setHeader.ts:22`
+    ```typescript
+    hash += tab.model.editor.protyle.block.rootID + Constants.ZWSP;
+    ```
+    弹窗加载的 block 在数据库里 `root_id` = 日记文档 ID，所以 hash 里有日记 ID。
+
+- **修复（`quickNoteBlockWindow.ts` 的 `HASH_FIX_JS`）**：
+  ```javascript
+  // ① 覆盖 setModelsHash，思源写 hash 的唯一入口
+  window.setModelsHash = function() { window.location.hash = ''; };
+  // ② 200ms 轮询兜底，防止其他代码直接写 hash
+  setInterval(function() {
+    if (window.location.hash) window.location.hash = '';
+  }, 200);
+  ```
+
+- **试过的无效方案**：
+  | 方案 | 结果 |
+  |------|------|
+  | `rootId: fakeRootId`（假 ID） | 内核 API 返回真实 `root_id` 覆盖 |
+  | 草稿文档隔离（`__quicknote_draft__`） | 内核仍返回日记 rootID |
+  | Dialog + Protyle（同窗口） | 被拒，需要独立 BrowserWindow |
+  | `siyuan.layout.center.tabs` 中移除 tab | 不管用，路由在 Electron 主进程层 |
+
 ---
 
 ## 手机端顶部工具栏 → #status 上漂问题

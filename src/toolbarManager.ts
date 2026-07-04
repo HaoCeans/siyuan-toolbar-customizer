@@ -4694,13 +4694,24 @@ async function executeClearEmptyBlocks(): Promise<void> {
     }
   }
 
-  // 3. 无空块
+  // 3. 过滤掉记事弹窗正在使用的块
+  const qnBlockId = (window as any).__qn_block_id as string | undefined
+  if (qnBlockId) {
+    const before = emptyBlockIds.length
+    const filtered = emptyBlockIds.filter(id => id !== qnBlockId)
+    if (filtered.length < before) {
+      emptyBlockIds.length = 0
+      emptyBlockIds.push(...filtered)
+    }
+  }
+
+  // 4. 无空块
   if (emptyBlockIds.length === 0) {
     Notify.showSuccess('当前文档没有空块')
     return
   }
 
-  // 4. 确认删除
+  // 5. 确认删除
   const confirmed = await showConfirmDialog({
     title: '清理空块',
     message: `发现 ${emptyBlockIds.length} 个空块，是否删除？`,

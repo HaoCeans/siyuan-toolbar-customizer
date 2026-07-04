@@ -14,11 +14,15 @@ const DRAG_CSS = '#qn-drag-handle{position:fixed;top:0;left:0;width:50%;height:3
 const BLOCK_EMPTY_KEY = '__qn_block_empty'  // localStorage key：Protyle 是否为空
 let qnWinId: number | null = null
 let _currentDraftBlockId: string | null = null
+function _syncDraftBlockId(): void {
+  try { (window as any).__qn_block_id = _currentDraftBlockId } catch {}
+}
 let _hideTimer: ReturnType<typeof setTimeout> | null = null  // 隐藏后 5 秒自动清理
 let _saveBoundsTimer: ReturnType<typeof setTimeout> | null = null
 
 function getBW(): any { try { return (window as any).require?.('@electron/remote')?.BrowserWindow ?? null } catch { return null } }
 function getMainId(): number | null { try { return (window as any).require?.('@electron/remote')?.getCurrentWindow?.()?.id ?? null } catch { return null } }
+function focusMainWindow(): void { try { const m = getBW()?.fromId(getMainId()); if (m && !m.isDestroyed?.()) m.focus() } catch { /* ignore */ } }
 function loadBounds(): any { try { const r = localStorage.getItem(BOUNDS_KEY); return r ? JSON.parse(r) : null } catch { return null } }
 function saveBounds(win: any): void { try { if (!win || win.isDestroyed?.()) return; const b = win.getBounds?.(); if (b) localStorage.setItem(BOUNDS_KEY, JSON.stringify(b)) } catch {} }
 
@@ -34,6 +38,7 @@ function getBounds() {
 
 function _clearDraftTracking(): void {
   _currentDraftBlockId = null
+  _syncDraftBlockId()
 }
 
 function _buildBlockUrl(blockId: string): string {
@@ -46,6 +51,18 @@ function _buildBlockUrl(blockId: string): string {
   }]))
   return window.location.protocol + '//' + window.location.host + '/stage/build/app/window.html?' + vPart + 'json=' + json
 }
+
+// 清空 window.location.hash，防止 Electron 主进程通过 hash 中的 rootID
+// 把其他窗口的文档焦点路由到这个弹窗
+const HASH_FIX_JS = `(function(){
+  // 覆盖 setModelsHash（思源更新 hash 的入口）
+  var _orig = window.setModelsHash;
+  window.setModelsHash = function() { window.location.hash = ''; if (_orig) _orig.call(window) };
+  // 兜底轮询：万一有别的代码直接写 hash，200ms 内清掉
+  window.__qn_hashTimer = setInterval(function() {
+    if (window.location.hash) window.location.hash = '';
+  }, 200);
+})()`
 
 function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string } {
   const toolbarOn = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteToolbarVisible !== false
@@ -119,14 +136,24 @@ function createOneWindow(blockId: string): boolean {
     })
     qnWinId = win.id
     _currentDraftBlockId = blockId
+    _syncDraftBlockId()
     try { localStorage.removeItem(BLOCK_EMPTY_KEY) } catch {}
 
-    win.on('close', () => { if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null } if (_saveBoundsTimer) { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = null } saveBounds(win) })
+    win.on('close', () => {
+      if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null }
+      if (_saveBoundsTimer) { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = null }
+      win.webContents.executeJavaScript('clearInterval(window.__qn_hashTimer)').catch(()=>{})
+      saveBounds(win)
+    })
     win.on('resize', () => saveBoundsThrottled(win))
     win.on('move', () => saveBoundsThrottled(win))
     win.on('closed', () => {
+      // 先保存位置（win.destroy() 只触发 closed，不触发 close，必须在此保存）
+      if (_saveBoundsTimer) { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = null }
+      saveBounds(win)
       const closingBlockId = _currentDraftBlockId
       _currentDraftBlockId = null
+      _syncDraftBlockId()
       if (qnWinId === win.id) qnWinId = null
       let isEmpty = true
       try { isEmpty = localStorage.getItem(BLOCK_EMPTY_KEY) !== '0'; localStorage.removeItem(BLOCK_EMPTY_KEY) } catch {}
@@ -135,7 +162,11 @@ function createOneWindow(blockId: string): boolean {
 
     const scripts = _getInjectionScripts()
     win.webContents.on('dom-ready', () => { win.webContents.executeJavaScript(scripts.hideJS).catch(()=>{}) })
-    win.webContents.once('did-finish-load', () => _injectScripts(win, scripts, true))
+    win.webContents.once('did-finish-load', () => {
+      _injectScripts(win, scripts, true)
+      // 清空 hash，防止主进程通过 hash 把日记文档路由到弹窗
+      win.webContents.executeJavaScript(HASH_FIX_JS).catch(() => {})
+    })
     win.loadURL(_buildBlockUrl(blockId))
     return true
   } catch (e) { showMessage('创建窗口失败', 3000, 'error'); return false }
@@ -150,6 +181,7 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
       if (typeof w.isVisible === 'function' && w.isVisible()) {
         // 隐藏窗口，X 秒后清空内容换新块（窗口不销毁，旧块保留为笔记）
         w.hide()
+        focusMainWindow()
         if (_hideTimer) clearTimeout(_hideTimer)
         const delay = ((pluginInstance?.desktopFeatureConfig as any)?.quickNoteBlockAutoCleanup ?? 5) * 1000
         _hideTimer = setTimeout(async () => {
@@ -158,6 +190,7 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
           const newId = await createQuickNoteDraftBlock(target)
           if (!newId) return
           _currentDraftBlockId = newId
+          _syncDraftBlockId()
           try { localStorage.removeItem(BLOCK_EMPTY_KEY) } catch {}
           // 拿新块 HTML 直接注入 Protyle，不重载页面
           try {
@@ -173,7 +206,7 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
                     var tabs=window.siyuan&&window.siyuan.layout&&window.siyuan.layout.center&&window.siyuan.layout.center.tabs;
                     if(tabs)for(var i=0;i<tabs.length;i++){
                       var p=tabs[i].model&&tabs[i].model.editor&&tabs[i].model.editor.protyle;
-                      if(p){p.block.id='${newId}';p.block.rootID='${newId}';break}
+                      if(p){p.block.id='${newId}';p.block.rootID='__qn_${newId}';break}
                     }
                   }catch(e){}
                 })()
@@ -205,6 +238,7 @@ export function destroyDesktopQuickNoteBlockWindow(): void {
   // 先捕获草稿块 ID，再销毁窗口（防止 closed 事件异步执行时 _currentDraftBlockId 已被清空）
   const draftToDelete = _currentDraftBlockId
   _currentDraftBlockId = null
+  _syncDraftBlockId()
   try { const BW = getBW(), mainId = getMainId(); if (BW) { for (const w of (BW.getAllWindows?.() || [])) { try { if (!w || w.isDestroyed?.() || w.id === mainId) continue; if ((w.getTitle?.() || '') === QUICKNOTE_TITLE) w.destroy?.() } catch {} } } } catch {}
   qnWinId = null
   // 作为兜底：如果窗口 closed 事件中未删块，这里直接删（插件卸载时内容不重要）
@@ -213,6 +247,7 @@ export function destroyDesktopQuickNoteBlockWindow(): void {
   }
   if (_saveBoundsTimer) { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = null }
   if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null }
+  focusMainWindow()
 }
 
 export function shouldUseDesktopQuickNoteBlockWindow(isFromButton = false): boolean {

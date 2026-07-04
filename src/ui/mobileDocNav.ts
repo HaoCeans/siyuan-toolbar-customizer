@@ -46,7 +46,6 @@ let switchProtyleHandler: (() => void) | null = null
 let currentDocId: string | null = null
 let retryInitTimer: ReturnType<typeof setTimeout> | null = null
 let currentNotebookId: string | null = null
-let currentDocPath: string | null = null  // 当前文档的父目录路径
 
 let prevDoc: { id: string; title: string } | null = null
 let nextDoc: { id: string; title: string } | null = null
@@ -196,6 +195,46 @@ function restoreAfterKeyboard(): void {
   }
 }
 
+function attachKeyboardListeners(): void {
+  keyboardBaselineHeight = getViewportHeight()
+  vvResizeHandler = () => {
+    if (!isMobileDevice()) return
+    const vh = getViewportHeight()
+    if (keyboardBaselineHeight == null) keyboardBaselineHeight = vh
+    if (!isTextInputTarget(document.activeElement)) {
+      keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, vh)
+    }
+    const baseline = keyboardBaselineHeight || vh
+    const delta = baseline - vh
+    if (delta > 120 && isTextInputTarget(document.activeElement)) {
+      hideForKeyboard()
+    } else if (delta < 60) {
+      restoreAfterKeyboard()
+    }
+  }
+  window.visualViewport?.addEventListener('resize', vvResizeHandler)
+
+  focusInHandler = (e: FocusEvent) => {
+    if (!isMobileDevice()) return
+    if (isTextInputTarget(e.target as Element)) {
+      keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
+      hideForKeyboard()
+    }
+  }
+  focusOutHandler = (e: FocusEvent) => {
+    if (!isMobileDevice()) return
+    if (!isTextInputTarget(e.target as Element)) return
+    setTimeout(() => {
+      if (!isTextInputTarget(document.activeElement)) {
+        keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
+        restoreAfterKeyboard()
+      }
+    }, 200)
+  }
+  document.addEventListener('focusin', focusInHandler, true)
+  document.addEventListener('focusout', focusOutHandler, true)
+}
+
 function handleScrollAutoHide(): void {
   if (!state.isVisible) return
   if (!autoHideOnScrollEnabled) return
@@ -299,7 +338,7 @@ async function fetchAdjacentDocsByFiletree(
     const response: any = await fetchSyncPost('/api/filetree/listDocsByPath', {
       notebook: notebookId,
       path: parentPath,
-      sort: 15  // 文件树排序规则
+      sort: (window as any).siyuan?.config?.fileTree?.sort ?? 4  // 用用户文件树排序，默认自然数升序
     })
 
     if (response?.code === 0 && response?.data) {
@@ -312,8 +351,11 @@ async function fetchAdjacentDocsByFiletree(
         return { prev: null, next: null }
       }
 
-      const prevFile = idx > 0 ? files[idx - 1] : null
-      const nextFile = idx < files.length - 1 ? files[idx + 1] : null
+	      // API 返回的数组顺序与文件树 UI 视觉顺序相反：
+	      // files[0] 在文件树底部，files[last] 在文件树顶部
+	      // 因此 files[idx+1] 是视觉"上一篇"（上面），files[idx-1] 是视觉"下一篇"（下面）
+	      const prevFile = idx < files.length - 1 ? files[idx + 1] : null
+	      const nextFile = idx > 0 ? files[idx - 1] : null
 
       const result = {
         prev: prevFile ? { id: prevFile.id, title: prevFile.name || '未命名' } : null,
@@ -381,9 +423,8 @@ async function refreshAdjacentDocs(): Promise<void> {
   }
 
   currentNotebookId = docInfo.notebookId
-  currentDocPath = docInfo.parentPath
 
-  const result = await fetchAdjacentDocsByFiletree(currentNotebookId, currentDocPath, currentDocId)
+  const result = await fetchAdjacentDocsByFiletree(currentNotebookId, docInfo.parentPath, currentDocId)
   if (reqId !== refreshRequestId) { isLoading = false; return }
   prevDoc = result.prev
   nextDoc = result.next
@@ -397,12 +438,36 @@ async function navigateTo(direction: 'prev' | 'next'): Promise<boolean> {
   const target = direction === 'prev' ? prevDoc : nextDoc
   if (!target) return false
 
+  // 保存当前状态，以便失败时恢复
+  const savedPrev = prevDoc
+  const savedNext = nextDoc
+
+  // 立刻清掉 prev/next 让按钮变灰，防止 refreshAdjacentDocs 完成前连点跳着切
+  prevDoc = null
+  nextDoc = null
+  refreshRequestId++  // 作废正在跑的旧 refreshAdjacentDocs
+  updateNavButtons()
+
   try {
     await openMobileFileById(pluginInstance?.app, target.id)
+    // 主动刷新：不依赖 switch-protyle 事件（手机端可能延迟或不触发）
+    setTimeout(() => {
+      const protyle = (window as any).siyuan?.mobile?.editor?.protyle
+      if (protyle?.block?.rootID) {
+        if (protyle.block.rootID !== currentDocId) {
+          currentDocId = protyle.block.rootID
+        }
+      }
+      refreshAdjacentDocs()
+    }, 200)
     return true
   } catch (err) {
     console.error('[文档导航] 打开文档失败:', err)
     showMessage('打开文档失败', 3000, 'error')
+    // 恢复 prev/next，避免按钮永久禁用
+    prevDoc = savedPrev
+    nextDoc = savedNext
+    updateNavButtons()
     return false
   }
 }
@@ -426,14 +491,9 @@ async function handleSwitchProtyle(): Promise<void> {
   if (!docId || docId === currentDocId) return
 
   currentDocId = docId
-  currentDocPath = null
 
   if (state.isVisible && navBar) {
-    // 进入加载态，但不立刻清空 prev/next（避免按钮瞬间变灰造成闪烁）
-    isLoading = true
-    setTimeout(() => {
-      refreshAdjacentDocs()
-    }, 800)
+    refreshAdjacentDocs()
   }
 
   // 确保绑定到当前文档的真实滚动容器
@@ -593,6 +653,12 @@ async function loadState(): Promise<void> {
 export async function init(context: DocNavContext): Promise<void> {
   ctx = context
 
+  // 防御性清理：防止插件重载时遗留的定时器
+  if (retryInitTimer) {
+    clearTimeout(retryInitTimer)
+    retryInitTimer = null
+  }
+
   if (!themeModeUnsubscribe) {
     themeModeUnsubscribe = observeSiYuanThemeMode(() => {
       refreshDocNavFloatBackground()
@@ -642,47 +708,15 @@ export async function init(context: DocNavContext): Promise<void> {
 
   // 仅在可见状态下才注册交互监听，避免启动后无谓开销
   if (state.isVisible) {
+    if (switchProtyleHandler) {
+      context.eventBus.off('switch-protyle', switchProtyleHandler)
+      context.eventBus.off('loaded-protyle-dynamic', switchProtyleHandler)
+    }
     switchProtyleHandler = debouncedSwitchProtyle
     context.eventBus.on('switch-protyle', switchProtyleHandler)
     context.eventBus.on('loaded-protyle-dynamic', switchProtyleHandler)
 
-    keyboardBaselineHeight = getViewportHeight()
-    vvResizeHandler = () => {
-      if (!isMobileDevice()) return
-      const vh = getViewportHeight()
-      if (keyboardBaselineHeight == null) keyboardBaselineHeight = vh
-      if (!isTextInputTarget(document.activeElement)) {
-        keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, vh)
-      }
-      const baseline = keyboardBaselineHeight || vh
-      const delta = baseline - vh
-      if (delta > 120 && isTextInputTarget(document.activeElement)) {
-        hideForKeyboard()
-      } else if (delta < 60) {
-        restoreAfterKeyboard()
-      }
-    }
-    window.visualViewport?.addEventListener('resize', vvResizeHandler)
-
-    focusInHandler = (e: FocusEvent) => {
-      if (!isMobileDevice()) return
-      if (isTextInputTarget(e.target as Element)) {
-        keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
-        hideForKeyboard()
-      }
-    }
-    focusOutHandler = (e: FocusEvent) => {
-      if (!isMobileDevice()) return
-      if (!isTextInputTarget(e.target as Element)) return
-      setTimeout(() => {
-        if (!isTextInputTarget(document.activeElement)) {
-          keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
-          restoreAfterKeyboard()
-        }
-      }, 200)
-    }
-    document.addEventListener('focusin', focusInHandler, true)
-    document.addEventListener('focusout', focusOutHandler, true)
+    attachKeyboardListeners()
 
     // 向上滚动消失、下滑出现（仅当按钮开关开启时才启用）
     ensureScrollListenerBound()
@@ -707,7 +741,6 @@ export function toggleVisibility(config: ButtonConfig): void {
 
     const protyle = (window as any).siyuan?.mobile?.editor?.protyle
     if (protyle?.block?.rootID) currentDocId = protyle.block.rootID
-    currentDocPath = null
     prevDoc = null
     nextDoc = null
 
@@ -722,44 +755,7 @@ export function toggleVisibility(config: ButtonConfig): void {
       ctx?.eventBus.on('loaded-protyle-dynamic', switchProtyleHandler)
     }
     if (!vvResizeHandler) {
-      keyboardBaselineHeight = getViewportHeight()
-      vvResizeHandler = () => {
-        if (!isMobileDevice()) return
-        const vh = getViewportHeight()
-        if (keyboardBaselineHeight == null) keyboardBaselineHeight = vh
-        if (!isTextInputTarget(document.activeElement)) {
-          keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, vh)
-        }
-        const baseline = keyboardBaselineHeight || vh
-        const delta = baseline - vh
-        if (delta > 120 && isTextInputTarget(document.activeElement)) {
-          hideForKeyboard()
-        } else if (delta < 60) {
-          restoreAfterKeyboard()
-        }
-      }
-      window.visualViewport?.addEventListener('resize', vvResizeHandler)
-    }
-    if (!focusInHandler) {
-      focusInHandler = (e: FocusEvent) => {
-        if (!isMobileDevice()) return
-        if (isTextInputTarget(e.target as Element)) {
-          keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
-          hideForKeyboard()
-        }
-      }
-      focusOutHandler = (e: FocusEvent) => {
-        if (!isMobileDevice()) return
-        if (!isTextInputTarget(e.target as Element)) return
-        setTimeout(() => {
-          if (!isTextInputTarget(document.activeElement)) {
-            keyboardBaselineHeight = Math.max(keyboardBaselineHeight || 0, getViewportHeight())
-            restoreAfterKeyboard()
-          }
-        }, 200)
-      }
-      document.addEventListener('focusin', focusInHandler, true)
-      document.addEventListener('focusout', focusOutHandler, true)
+      attachKeyboardListeners()
     }
 
     if (config.showNotification !== false) showMessage('文档导航已显示', 1500, 'info')
@@ -772,6 +768,7 @@ export function toggleVisibility(config: ButtonConfig): void {
       ctx.eventBus.off('loaded-protyle-dynamic', switchProtyleHandler)
       switchProtyleHandler = null
     }
+    debouncedSwitchProtyle.cancel()
     if (vvResizeHandler) {
       window.visualViewport?.removeEventListener('resize', vvResizeHandler)
       vvResizeHandler = null
@@ -789,7 +786,6 @@ export function toggleVisibility(config: ButtonConfig): void {
     // 清空状态
     currentDocId = null
     currentNotebookId = null
-    currentDocPath = null
     prevDoc = null
     nextDoc = null
     hiddenByKeyboard = false
@@ -847,7 +843,6 @@ export function cleanup(): void {
   state = { isVisible: false }
   currentDocId = null
   currentNotebookId = null
-  currentDocPath = null
   prevDoc = null
   nextDoc = null
   isLoading = false

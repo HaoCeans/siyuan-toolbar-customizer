@@ -5,13 +5,10 @@
 import { Dialog, Protyle, ProtyleMethod, showMessage, fetchSyncPost } from 'siyuan'
 import type { QuickNoteSaveTarget } from './kernelBlock'
 import { createQuickNoteDraftBlock, deleteQuickNoteDraftBlock } from './kernelBlock'
-import { type QuickNoteRootState, createQuickNoteRootState } from './popoverBlocks'
 
 // ===== 模块级单例 =====
 let dialog: Dialog | null = null
 let protyle: Protyle | null = null
-let blockState: QuickNoteRootState | null = null
-let currentBlockId: string | null = null
 const TAG = '[QN-BlockDialog]'
 
 function log(msg: string, ...args: any[]): void {
@@ -89,8 +86,6 @@ async function open(app: any, target: QuickNoteSaveTarget): Promise<boolean> {
     }
 
     createProtyle(app, blockId, html)
-    currentBlockId = blockId
-    blockState = createQuickNoteRootState(blockId)
     t.end()
   } else {
     log('♻️ 复用已有 Protyle，跳过重建')
@@ -126,8 +121,6 @@ export async function toggleBlockDialog(app: any, target: QuickNoteSaveTarget): 
 export function destroyBlockDialog(): void {
   if (dialog) { try { dialog.destroy() } catch {}; dialog = null }
   protyle = null
-  blockState = null
-  currentBlockId = null
 }
 
 export function isBlockDialogVisible(): boolean {

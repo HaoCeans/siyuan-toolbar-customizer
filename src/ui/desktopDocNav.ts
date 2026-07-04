@@ -40,8 +40,6 @@ let switchProtyleHandler: (() => void) | null = null
 let dragCleanup: (() => void) | null = null
 let themeModeUnsubscribe: (() => void) | null = null
 
-let currentDocId: string | null = null
-let currentNotebookId: string | null = null
 let prevDoc: { id: string; title: string } | null = null
 let nextDoc: { id: string; title: string } | null = null
 let isLoading = false
@@ -93,30 +91,32 @@ async function fetchAdjacentDocs(): Promise<void> {
     if (!docInfo?.notebookId) {
       prevDoc = null
       nextDoc = null
-      return
-    }
+    } else {
+      const response: any = await fetchSyncPost('/api/filetree/listDocsByPath', {
+        notebook: docInfo.notebookId,
+        path: docInfo.parentPath,
+        sort: (window as any).siyuan?.config?.fileTree?.sort ?? 4
+      })
 
-    const response: any = await fetchSyncPost('/api/filetree/listDocsByPath', {
-      notebook: docInfo.notebookId,
-      path: docInfo.parentPath,
-      sort: 15
-    })
+	      if (response?.code === 0 && response?.data) {
+	        const files: FiletreeDoc[] = response.data.files || []
+	        const idx = files.findIndex(f => f.id === docId)
 
-    if (response?.code === 0 && response?.data) {
-      const files: FiletreeDoc[] = response.data.files || []
-      const idx = files.findIndex(f => f.id === docId)
+	        // API 返回的数组顺序与文件树 UI 视觉顺序相反：
+	        // files[0] 在文件树底部，files[last] 在文件树顶部
+	        // 因此 files[idx+1] 是视觉"上一篇"（上面），files[idx-1] 是视觉"下一篇"（下面）
+	        if (idx >= 0 && idx < files.length - 1) {
+	          prevDoc = { id: files[idx + 1].id, title: files[idx + 1].name || '未命名' }
+	        } else {
+	          prevDoc = null
+	        }
 
-      if (idx > 0) {
-        prevDoc = { id: files[idx - 1].id, title: files[idx - 1].name || '未命名' }
-      } else {
-        prevDoc = null
-      }
-
-      if (idx >= 0 && idx < files.length - 1) {
-        nextDoc = { id: files[idx + 1].id, title: files[idx + 1].name || '未命名' }
-      } else {
-        nextDoc = null
-      }
+	        if (idx > 0) {
+	          nextDoc = { id: files[idx - 1].id, title: files[idx - 1].name || '未命名' }
+	        } else {
+	          nextDoc = null
+	        }
+	      }
     }
   } catch (err) {
     console.warn('[DesktopDocNav] 获取相邻文档失败:', err)
@@ -133,6 +133,11 @@ async function navigateTo(direction: 'prev' | 'next'): Promise<boolean> {
   const target = direction === 'prev' ? prevDoc : nextDoc
   if (!target) return false
 
+  // 立刻清掉 prev/next 防止连点
+  prevDoc = null
+  nextDoc = null
+  updateNavButtons()
+
   try {
     await siyuanOpenTab({
       app: pluginInstance?.app,
@@ -140,10 +145,14 @@ async function navigateTo(direction: 'prev' | 'next'): Promise<boolean> {
         id: target.id
       }
     })
+    // 主动刷新：不依赖 switch-protyle 事件（可能延迟或不触发）
+    setTimeout(() => fetchAdjacentDocs(), 200)
     return true
   } catch (err) {
     console.error('[DesktopDocNav] 打开文档失败:', err)
     showMessage('打开文档失败', 3000, 'error')
+    // 恢复 prev/next 状态
+    fetchAdjacentDocs()
     return false
   }
 }
@@ -156,6 +165,20 @@ async function navigateTo(direction: 'prev' | 'next'): Promise<boolean> {
 export async function navigateToAdjacentDoc(direction: 'prev' | 'next'): Promise<boolean> {
   await fetchAdjacentDocs()
   return navigateTo(direction)
+}
+
+// ===== Switch-protyle handler 工厂 =====
+/** 创建带防抖的文档切换处理器，每次调用返回新闭包，需先 off 旧引用再 on */
+function createSwitchProtyleHandler(): () => void {
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  return () => {
+    if (!state.isVisible) return
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      fetchAdjacentDocs()
+    }, 300)
+  }
 }
 
 // ===== DOM 构建 =====
@@ -333,6 +356,9 @@ async function loadState(): Promise<void> {
 
 // ===== 公开 API =====
 export async function init(context: DocNavContext): Promise<void> {
+  // 悬浮弹窗中不显示（块格式记事窗、纯文本悬浮窗等）
+  if (location.href.includes('window.html') || location.href.startsWith('data:text/html')) return
+
   ctx = context
 
   if (!themeModeUnsubscribe) {
@@ -348,17 +374,24 @@ export async function init(context: DocNavContext): Promise<void> {
     applyFloatPanelBackground(navBar, undefined, 0.85)
   }
 
-  // 监听文档切换事件
-  switchProtyleHandler = () => {
-    if (state.isVisible) {
-      fetchAdjacentDocs()
-    }
+  // 监听文档切换事件（300ms 防抖，避免快速切标签时大量 API）
+  // 先移除旧的 handler（防止 init 重入泄漏），再创建新的
+  if (switchProtyleHandler) {
+    context.eventBus.off('switch-protyle', switchProtyleHandler)
+    context.eventBus.off('loaded-protyle-dynamic', switchProtyleHandler)
   }
+  switchProtyleHandler = createSwitchProtyleHandler()
   context.eventBus.on('switch-protyle', switchProtyleHandler)
   context.eventBus.on('loaded-protyle-dynamic', switchProtyleHandler)
 }
 
 export function toggleVisibility(config: ButtonConfig): void {
+  // 悬浮弹窗 / 独立窗口中不显示
+  if (location.href.includes('window.html') || location.href.startsWith('data:text/html')) {
+    showMessage('此功能仅支持主窗口', 1500, 'info')
+    return
+  }
+
   // 只在桌面端运行
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
   if (isMobile) {
@@ -371,12 +404,27 @@ export function toggleVisibility(config: ButtonConfig): void {
   if (state.isVisible) {
     createNavBar()
     applyFloatPanelBackground(navBar, config.floatOpacity, 0.85)
+    // 注册 EventBus 监听（先 off 旧再 on 新，处理 init 时 handler 为空的情况）
+    if (ctx) {
+      if (switchProtyleHandler) {
+        ctx.eventBus.off('switch-protyle', switchProtyleHandler)
+        ctx.eventBus.off('loaded-protyle-dynamic', switchProtyleHandler)
+      }
+      switchProtyleHandler = createSwitchProtyleHandler()
+      ctx.eventBus.on('switch-protyle', switchProtyleHandler)
+      ctx.eventBus.on('loaded-protyle-dynamic', switchProtyleHandler)
+    }
 
     if (config.showNotification !== false) {
       showMessage('文档导航已显示', 1500, 'info')
     }
   } else {
     removeNavBar()
+    // 隐藏时移除 EventBus 监听，避免后台无效触发
+    if (ctx && switchProtyleHandler) {
+      ctx.eventBus.off('switch-protyle', switchProtyleHandler)
+      ctx.eventBus.off('loaded-protyle-dynamic', switchProtyleHandler)
+    }
 
     if (config.showNotification !== false) {
       showMessage('文档导航已隐藏', 1500, 'info')
@@ -400,6 +448,9 @@ export function cleanup(): void {
     themeModeUnsubscribe = null
   }
 
+  prevDoc = null
+  nextDoc = null
+  isLoading = false
   ctx = null
   state = { isVisible: false }
 }

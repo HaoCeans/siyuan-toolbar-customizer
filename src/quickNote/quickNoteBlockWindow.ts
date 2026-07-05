@@ -22,7 +22,7 @@ let _saveBoundsTimer: ReturnType<typeof setTimeout> | null = null
 
 function getBW(): any { try { return (window as any).require?.('@electron/remote')?.BrowserWindow ?? null } catch { return null } }
 function getMainId(): number | null { try { return (window as any).require?.('@electron/remote')?.getCurrentWindow?.()?.id ?? null } catch { return null } }
-function focusMainWindow(): void { try { const m = getBW()?.fromId(getMainId()); if (m && !m.isDestroyed?.()) m.focus() } catch { /* ignore */ } }
+function focusMainWindow(): void { try { const m = getBW()?.fromId(getMainId()); if (m && !m.isDestroyed?.() && !m.isMinimized?.()) m.focus() } catch { /* ignore */ } }
 function loadBounds(): any { try { const r = localStorage.getItem(BOUNDS_KEY); return r ? JSON.parse(r) : null } catch { return null } }
 function saveBounds(win: any): void { try { if (!win || win.isDestroyed?.()) return; const b = win.getBounds?.(); if (b) localStorage.setItem(BOUNDS_KEY, JSON.stringify(b)) } catch {} }
 
@@ -178,8 +178,13 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
   let found = false
   for (const w of (BW.getAllWindows?.() || [])) {
     try { if (!w || w.isDestroyed?.() || w.id === mainId) continue; if (w.id !== qnWinId) continue; found = true;
-      if (typeof w.isVisible === 'function' && w.isVisible()) {
-        // 隐藏窗口，X 秒后清空内容换新块（窗口不销毁，旧块保留为笔记）
+	      if (typeof w.isVisible === 'function' && w.isVisible()) {
+	        // 弹窗在后台（被其他窗口挡住）→ 拉到前台，不隐藏
+	        if (typeof w.isFocused === 'function' && !w.isFocused()) {
+	          w.focus()
+	          return true
+	        }
+	        // 弹窗在前台 → 隐藏
         w.hide()
         focusMainWindow()
         if (_hideTimer) clearTimeout(_hideTimer)

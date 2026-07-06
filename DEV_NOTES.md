@@ -64,39 +64,52 @@ HIDE_CSS 常量：
 - 为何不 `win.destroy` 重建：销毁重建需起新渲染进程，打开慢（~1s）；替换内容毫秒级
 - 5 秒内再摁快捷键 → 取消定时器 → `w.show()` 恢复编辑
 
-**弹窗与主窗口焦点冲突（hash 路由机制）**：
+**弹窗与主窗口焦点冲突（hash 路由 + 僵尸窗口）**：
 
-- **症状**：记事弹窗打开时，主窗口文档树点击今日日记，焦点被切到弹窗而非在主窗口打开日记。
+- **症状**：一旦打开过记事弹窗，主窗口文档树点击日记文档完全无反应，只有重启思源才能恢复。
 
-- **根因（Electron 主进程层）**：
+- **根因（两层）**：
+
+  ① **hash 路由**（Electron 主进程层）：
   1. 主窗口点击日记 → `openFileById()` 本地没匹配
   2. → `ipcRenderer.invoke("siyuan-open-file", { rootID })` 发到 Electron 主进程
   3. → 主进程 `BrowserWindow.getAllWindows().find(w => w.hash.split("\u200b").includes(rootID))`
-  4. → 弹窗的 hash 包含日记 rootID → 匹配 → `w.focus()` ❌
+  4. 弹窗加载的 block 在数据库里 `root_id` = 日记文档 ID，所以 hash 里有日记 ID
+  5. → 匹配 → `w.focus()` 切到弹窗 ❌
 
-  - hash 来源：`app/src/window/setHeader.ts:22`
-    ```typescript
-    hash += tab.model.editor.protyle.block.rootID + Constants.ZWSP;
-    ```
-    弹窗加载的 block 在数据库里 `root_id` = 日记文档 ID，所以 hash 里有日记 ID。
+  ② **僵尸窗口累积**（主因）：
+  - 每次打开记事弹窗创建 BrowserWindow，关闭时用 `getTitle() === '⚡ 快捷记事'` 匹配销毁
+  - 但思源会覆盖窗口标题为 `日期） - 工作空间 - 思源笔记`，`getTitle()` 永远匹配不上
+  - 旧窗口从未被销毁，hash 里仍带着日记 ID
+  - 主进程遍历所有窗口时匹配到僵尸窗口 → 日记永远打不开
 
-- **修复（`quickNoteBlockWindow.ts` 的 `HASH_FIX_JS`）**：
+- **最终修复**（`quickNoteBlockWindow.ts`）：
+
+  ① **hash 拦截**（`HASH_FIX_JS`）：
+  - `window.setModelsHash` 不存在（`typeof=undefined`），hash 是直接写 `location.hash` 的
+  - 改为 `Object.defineProperty` 拦截 `window.location.hash` 的 setter，所有写入都变空字符串
+  - 50ms 轮询兜底
   ```javascript
-  // ① 覆盖 setModelsHash，思源写 hash 的唯一入口
-  window.setModelsHash = function() { window.location.hash = ''; };
-  // ② 200ms 轮询兜底，防止其他代码直接写 hash
-  setInterval(function() {
-    if (window.location.hash) window.location.hash = '';
-  }, 200);
+  var desc = Object.getOwnPropertyDescriptor(window.location.__proto__, 'hash');
+  Object.defineProperty(window.location, 'hash', {
+    get: desc.get,
+    set: function(v) { desc.set.call(this, ''); }  // 永远写空
+  });
   ```
+
+  ② **僵尸窗口清理**（`destroyAllBlockWindows()`）：
+  - 创建窗口时打标记 `win.__qn_block_window = true`
+  - 清理时遍历所有窗口，检查 `__qn_block_window` 标记 → 销毁
+  - 插件启动时（`onLayoutReady`）调用一次，清理上次残留的僵尸窗口
 
 - **试过的无效方案**：
   | 方案 | 结果 |
   |------|------|
   | `rootId: fakeRootId`（假 ID） | 内核 API 返回真实 `root_id` 覆盖 |
-  | 草稿文档隔离（`__quicknote_draft__`） | 内核仍返回日记 rootID |
-  | Dialog + Protyle（同窗口） | 被拒，需要独立 BrowserWindow |
-  | `siyuan.layout.center.tabs` 中移除 tab | 不管用，路由在 Electron 主进程层 |
+  | 覆盖 `window.setModelsHash` | 该函数不存在（`typeof=undefined`），hash 是直接写的 |
+  | 200ms 轮询清空 hash | 有空窗期，且根本问题是僵尸窗口 |
+  | `getTitle()` 匹配销毁旧窗口 | 思源覆盖了窗口标题，永远匹配不上 |
+  | Dialog + Protyle（同窗口） | 需要独立 BrowserWindow（副屏、拖拽等） |
 
 ---
 

@@ -23,6 +23,25 @@ let _saveBoundsTimer: ReturnType<typeof setTimeout> | null = null
 function getBW(): any { try { return (window as any).require?.('@electron/remote')?.BrowserWindow ?? null } catch { return null } }
 function getMainId(): number | null { try { return (window as any).require?.('@electron/remote')?.getCurrentWindow?.()?.id ?? null } catch { return null } }
 function focusMainWindow(): void { try { const m = getBW()?.fromId(getMainId()); if (m && !m.isDestroyed?.() && !m.isMinimized?.()) m.focus() } catch { /* ignore */ } }
+
+/** 销毁所有记事弹窗（通过窗口标记 __qn_block_window 匹配） */
+function destroyAllBlockWindows(): void {
+  try {
+    const BW = getBW(), mainId = getMainId()
+    if (!BW) return
+    for (const w of (BW.getAllWindows?.() || [])) {
+      try {
+        if (!w || w.isDestroyed?.() || w.id === mainId) continue
+        if ((w as any).__qn_block_window) w.destroy?.()
+      } catch { /* skip */ }
+    }
+  } catch { /* ignore */ }
+}
+
+/** 启动时清理残留的僵尸弹窗 */
+export function cleanupOrphanBlockWindows(): void {
+  destroyAllBlockWindows()
+}
 function loadBounds(): any { try { const r = localStorage.getItem(BOUNDS_KEY); return r ? JSON.parse(r) : null } catch { return null } }
 function saveBounds(win: any): void { try { if (!win || win.isDestroyed?.()) return; const b = win.getBounds?.(); if (b) localStorage.setItem(BOUNDS_KEY, JSON.stringify(b)) } catch {} }
 
@@ -55,13 +74,32 @@ function _buildBlockUrl(blockId: string): string {
 // 清空 window.location.hash，防止 Electron 主进程通过 hash 中的 rootID
 // 把其他窗口的文档焦点路由到这个弹窗
 const HASH_FIX_JS = `(function(){
-  // 覆盖 setModelsHash（思源更新 hash 的入口）
-  var _orig = window.setModelsHash;
-  window.setModelsHash = function() { window.location.hash = ''; if (_orig) _orig.call(window) };
-  // 兜底轮询：万一有别的代码直接写 hash，200ms 内清掉
+  // 直接拦截 location.hash 的 setter，不依赖 setModelsHash
+  try {
+    var proto = window.location.__proto__ || window.location.constructor.prototype;
+    var desc = Object.getOwnPropertyDescriptor(proto, 'hash');
+    if (desc && desc.set) {
+      var _origSet = desc.set;
+      Object.defineProperty(window.location, 'hash', {
+        get: desc.get || function() { return ''; },
+        set: function(v) {
+          // 只调原始 setter 完成副作用，但永远写空字符串
+          _origSet.call(this, '');
+        },
+        configurable: true
+      });
+      console.log('[QN-HASH] hash setter 拦截成功');
+    } else {
+      console.log('[QN-HASH] 无法获取hash descriptor, 降级到轮询');
+    }
+  } catch(e) {
+    console.log('[QN-HASH] hash setter 拦截失败:', e, ', 降级到轮询');
+  }
+
+  // 兜底：50ms 轮询（比之前200ms快，减少空窗期）
   window.__qn_hashTimer = setInterval(function() {
     if (window.location.hash) window.location.hash = '';
-  }, 200);
+  }, 50);
 })()`
 
 function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string } {
@@ -120,8 +158,8 @@ export function resolveSaveTarget(isFromButton: boolean): QuickNoteSaveTarget {
 }
 
 function createOneWindow(blockId: string): boolean {
-  // 销毁所有同标题旧窗口
-  try { const BW = getBW(), mainId = getMainId(); if (BW) { for (const w of (BW.getAllWindows?.() || [])) { try { if (!w || w.isDestroyed?.() || w.id === mainId) continue; if ((w.getTitle?.() || '') === QUICKNOTE_TITLE) w.destroy?.() } catch {} } } } catch {}
+  // 销毁所有旧记事弹窗（匹配URL中的 ⚡ 标记）
+  destroyAllBlockWindows()
   _clearDraftTracking()
 
   const BW = getBW()
@@ -135,6 +173,7 @@ function createOneWindow(blockId: string): boolean {
       title: QUICKNOTE_TITLE, webPreferences: { contextIsolation: false, nodeIntegration: true },
     })
     qnWinId = win.id
+    ;(win as any).__qn_block_window = true
     _currentDraftBlockId = blockId
     _syncDraftBlockId()
     try { localStorage.removeItem(BLOCK_EMPTY_KEY) } catch {}
@@ -165,7 +204,12 @@ function createOneWindow(blockId: string): boolean {
     win.webContents.once('did-finish-load', () => {
       _injectScripts(win, scripts, true)
       // 清空 hash，防止主进程通过 hash 把日记文档路由到弹窗
-      win.webContents.executeJavaScript(HASH_FIX_JS).catch(() => {})
+      console.log('[QN-HASH] Node侧: did-finish-load 触发, 准备注入 HASH_FIX_JS')
+      win.webContents.executeJavaScript(HASH_FIX_JS).then(() => {
+        console.log('[QN-HASH] Node侧: HASH_FIX_JS 注入成功')
+      }).catch((e: any) => {
+        console.error('[QN-HASH] Node侧: HASH_FIX_JS 注入失败', e)
+      })
     })
     win.loadURL(_buildBlockUrl(blockId))
     return true

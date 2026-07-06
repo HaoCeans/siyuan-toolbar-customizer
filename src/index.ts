@@ -64,7 +64,7 @@ import {
   handleQuickNoteFloatCommand,
   isQuickNoteFloatSaveFromButton,
 } from './quickNote/quickNoteFloatWindow'
-import { destroyDesktopQuickNoteBlockWindow } from './quickNote/quickNoteBlockWindow'
+import { destroyDesktopQuickNoteBlockWindow, cleanupOrphanBlockWindows } from './quickNote/quickNoteBlockWindow'
 import { cleanupImagePicker } from './quickNote/imageInsert'
 
 // 导入 StressThreshold 清理函数
@@ -582,6 +582,7 @@ export default class ToolbarCustomizer extends Plugin {
   // 布局就绪后初始化（确保 DOM 完全加载）
   onLayoutReady() {
     this.cleanupOrphanDraftBlocks()
+    cleanupOrphanBlockWindows()  // 清理残留的僵尸记事弹窗
     this.initPluginFunctions()  // initPluginFunctions 是 async，不阻塞后续代码
 
     // ===== 初始化 TTS 设置缓存（从 plugin.loadData 读取）=====

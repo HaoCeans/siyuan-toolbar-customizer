@@ -67,10 +67,12 @@ export interface MobileToolbarConfig {
   overflowToolbarHeightTop?: string     // 顶部模式扩展工具栏高度
   topToolbarRetryDelay?: number;        // 顶部工具栏重试延迟（毫秒，0=无重试）
 
-  // 底部悬浮工具栏配置
-  enableFloatingToolbar?: boolean;  // 是否启用底部悬浮工具栏
-  floatingToolbarMargin?: string;   // 悬浮工具栏距底部距离
-  floatingToolbarBorderRadius?: string; // 悬浮工具栏圆角
+  // 底部胶囊工具栏配置
+  enableFloatingToolbar?: boolean;  // 是否启用底部胶囊工具栏
+  floatingToolbarMargin?: string;   // 胶囊距底部距离
+  floatingToolbarBorderRadius?: string; // 胶囊圆角
+  floatingToolbarHeight?: string;   // 胶囊自身高度
+  floatingToolbarScrollHide?: boolean; // 胶囊滚动隐藏
 }
 
 /**
@@ -1604,7 +1606,7 @@ export function createMobileSettingLayout(
       const options = [
         { value: 'top', label: '顶部固定' },
         { value: 'bottom', label: '底部固定' },
-        { value: 'floating', label: '底部悬浮' }
+        { value: 'floating', label: '底部胶囊' }
       ]
 
       // 确定当前选中的值
@@ -2108,21 +2110,21 @@ export function createMobileSettingLayout(
     }
   })
 
-  // === 底部悬浮工具栏配置 ===
+  // === 底部胶囊配置 ===
   setting.addItem({
     title: '',
     description: '',
     createActionElement: () => {
       const div = document.createElement('div')
       div.className = 'floating-toolbar-section'
-      div.innerHTML = '<span style="font-size: 14px; font-weight: 600; color: #a855f7; display: flex; align-items: center; gap: 6px;"><span>🪐</span><span>底部悬浮工具栏配置</span></span>'
+      div.innerHTML = '<span style="font-size: 14px; font-weight: 600; color: #a855f7; display: flex; align-items: center; gap: 6px;"><span>💊</span><span>底部胶囊配置</span></span>'
       return div
     }
   })
 
   setting.addItem({
-    title: '①悬浮工具栏距底部距离',
-    description: '💡工具栏悬浮时距离屏幕底部的间距',
+    title: '①胶囊距底部距离',
+    description: '💡胶囊工具栏距离屏幕底部的间距',
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.floatingToolbarMargin ?? '12px';
       const currentValue = parseInt(currentValueStr) || 12;
@@ -2145,8 +2147,32 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '②悬浮工具栏圆角大小',
-    description: '💡工具栏悬浮时的圆角弧度，值越大越圆',
+    title: '②胶囊自身高度',
+    description: '💡胶囊工具栏自身的高度',
+    createActionElement: () => {
+      const currentValueStr = context.mobileConfig.floatingToolbarHeight ?? '40px';
+      const currentValue = parseInt(currentValueStr) || 40;
+      const slider = createCustomSliderWithoutLabel(
+        currentValue,
+        24, 60, 'px',
+        async (value) => {
+          context.mobileConfig.floatingToolbarHeight = value + 'px';
+          await context.saveData('mobileToolbarConfig', context.mobileConfig);
+          context.updateMobileToolbar();
+        }
+      );
+      slider.classList.add('floating-toolbar-setting');
+      if (!context.mobileConfig.enableFloatingToolbar) {
+        slider.style.opacity = '0.5';
+        slider.style.pointerEvents = 'none';
+      }
+      return slider;
+    }
+  })
+
+  setting.addItem({
+    title: '③胶囊圆角大小',
+    description: '💡胶囊工具栏的圆角弧度，值越大越圆',
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.floatingToolbarBorderRadius ?? '24px';
       const currentValue = parseInt(currentValueStr) || 24;
@@ -2165,6 +2191,36 @@ export function createMobileSettingLayout(
         slider.style.pointerEvents = 'none';
       }
       return slider;
+    }
+  })
+
+  setting.addItem({
+    title: '④滚动隐藏',
+    description: '💡开启后向下滚动时胶囊自动隐藏，向上滚动时重新显示',
+    createActionElement: () => {
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'b3-switch'
+      toggle.checked = !!context.mobileConfig.floatingToolbarScrollHide
+      toggle.style.cssText = 'transform: scale(1.2);'
+      toggle.onchange = async () => {
+        context.mobileConfig.floatingToolbarScrollHide = toggle.checked
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
+        context.updateMobileToolbar()
+      }
+      const wrapper = document.createElement('div')
+      wrapper.style.cssText = 'display:flex;align-items:center;gap:12px;'
+      wrapper.appendChild(toggle)
+
+      const toggleWrapper = document.createElement('div')
+      toggleWrapper.style.cssText = 'display:flex;align-items:center;gap:8px;'
+      toggleWrapper.classList.add('floating-toolbar-setting')
+      toggleWrapper.appendChild(wrapper)
+      if (!context.mobileConfig.enableFloatingToolbar) {
+        toggleWrapper.style.opacity = '0.5';
+        toggleWrapper.style.pointerEvents = 'none';
+      }
+      return toggleWrapper;
     }
   })
 

@@ -66,10 +66,12 @@ export interface MobileToolbarConfig {
   overflowToolbarHeightTop?: string     // 顶部模式扩展工具栏高度（如 "40px"）
   topToolbarRetryDelay?: number;        // 顶部工具栏重试延迟（毫秒，0=无重试）
 
-  // 底部悬浮工具栏配置
-  enableFloatingToolbar?: boolean;  // 是否启用底部悬浮工具栏
-  floatingToolbarMargin?: string;   // 悬浮工具栏距底部距离
-  floatingToolbarBorderRadius?: string; // 悬浮工具栏圆角
+  // 底部胶囊工具栏配置
+  enableFloatingToolbar?: boolean;  // 是否启用底部胶囊工具栏
+  floatingToolbarMargin?: string;   // 胶囊距底部距离
+  floatingToolbarBorderRadius?: string; // 胶囊圆角
+  floatingToolbarHeight?: string;   // 胶囊自身高度
+  floatingToolbarScrollHide?: boolean; // 胶囊滚动隐藏
 }
 
 export interface ButtonConfig {
@@ -200,10 +202,12 @@ export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
   topToolbarOffset: '50px',   // 距离顶部 50px
   topToolbarPaddingLeft: '0px', // 顶部工具栏左边距（居中显示）
 
-  // 底部悬浮工具栏配置（默认不启用）
+  // 底部胶囊工具栏配置（默认不启用）
   enableFloatingToolbar: false,
   floatingToolbarMargin: '12px',
   floatingToolbarBorderRadius: '24px',
+  floatingToolbarHeight: '40px',
+  floatingToolbarScrollHide: false,
 }
 
 export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = []
@@ -1017,7 +1021,9 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
         const floatRadius = config.floatingToolbarBorderRadius || '24px'
 
         if (isFloating) {
-          // === 底部悬浮模式 CSS ===
+          // === 底部胶囊模式 CSS ===
+          const capHeight = config.floatingToolbarHeight || config.toolbarHeight || '40px'
+          const scrollHideTransition = config.floatingToolbarScrollHide ? 'bottom 0.3s ease, opacity 0.3s ease' : 'bottom 0.3s ease'
           style.textContent = `
             @media (max-width: 768px) {
               .protyle-breadcrumb__bar[data-input-method],
@@ -1037,13 +1043,21 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
                 justify-content: center !important;
                 align-items: center !important;
                 box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15) !important;
-                transition: bottom 0.3s ease !important;
+                transition: ${scrollHideTransition} !important;
                 backdrop-filter: blur(10px);
-                height: ${config.toolbarHeight} !important;
-                min-height: ${config.toolbarHeight} !important;
+                height: ${capHeight} !important;
+                min-height: ${capHeight} !important;
                 -webkit-backface-visibility: hidden;
                 backface-visibility: hidden;
                 will-change: transform;
+              }
+
+              /* 滚动隐藏 */
+              body.siyuan-toolbar-customizer-enabled .floating-toolbar-hidden[data-input-method],
+              body.siyuan-toolbar-customizer-enabled .floating-toolbar-hidden[data-input-method] .protyle-breadcrumb {
+                bottom: calc(-${capHeight} - ${floatMargin}) !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
               }
 
               /* 防止编辑器内容被遮挡 */
@@ -1166,6 +1180,26 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
 
     // 页面加载完成后检查一次
     updateToolbarVisibility()
+
+    // 底部胶囊：滚动隐藏
+    if (isFloating && config.floatingToolbarScrollHide) {
+      let scrollHideTimer: ReturnType<typeof setTimeout> | null = null
+      let lastScrollY = window.scrollY
+      const scrollHandler = () => {
+        if (scrollHideTimer) clearTimeout(scrollHideTimer)
+        scrollHideTimer = setTimeout(() => {
+          const currentY = window.scrollY
+          const toolbars = document.querySelectorAll<HTMLElement>('[data-toolbar-customized="true"][data-input-method]')
+          if (currentY > lastScrollY + 10) {
+            toolbars.forEach(el => el.classList.add('floating-toolbar-hidden'))
+          } else if (currentY < lastScrollY - 5) {
+            toolbars.forEach(el => el.classList.remove('floating-toolbar-hidden'))
+          }
+          lastScrollY = currentY
+        }, 50)
+      }
+      window.addEventListener('scroll', scrollHandler, { passive: true })
+    }
 
     // 底部固定模式提前返回（悬浮模式继续执行到公共代码段）
     if (!isFloating) return

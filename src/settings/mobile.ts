@@ -66,6 +66,11 @@ export interface MobileToolbarConfig {
   overflowToolbarDistanceTop?: string  // 扩展工具栏距离顶部工具栏的距离
   overflowToolbarHeightTop?: string     // 顶部模式扩展工具栏高度
   topToolbarRetryDelay?: number;        // 顶部工具栏重试延迟（毫秒，0=无重试）
+
+  // 底部悬浮工具栏配置
+  enableFloatingToolbar?: boolean;  // 是否启用底部悬浮工具栏
+  floatingToolbarMargin?: string;   // 悬浮工具栏距底部距离
+  floatingToolbarBorderRadius?: string; // 悬浮工具栏圆角
 }
 
 /**
@@ -2103,6 +2108,65 @@ export function createMobileSettingLayout(
     }
   })
 
+  // === 底部悬浮工具栏配置 ===
+  setting.addItem({
+    title: '',
+    description: '',
+    createActionElement: () => {
+      const div = document.createElement('div')
+      div.className = 'floating-toolbar-section'
+      div.innerHTML = '<span style="font-size: 14px; font-weight: 600; color: #a855f7; display: flex; align-items: center; gap: 6px;"><span>🪐</span><span>底部悬浮工具栏配置</span></span>'
+      return div
+    }
+  })
+
+  setting.addItem({
+    title: '①悬浮工具栏距底部距离',
+    description: '💡工具栏悬浮时距离屏幕底部的间距',
+    createActionElement: () => {
+      const currentValueStr = context.mobileConfig.floatingToolbarMargin ?? '12px';
+      const currentValue = parseInt(currentValueStr) || 12;
+      const slider = createCustomSliderWithoutLabel(
+        currentValue,
+        0, 20, 'px',
+        async (value) => {
+          context.mobileConfig.floatingToolbarMargin = value + 'px';
+          await context.saveData('mobileToolbarConfig', context.mobileConfig);
+          context.updateMobileToolbar();
+        }
+      );
+      slider.classList.add('floating-toolbar-setting');
+      if (!context.mobileConfig.enableFloatingToolbar) {
+        slider.style.opacity = '0.5';
+        slider.style.pointerEvents = 'none';
+      }
+      return slider;
+    }
+  })
+
+  setting.addItem({
+    title: '②悬浮工具栏圆角大小',
+    description: '💡工具栏悬浮时的圆角弧度，值越大越圆',
+    createActionElement: () => {
+      const currentValueStr = context.mobileConfig.floatingToolbarBorderRadius ?? '24px';
+      const currentValue = parseInt(currentValueStr) || 24;
+      const slider = createCustomSliderWithoutLabel(
+        currentValue,
+        0, 40, 'px',
+        async (value) => {
+          context.mobileConfig.floatingToolbarBorderRadius = value + 'px';
+          await context.saveData('mobileToolbarConfig', context.mobileConfig);
+          context.updateMobileToolbar();
+        }
+      );
+      slider.classList.add('floating-toolbar-setting');
+      if (!context.mobileConfig.enableFloatingToolbar) {
+        slider.style.opacity = '0.5';
+        slider.style.pointerEvents = 'none';
+      }
+      return slider;
+    }
+  })
 
   // === 一键记事弹窗 ===
   createGroupTitle('4️⃣ ','一键记事弹窗', 'quick-note-settings-section')

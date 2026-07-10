@@ -11,8 +11,10 @@ import type { ButtonConfig } from '../toolbarManager'
 import { showMessage } from 'siyuan'
 import * as Notify from '../notification'
 import { createMobileButtonItem, type MobileButtonContext } from '../ui/buttonItems/mobile'
+import { createToolbarPreview } from '../ui/toolbarPreview'
 import { createMobileQuickNoteFormatField } from '../ui/quickNoteFormatField'
 import { calculateButtonOverflow, getToolbarAvailableWidth, getButtonWidth } from '../toolbarManager'
+import { lucideToSvg } from '../utils/lucideHelper'
 
 /**
  * 活跃的滑杆拖拽清理函数集合。
@@ -863,10 +865,18 @@ export function createMobileSettingLayout(
 
   setting.addItem({
     title: '',
-    description: `已配置 ${context.mobileButtonConfigs.length} 个按钮，点击展开编辑`,
+    description: '',
     createActionElement: () => {
       const container = document.createElement('div')
       container.style.cssText = 'width: 100%; padding: 8px 0;'
+
+      // 按钮计数（动态更新，放在预览框内部下方）
+      const countHint = document.createElement('div')
+      countHint.style.cssText = 'font-size:12px;color:var(--b3-theme-on-surface-light);margin-bottom:8px;'
+      const updateCountHint = () => {
+        countHint.textContent = `已配置 ${context.buttonConfigs.length} 个按钮，点击展开编辑`
+      }
+      updateCountHint()
 
       // 添加按钮
       const addBtn = document.createElement('button')
@@ -885,10 +895,10 @@ export function createMobileSettingLayout(
 
       let lastAddedButtonId: string | null = null
 
-      const renderList = () => {
-        flushSliderDrags()
-        listContainer.innerHTML = ''
-        const sortedButtons = [...context.buttonConfigs].sort((a, b) => a.sort - b.sort)
+	      const renderList = () => {
+	        flushSliderDrags()
+	        listContainer.innerHTML = ''
+	        const sortedButtons = [...context.buttonConfigs].sort((a, b) => a.sort - b.sort)
 
         sortedButtons.forEach((button, index) => {
           const mobileButtonContext: MobileButtonContext = {
@@ -938,6 +948,9 @@ export function createMobileSettingLayout(
             }, 100)
           }
         })
+        // 同步刷新工具栏预览（反映卡片列表里的删除/启用禁用/图标改动）
+        previewEl?.refresh()
+        updateCountHint()
       }
 
       addBtn.onclick = () => {
@@ -982,8 +995,31 @@ export function createMobileSettingLayout(
         renderList()
       }
 
+      // 手机端工具栏所见即所得预览（放在最上方，便于一眼看清布局 + 直接拖动排序）
+      let previewEl: any = null
+      try {
+        previewEl = createToolbarPreview({
+          getButtons: () => context.buttonConfigs,
+          isMobile: true,
+          isTopMode: context.mobileConfig?.enableTopToolbar,
+          onChanged: renderList,
+        })
+      } catch (e) {
+        console.error('[MobilePreview] 创建预览失败:', e)
+        const errEl = document.createElement('div')
+        errEl.style.cssText = 'color:var(--b3-card-error-color);font-size:12px;padding:8px;'
+        errEl.textContent = '⚠️ 工具栏预览加载失败，请检查控制台错误'
+        container.appendChild(errEl)
+      }
+
       renderList()
 
+      if (previewEl) {
+        container.appendChild(previewEl)
+        // previewEl 已挂载到 DOM，刷新一次使缩放计算（依赖 clientWidth）生效
+        previewEl.refresh()
+      }
+      container.appendChild(countHint)
       container.appendChild(addBtn)
       container.appendChild(listContainer)
       return container
@@ -3184,8 +3220,14 @@ export function createMobileSettingLayout(
             svg.appendChild(use);
             iconSpan.appendChild(svg);
           } else if (btn.icon.startsWith('lucide:')) {
-            iconSpan.textContent = btn.icon.substring(7).substring(0, 2);
-            iconSpan.style.fontSize = '12px';
+            const iconName = btn.icon.substring(7);
+            const svgHtml = lucideToSvg(iconName, btn.iconSize || 16);
+            if (svgHtml) {
+              iconSpan.innerHTML = svgHtml;
+            } else {
+              iconSpan.textContent = iconName.substring(0, 2);
+              iconSpan.style.fontSize = '12px';
+            }
           } else if (/\.(png|jpg|jpeg|gif|svg)$/i.test(btn.icon)) {
             const img = document.createElement('img');
             const pluginName = 'siyuan-toolbar-customizer';

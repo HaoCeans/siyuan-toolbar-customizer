@@ -4,6 +4,7 @@
  */
 
 import { showIconPicker as showIconPickerModal } from './iconPicker'
+import { lucideToSvg } from '../utils/lucideHelper'
 
 /**
  * 更新图标显示
@@ -21,24 +22,11 @@ export function updateIconDisplay(element: HTMLElement, iconValue: string): void
   // 检查是否是 lucide 图标（格式: lucide:图标名）
   if (iconValue.startsWith('lucide:')) {
     const iconName = iconValue.replace('lucide:', '')
-    // 使用 SVG 来显示 lucide 图标
-    element.innerHTML = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <use href="#${iconName}"></use>
-      </svg>
-    `
-    // 如果 SVG 找不到，回退到显示文本
-    const svg = element.querySelector('svg')
-    if (svg) {
-      const use = svg.querySelector('use')
-      if (use) {
-        // 检查图标是否存在
-        const existingSymbol = document.getElementById(iconName)
-        if (!existingSymbol) {
-          // 图标不存在，显示图标名
-          element.innerHTML = `<span style="font-size: 10px;">${iconName}</span>`
-        }
-      }
+    const svgHtml = lucideToSvg(iconName, 16)
+    if (svgHtml) {
+      element.innerHTML = svgHtml
+    } else {
+      element.innerHTML = `<span style="font-size: 10px;">${iconName}</span>`
     }
   } else if (iconValue.startsWith('icon')) {
     // 思源内置图标

@@ -27,6 +27,7 @@ import { showConfirmDialog } from "./ui/dialog";
 // API 工具
 import { deleteBlock } from "./api";
 import { uploadImageFile, insertProtyleImageAtCaret } from "./quickNote/imageInsert";
+import { lucideToSvg } from "./utils/lucideHelper";
 
 // ===== 插件实例（用于需要 app 参数的 API 调用） =====
 export let pluginInstance: any = null;
@@ -448,10 +449,10 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
 ]
 
 // ===== 扩展工具栏辅助常量 =====
-const OVERFLOW_BUTTON_ID_MOBILE = 'overflow-button-mobile'
-const OVERFLOW_BUTTON_ID_DESKTOP = 'overflow-button-desktop'
+export const OVERFLOW_BUTTON_ID_MOBILE = 'overflow-button-mobile'
+export const OVERFLOW_BUTTON_ID_DESKTOP = 'overflow-button-desktop'
 
-function isOverflowButton(id: string): boolean {
+export function isOverflowButton(id: string): boolean {
   return id === OVERFLOW_BUTTON_ID_MOBILE || id === OVERFLOW_BUTTON_ID_DESKTOP
 }
 
@@ -610,7 +611,8 @@ export function getButtonWidth(button: ButtonConfig): number {
 export function calculateButtonOverflow(
   buttons: ButtonConfig[],
   overflowToolbarLayers: number = 1,
-  externalButtonsReserveWidth: number = 0
+  externalButtonsReserveWidth: number = 0,
+  availableWidth?: number   // 可选：传入则使用此宽度（预览场景），否则调 getToolbarAvailableWidth()
 ): ButtonConfig[] {
   // 过滤出启用的移动端按钮，按排序值排序（从左到右）
   const enabledButtons = buttons.filter(btn =>
@@ -622,8 +624,8 @@ export function calculateButtonOverflow(
   // 获取扩展工具栏按钮（⋯）
   const overflowButton = buttons.find(btn => isOverflowButton(btn.id))
 
-  // 获取可用宽度
-  const toolbarAvailableWidth = getToolbarAvailableWidth()
+  // 获取可用宽度：有传入则用传入值（预览场景），否则读真实 DOM
+  const toolbarAvailableWidth = availableWidth ?? getToolbarAvailableWidth()
 
   // 主工具栏：需要预留 “⋯” 按钮 + 其他插件按钮预留宽度
   let mainAvailableWidth = toolbarAvailableWidth
@@ -637,8 +639,8 @@ export function calculateButtonOverflow(
   // toolbarAvailableWidth 是面包屑宽度减去面包屑内边距，不含扩展工具栏的这 22px
   const overflowAvailableWidth = toolbarAvailableWidth - 22
 
-  if (mainAvailableWidth <= 0 || overflowAvailableWidth <= 0) {
-    return buttons.map(btn => ({ ...btn, overflowLevel: 0 }))
+    if (mainAvailableWidth <= 0 || overflowAvailableWidth <= 0) {
+      return buttons.map(btn => ({ ...btn, overflowLevel: btn.overflowLevel ?? 0 }))
   }
 
   // 计算每个按钮的宽度
@@ -1653,27 +1655,14 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
   } else if (config.icon.startsWith('lucide:')) {
     // Lucide 图标
     const iconName = config.icon.substring(7)
-    try {
-      const lucideIcons = require('lucide')
-      const IconComponent = lucideIcons[iconName]
-
-      if (IconComponent) {
-        const svgString = IconComponent.toSvg({
-          width: config.iconSize,
-          height: config.iconSize
-        })
-        button.innerHTML = svgString
-        // 确保 SVG 样式正确
-        const svg = button.querySelector('svg')
-        if (svg) {
-          svg.style.cssText = 'flex-shrink: 0; display: block;'
-        }
-      } else {
-        // 图标不存在，使用文本
-        button.textContent = config.icon
-        button.style.fontSize = `${config.iconSize}px`
+    const svgString = lucideToSvg(iconName, config.iconSize)
+    if (svgString) {
+      button.innerHTML = svgString
+      const svg = button.querySelector('svg')
+      if (svg) {
+        svg.style.cssText = 'flex-shrink: 0; display: block;'
       }
-    } catch (e) {
+    } else {
       button.textContent = config.icon
       button.style.fontSize = `${config.iconSize}px`
     }
@@ -2124,26 +2113,16 @@ function showOverflowToolbar(config: ButtonConfig) {
       } else if (btn.icon.startsWith('lucide:')) {
         // Lucide 图标
         const iconName = btn.icon.substring(7)
-        try {
-          const lucideIcons = require('lucide')
-          const IconComponent = lucideIcons[iconName]
-          if (IconComponent) {
-            const svgString = IconComponent.toSvg({
-              width: btn.iconSize,
-              height: btn.iconSize
-            })
-            layerBtn.innerHTML = svgString
-            // 确保 SVG 样式正确
-            const svg = layerBtn.querySelector('svg')
-            if (svg) {
-              svg.style.cssText = 'flex-shrink: 0; display: block;'
-            }
-          } else {
-            // 图标不存在，使用文本
-            layerBtn.textContent = btn.icon
-            layerBtn.style.fontSize = `${btn.iconSize}px`
+        const svgString = lucideToSvg(iconName, btn.iconSize)
+        if (svgString) {
+          layerBtn.innerHTML = svgString
+          // 确保 SVG 样式正确
+          const svg = layerBtn.querySelector('svg')
+          if (svg) {
+            svg.style.cssText = 'flex-shrink: 0; display: block;'
           }
-        } catch (e) {
+        } else {
+          // 图标不存在，使用文本
           layerBtn.textContent = btn.icon
           layerBtn.style.fontSize = `${btn.iconSize}px`
         }
@@ -2504,24 +2483,14 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
         layerBtn.appendChild(svg)
       } else if (btn.icon.startsWith('lucide:')) {
         const iconName = btn.icon.substring(7)
-        try {
-          const lucideIcons = require('lucide')
-          const IconComponent = lucideIcons[iconName]
-          if (IconComponent) {
-            const svgString = IconComponent.toSvg({
-              width: btn.iconSize,
-              height: btn.iconSize
-            })
-            layerBtn.innerHTML = svgString
-            const svg = layerBtn.querySelector('svg')
-            if (svg) {
-              svg.style.cssText = 'flex-shrink: 0; display: block;'
-            }
-          } else {
-            layerBtn.textContent = btn.icon
-            layerBtn.style.fontSize = `${btn.iconSize}px`
+        const svgString = lucideToSvg(iconName, btn.iconSize)
+        if (svgString) {
+          layerBtn.innerHTML = svgString
+          const svg = layerBtn.querySelector('svg')
+          if (svg) {
+            svg.style.cssText = 'flex-shrink: 0; display: block;'
           }
-        } catch (e) {
+        } else {
           layerBtn.textContent = btn.icon
           layerBtn.style.fontSize = `${btn.iconSize}px`
         }
@@ -4291,19 +4260,12 @@ function updateToggleLockIcon(btn: HTMLElement, isLocked: boolean): void {
     btn.appendChild(svg)
   } else if (targetIcon.startsWith('lucide:')) {
     const iconName = targetIcon.substring(7)
-    try {
-      const lucideIcons = require('lucide')
-      const IconComponent = lucideIcons[iconName]
-      if (IconComponent) {
-        const svgString = IconComponent.toSvg({ width: cfg.iconSize, height: cfg.iconSize })
-        btn.innerHTML = svgString
-        const svg = btn.querySelector('svg')
-        if (svg) svg.style.cssText = 'flex-shrink: 0; display: block;'
-      } else {
-        btn.textContent = targetIcon
-        btn.style.fontSize = `${cfg.iconSize}px`
-      }
-    } catch {
+    const svgString = lucideToSvg(iconName, cfg.iconSize)
+    if (svgString) {
+      btn.innerHTML = svgString
+      const svg = btn.querySelector('svg')
+      if (svg) svg.style.cssText = 'flex-shrink: 0; display: block;'
+    } else {
       btn.textContent = targetIcon
       btn.style.fontSize = `${cfg.iconSize}px`
     }

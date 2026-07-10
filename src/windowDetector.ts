@@ -23,6 +23,7 @@ import {
 import { createQuoteOverlay } from './quickNote/quoteOverlay';
 import { pickAndInsertImages, installImagePasteHandler, preSaveBlockCursor, clearPreSavedBlockCursor } from './quickNote/imageInsert';
 import { fetchSyncPost } from 'siyuan';
+import { lucideToSvg } from './utils/lucideHelper';
 
 export type QuickNoteOpenSource = 'auto' | 'button' | 'globalHotkey';
 
@@ -1426,10 +1427,16 @@ function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null, 
       
       clonedBtn.appendChild(svg);
     } else if (buttonConfig.icon.startsWith('lucide:')) {
-      // Lucide 图标 - 简化处理，显示图标名
       const iconName = buttonConfig.icon.substring(7);
-      clonedBtn.textContent = iconName;
-      clonedBtn.style.fontSize = `${buttonConfig.iconSize || 16}px`;
+      const svgString = lucideToSvg(iconName, buttonConfig.iconSize || 16);
+      if (svgString) {
+        clonedBtn.innerHTML = svgString;
+        const svg = clonedBtn.querySelector('svg');
+        if (svg) svg.style.cssText = 'flex-shrink:0;display:block';
+      } else {
+        clonedBtn.textContent = iconName;
+        clonedBtn.style.fontSize = `${buttonConfig.iconSize || 16}px`;
+      }
     } else if (/\.(png|jpg|jpeg|gif|svg)$/i.test(buttonConfig.icon)) {
       // 图片路径（自定义图标）
       const pluginName = 'siyuan-toolbar-customizer';

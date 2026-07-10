@@ -83,11 +83,9 @@ export function createMobileButtonItem(
       position: relative;
       transition: all 0.2s ease;
     `
-  }
-  // 扩展工具栏按钮不可拖动
-  item.draggable = !isOverflowButton
+	  }
 
-  let isExpanded = false
+	  let isExpanded = false
 
   // 触摸拖拽相关变量
   let touchStartY = 0
@@ -98,14 +96,8 @@ export function createMobileButtonItem(
   let placeholder: HTMLElement | null = null
   let initialTouchY = 0
 
-  // 桌面端拖拽事件（扩展工具栏按钮跳过）
+  // 拖放目标高亮（ondragover/ondragleave/ondrop 绑在 item 上，因为拖到哪个卡片上方就高亮哪个）
   if (!isOverflowButton) {
-    item.ondragstart = (e) => {
-      e.dataTransfer!.effectAllowed = 'move'
-      e.dataTransfer!.setData('text/plain', index.toString())
-      item.style.opacity = '0.4'
-    }
-
     item.ondragend = (e) => {
       item.style.opacity = '1'
     }
@@ -342,12 +334,6 @@ export function createMobileButtonItem(
     initialTouchY = 0
   }
 
-  // 绑定触摸事件到拖动手柄
-  item.addEventListener('touchstart', handleTouchStart, { passive: true })
-  item.addEventListener('touchmove', handleTouchMove, { passive: false })
-  item.addEventListener('touchend', handleTouchEnd)
-  item.addEventListener('touchcancel', handleTouchEnd)
-
   const header = document.createElement('div')
   header.style.cssText = 'display: flex; align-items: center; gap: 10px; cursor: pointer;'
 
@@ -360,6 +346,22 @@ export function createMobileButtonItem(
     touch-action: none;
   `
   dragHandle.title = '长按拖动排序'
+
+  // 桌面端拖拽：只有拖拽手柄可发起拖拽（扩展工具栏不可拖动）
+  if (!isOverflowButton) {
+    dragHandle.draggable = true
+    dragHandle.ondragstart = (e) => {
+      e.dataTransfer!.effectAllowed = 'move'
+      e.dataTransfer!.setData('text/plain', index.toString())
+      item.style.opacity = '0.4'
+    }
+  }
+
+  // 触摸事件绑在拖拽手柄上，非手柄区域不响应
+  dragHandle.addEventListener('touchstart', handleTouchStart, { passive: true })
+  dragHandle.addEventListener('touchmove', handleTouchMove, { passive: false })
+  dragHandle.addEventListener('touchend', handleTouchEnd)
+  dragHandle.addEventListener('touchcancel', handleTouchEnd)
 
   const iconSpan = document.createElement('span')
   iconSpan.className = 'toolbar-customizer-button-icon'

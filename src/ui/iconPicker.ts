@@ -1,9 +1,11 @@
 /**
  * 图标选择器
- * 三级分区结构：本体图标 | 思源图标 | 阿里图标
+ * 三级分区：思源图标 | 阿里图标 | 极简图标（Lucide）
+ * 支持按关键词搜索（跨分类）
  */
 
-import { iconCategories, aliIconCategories, updateIconDisplay } from '../data/icons'
+import { aliIconCategories, updateIconDisplay } from '../data/icons'
+import { getLucideIconNames, lucideToSvg } from '../utils/lucideHelper'
 
 export interface IconPickerOptions {
   title?: string
@@ -12,7 +14,7 @@ export interface IconPickerOptions {
   onSelect: (icon: string) => void
 }
 
-type PartitionType = 'local' | 'siyuan' | 'ali'
+type PartitionType = 'siyuan' | 'ali' | 'lucide'
 
 /**
  * Unicode 转 Emoji 字符串
@@ -72,6 +74,7 @@ export function showIconPicker(options: IconPickerOptions): void {
     max-width: 500px;
     width: 100%;
     max-height: 80vh;
+    min-height: 400px;
     display: flex;
     flex-direction: column;
   `
@@ -99,11 +102,68 @@ export function showIconPicker(options: IconPickerOptions): void {
     padding: 16px 20px;
   `
 
+  // ===== 搜索框 =====
+  let searchKeyword = ''
+
+  const searchWrapper = document.createElement('div')
+  searchWrapper.style.cssText = `
+    position: relative;
+    margin-bottom: 12px;
+  `
+
+  const searchIcon = document.createElement('span')
+  searchIcon.style.cssText = `
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    color: var(--b3-theme-on-surface-light);
+    pointer-events: none;
+  `
+  searchIcon.textContent = '🔍'
+
+  const searchInput = document.createElement('input')
+  searchInput.type = 'text'
+  searchInput.className = 'b3-text-field'
+  searchInput.style.cssText = `
+    width: 100%;
+    padding: 8px 32px 8px 32px;
+    box-sizing: border-box;
+    border-radius: 6px;
+    font-size: 13px;
+  `
+
+  const searchClearBtn = document.createElement('button')
+  searchClearBtn.style.cssText = `
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 16px;
+    color: var(--b3-theme-on-surface-light);
+    padding: 4px;
+    display: none;
+    line-height: 1;
+    border-radius: 4px;
+  `
+  searchClearBtn.textContent = '×'
+  searchClearBtn.onmouseenter = () => { searchClearBtn.style.background = 'var(--b3-theme-surface)' }
+  searchClearBtn.onmouseleave = () => { searchClearBtn.style.background = 'none' }
+
+  searchWrapper.appendChild(searchIcon)
+  searchWrapper.appendChild(searchInput)
+  searchWrapper.appendChild(searchClearBtn)
+
   // ===== 一级分区标签 =====
   const partitionTabs = document.createElement('div')
   partitionTabs.style.cssText = `
     display: flex;
-    gap: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
     margin-bottom: 16px;
     padding-bottom: 12px;
     border-bottom: 2px solid var(--b3-border-color);
@@ -118,99 +178,231 @@ export function showIconPicker(options: IconPickerOptions): void {
     flex-wrap: wrap;
   `
 
-  let activePartition: PartitionType = 'local'
-  let activeCategory = iconCategories[0].id
+  let activePartition: PartitionType = 'lucide'
+  let activeCategory = ''
 
-  // ===== 渲染本体图标内容 =====
-  const renderLocalContent = (categoryId: string) => {
+  // ===== 搜索框占位符根据分区动态变化 =====
+  const updateSearchPlaceholder = () => {
+    const map: Record<PartitionType, string> = {
+      lucide: '极简图标搜索，请用拼音...',
+      ali: '阿里图标搜索，请用拼音...',
+      siyuan: '思源图标搜索，请用汉字...',
+    }
+    searchInput.placeholder = map[activePartition]
+  }
+  updateSearchPlaceholder()
+
+  // ===== 通用：创建图标按钮 =====
+  const createIconButton = (icon: string, onClick: () => void): HTMLElement => {
+    const btnSize = Math.max(40, iconSize + 16)
+    const btn = document.createElement('button')
+    btn.className = 'b3-button'
+    btn.style.cssText = `
+      width: ${btnSize}px;
+      height: ${btnSize}px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--b3-border-color);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: ${iconSize}px;
+      background: var(--b3-theme-background);
+      padding: 0;
+    `
+
+    const iconSpan = document.createElement('span')
+    iconSpan.style.cssText = `
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+    `
+    updateIconDisplay(iconSpan, icon)
+    btn.appendChild(iconSpan)
+
+    btn.onclick = onClick
+    btn.onmouseenter = () => {
+      btn.style.background = 'var(--b3-theme-surface)'
+      btn.style.borderColor = 'var(--b3-theme-primary)'
+    }
+    btn.onmouseleave = () => {
+      btn.style.background = 'var(--b3-theme-background)'
+      btn.style.borderColor = 'var(--b3-border-color)'
+    }
+    return btn
+  }
+
+  /**
+   * 创建 Lucide 图标按钮
+   * 直接用 lucideToSvg 生成内联 SVG（不依赖 DOM symbol）
+   */
+  const createLucideIconButton = (iconName: string, onClick: () => void): HTMLElement => {
+    const btnSize = Math.max(40, iconSize + 16)
+    const btn = document.createElement('button')
+    btn.className = 'b3-button'
+    btn.style.cssText = `
+      width: ${btnSize}px;
+      height: ${btnSize}px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--b3-border-color);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: ${iconSize}px;
+      background: var(--b3-theme-background);
+      padding: 0;
+    `
+
+	    const svgHtml = lucideToSvg(iconName, iconSize)
+    if (svgHtml) {
+      btn.innerHTML = svgHtml
+      btn.style.color = 'var(--b3-theme-on-background)'
+      const svg = btn.querySelector('svg')
+      if (svg) svg.style.cssText = 'flex-shrink:0;display:block;color:inherit'
+    } else {
+      btn.textContent = iconName.substring(0, 2)
+    }
+
+    btn.onclick = onClick
+    btn.onmouseenter = () => {
+      btn.style.background = 'var(--b3-theme-surface)'
+      btn.style.borderColor = 'var(--b3-theme-primary)'
+    }
+    btn.onmouseleave = () => {
+      btn.style.background = 'var(--b3-theme-background)'
+      btn.style.borderColor = 'var(--b3-border-color)'
+    }
+    return btn
+  }
+
+  // ===== 通用：创建并替换网格容器 =====
+  const replaceGrid = (): HTMLElement => {
     const existingGrid = content.querySelector('.icon-grid')
     if (existingGrid) {
       existingGrid.remove()
     }
-
+    const btnSize = Math.max(40, iconSize + 16)
     const grid = document.createElement('div')
     grid.className = 'icon-grid'
-    // 根据图标大小动态计算按钮大小（图标大小 + 边距）
-    const btnSize = Math.max(40, iconSize + 16)
     grid.style.cssText = `
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(${btnSize}px, 1fr));
       gap: 8px;
     `
+    return grid
+  }
 
-    const cat = iconCategories.find(c => c.id === categoryId)
-    if (!cat) return
+  // ===== 搜索模式：跨分类展平搜索 =====
+  const renderSearchResults = () => {
+    const grid = replaceGrid()
+    const keyword = searchKeyword.toLowerCase()
+    const onSelectIcon = (icon: string) => {
+      onSelect(icon)
+      document.body.removeChild(dialog)
+    }
 
-    cat.icons.forEach(icon => {
-      const btn = document.createElement('button')
-      btn.className = 'b3-button'
-      btn.style.cssText = `
-        width: ${btnSize}px;
-        height: ${btnSize}px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: 1px solid var(--b3-border-color);
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: ${iconSize}px;
-        background: var(--b3-theme-background);
-        padding: 0;
+    let matchedCount = 0
+
+    if (activePartition === 'siyuan') {
+      const emojiCategories = getSiYuanEmojis()
+      emojiCategories.forEach((cat: any) => {
+        const catName = (cat.title_zh_cn || cat.title || '').toLowerCase()
+        ;(cat.items || []).forEach((item: any) => {
+          const desc = (item.description_zh_cn || item.description || '').toLowerCase()
+          const keys = (item.keywords || '').toLowerCase()
+          if (desc.includes(keyword) || keys.includes(keyword) || catName.includes(keyword)) {
+            const emoji = unicodeToEmoji(item.unicode)
+            grid.appendChild(createIconButton(emoji, () => onSelectIcon(emoji)))
+            matchedCount++
+          }
+        })
+      })
+    } else if (activePartition === 'ali') {
+      aliIconCategories.forEach(cat => {
+        const catName = cat.name.toLowerCase()
+        cat.icons.forEach(iconPath => {
+          const fileName = iconPath.split('/').pop()?.replace(/\.\w+$/, '').toLowerCase() || ''
+          if (catName.includes(keyword) || fileName.includes(keyword)) {
+            grid.appendChild(createIconButton(iconPath, () => onSelectIcon(iconPath)))
+            matchedCount++
+          }
+        })
+      })
+    } else if (activePartition === 'lucide') {
+      const allNames = getLucideIconNames()
+      allNames.forEach(name => {
+        if (name.toLowerCase().includes(keyword)) {
+          grid.appendChild(createLucideIconButton(name, () => onSelectIcon(`lucide:${name}`)))
+          matchedCount++
+        }
+      })
+    }
+
+    // 更新分类标签区域：显示搜索结果数量
+    categoryTabs.innerHTML = ''
+    const statusEl = document.createElement('div')
+    statusEl.style.cssText = 'padding: 6px 0 10px 0; font-size: 13px; color: var(--b3-theme-on-surface-light);'
+    if (matchedCount === 0) {
+      statusEl.textContent = `未找到匹配"${keyword}"的图标`
+    } else {
+      statusEl.textContent = `找到 ${matchedCount} 个匹配"${keyword}"的图标`
+    }
+    categoryTabs.appendChild(statusEl)
+
+    // 无结果时在网格中显示提示
+    if (matchedCount === 0) {
+      const emptyHint = document.createElement('div')
+      emptyHint.style.cssText = `
+        grid-column: 1 / -1;
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--b3-theme-on-surface-light);
+        font-size: 14px;
       `
-
-      // 创建图标容器
-      const iconSpan = document.createElement('span')
-      iconSpan.style.cssText = `
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        height: 100%;
-      `
-      updateIconDisplay(iconSpan, icon, iconSize)
-      btn.appendChild(iconSpan)
-
-      btn.onclick = () => {
-        onSelect(icon)
-        document.body.removeChild(dialog)
-      }
-
-      btn.onmouseenter = () => {
-        btn.style.background = 'var(--b3-theme-surface)'
-        btn.style.borderColor = 'var(--b3-theme-primary)'
-      }
-
-      btn.onmouseleave = () => {
-        btn.style.background = 'var(--b3-theme-background)'
-        btn.style.borderColor = 'var(--b3-border-color)'
-      }
-
-      grid.appendChild(btn)
-    })
+      emptyHint.textContent = '未找到匹配的图标'
+      grid.appendChild(emptyHint)
+    }
 
     content.appendChild(grid)
   }
 
-  // ===== 渲染思源表情内容 =====
-  const renderSiyuanContent = (categoryId: string) => {
-    const existingGrid = content.querySelector('.icon-grid')
-    if (existingGrid) {
-      existingGrid.remove()
-    }
+  // ===== 搜索输入处理 =====
+  const handleSearch = () => {
+    const value = searchInput.value
+    searchKeyword = value.trim()
 
-    const grid = document.createElement('div')
-    grid.className = 'icon-grid'
-    grid.style.cssText = `
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-      gap: 8px;
-    `
+    searchClearBtn.style.display = searchKeyword ? 'block' : 'none'
+
+    if (searchKeyword) {
+      // 搜索模式：隐藏分区标签，显示搜索结果
+      partitionTabs.style.display = 'none'
+      renderSearchResults()
+    } else {
+      // 非搜索模式：恢复分区标签，显示分类浏览
+      partitionTabs.style.display = 'flex'
+      updateCategoryTabs()
+    }
+  }
+
+  searchInput.oninput = handleSearch
+  searchClearBtn.onclick = () => {
+    searchInput.value = ''
+    handleSearch()
+    searchInput.focus()
+  }
+
+  // ===== 渲染思源表情内容（按分类） =====
+  const renderSiyuanContent = (categoryId: string) => {
+    const grid = replaceGrid()
 
     const emojiCategories = getSiYuanEmojis()
     const category = emojiCategories.find((c: any) => c.id === categoryId)
     if (!category) return
 
-    category.items.forEach((item: any) => {
+    ;(category.items || []).forEach((item: any) => {
       const btn = document.createElement('button')
       btn.className = 'b3-button'
       btn.style.cssText = `
@@ -255,73 +447,59 @@ export function showIconPicker(options: IconPickerOptions): void {
     content.appendChild(grid)
   }
 
-  // ===== 渲染阿里图标内容 =====
+  // ===== 渲染阿里图标内容（按分类） =====
   const renderAliContent = (categoryId: string) => {
-    const existingGrid = content.querySelector('.icon-grid')
-    if (existingGrid) {
-      existingGrid.remove()
-    }
-
-    const grid = document.createElement('div')
-    grid.className = 'icon-grid'
-    // 根据图标大小动态计算按钮大小（图标大小 + 边距）
-    const btnSize = Math.max(40, iconSize + 16)
-    grid.style.cssText = `
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(${btnSize}px, 1fr));
-      gap: 8px;
-    `
+    const grid = replaceGrid()
 
     const cat = aliIconCategories.find(c => c.id === categoryId)
     if (!cat) return
 
     cat.icons.forEach(icon => {
-      const btn = document.createElement('button')
-      btn.className = 'b3-button'
-      btn.style.cssText = `
-        width: ${btnSize}px;
-        height: ${btnSize}px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: 1px solid var(--b3-border-color);
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: ${iconSize}px;
-        background: var(--b3-theme-background);
-        padding: 0;
-      `
-
-      // 创建图标容器
-      const iconSpan = document.createElement('span')
-      iconSpan.style.cssText = `
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        height: 100%;
-      `
-      updateIconDisplay(iconSpan, icon, iconSize)
-      btn.appendChild(iconSpan)
-
-      btn.onclick = () => {
+      grid.appendChild(createIconButton(icon, () => {
         onSelect(icon)
         document.body.removeChild(dialog)
-      }
-
-      btn.onmouseenter = () => {
-        btn.style.background = 'var(--b3-theme-surface)'
-        btn.style.borderColor = 'var(--b3-theme-primary)'
-      }
-
-      btn.onmouseleave = () => {
-        btn.style.background = 'var(--b3-theme-background)'
-        btn.style.borderColor = 'var(--b3-border-color)'
-      }
-
-      grid.appendChild(btn)
+      }))
     })
 
+    content.appendChild(grid)
+  }
+
+  // ===== 渲染极简图标内容（Lucide - 无分类，全量网格） =====
+  const renderLucideContent = () => {
+    const allNames = getLucideIconNames()
+
+    categoryTabs.innerHTML = ''
+    if (allNames.length === 0) {
+      const msg = document.createElement('div')
+      msg.style.cssText = 'padding: 6px 0 10px 0; font-size: 13px; color: var(--b3-theme-on-surface-light);'
+      msg.textContent = 'Lucide 图标库未加载，请确认插件已正确打包 lucide 依赖'
+      categoryTabs.appendChild(msg)
+
+      const grid = replaceGrid()
+      const emptyHint = document.createElement('div')
+      emptyHint.style.cssText = 'grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--b3-theme-on-surface-light);font-size:14px;'
+      emptyHint.textContent = '未能加载 Lucide 图标列表'
+      grid.appendChild(emptyHint)
+      content.appendChild(grid)
+      return
+    }
+
+    const countEl = document.createElement('div')
+    countEl.style.cssText = 'padding: 6px 0 10px 0; font-size: 13px; color: var(--b3-theme-on-surface-light);'
+    countEl.textContent = `共 ${allNames.length} 个图标`
+    categoryTabs.appendChild(countEl)
+
+    const grid = replaceGrid()
+    const fragment = document.createDocumentFragment()
+
+    allNames.forEach(name => {
+      fragment.appendChild(createLucideIconButton(name, () => {
+        onSelect(`lucide:${name}`)
+        document.body.removeChild(dialog)
+      }))
+    })
+
+    grid.appendChild(fragment)
     content.appendChild(grid)
   }
 
@@ -329,25 +507,7 @@ export function showIconPicker(options: IconPickerOptions): void {
   const updateCategoryTabs = () => {
     categoryTabs.innerHTML = ''
 
-    if (activePartition === 'local') {
-      // 生成本地图标分类标签
-      // 默认选择"表情"分类（emoji-smileys）
-      const defaultCategoryId = 'emoji-smileys'
-      activeCategory = iconCategories.find(c => c.id === defaultCategoryId)?.id || iconCategories[0]?.id
-
-      iconCategories.forEach(cat => {
-        const tab = createCategoryTab(cat.id, cat.name, activeCategory === cat.id, () => {
-          activeCategory = cat.id
-          updateCategoryTabStyles()
-          renderLocalContent(cat.id)
-        })
-        categoryTabs.appendChild(tab)
-      })
-      // 渲染默认分类
-      renderLocalContent(activeCategory)
-    } else if (activePartition === 'siyuan') {
-      // 生成思源表情分类标签
-      // 默认选择"笑脸和人类"分类（people）
+    if (activePartition === 'siyuan') {
       const emojiCategories = getSiYuanEmojis()
       const defaultCategoryId = 'people'
       activeCategory = emojiCategories.find((c: any) => c.id === defaultCategoryId)?.id || emojiCategories[0]?.id
@@ -360,13 +520,10 @@ export function showIconPicker(options: IconPickerOptions): void {
         })
         categoryTabs.appendChild(tab)
       })
-      // 渲染默认分类
       if (activeCategory) {
         renderSiyuanContent(activeCategory)
       }
     } else if (activePartition === 'ali') {
-      // 生成阿里图标分类标签
-      // 默认选择"食物图标"分类
       const defaultCategoryId = 'ali-food'
       activeCategory = aliIconCategories.find(c => c.id === defaultCategoryId)?.id || aliIconCategories[0]?.id
 
@@ -378,8 +535,10 @@ export function showIconPicker(options: IconPickerOptions): void {
         })
         categoryTabs.appendChild(tab)
       })
-      // 渲染默认分类
       renderAliContent(activeCategory)
+    } else if (activePartition === 'lucide') {
+      // 极简图标无分类，直接渲染全量
+      renderLucideContent()
     }
   }
 
@@ -434,8 +593,17 @@ export function showIconPicker(options: IconPickerOptions): void {
     tab.onclick = () => {
       if (activePartition === type) return
 
+      // 切换分区时，若有搜索关键词则自动清空
+      if (searchKeyword) {
+        searchInput.value = ''
+        searchKeyword = ''
+        searchClearBtn.style.display = 'none'
+        partitionTabs.style.display = 'flex'
+      }
+
       activePartition = type
-      activeCategory = '' // 重置分类
+      activeCategory = ''
+      updateSearchPlaceholder()
 
       // 更新分区标签样式
       partitionTabs.querySelectorAll('button').forEach(b => {
@@ -446,7 +614,6 @@ export function showIconPicker(options: IconPickerOptions): void {
         b.style.borderColor = isActive ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
       })
 
-      // 更新分类标签和内容
       updateCategoryTabs()
     }
 
@@ -454,15 +621,16 @@ export function showIconPicker(options: IconPickerOptions): void {
   }
 
   // 添加分区标签
-  partitionTabs.appendChild(createPartitionTab('local', '本体图标'))
-  partitionTabs.appendChild(createPartitionTab('siyuan', '思源图标'))
+  partitionTabs.appendChild(createPartitionTab('lucide', '极简图标'))
   partitionTabs.appendChild(createPartitionTab('ali', '阿里图标'))
+  partitionTabs.appendChild(createPartitionTab('siyuan', '思源图标'))
 
-  // 组装界面
+  // 组装界面：搜索框 → 分区标签 → 分类标签
+  content.appendChild(searchWrapper)
   content.appendChild(partitionTabs)
   content.appendChild(categoryTabs)
 
-  // 初始化显示本体图标分类
+  // 初始化显示思源图标分类
   updateCategoryTabs()
 
   panel.appendChild(header)

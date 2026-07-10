@@ -1598,12 +1598,14 @@ export function createMobileSettingLayout(
 
       const options = [
         { value: 'top', label: '顶部固定' },
-        { value: 'bottom', label: '底部固定' }
+        { value: 'bottom', label: '底部固定' },
+        { value: 'floating', label: '底部悬浮' }
       ]
 
       // 确定当前选中的值
       const getCurrentValue = () => {
         if (context.mobileConfig.enableTopToolbar) return 'top'
+        if (context.mobileConfig.enableFloatingToolbar) return 'floating'
         return 'bottom'  // 默认底部
       }
 
@@ -1622,12 +1624,14 @@ export function createMobileSettingLayout(
           // 更新配置（互斥，只启用一个）
           context.mobileConfig.enableTopToolbar = option.value === 'top'
           context.mobileConfig.enableBottomToolbar = option.value === 'bottom'
+          context.mobileConfig.enableFloatingToolbar = option.value === 'floating'
 
           await context.saveData('mobileToolbarConfig', context.mobileConfig)
 
-          // 动态更新底部/顶部专用设置的禁用状态
+          // 动态更新底部/顶部/悬浮专用设置的禁用状态
           const isBottom = option.value === 'bottom'
           const isTop = option.value === 'top'
+          const isFloating = option.value === 'floating'
 
           document.querySelectorAll('.bottom-toolbar-setting').forEach(el => {
             (el as HTMLInputElement).disabled = !isBottom
@@ -1637,6 +1641,11 @@ export function createMobileSettingLayout(
           document.querySelectorAll('.top-toolbar-setting').forEach(el => {
             (el as HTMLInputElement).disabled = !isTop
             ;(el as HTMLInputElement).style.opacity = isTop ? '' : '0.5'
+          })
+
+          document.querySelectorAll('.floating-toolbar-setting').forEach(el => {
+            (el as HTMLInputElement).disabled = !isFloating
+            ;(el as HTMLInputElement).style.opacity = isFloating ? '' : '0.5'
           })
 
           // 动态显示/隐藏整个配置分区
@@ -1654,6 +1663,13 @@ export function createMobileSettingLayout(
             }
           })
 
+          document.querySelectorAll('.floating-toolbar-section').forEach(el => {
+            const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
+            if (parent) {
+              parent.style.display = isFloating ? '' : 'none'
+            }
+          })
+
           // 同时显示/隐藏分区下的所有配置项
           const updateSectionVisibility = (className: string, show: boolean) => {
             document.querySelectorAll(className).forEach(el => {
@@ -1667,6 +1683,7 @@ export function createMobileSettingLayout(
 
           updateSectionVisibility('.top-toolbar-setting', isTop)
           updateSectionVisibility('.bottom-toolbar-setting', isBottom)
+          updateSectionVisibility('.floating-toolbar-setting', isFloating)
 
           // 重新初始化工具栏
           context.updateMobileToolbar()
@@ -1684,6 +1701,7 @@ export function createMobileSettingLayout(
       setTimeout(() => {
         const isTop = context.mobileConfig.enableTopToolbar
         const isBottom = context.mobileConfig.enableBottomToolbar
+        const isFloating = !!context.mobileConfig.enableFloatingToolbar
 
         document.querySelectorAll('.top-toolbar-section').forEach(el => {
           const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
@@ -1699,6 +1717,13 @@ export function createMobileSettingLayout(
           }
         })
 
+        document.querySelectorAll('.floating-toolbar-section').forEach(el => {
+          const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
+          if (parent) {
+            parent.style.display = isFloating ? '' : 'none'
+          }
+        })
+
         const updateSectionVisibility = (className: string, show: boolean) => {
           document.querySelectorAll(className).forEach(el => {
             const input = el as HTMLInputElement
@@ -1711,6 +1736,7 @@ export function createMobileSettingLayout(
 
         updateSectionVisibility('.top-toolbar-setting', isTop)
         updateSectionVisibility('.bottom-toolbar-setting', isBottom)
+        updateSectionVisibility('.floating-toolbar-setting', isFloating)
       }, 100)
 
       wrapper.appendChild(container)

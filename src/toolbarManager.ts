@@ -1108,6 +1108,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
         `
       }
     }
+  }
 
     // 尝试设置工具栏
     if (!setupToolbar()) {

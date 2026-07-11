@@ -1696,8 +1696,9 @@ export function createMobileSettingLayout(
           context.updateMobileToolbar()
         }
 
-        const text = document.createElement('span')
-        text.textContent = option.label
+	        const text = document.createElement('span')
+	        text.textContent = option.label
+	        text.style.whiteSpace = 'nowrap'  // 避免文字在中间断开换行
 
         label.appendChild(radio)
         label.appendChild(text)
@@ -2195,7 +2196,55 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '④滚动隐藏',
+    title: '④胶囊自身宽度',
+    description: '💡胶囊工具栏自身的固定宽度（0=自动适应按钮宽度）',
+    createActionElement: () => {
+      const currentValueStr = context.mobileConfig.floatingToolbarWidth ?? '0';
+      const currentValue = parseInt(currentValueStr) || 0;
+      const slider = createCustomSliderWithoutLabel(
+        currentValue,
+        0, 500, 'px',
+        async (value) => {
+          context.mobileConfig.floatingToolbarWidth = value + '';
+          await context.saveData('mobileToolbarConfig', context.mobileConfig);
+          context.updateMobileToolbar();
+        }
+      );
+      slider.classList.add('floating-toolbar-setting');
+      if (!context.mobileConfig.enableFloatingToolbar) {
+        slider.style.opacity = '0.5';
+        slider.style.pointerEvents = 'none';
+      }
+      return slider;
+    }
+  })
+
+  setting.addItem({
+    title: '⑤胶囊扩展栏间距',
+    description: '💡扩展工具栏与胶囊之间的间距',
+    createActionElement: () => {
+      const currentValueStr = context.mobileConfig.floatingToolbarOverflowDistance ?? '8';
+      const currentValue = parseInt(currentValueStr) || 8;
+      const slider = createCustomSliderWithoutLabel(
+        currentValue,
+        0, 30, 'px',
+        async (value) => {
+          context.mobileConfig.floatingToolbarOverflowDistance = value + '';
+          await context.saveData('mobileToolbarConfig', context.mobileConfig);
+          context.updateMobileToolbar();
+        }
+      );
+      slider.classList.add('floating-toolbar-setting');
+      if (!context.mobileConfig.enableFloatingToolbar) {
+        slider.style.opacity = '0.5';
+        slider.style.pointerEvents = 'none';
+      }
+      return slider;
+    }
+  })
+
+  setting.addItem({
+    title: '⑥滚动隐藏',
     description: '💡开启后向下滚动时胶囊自动隐藏，向上滚动时重新显示',
     createActionElement: () => {
       const toggle = document.createElement('input')
@@ -2221,6 +2270,57 @@ export function createMobileSettingLayout(
         toggleWrapper.style.pointerEvents = 'none';
       }
       return toggleWrapper;
+    }
+  })
+
+  setting.addItem({
+    title: '⑦胶囊样式',
+    description: '💡普通模式为当前样式，毛玻璃模式为半透明磨砂效果',
+    createActionElement: () => {
+      const wrapper = document.createElement('div')
+      wrapper.style.cssText = 'display: flex; gap: 12px; align-items: center;'
+      wrapper.classList.add('floating-toolbar-setting')
+
+	      const styles = [
+        { value: 'normal', label: '普通模式' },
+        { value: 'glass', label: '毛玻璃' },
+      ]
+
+	      styles.forEach(s => {
+	        const btn = document.createElement('button')
+	        btn.textContent = s.label
+	        btn.dataset.value = s.value
+	        const refreshBtn = () => {
+	          const active = context.mobileConfig.floatingToolbarStyle === s.value
+	          btn.style.cssText = `
+	            padding: 6px 16px; border-radius: 8px; cursor: pointer;
+	            font-size: 14px; font-weight: 500;
+	            border: 1px solid var(--b3-border-color);
+	            background: ${active ? 'var(--b3-theme-primary)' : 'var(--b3-theme-surface)'};
+	            color: ${active ? '#fff' : 'var(--b3-theme-on-surface)'};
+	            transition: all 0.15s ease;
+	          `
+	        }
+	        refreshBtn()
+	        btn.onclick = async () => {
+	          context.mobileConfig.floatingToolbarStyle = s.value
+	          await context.saveData('mobileToolbarConfig', context.mobileConfig)
+	          // 立即更新所有按钮的高亮状态，再刷新工具栏
+	          wrapper.querySelectorAll('button').forEach(b => {
+	            const isActive = b.dataset.value === context.mobileConfig.floatingToolbarStyle
+	            b.style.background = isActive ? 'var(--b3-theme-primary)' : 'var(--b3-theme-surface)'
+	            b.style.color = isActive ? '#fff' : 'var(--b3-theme-on-surface)'
+	          })
+	          context.updateMobileToolbar()
+	        }
+	        wrapper.appendChild(btn)
+	      })
+
+      if (!context.mobileConfig.enableFloatingToolbar) {
+        wrapper.style.opacity = '0.5';
+        wrapper.style.pointerEvents = 'none';
+      }
+      return wrapper;
     }
   })
 

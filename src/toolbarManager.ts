@@ -66,13 +66,16 @@ export interface MobileToolbarConfig {
   overflowToolbarHeightTop?: string     // 顶部模式扩展工具栏高度（如 "40px"）
   topToolbarRetryDelay?: number;        // 顶部工具栏重试延迟（毫秒，0=无重试）
 
-  // 底部胶囊工具栏配置
-  enableFloatingToolbar?: boolean;  // 是否启用底部胶囊工具栏
-  floatingToolbarMargin?: string;   // 胶囊距底部距离
-  floatingToolbarBorderRadius?: string; // 胶囊圆角
-  floatingToolbarHeight?: string;   // 胶囊自身高度
-  floatingToolbarScrollHide?: boolean; // 胶囊滚动隐藏
-}
+	  // 底部胶囊工具栏配置
+	  enableFloatingToolbar?: boolean;  // 是否启用底部胶囊工具栏
+	  floatingToolbarMargin?: string;   // 胶囊距底部距离
+	  floatingToolbarBorderRadius?: string; // 胶囊圆角
+	  floatingToolbarHeight?: string;   // 胶囊自身高度
+		  floatingToolbarWidth?: string;    // 胶囊固定宽度（px），0=自动
+		  floatingToolbarOverflowDistance?: string; // 胶囊扩展工具栏间距（px）
+      floatingToolbarStyle?: string;   // 胶囊样式：normal=普通, glass=毛玻璃
+      floatingToolbarScrollHide?: boolean; // 胶囊滚动隐藏
+	}
 
 export interface ButtonConfig {
   id: string;                 // 唯一标识
@@ -202,13 +205,16 @@ export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
   topToolbarOffset: '50px',   // 距离顶部 50px
   topToolbarPaddingLeft: '0px', // 顶部工具栏左边距（居中显示）
 
-  // 底部胶囊工具栏配置（默认不启用）
-  enableFloatingToolbar: false,
-  floatingToolbarMargin: '12px',
-  floatingToolbarBorderRadius: '24px',
-  floatingToolbarHeight: '40px',
-  floatingToolbarScrollHide: false,
-}
+	  // 底部胶囊工具栏配置（默认不启用）
+	  enableFloatingToolbar: false,
+	  floatingToolbarMargin: '12px',
+	  floatingToolbarBorderRadius: '24px',
+	  floatingToolbarHeight: '40px',
+	  floatingToolbarWidth: '0',     // 0=自动
+	  floatingToolbarOverflowDistance: '8',  // 扩展工具栏间距（px）
+      floatingToolbarStyle: 'normal',
+      floatingToolbarScrollHide: false,
+	}
 
 export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = []
 
@@ -501,6 +507,8 @@ let toolbarAutoHideLastHide = 0
 let toolbarAutoHideLastShow = 0
 let toolbarAutoHideIgnoreUntil = 0  // hide/show 后的静默期，期间只跟踪位置不动作，防止布局位移引发的反馈滚动
 let toolbarAutoHideDocLocked = false  // 缓存当前文档锁状态，滚动处理器直接读，避免每帧 querySelector
+	let toolbarAutoHideForceActive = false  // 胶囊滚动隐藏开关：不依赖文档锁也能滚动隐藏
+	let toolbarAutoHideCapsuleMode = false  // 当前工具栏是否为胶囊布局（与滚动隐藏开关解耦）
 let toolbarAutoHidePendingTimer: ReturnType<typeof setTimeout> | null = null  // 跟踪隐藏/显示的延时定时器
 const toolbarCheckTimers = new Map<Element, ReturnType<typeof setTimeout>>()  // [已弃用] 保留兼容，不再写入
 
@@ -896,8 +904,12 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
   // 保存配置到全局变量，供扩展工具栏使用
   (window as any).__mobileToolbarConfig = config
 
-  // 判断工具栏模式
-  const isFloating = config.enableFloatingToolbar
+	  // 重置胶囊滚动隐藏标记（后面如果还是胶囊模式会重新设上）
+	  toolbarAutoHideForceActive = false
+	  toolbarAutoHideCapsuleMode = config.enableFloatingToolbar ?? false
+	
+	  // 判断工具栏模式
+	  const isFloating = config.enableFloatingToolbar
 
   if (config.enableBottomToolbar || isFloating) {
     // === 底部工具栏模式 ===
@@ -937,94 +949,31 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
     }
 
     const setupToolbarForElement = (toolbar: Element) => {
-      // 防止重复设置
-      if ((toolbar as HTMLElement).dataset.toolbarCustomized === 'true') return
-
-      // 标记已设置
-      (toolbar as HTMLElement).dataset.toolbarCustomized = 'true'
-
-      // 初始设置
-      let baseHeight = window.innerHeight  // 基准高度（输入法关闭时的高度）
-      let inputMethodOpen = false
-
-      // 创建 CSS 变量
-      document.documentElement.style.setProperty('--mobile-toolbar-offset', config.closeInputOffset)
-      
-      // 更新工具栏位置
-      function updateToolbarPosition() {
-        const currentHeight = window.innerHeight
-      
-        // 计算高度变化百分比（相对于基准高度）
-        const heightRatio = currentHeight / baseHeight
-      
-        // 如果当前高度比基准高度小阈值以上，认为输入法打开了
-        const threshold = config.heightThreshold / 100
-        const isNowOpen = heightRatio <= threshold
-      
-        if (isNowOpen !== inputMethodOpen) {
-          inputMethodOpen = isNowOpen
-      
-          if (inputMethodOpen) {
-            // 输入法打开时
-            document.documentElement.style.setProperty('--mobile-toolbar-offset', config.openInputOffset)
-            toolbar.setAttribute('data-input-method', 'open')
-          } else {
-            // 输入法关闭时
-            document.documentElement.style.setProperty('--mobile-toolbar-offset', config.closeInputOffset)
-            toolbar.setAttribute('data-input-method', 'close')
-            // 重置基准高度为当前高度（因为现在输入法已关闭）
-            baseHeight = currentHeight
-          }
+      // 更新CSS样式（每次都要执行，使胶囊配置变更实时生效）
+      const updateToolbarCSS = () => {
+        const styleId = 'mobile-toolbar-custom-style'
+        let style = document.getElementById(styleId) as HTMLStyleElement
+        if (!style) {
+          style = document.createElement('style')
+          style.id = styleId
+          document.head.appendChild(style)
         }
-      }
-      
-      // 延迟初始化，让 DOM 先渲染完成
-      safeSetTimeout(() => {
-        updateToolbarPosition()
-        // 设置初始属性（根据实际状态）
-        toolbar.setAttribute('data-input-method', inputMethodOpen ? 'open' : 'close')
-      }, 100)
-
-      // 监听窗口大小变化（替代 200ms 轮询，仅在尺寸变化时检测）
-      resizeHandler = updateToolbarPosition
-      window.addEventListener('resize', resizeHandler)
-
-      // 监听焦点事件，作为辅助判断
-      const textInputs = document.querySelectorAll('textarea, input[type="text"], .protyle-wysiwyg, .protyle-content, .protyle-input')
-      textInputs.forEach(input => {
-        const focusHandler = () => {
-          safeSetTimeout(updateToolbarPosition, 300)
-        }
-        const blurHandler = () => {
-          safeSetTimeout(updateToolbarPosition, 300)
-        }
-        input.addEventListener('focus', focusHandler)
-        input.addEventListener('blur', blurHandler)
-        // 保存引用以便清理
-        focusEventHandlers.push({ element: input as HTMLElement, focusHandler, blurHandler })
-      })
-
-      // 添加CSS样式
-      const styleId = 'mobile-toolbar-custom-style'
-      let style = document.getElementById(styleId) as HTMLStyleElement
-      if (!style) {
-        style = document.createElement('style')
-        style.id = styleId
-        document.head.appendChild(style)
-      }
-
-      // 如果禁用了自定义按钮，则不应用移动端工具栏样式
-      if (disableCustomButtons) {
-        style.textContent = ''
-      } else {
-        const floatMargin = config.floatingToolbarMargin || '12px'
-        const floatRadius = config.floatingToolbarBorderRadius || '24px'
-
-        if (isFloating) {
-          // === 底部胶囊模式 CSS ===
-          const capHeight = config.floatingToolbarHeight || config.toolbarHeight || '40px'
-          const scrollHideTransition = config.floatingToolbarScrollHide ? 'bottom 0.3s ease, opacity 0.3s ease' : 'bottom 0.3s ease'
-          style.textContent = `
+        if (disableCustomButtons) {
+          style.textContent = ''
+        } else {
+          const floatMargin = config.floatingToolbarMargin || '12px'
+          const floatRadius = config.floatingToolbarBorderRadius || '24px'
+          if (isFloating) {
+            const capHeight = config.floatingToolbarHeight || config.toolbarHeight || '40px'
+            const floatWidthVal = config.floatingToolbarWidth && parseInt(config.floatingToolbarWidth) > 0
+            const floatWidth = floatWidthVal ? `${config.floatingToolbarWidth}px` : 'auto'
+            const floatMaxWidth = floatWidthVal ? 'none' : '95vw'
+            const isGlass = config.floatingToolbarStyle === 'glass'
+            const floatBlur = isGlass ? 'blur(20px) saturate(180%)' : 'blur(10px)'
+            const floatShadow = isGlass
+              ? '0 8px 32px rgba(0,0,0,0.18)'
+              : '0 4px 24px rgba(0, 0, 0, 0.15)'
+            style.textContent = `
             @media (max-width: 768px) {
               .protyle-breadcrumb__bar[data-input-method],
               .protyle-breadcrumb[data-input-method] {
@@ -1032,9 +981,9 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
                 bottom: calc(${floatMargin} + var(--mobile-toolbar-offset) + env(safe-area-inset-bottom)) !important;
                 top: auto !important;
                 left: 50% !important;
-                transform: translateX(-50%) translateZ(0) !important;
-                width: auto !important;
-                max-width: 95vw !important;
+                transform: translateX(-50%) translateY(0);
+                width: ${floatWidth} !important;
+                max-width: ${floatMaxWidth} !important;
                 z-index: ${config.toolbarZIndex} !important;
                 border: 1px solid var(--b3-border-color) !important;
                 border-radius: ${floatRadius} !important;
@@ -1042,29 +991,28 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
                 display: flex !important;
                 justify-content: center !important;
                 align-items: center !important;
-                box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15) !important;
-                transition: ${scrollHideTransition} !important;
-                backdrop-filter: blur(10px);
+                box-shadow: ${floatShadow} !important;
+                transition: opacity 0.16s ease, transform 0.16s ease !important;
+                backdrop-filter: ${floatBlur};
+                -webkit-backdrop-filter: ${floatBlur};
                 height: ${capHeight} !important;
                 min-height: ${capHeight} !important;
                 -webkit-backface-visibility: hidden;
                 backface-visibility: hidden;
                 will-change: transform;
               }
-
-              /* 滚动隐藏 */
-              body.siyuan-toolbar-customizer-enabled .floating-toolbar-hidden[data-input-method],
-              body.siyuan-toolbar-customizer-enabled .floating-toolbar-hidden[data-input-method] .protyle-breadcrumb {
-                bottom: calc(-${capHeight} - ${floatMargin}) !important;
-                opacity: 0 !important;
-                pointer-events: none !important;
+              ${isGlass ? `
+              /* 毛玻璃模式 */
+              .protyle-breadcrumb__bar[data-input-method],
+              .protyle-breadcrumb[data-input-method] {
+                background: rgba(255, 255, 255, 0.25) !important;
+                border-color: rgba(0, 0, 0, 0.06) !important;
               }
-
-              /* 防止编辑器内容被遮挡 */
-              body.siyuan-toolbar-customizer-enabled .protyle {
-                padding-bottom: calc(${config.toolbarHeight} + ${floatMargin} + env(safe-area-inset-bottom) + 8px) !important;
-              }
-            }
+              html[data-theme-mode="dark"] .protyle-breadcrumb__bar[data-input-method],
+              html[data-theme-mode="dark"] .protyle-breadcrumb[data-input-method] {
+                background: rgba(30, 30, 30, 0.3) !important;
+                border-color: rgba(255, 255, 255, 0.06) !important;
+              }` : ''}
           `
         } else {
           // 底部固定模式 CSS（原有）
@@ -1090,7 +1038,6 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
               backdrop-filter: blur(10px);
               height: ${config.toolbarHeight} !important;
               min-height: ${config.toolbarHeight} !important;
-              /* iOS z-index 修复 - 启用硬件加速提升层级 */
               -webkit-transform: translateZ(0);
               transform: translateZ(0);
               -webkit-backface-visibility: hidden;
@@ -1108,12 +1055,10 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
               bottom: calc(var(--mobile-toolbar-offset) + env(safe-area-inset-bottom)) !important;
             }
 
-            /* 防止编辑器内容被遮挡 - 仅在启用底部工具栏且工具栏显示时应用 */
             body.siyuan-toolbar-customizer-enabled .protyle {
               padding-bottom: calc(${config.toolbarHeight} + env(safe-area-inset-bottom) + 3px) !important;
             }
 
-            /* 使用思源原生的隐藏类 */
             .protyle-breadcrumb__bar[data-input-method].fn__none,
             .protyle-breadcrumb[data-input-method].fn__none {
               display: none !important;
@@ -1123,6 +1068,59 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
       }
     }
   }
+
+      // 执行CSS更新（每次都要刷新，使配置变更实时生效）
+      updateToolbarCSS()
+
+	    // 防止重复设置
+	    if ((toolbar as HTMLElement).dataset.toolbarCustomized === 'true') return
+
+	    // 标记已设置
+	    (toolbar as HTMLElement).dataset.toolbarCustomized = 'true'
+
+	    // 初始设置
+	    let baseHeight = window.innerHeight
+	    let inputMethodOpen = false
+
+	    // 创建 CSS 变量
+	    document.documentElement.style.setProperty('--mobile-toolbar-offset', config.closeInputOffset)
+
+	    // 更新工具栏位置
+	    function updateToolbarPosition() {
+	      const currentHeight = window.innerHeight
+	      const heightRatio = currentHeight / baseHeight
+	      const threshold = config.heightThreshold / 100
+	      const isNowOpen = heightRatio <= threshold
+	      if (isNowOpen !== inputMethodOpen) {
+	        inputMethodOpen = isNowOpen
+	        if (inputMethodOpen) {
+	          document.documentElement.style.setProperty('--mobile-toolbar-offset', config.openInputOffset)
+	          toolbar.setAttribute('data-input-method', 'open')
+	        } else {
+	          document.documentElement.style.setProperty('--mobile-toolbar-offset', config.closeInputOffset)
+	          toolbar.setAttribute('data-input-method', 'close')
+	          baseHeight = currentHeight
+	        }
+	      }
+	    }
+
+	    safeSetTimeout(() => {
+	      updateToolbarPosition()
+	      toolbar.setAttribute('data-input-method', inputMethodOpen ? 'open' : 'close')
+	    }, 100)
+
+	    resizeHandler = updateToolbarPosition
+	    window.addEventListener('resize', resizeHandler)
+
+	    const textInputs = document.querySelectorAll('textarea, input[type="text"], .protyle-wysiwyg, .protyle-content, .protyle-input')
+	    textInputs.forEach(input => {
+	      const focusHandler = () => safeSetTimeout(updateToolbarPosition, 300)
+	      const blurHandler = () => safeSetTimeout(updateToolbarPosition, 300)
+	      input.addEventListener('focus', focusHandler)
+	      input.addEventListener('blur', blurHandler)
+	      focusEventHandlers.push({ element: input as HTMLElement, focusHandler, blurHandler })
+	    })
+	  }
 
     // 尝试设置工具栏
     if (!setupToolbar()) {
@@ -1167,38 +1165,27 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
       }, 100)
     }
     
-    // 监听 DOM 变化（缩小监听范围，只监听直接子元素变化）
-    const toolbarContainer = document.querySelector('.layout__center') ||
-                            document.querySelector('.fn__flex-1.fn__flex-column') ||
-                            document.body
-    if (mutationObserver) mutationObserver.disconnect()
-    mutationObserver = new MutationObserver(handleMutation)
-    mutationObserver.observe(toolbarContainer, {
-      childList: true,  // 只监听直接子元素
-      subtree: false    // 不监听后代节点，提升性能
-    })
+	    // 监听 DOM 变化，检测面包屑的出现
+	    // 注意：必须 subtree: true，因为 .protyle-breadcrumb 在 .protyle 内层，
+	    // 首次加载时 breadcrumb 可能还未渲染，需等 SiYuan 创建文档后才出现。
+	    const toolbarContainer = document.querySelector('.layout__center') ||
+	                            document.querySelector('.fn__flex-1.fn__flex-column') ||
+	                            document.body
+	    if (mutationObserver) mutationObserver.disconnect()
+	    mutationObserver = new MutationObserver(handleMutation)
+	    mutationObserver.observe(toolbarContainer, {
+	      childList: true,
+	      subtree: true,    // 必须 true，才能监测到深层 breadcrumb 的添加
+	    })
 
     // 页面加载完成后检查一次
     updateToolbarVisibility()
 
-    // 底部胶囊：滚动隐藏
+    // 底部胶囊：滚动隐藏（复用 toggle-lock 的机制，不依赖文档锁定）
     if (isFloating && config.floatingToolbarScrollHide) {
-      let scrollHideTimer: ReturnType<typeof setTimeout> | null = null
-      let lastScrollY = window.scrollY
-      const scrollHandler = () => {
-        if (scrollHideTimer) clearTimeout(scrollHideTimer)
-        scrollHideTimer = setTimeout(() => {
-          const currentY = window.scrollY
-          const toolbars = document.querySelectorAll<HTMLElement>('[data-toolbar-customized="true"][data-input-method]')
-          if (currentY > lastScrollY + 10) {
-            toolbars.forEach(el => el.classList.add('floating-toolbar-hidden'))
-          } else if (currentY < lastScrollY - 5) {
-            toolbars.forEach(el => el.classList.remove('floating-toolbar-hidden'))
-          }
-          lastScrollY = currentY
-        }, 50)
-      }
-      window.addEventListener('scroll', scrollHandler, { passive: true })
+      ensureToolbarAutoHideStyle()
+      toolbarAutoHideForceActive = true
+      startToolbarScrollBindRetry()
     }
 
     // 底部固定模式提前返回（悬浮模式继续执行到公共代码段）
@@ -1519,6 +1506,17 @@ function cleanupCustomButtons() {
 function setupEditorButtons(configs: ButtonConfig[]) {
   // 保存按钮配置到全局变量，供扩展工具栏使用
   (window as any).__mobileButtonConfigs = configs
+
+  // 等待 initMobileToolbarAdjuster 初始化完成后再溢出计算
+  // 必须要有 data-input-method 胶囊 CSS (position:fixed, width:xxx) 才生效，
+  // 否则 getToolbarAvailableWidth() 读到的是 SiYuan 原生全屏宽度，不是胶囊真实宽度。
+  const toolbarReady = document.querySelector(
+    '.protyle-breadcrumb[data-input-method], .protyle-breadcrumb__bar[data-input-method]'
+  )
+  if (isMobileDevice() && !toolbarReady) {
+    requestAnimationFrame(() => setupEditorButtons(configs))
+    return
+  }
 
   // 找到扩展工具栏按钮，获取层数配置
   const overflowBtn = configs.find(btn => btn.id === OVERFLOW_BUTTON_ID_MOBILE)
@@ -1964,11 +1962,12 @@ function showOverflowToolbar(config: ButtonConfig) {
     overflowButton.style.backgroundColor = 'var(--b3-list-hover)'
   }
 
-  // 检测工具栏位置：通过 body 类名判断是否启用了底部工具栏
-  const isBottomToolbar = document.body.classList.contains('siyuan-toolbar-customizer-enabled')
-
-  // 获取层数配置（1-5层）
-  const layers = config.layers || 1
+	  // 检测工具栏位置：通过 body 类名判断是否启用了底部工具栏
+	  const isBottomToolbar = document.body.classList.contains('siyuan-toolbar-customizer-enabled')
+	  const isCapsuleMode = toolbarAutoHideCapsuleMode  // 胶囊布局下扩展栏与胶囊同宽居中
+	
+	  // 获取层数配置（1-5层）
+	  const layers = config.layers || 1
 
   // 获取移动端工具栏配置
   const mobileConfig = (window as any).__mobileToolbarConfig as MobileToolbarConfig
@@ -1990,18 +1989,28 @@ function showOverflowToolbar(config: ButtonConfig) {
     const mainToolbarHeightTop = parseInt(String(mobileConfig.toolbarHeight ?? '40'), 10) || 40
     topOffset = safeTop + mainToolbarHeightTop + distanceTopNum
   }
-  // 底部模式：计算 = closeInputOffset + 主工具栏高度 + overflowToolbarDistanceBottom
-  // 注意：不能用 if (mobileConfig?.closeInputOffset) —— 持久化里可能是数字 0、null、""，会误判为假，
-  // 从而整段不执行、bottomOffset 恒为 60，导致 overflowToolbarDistanceBottom 永远不生效。
-  let bottomOffset = 60
-  if (mobileConfig) {
-    const bottomOffsetNum = parseInt(String(mobileConfig.closeInputOffset ?? '0'), 10)
-    const safeBottom = Number.isNaN(bottomOffsetNum) ? 0 : bottomOffsetNum
-    const _distanceBottom = parseInt(String(mobileConfig.overflowToolbarDistanceBottom ?? ''), 10)
-    const distanceBottomNum = Number.isNaN(_distanceBottom) ? 8 : _distanceBottom
-    const mainToolbarHeightBottom = parseInt(String(mobileConfig.toolbarHeight ?? '40'), 10) || 40
-    bottomOffset = safeBottom + mainToolbarHeightBottom + distanceBottomNum
-  }
+	  // 底部模式：计算 = closeInputOffset + 主工具栏高度 + overflowToolbarDistanceBottom
+	  // 胶囊模式：使用胶囊自身配置（floatingToolbarMargin + floatingToolbarHeight + floatingToolbarOverflowDistance）
+	  // 注意：不能用 if (mobileConfig?.closeInputOffset) —— 持久化里可能是数字 0、null、""，会误判为假，
+	  // 从而整段不执行、bottomOffset 恒为 60，导致 overflowToolbarDistanceBottom 永远不生效。
+	  let bottomOffset = 60
+	  if (mobileConfig) {
+	    if (isCapsuleMode) {
+	      const _margin = parseInt(String(mobileConfig.floatingToolbarMargin ?? '12'), 10)
+	      const _height = parseInt(String(mobileConfig.floatingToolbarHeight ?? '40'), 10)
+	      const _dist = parseInt(String(mobileConfig.floatingToolbarOverflowDistance ?? '8'), 10)
+	      bottomOffset = (Number.isNaN(_margin) ? 12 : _margin)
+	                + (Number.isNaN(_height) ? 40 : _height)
+	                + (Number.isNaN(_dist) ? 8 : _dist)
+	    } else {
+	      const bottomOffsetNum = parseInt(String(mobileConfig.closeInputOffset ?? '0'), 10)
+	      const safeBottom = Number.isNaN(bottomOffsetNum) ? 0 : bottomOffsetNum
+	      const _distanceBottom = parseInt(String(mobileConfig.overflowToolbarDistanceBottom ?? ''), 10)
+	      const distanceBottomNum = Number.isNaN(_distanceBottom) ? 8 : _distanceBottom
+	      const mainToolbarHeightBottom = parseInt(String(mobileConfig.toolbarHeight ?? '40'), 10) || 40
+	      bottomOffset = safeBottom + mainToolbarHeightBottom + distanceBottomNum
+	    }
+	  }
 
   // 获取所有按钮配置
   const allButtons = (window as any).__mobileButtonConfigs || []
@@ -2124,21 +2133,32 @@ function showOverflowToolbar(config: ButtonConfig) {
       `
     }
 
-    toolbar.style.cssText = `
-      ${positionCss}
-      left: 10px;
-      right: 10px;
-      height: ${toolbarHeight}px;
-      background: var(--b3-theme-surface);
-      border: 1px solid var(--b3-theme-primary);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      padding: 0 12px;
-      z-index: ${1000 + i};
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    `
+	    // 胶囊模式：扩展面板跟随胶囊的位置和宽度
+	    let horizontalCss = 'left: 10px; right: 10px;'
+	    if (isCapsuleMode) {
+	      const capsuleEl = document.querySelector(
+	        '.protyle-breadcrumb__bar[data-toolbar-customized], .protyle-breadcrumb[data-toolbar-customized]'
+	      ) as HTMLElement
+	      if (capsuleEl) {
+	        const cr = capsuleEl.getBoundingClientRect()
+	        horizontalCss = `left: ${cr.left}px; width: ${cr.width}px; box-sizing: border-box;`
+	      }
+	    }
+
+	    toolbar.style.cssText = `
+	      ${positionCss}
+	      ${horizontalCss}
+	      height: ${toolbarHeight}px;
+	      background: var(--b3-theme-surface);
+	      border: 1px solid var(--b3-theme-primary);
+	      border-radius: 8px;
+	      display: flex;
+	      align-items: center;
+	      justify-content: flex-end;
+	      padding: 0 12px;
+	      z-index: ${1000 + i};
+	      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+	    `
 
     // 应用工具栏背景颜色和透明度配置
     if (mobileConfig) {
@@ -4461,19 +4481,22 @@ function getToolbarElementsForAutoHide(): HTMLElement[] {
   return els
 }
 
-		/** 处理滚动事件 */
-		function handleToolbarAutoHideScroll(): void {
-		  if (!toolbarAutoHideConfigured) return
-		  // 读缓存的锁状态（refreshToolbarAutoHide 切文档/锁切换时更新），省掉每帧 querySelector
-		  if (!toolbarAutoHideDocLocked) {
-		    // 文档已解锁，立即恢复工具栏
-		    if (toolbarHiddenByScroll) {
-		      toolbarHiddenByScroll = false
-			      document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
-			        const htmlEl = el as HTMLElement
-			        htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
-			        htmlEl.classList.remove('toolbar-scroll-hidden');
-			        htmlEl.style.transform = 'translateZ(0) translateY(0)'
+			/** 处理滚动事件 */
+			function handleToolbarAutoHideScroll(): void {
+			  if (!toolbarAutoHideConfigured && !toolbarAutoHideForceActive) return
+			  // 胶囊模式不检查文档锁定；toggle-lock 模式下文档解锁时恢复工具栏
+			  // 读缓存的锁状态（refreshToolbarAutoHide 切文档/锁切换时更新），省掉每帧 querySelector
+			  // 胶囊模式（forceActive）不检查锁定状态
+			  if (!toolbarAutoHideDocLocked && !toolbarAutoHideForceActive) {
+				    // 文档已解锁，立即恢复工具栏
+				    if (toolbarHiddenByScroll) {
+				      toolbarHiddenByScroll = false
+				      const unlockRestoreTransform = toolbarAutoHideCapsuleMode ? 'translateX(-50%) translateY(0)' : 'translateZ(0) translateY(0)'
+				      document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
+				        const htmlEl = el as HTMLElement
+				        htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
+				        htmlEl.classList.remove('toolbar-scroll-hidden');
+				        htmlEl.style.transform = unlockRestoreTransform
 			      })
 		      document.body.classList.remove('toolbar-autohide-active')
 		    }
@@ -4511,29 +4534,37 @@ function getToolbarElementsForAutoHide(): HTMLElement[] {
     toolbarAutoHideIgnoreUntil = now + 250  // 静默 250ms，待 padding 过渡完
     toolbarLastScrollTop = st  // 以当前滚动位置为新基准
     const isTop = document.body.classList.contains('siyuan-toolbar-top-mode')
-	    const slideTransform = isTop
-	      ? 'translateZ(0) translateY(calc(-100% - 120px))'
-	      : 'translateZ(0) translateY(calc(100% + 8px))'
-			    if (isTop) {
-			      // 顶部模式：先隐藏原生顶栏，再滑走工具栏
-			      document.body.classList.add('toolbar-autohide-active')
-			      toolbarAutoHidePendingTimer = setTimeout(() => {
-			        toolbarAutoHidePendingTimer = null
+		    const slideTransform = isTop
+		      ? 'translateZ(0) translateY(calc(-100% - 120px))'
+		      : 'translateZ(0) translateY(calc(100% + 8px))'
+				    if (isTop) {
+				      // 顶部模式：先隐藏原生顶栏，再滑走工具栏
+				      document.body.classList.add('toolbar-autohide-active')
+				      toolbarAutoHidePendingTimer = setTimeout(() => {
+				        toolbarAutoHidePendingTimer = null
 			        getToolbarElementsForAutoHide().forEach(el => {
-			          el.classList.add('toolbar-scroll-hidden')
-			          el.style.transform = slideTransform
+				          el.classList.add('toolbar-scroll-hidden')
+				          // 胶囊模式需要保持 translateX(-50%) 居中对齐
+				          // 注意：不能读 el.style.transform 判断，CSS 中的 translateX 不在内联样式里
+				          el.style.transform = toolbarAutoHideCapsuleMode
+				            ? 'translateX(-50%) translateY(calc(100% + 30px))'
+				            : slideTransform
+				        })
+				      }, 80)
+				    } else {
+				      // 底部模式：先收 protyle 间距 + 状态栏，再滑走工具栏
+				      document.body.classList.add('toolbar-autohide-active')
+				      toolbarAutoHidePendingTimer = setTimeout(() => {
+				        toolbarAutoHidePendingTimer = null
+				        getToolbarElementsForAutoHide().forEach(el => {
+				          el.classList.add('toolbar-scroll-hidden')
+				          // 胶囊模式需要保持 translateX(-50%) 居中对齐
+				          // 注意：不能读 el.style.transform 判断，CSS 中的 translateX 不在内联样式里
+				          el.style.transform = toolbarAutoHideCapsuleMode
+				            ? 'translateX(-50%) translateY(calc(100% + 30px))'
+				            : slideTransform
 			        })
-			      }, 80)
-			    } else {
-		      // 底部模式：先收 protyle 间距 + 状态栏，再滑走工具栏
-		      document.body.classList.add('toolbar-autohide-active')
-		      toolbarAutoHidePendingTimer = setTimeout(() => {
-		        toolbarAutoHidePendingTimer = null
-		        getToolbarElementsForAutoHide().forEach(el => {
-		          el.classList.add('toolbar-scroll-hidden')
-		          el.style.transform = slideTransform
-		        })
-		      }, 50)
+			      }, 50)
 		    }
 		  } else if (toolbarHiddenByScroll && delta < -TOOLBAR_AUTOHIDE_THRESHOLD) {
 		    // 下滑 → 显示
@@ -4554,13 +4585,17 @@ function getToolbarElementsForAutoHide(): HTMLElement[] {
 			        toolbarAutoHidePendingTimer = null
 			        document.body.classList.remove('toolbar-autohide-active')
 			      }, 50)
-			    } else {
-		      // 底部模式：先滑回工具栏，再恢复 protyle 间距 + 状态栏
-		      document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
-		        const htmlEl = el as HTMLElement
-		        htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
-		        htmlEl.classList.remove('toolbar-scroll-hidden')
-		        htmlEl.style.transform = 'translateZ(0) translateY(0)'
+				    } else {
+			      // 底部模式：先滑回工具栏，再恢复 protyle 间距 + 状态栏
+			      document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
+			        const htmlEl = el as HTMLElement
+			        htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
+			        htmlEl.classList.remove('toolbar-scroll-hidden')
+			        // 胶囊模式需要保持 translateX(-50%) 居中对齐
+			        // 注意：不能读 el.style.transform 判断，CSS 中的 translateX 不在内联样式里
+			    htmlEl.style.transform = toolbarAutoHideCapsuleMode
+			          ? 'translateX(-50%) translateY(0)'
+			          : 'translateZ(0) translateY(0)'
 		      })
 		      toolbarAutoHidePendingTimer = setTimeout(() => {
 		        toolbarAutoHidePendingTimer = null
@@ -4661,45 +4696,75 @@ function unbindToolbarAutoHideScroll(): void {
 	  }
 	}
 
-/** 刷新工具栏滚动隐藏状态（切换文档/锁定文档/初始化时调用） */
-	export function refreshToolbarAutoHide(): void {
-	  // 仅移动端生效
-	  if (!isMobileDevice()) return
+	/** 刷新工具栏滚动隐藏状态（切换文档/锁定文档/初始化时调用）
+	 *
+	 * 胶囊滚动隐藏（toolbarAutoHideForceActive）和 toggle-lock 滚动隐藏
+	 * 共用同一套监听/动画基础设施，但胶囊特殊之处在于它用 translateX(-50%) 居中。
+	 * 此函数必须区分三种场景：
+	 *   1. 胶囊滚动隐藏激活（forceActive）→ 不动滚动监听，由胶囊自主管理
+	 *   2. 胶囊布局 + toggle-lock（!forceActive && capsuleMode）→ toggle-lock 管理生命周期，
+	 *      但恢复 transform 时要保留 translateX(-50%) 居中
+	 *   3. 底部固定/顶部模式 → 完整清理
+	 */
+		export function refreshToolbarAutoHide(): void {
+		  // 仅移动端生效
+		  if (!isMobileDevice()) return
+	
+		  // 检查是否有 toggle-lock 按钮配置了 toolbarAutoHide
+		  toolbarAutoHideConfigured = currentButtonConfigs.some(
+		    b => b.type === 'author-tool' && b.authorToolSubtype === 'toggle-lock' && b.toolbarAutoHide
+		  )
+	
+	  const hasToggleLockAutoHide = toolbarAutoHideConfigured
+	  const capsuleScrollHideOn = toolbarAutoHideForceActive  // 胶囊自主滚动隐藏
+	  const isCapsuleLayout = toolbarAutoHideCapsuleMode       // 胶囊布局（不论滚动隐藏开关）
 
-	  // 检查是否有 toggle-lock 按钮配置了 toolbarAutoHide
-	  toolbarAutoHideConfigured = currentButtonConfigs.some(
-	    b => b.type === 'author-tool' && b.authorToolSubtype === 'toggle-lock' && b.toolbarAutoHide
-	  )
+	  /** 恢复工具栏（移除隐藏样式，重置 transform） */
+	  const restoreToolbar = () => {
+	    toolbarHiddenByScroll = false
+	    const restoreTransform = isCapsuleLayout ? 'translateX(-50%) translateY(0)' : 'translateZ(0) translateY(0)'
+	    document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
+	      const htmlEl = el as HTMLElement
+	      htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
+	      htmlEl.classList.remove('toolbar-scroll-hidden')
+	      htmlEl.style.transform = restoreTransform
+	    })
+	    document.body.classList.remove('toolbar-autohide-active')
+	  }
 
-  if (!toolbarAutoHideConfigured) {
-    unbindToolbarAutoHideScroll()
-    toolbarHiddenByScroll = false
-    document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => { const htmlEl = el as HTMLElement; htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'; htmlEl.classList.remove('toolbar-scroll-hidden'); htmlEl.style.transform = 'translateZ(0) translateY(0)' })
-    document.body.classList.remove('toolbar-autohide-active')
-    document.body.classList.remove('toolbar-locked')
-    return
-  }
-
-  // 检查当前文档是否锁定
-  const readonlyBtn = document.querySelector('[data-type="readonly"]') as HTMLElement | null
-  const isLocked = readonlyBtn?.getAttribute('data-subtype') === 'lock'
-  toolbarAutoHideDocLocked = isLocked  // 缓存供滚动处理器读取，省去每帧 querySelector
-  // 锁定时始终隐藏原生顶栏（不跟滚动联动），解锁时恢复
-  document.body.classList.toggle('toolbar-locked', isLocked)
-
-  if (!isLocked) {
-    unbindToolbarAutoHideScroll()
-    toolbarHiddenByScroll = false
-    document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => { const htmlEl = el as HTMLElement; htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'; htmlEl.classList.remove('toolbar-scroll-hidden'); htmlEl.style.transform = 'translateZ(0) translateY(0)' })
-    document.body.classList.remove('toolbar-autohide-active')
-    return
-  }
-
-	  // 锁定状态：注入样式 + 绑定滚动监听
-	  ensureToolbarAutoHideStyle()
-	  bindToolbarAutoHideScroll()
-	  if (!toolbarAutoHideBoundEl) startToolbarScrollBindRetry()
-	}
+	  if (!hasToggleLockAutoHide) {
+	    // 没有 toggle-lock autoHide——只清理 toggle-lock 相关状态
+	    document.body.classList.remove('toolbar-locked')
+	    if (!capsuleScrollHideOn) {
+	      // 胶囊未开启自主滚动隐藏 → 彻底清理
+	      unbindToolbarAutoHideScroll()
+	      restoreToolbar()
+	    }
+	    return
+	  }
+	
+	  // 检查当前文档是否锁定
+	  const readonlyBtn = document.querySelector('[data-type="readonly"]') as HTMLElement | null
+	  const isLocked = readonlyBtn?.getAttribute('data-subtype') === 'lock'
+	  toolbarAutoHideDocLocked = isLocked  // 缓存供滚动处理器读取，省去每帧 querySelector
+	  // 锁定时始终隐藏原生顶栏（不跟滚动联动），解锁时恢复
+	  document.body.classList.toggle('toolbar-locked', isLocked)
+	
+	  if (!isLocked) {
+	    // 文档未锁定——只清理 toggle-lock 的滚动隐藏
+	    if (!capsuleScrollHideOn) {
+	      // 胶囊未开启自主滚动隐藏 → 允许解绑
+	      unbindToolbarAutoHideScroll()
+	      restoreToolbar()
+	    }
+	    return
+	  }
+	
+		  // 锁定状态：注入样式 + 绑定滚动监听
+		  ensureToolbarAutoHideStyle()
+		  bindToolbarAutoHideScroll()
+		  if (!toolbarAutoHideBoundEl) startToolbarScrollBindRetry()
+		}
 
 	/**
 	 * 一键清理当前文档的空块

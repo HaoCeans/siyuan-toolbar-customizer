@@ -259,7 +259,7 @@ export function showIconPicker(options: IconPickerOptions): void {
 	    const svgHtml = lucideToSvg(iconName, iconSize)
     if (svgHtml) {
       btn.innerHTML = svgHtml
-      btn.style.color = 'var(--b3-theme-on-background)'
+      btn.style.color = 'var(--b3-theme-on-surface)'
       const svg = btn.querySelector('svg')
       if (svg) svg.style.cssText = 'flex-shrink:0;display:block;color:inherit'
     } else {

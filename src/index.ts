@@ -410,11 +410,14 @@ export default class ToolbarCustomizer extends Plugin {
         }
       }
 
-      // 同步全局按钮配置的 showNotification 到所有电脑端按钮
+      // 同步全局按钮配置到所有电脑端按钮（iconSize/minWidth/marginRight/showNotification）
       // 只有启用全局配置时才同步，否则保留各按钮的独立配置
-      if ((this.desktopGlobalButtonConfig.enabled ?? true) && this.desktopGlobalButtonConfig.showNotification !== undefined) {
+      if (this.desktopGlobalButtonConfig.enabled ?? true) {
         this.desktopButtonConfigs.forEach(btn => {
-          btn.showNotification = this.desktopGlobalButtonConfig.showNotification
+          if (this.desktopGlobalButtonConfig.iconSize !== undefined) btn.iconSize = this.desktopGlobalButtonConfig.iconSize
+          if (this.desktopGlobalButtonConfig.minWidth !== undefined) btn.minWidth = this.desktopGlobalButtonConfig.minWidth
+          if (this.desktopGlobalButtonConfig.marginRight !== undefined) btn.marginRight = this.desktopGlobalButtonConfig.marginRight
+          if (this.desktopGlobalButtonConfig.showNotification !== undefined) btn.showNotification = this.desktopGlobalButtonConfig.showNotification
         })
       }
 
@@ -427,11 +430,14 @@ export default class ToolbarCustomizer extends Plugin {
         }
       }
 
-      // 同步全局按钮配置的 showNotification 到所有手机端按钮
+      // 同步全局按钮配置到所有手机端按钮（iconSize/minWidth/marginRight/showNotification）
       // 只有启用全局配置时才同步，否则保留各按钮的独立配置
-      if ((this.mobileGlobalButtonConfig.enabled ?? true) && this.mobileGlobalButtonConfig.showNotification !== undefined) {
+      if (this.mobileGlobalButtonConfig.enabled ?? true) {
         this.mobileButtonConfigs.forEach(btn => {
-          btn.showNotification = this.mobileGlobalButtonConfig.showNotification
+          if (this.mobileGlobalButtonConfig.iconSize !== undefined) btn.iconSize = this.mobileGlobalButtonConfig.iconSize
+          if (this.mobileGlobalButtonConfig.minWidth !== undefined) btn.minWidth = this.mobileGlobalButtonConfig.minWidth
+          if (this.mobileGlobalButtonConfig.marginRight !== undefined) btn.marginRight = this.mobileGlobalButtonConfig.marginRight
+          if (this.mobileGlobalButtonConfig.showNotification !== undefined) btn.showNotification = this.mobileGlobalButtonConfig.showNotification
         })
       }
 
@@ -1340,10 +1346,51 @@ export default class ToolbarCustomizer extends Plugin {
       `
     }
 
-    // 禁用自定义按钮（恢复思源原始状态）
-    // 前面的所有修改CSS都已跳过，这里只需要隐藏自定义按钮
-    if (disableCustomButtons) {
-      styleContent += `
+	    // 禁用自定义按钮（恢复思源原始状态）
+	    // 前面的所有修改CSS都已跳过，这里只需要隐藏自定义按钮
+	    if (disableCustomButtons) {
+	      // ===== 清理所有插件注入的残留样式和标记 =====
+	      // 样式元素
+	      ;[
+	        'mobile-toolbar-custom-style',
+	        'mobile-toolbar-background-color-style',
+	        'top-toolbar-custom-style',
+	        'custom-button-focus-style',
+	        'native-toolbar-lock-style',
+	        'toolbar-autohide-style',
+	        'kmind-zen-compat-style',
+	        'overflow-toolbar-animation',
+	        'desktop-overflow-toolbar-animation',
+	        'mobile-toolbar-dynamic-style',
+	        'popup-select-scrollbar-style',
+	      ].forEach(id => document.getElementById(id)?.remove())
+
+	      // body 类名
+	      document.body.classList.remove(
+	        'siyuan-toolbar-customizer-enabled',
+	        'siyuan-toolbar-top-mode',
+	        'toolbar-autohide-active',
+	        'toolbar-locked',
+	        'kmind-zen-active',
+	      )
+
+	      // CSS 变量
+	      document.documentElement.style.removeProperty('--mobile-toolbar-offset')
+
+	      // 扩展工具栏弹出层
+	      document.querySelectorAll('.overflow-toolbar-layer, .desktop-overflow-toolbar-layer').forEach(el => el.remove())
+
+	      // 面包屑上的自定义标记属性
+	      document.querySelectorAll('.protyle-breadcrumb__bar[data-toolbar-customized], .protyle-breadcrumb[data-toolbar-customized]').forEach(el => {
+	        el.removeAttribute('data-input-method')
+	        el.removeAttribute('data-toolbar-customized')
+	      })
+
+	      // 滚动隐藏残留
+	      document.querySelectorAll('.toolbar-scroll-hidden').forEach(el => el.classList.remove('toolbar-scroll-hidden'))
+
+	      // 隐藏自定义按钮的 CSS
+	      styleContent += `
         /* 隐藏所有自定义按钮 */
         .protyle-breadcrumb__bar button[data-custom-button],
         .protyle-breadcrumb button[data-custom-button],

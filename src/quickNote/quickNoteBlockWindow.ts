@@ -73,34 +73,58 @@ function _buildBlockUrl(blockId: string): string {
 
 // 清空 window.location.hash，防止 Electron 主进程通过 hash 中的 rootID
 // 把其他窗口的文档焦点路由到这个弹窗
+//
+// 注意：SiYuan 内部路由使用 history.pushState/replaceState 修改 URL hash，
+// 只拦截 location.hash setter 是不够的，必须同时拦截 History API。
 const HASH_FIX_JS = `(function(){
-  // 直接拦截 location.hash 的 setter，不依赖 setModelsHash
-  try {
-    var proto = window.location.__proto__ || window.location.constructor.prototype;
-    var desc = Object.getOwnPropertyDescriptor(proto, 'hash');
-    if (desc && desc.set) {
-      var _origSet = desc.set;
-      Object.defineProperty(window.location, 'hash', {
-        get: desc.get || function() { return ''; },
-        set: function(v) {
-          // 只调原始 setter 完成副作用，但永远写空字符串
-          _origSet.call(this, '');
-        },
-        configurable: true
-      });
-      console.log('[QN-HASH] hash setter 拦截成功');
-    } else {
-      console.log('[QN-HASH] 无法获取hash descriptor, 降级到轮询');
-    }
-  } catch(e) {
-    console.log('[QN-HASH] hash setter 拦截失败:', e, ', 降级到轮询');
-  }
+	  if (window.__qn_hashFixed) return;
+	  window.__qn_hashFixed = true;
 
-  // 兜底：50ms 轮询（比之前200ms快，减少空窗期）
-  window.__qn_hashTimer = setInterval(function() {
-    if (window.location.hash) window.location.hash = '';
-  }, 50);
-})()`
+	  // 1. 拦截 location.hash 的 setter
+	  try {
+	    var proto = window.location.__proto__ || window.location.constructor.prototype;
+	    var desc = Object.getOwnPropertyDescriptor(proto, 'hash');
+	    if (desc && desc.set) {
+	      var _origSet = desc.set;
+	      Object.defineProperty(window.location, 'hash', {
+	        get: desc.get || function() { return ''; },
+	        set: function(v) {
+	          // 只调原始 setter 完成副作用，但永远写空字符串
+	          _origSet.call(this, '');
+	        },
+	        configurable: true
+	      });
+	      console.log('[QN-HASH] hash setter 拦截成功');
+	    } else {
+	      console.log('[QN-HASH] 无法获取hash descriptor, 降级到轮询');
+	    }
+	  } catch(e) {
+	    console.log('[QN-HASH] hash setter 拦截失败:', e, ', 降级到轮询');
+	  }
+
+	  // 2. 拦截 history.pushState / replaceState
+	  //    SiYuan 通过此 API 修改 URL hash，绕过 location.hash setter
+	  try {
+	    var _origPushState = history.pushState.bind(history);
+	    var _origReplaceState = history.replaceState.bind(history);
+	    history.pushState = function() {
+	      _origPushState.apply(this, arguments);
+	      if (window.location.hash) window.location.hash = '';
+	    };
+	    history.replaceState = function() {
+	      _origReplaceState.apply(this, arguments);
+	      if (window.location.hash) window.location.hash = '';
+	    };
+	    console.log('[QN-HASH] history API 拦截成功');
+	  } catch(e) {
+	    console.log('[QN-HASH] history API 拦截失败:', e);
+	  }
+
+	  // 3. 兜底：50ms 轮询（捕获通过 location.href 等其他途径设置的 hash）
+	  window.__qn_hashTimer = setInterval(function() {
+	    if (window.location.hash) window.location.hash = '';
+	  }, 50);
+	})()`
 
 function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string } {
   const toolbarOn = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteToolbarVisible !== false
@@ -114,9 +138,23 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
     closeHookJS: `(function(){
       function forceClose(){
         try{
+          // 先手动关 WebSocket，因为 destroy() 跳过 beforeunload
+          try{
+            if(window.__qnPollTimer){clearInterval(window.__qnPollTimer);window.__qnPollTimer=null}
+            if(window.__qn_hashTimer){clearInterval(window.__qn_hashTimer);window.__qn_hashTimer=null}
+            var ws=window.siyuan&&window.siyuan.ws;
+            if(ws&&ws.ws&&ws.ws.readyState===1){
+              try{ws.send('closews',{})}catch(e){}
+              try{ws.ws.close(1000,'qn-close')}catch(e){}
+            }
+          }catch(e){}
           var remote=require('@electron/remote');
           var win=remote.getCurrentWindow();
-          win.close();
+          // 用 destroy() 而非 close()：同步强制销毁，跳过 SiYuan 的 beforeunload 回调，
+          // 不给它通过 history.pushState 设置 location.hash 的机会。
+          // close() 会触发 beforeunload → SiYuan 清理代码写 hash → hash 被 Electron
+          // 主进程记住 → siyuan-open-file 路由匹配到已销毁的僵尸窗口 → 日记打不开
+          win.destroy();
         }catch(e){try{window.close()}catch(e2){}}
       }
       function hookCloseBtn(){
@@ -137,7 +175,10 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
         }catch(e){}
       });
     })()`,
-    pollJS: `window.__qnPollTimer=setInterval(function(){var w=document.querySelector('.protyle-wysiwyg');var e=!w||(w.textContent||'').replace(/\\u200b/g,'').trim().length===0;try{localStorage.setItem('${BLOCK_EMPTY_KEY}',e?'1':'0')}catch(ex){}},500)`,
+    // 仅在"是否为空"状态变化时才写入 localStorage，避免每 500ms 无条件 setItem。
+    // 用 localStorage 当前值作为真源（而非 window 变量缓存）：弹窗隐藏 5 秒重建时
+    // 父窗口会 removeItem 清空，若用变量缓存会与 localStorage 脱节，可能误删非空块。
+    pollJS: `window.__qnPollTimer=setInterval(function(){var w=document.querySelector('.protyle-wysiwyg');var v=(!w||(w.textContent||'').replace(/\\u200b/g,'').trim().length===0)?'1':'0';try{if(localStorage.getItem('${BLOCK_EMPTY_KEY}')!==v)localStorage.setItem('${BLOCK_EMPTY_KEY}',v)}catch(ex){}},500)`,
   }
 }
 
@@ -181,7 +222,9 @@ function createOneWindow(blockId: string): boolean {
     win.on('close', () => {
       if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null }
       if (_saveBoundsTimer) { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = null }
-      win.webContents.executeJavaScript('clearInterval(window.__qn_hashTimer)').catch(()=>{})
+      // 注意：不再主动清除 hash 轮询定时器，让它在渲染进程销毁时自然终止。
+      // 若在此处 clearInterval，SiYuan 的 beforeunload 清理代码可能在 close 之后
+      // 通过 history.pushState 设置 hash，而此时轮询已停、无法清空 hash。
       saveBounds(win)
     })
     win.on('resize', () => saveBoundsThrottled(win))
@@ -200,16 +243,17 @@ function createOneWindow(blockId: string): boolean {
     })
 
     const scripts = _getInjectionScripts()
-    win.webContents.on('dom-ready', () => { win.webContents.executeJavaScript(scripts.hideJS).catch(()=>{}) })
+    win.webContents.on('dom-ready', () => {
+      win.webContents.executeJavaScript(scripts.hideJS).catch(()=>{})
+      // 尽早注入 hash 修复，赶在 SiYuan 内部路由设置 hash 之前
+      win.webContents.executeJavaScript(HASH_FIX_JS).then(() => {
+        console.log('[QN-HASH] dom-ready: HASH_FIX_JS 注入成功')
+      }).catch((e: any) => {
+        console.error('[QN-HASH] dom-ready: HASH_FIX_JS 注入失败', e)
+      })
+    })
     win.webContents.once('did-finish-load', () => {
       _injectScripts(win, scripts, true)
-      // 清空 hash，防止主进程通过 hash 把日记文档路由到弹窗
-      console.log('[QN-HASH] Node侧: did-finish-load 触发, 准备注入 HASH_FIX_JS')
-      win.webContents.executeJavaScript(HASH_FIX_JS).then(() => {
-        console.log('[QN-HASH] Node侧: HASH_FIX_JS 注入成功')
-      }).catch((e: any) => {
-        console.error('[QN-HASH] Node侧: HASH_FIX_JS 注入失败', e)
-      })
     })
     win.loadURL(_buildBlockUrl(blockId))
     return true
@@ -228,9 +272,8 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
 	          w.focus()
 	          return true
 	        }
-	        // 弹窗在前台 → 隐藏
+	        // 弹窗在前台 → 隐藏（不强制聚焦主窗口，避免打断用户在其他软件的操作）
         w.hide()
-        focusMainWindow()
         if (_hideTimer) clearTimeout(_hideTimer)
         const delay = ((pluginInstance?.desktopFeatureConfig as any)?.quickNoteBlockAutoCleanup ?? 5) * 1000
         _hideTimer = setTimeout(async () => {

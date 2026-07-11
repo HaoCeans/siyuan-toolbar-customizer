@@ -128,3 +128,82 @@ HIDE_CSS 常量：
 - 用户反馈 `#status` 位置异常时，先让用户切换默认主题排查
 - 不要改动 `toolbarManager.ts` 中顶部模式的布局逻辑去迁就主题 bug
 - `closed` 事件监听 - preventDefault 后仍然触发
+
+---
+
+## 工具栏预览模块（设置面板内所见即所得）
+
+**文件**：`src/ui/toolbarPreview.ts`
+
+**背景**：在电脑端和手机端的设置面板"添加新按钮"上方，增加一个模拟真实工具栏的预览视图，支持直接拖动按钮重排序。
+
+### 设计原则
+
+1. **预览只读 overflowLevel**——直接读取按钮的 `overflowLevel` 字段，不重新计算分层
+2. **拖动只改 sort，不 saveData**——拖完只改内存数组的 sort 值，点"确定"才统一保存+reloadUI
+3. **电脑端和手机端共享**——同一个 `createToolbarPreview` 函数，`isMobile` 参数控制布局样式
+
+### 排序方向
+
+真实工具栏的排序方向：
+
+- `createButtonsForEditors` 用 `b.sort - a.sort` **降序**排列
+- 逐个 `insertAdjacentElement('beforebegin', readonlyBtn)` 插入
+- 最终视觉：**sort 越大越靠左，sort 越小越靠右**（紧挨锁定按钮）
+- 预览必须使用同样的降序排序，否则与真实工具栏左右相反
+
+关键代码（`toolbarManager.ts:1504-1507`）：
+```typescript
+const buttonsToAdd = configs
+  .filter(button => shouldShowButton(button) && shouldShowInMainToolbar(button))
+  .sort((a, b) => b.sort - a.sort) // 降序
+```
+
+### overflowLevel 的保存与读取
+
+- 手机端真实工具栏渲染时，`calculateButtonOverflow` 根据屏幕宽度计算每个按钮的 overflowLevel
+- 计算结果**直接写回按钮对象的 overflowLevel 属性**，随 `saveData` 持久化
+- 设置面板打开时，直接从加载的配置中读取 `button.overflowLevel`
+- **不要在预览或设置面板中重新计算 overflowLevel**——手机端算好的值就是最终结果
+
+### 踩坑记录
+
+#### ① `calculateButtonOverflow` 在 DOM 不可用时重置 overflowLevel
+
+**症状**：桌面端设置面板中，手机端按钮列表全部显示"· 常见"（overflowLevel=0），但手机端设置显示"第1层"（正确）。
+
+**根因**：`calculateButtonOverflow` 内部调 `getToolbarAvailableWidth()` 读取 `.protyle-breadcrumb` 宽度。桌面端没有这个 DOM 元素，返回 0 → `mainAvailableWidth <= 0` → 全部 overflowLevel=0。
+
+**修复**（`toolbarManager.ts:642`）：
+```typescript
+// 改前：DOM 不可用时全部归零，覆盖了手机端保存的正确值
+return buttons.map(btn => ({ ...btn, overflowLevel: 0 }))
+
+// 改后：DOM 不可用时保留原有值
+return buttons.map(btn => ({ ...btn, overflowLevel: btn.overflowLevel ?? 0 }))
+```
+
+#### ② 预览缩放因子依赖 clientWidth（需在 DOM 挂载后计算）
+
+**症状**：预览创建时按钮按真实尺寸渲染，超出预览容器边框被裁剪。
+
+**根因**：`createToolbarPreview` 构造函数内首次 `render()` 时，root 元素尚未 `appendChild` 到 DOM，`root.clientWidth` 为 0，缩放因子计算被跳过。
+
+**修复**：在 `appendChild(previewEl)` 后立即调用 `previewEl.refresh()`，此时 root 在 DOM 中，`clientWidth` 有效。
+
+#### ③ `isTopMode` 漏解构导致 ReferenceError
+
+**症状**：设置面板完全无法打开（或手机端设置区段空白）。
+
+**根因**：`createToolbarPreview` 中 `const { getButtons, isMobile, onChanged } = opts` 漏了 `isTopMode`，而 `render()` 内访问 `!isTopMode` → ReferenceError，整个 `createActionElement` 崩溃。
+
+**修复**：解构时包含 `isTopMode`。
+
+#### ④ let/const 暂时性死区（TDZ）
+
+**症状**：`ReferenceError: Cannot access 'scaleFactor' before initialization`。
+
+**根因**：`scaleFactor` 用 `let` 声明在滑杆 UI 代码之后，但滑杆创建时访问了 `scaleFactor.toString()` → TDZ。
+
+**修复**：把所有变量声明（`overflowExpanded`、`SCALE_KEY`、`scaleFactor`）移到所有 UI 代码之前。
+

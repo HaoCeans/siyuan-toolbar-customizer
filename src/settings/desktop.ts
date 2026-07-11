@@ -7,8 +7,10 @@ import { validateActivationCode } from '../utils/activationCodeValidator'
 
 import type { Setting } from 'siyuan'
 import type { GlobalButtonConfig, ButtonConfig } from '../toolbarManager'
+import { calculateButtonOverflow } from '../toolbarManager'
 import { createDesktopButtonItem, type DesktopButtonContext } from '../ui/buttonItems/desktop'
 import { createMobileButtonItem, type MobileButtonContext } from '../ui/buttonItems/mobile'
+import { createToolbarPreview } from '../ui/toolbarPreview'
 import { fetchSyncPost, showMessage } from 'siyuan'
 import * as Notify from '../notification'
 import { showButtonSelector } from '../ui/buttonSelector'
@@ -1249,6 +1251,8 @@ export function createDesktopSettingLayout(
             }, 100)
           }
         })
+        // 同步刷新工具栏预览（反映卡片列表里的删除/启用禁用/图标改动）
+        previewEl?.refresh()
       }
 
       const addBtn = document.createElement('button')
@@ -1276,7 +1280,28 @@ export function createDesktopSettingLayout(
         renderList()
       }
 
+      // 工具栏所见即所得预览（放在最上方，便于一眼看清布局 + 直接拖动排序）
+      let previewEl: any = null
+      try {
+        previewEl = createToolbarPreview({
+          getButtons: () => context.desktopButtonConfigs,
+          isMobile: false,
+          onChanged: renderList,
+        })
+      } catch (e) {
+        console.error('[DesktopPreview] 创建预览失败:', e)
+        const errEl = document.createElement('div')
+        errEl.style.cssText = 'color:var(--b3-card-error-color);font-size:12px;padding:8px;'
+        errEl.textContent = '⚠️ 工具栏预览加载失败，请检查控制台错误'
+        wrapper.appendChild(errEl)
+      }
+
       renderList()
+      if (previewEl) {
+        wrapper.appendChild(previewEl)
+        // previewEl 已挂载到 DOM，刷新使缩放计算（依赖 clientWidth）生效
+        previewEl.refresh()
+      }
       wrapper.appendChild(addBtn)
       wrapper.appendChild(listContainer)
       return wrapper
@@ -1803,8 +1828,18 @@ export function createDesktopSettingLayout(
     createActionElement: () => {
       const wrapper = document.createElement('div')
       wrapper.className = 'toolbar-customizer-content'
-      wrapper.dataset.tabGroup = 'mobile'
-      wrapper.style.cssText = 'display: flex; flex-direction: column; gap: 8px; width: 100%;'
+	      wrapper.dataset.tabGroup = 'mobile'
+	      wrapper.style.cssText = 'display: flex; flex-direction: column; gap: 8px; width: 100%;'
+
+	      // 提示：电脑端的手机配置仅展示部分功能
+	      const mobileNotice = document.createElement('div')
+		      mobileNotice.style.cssText = `
+		        font-size: 13px; color: #a855f7; background: color-mix(in srgb, #a855f7 8%, transparent);
+		        border: 1px solid color-mix(in srgb, #a855f7 20%, transparent); border-radius: 6px;
+		        padding: 10px 12px; text-align: center;
+		      `
+		      mobileNotice.textContent = '注意：电脑端和手机端完全独立、互不影响；此部分仅展示手机端20%的功能，请同步至手机端后，使用手机端插件设置的剩余80%功能：一键记事弹窗、朗读、批注等等'
+	      wrapper.appendChild(mobileNotice)
 
       const listContainer = document.createElement('div')
       listContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px;'
@@ -1825,7 +1860,17 @@ export function createDesktopSettingLayout(
             },
             buttonConfigs: context.mobileButtonConfigs,
             mobileButtonConfigs: context.mobileButtonConfigs,
-            recalculateOverflow: () => {}
+            recalculateOverflow: () => {
+              // 电脑端编辑手机端按钮时，被 calculateButtonOverflow 模拟 375px 宽度计算分层
+              const overflowBtn = context.mobileButtonConfigs.find((b: any) => b.id === 'overflow-button-mobile')
+              const overflowLayers = (overflowBtn && overflowBtn.enabled !== false) ? (overflowBtn.layers || 1) : 0
+              // 模拟典型手机宽度 375px，使按钮能分配到正确的扩展层
+              const updated = calculateButtonOverflow(context.mobileButtonConfigs, overflowLayers, 0, 375)
+              updated.forEach((btn: any) => {
+                const original = context.mobileButtonConfigs.find((b: any) => b.id === btn.id)
+                if (original) original.overflowLevel = btn.overflowLevel
+              })
+            }
           }
           const item = createMobileButtonItem(button, index, renderList, context.mobileButtonConfigs, buttonContext)
           listContainer.appendChild(item)
@@ -1841,6 +1886,8 @@ export function createDesktopSettingLayout(
             }, 100)
           }
         })
+        // 同步刷新工具栏预览（反映卡片列表里的删除/启用禁用/图标改动）
+        previewEl?.refresh()
       }
 
       const addBtn = document.createElement('button')
@@ -1868,7 +1915,29 @@ export function createDesktopSettingLayout(
         renderList()
       }
 
-      renderList()
+      // 手机端工具栏预览（这里虽在电脑端设置面板内，但操作的是 mobileButtonConfigs，用手机端样式）
+      let previewEl: any = null
+      try {
+	        previewEl = createToolbarPreview({
+	          getButtons: () => context.mobileButtonConfigs,
+	          isMobile: true,
+	          isTopMode: context.mobileConfig?.enableTopToolbar,
+	          onChanged: renderList,
+	        })
+      } catch (e) {
+        console.error('[MobilePreview] 创建预览失败:', e)
+        const errEl = document.createElement('div')
+        errEl.style.cssText = 'color:var(--b3-card-error-color);font-size:12px;padding:8px;'
+        errEl.textContent = '⚠️ 工具栏预览加载失败，请检查控制台错误'
+        wrapper.appendChild(errEl)
+      }
+
+	      renderList()
+      if (previewEl) {
+        wrapper.appendChild(previewEl)
+        // previewEl 已挂载到 DOM，刷新使缩放计算（依赖 clientWidth）生效
+        previewEl.refresh()
+      }
       wrapper.appendChild(addBtn)
       wrapper.appendChild(listContainer)
       return wrapper

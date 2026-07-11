@@ -222,6 +222,8 @@ export function createDesktopButtonItem(
     enabledToggle.title = enabledToggle.checked ? '点击禁用按钮' : '点击启用按钮'
     // 更新按钮项的透明度
     item.style.opacity = enabledToggle.checked ? '1' : '0.5'
+    // 通知父级刷新，同步更新预览
+    renderList()
   }
   // 根据启用状态设置透明度
   if (button.enabled === false) {

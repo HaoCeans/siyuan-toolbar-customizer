@@ -134,88 +134,33 @@ export function injectTabSwitcher(): void {
       padding: 8px 16px;
       font-size: 13px;
       border-radius: 4px;
-    `
+	    `
 
-    const previewConfig = {
-      width: '100%',                 // 宽度：'100%' / '300px' / '20rem' 等
-      fontSize: '17px',
-      textColor: '#000000ff',         // 文字颜色
-      bgColor: '#a3bcf1ff',           // 默认背景色
-      hoverBgColor: '#2563eb',        // 悬停背景色
-      borderColor: '#2563eb'          // 边框颜色
-    }
-
-    // 预览链接（只在手机端选中时显示）
-    const previewLink = document.createElement('a')
-    previewLink.href = 'http://127.0.0.1:6806/stage/build/mobile/'
-    previewLink.target = '_blank'
-    previewLink.className = 'b3-button b3-button--outline'
-    previewLink.innerHTML = '🔍 伺服浏览器：预览手机端'
-
-    previewLink.style.cssText = `
-      width: ${previewConfig.width};
-      margin-bottom: 15px;
-      padding: 10px;
-      border-radius: 6px;
-      font-size: ${previewConfig.fontSize};
-      text-align: center;
-      text-decoration: none;
-      display: none;
-      color: ${previewConfig.textColor};
-      background: ${previewConfig.bgColor};
-      border: 1px solid ${previewConfig.borderColor};
-    `
-
-    previewLink.onmouseenter = () => {
-      previewLink.style.background = previewConfig.hoverBgColor
-    }
-
-    previewLink.onmouseleave = () => {
-      previewLink.style.background = previewConfig.bgColor
-    }
-
-    // 预览链接的说明文字
-    const previewHint = document.createElement('div')
-    previewHint.style.cssText = `
-      font-size: 15px;
-      color: var(--b3-theme-on-surface-light);
-      text-align: center;
-      margin-top: 4px;
-      display: none;
-    `
-    previewHint.textContent = '💡点击打开浏览器，可预览手机端效果，本处仅支持插入按钮。更多配置，请同步至手机端设置！'
-
-    // 切换函数
-    const switchTab = (type: 'desktop' | 'mobile' | 'version') => {
-      // 更新按钮样式
-      if (type === 'desktop') {
-        desktopTab.classList.add('b3-button--primary')
-        desktopTab.classList.remove('b3-button--outline')
-        mobileTab.classList.remove('b3-button--primary')
-        mobileTab.classList.add('b3-button--outline')
-        versionTab.classList.remove('b3-button--primary')
-        versionTab.classList.add('b3-button--outline')
-        previewLink.style.display = 'none'
-        previewHint.style.display = 'none'
-      } else if (type === 'mobile') {
-        mobileTab.classList.add('b3-button--primary')
-        mobileTab.classList.remove('b3-button--outline')
-        desktopTab.classList.remove('b3-button--primary')
-        desktopTab.classList.add('b3-button--outline')
-        versionTab.classList.remove('b3-button--primary')
-        versionTab.classList.add('b3-button--outline')
-        previewLink.style.display = 'block'
-        previewHint.style.display = 'block'
-      } else { // type === 'version'
-        versionTab.classList.add('b3-button--primary')
-        versionTab.classList.remove('b3-button--outline')
-        desktopTab.classList.remove('b3-button--primary')
-        desktopTab.classList.add('b3-button--outline')
-        mobileTab.classList.remove('b3-button--primary')
-        mobileTab.classList.add('b3-button--outline')
-        previewLink.style.display = 'none'
-        previewHint.style.display = 'none'
-      }
+	    // 切换函数
+	    const switchTab = (type: 'desktop' | 'mobile' | 'version') => {
+	      // 更新按钮样式
+	      if (type === 'desktop') {
+	        desktopTab.classList.add('b3-button--primary')
+	        desktopTab.classList.remove('b3-button--outline')
+	        mobileTab.classList.remove('b3-button--primary')
+	        mobileTab.classList.add('b3-button--outline')
+	        versionTab.classList.remove('b3-button--primary')
+	        versionTab.classList.add('b3-button--outline')
+	      } else if (type === 'mobile') {
+	        mobileTab.classList.add('b3-button--primary')
+	        mobileTab.classList.remove('b3-button--outline')
+	        desktopTab.classList.remove('b3-button--primary')
+	        desktopTab.classList.add('b3-button--outline')
+	        versionTab.classList.remove('b3-button--primary')
+	        versionTab.classList.add('b3-button--outline')
+	      } else { // type === 'version'
+	        versionTab.classList.add('b3-button--primary')
+	        versionTab.classList.remove('b3-button--outline')
+	        desktopTab.classList.remove('b3-button--primary')
+	        desktopTab.classList.add('b3-button--outline')
+	        mobileTab.classList.remove('b3-button--primary')
+	        mobileTab.classList.add('b3-button--outline')
+	      }
 
       // 显示/隐藏对应的配置项
       // 遍历所有配置项，根据 toolbar-customizer-content 的 data-tabGroup 属性切换显示
@@ -239,19 +184,10 @@ export function injectTabSwitcher(): void {
 
     tabsContainer.appendChild(desktopTab)
     tabsContainer.appendChild(mobileTab)
-    tabsContainer.appendChild(versionTab)
+	    tabsContainer.appendChild(versionTab)
 
-    // 预览链接容器（插入到标签栏后面，会在第一个配置项前面显示）
-    const previewContainer = document.createElement('div')
-    previewContainer.className = 'toolbar-customizer-preview-container'
-    previewContainer.dataset.tabGroup = 'mobile'
-    previewContainer.style.cssText = 'margin-bottom: 12px;'
-    previewContainer.appendChild(previewLink)
-    previewContainer.appendChild(previewHint)
-
-    // 插入到内容区域顶部
-    dialogContent.insertBefore(tabsContainer, dialogContent.firstChild)
-    dialogContent.insertBefore(previewContainer, tabsContainer.nextSibling)
+	    // 插入到内容区域顶部
+	    dialogContent.insertBefore(tabsContainer, dialogContent.firstChild)
 
     // 默认显示电脑端配置
     switchTab('desktop')

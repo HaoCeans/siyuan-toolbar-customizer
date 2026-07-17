@@ -2138,7 +2138,7 @@ export function createMobileSettingLayout(
     description: '💡胶囊工具栏距离屏幕底部的间距',
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.floatingToolbarMargin ?? '50px';
-      const currentValue = parseInt(currentValueStr) || 50;
+      const currentValue = parseLengthSliderInt(currentValueStr, 50);
       const slider = createCustomSliderWithoutLabel(
         currentValue,
 	        0, 80, 'px',
@@ -2162,7 +2162,7 @@ export function createMobileSettingLayout(
     description: '💡胶囊工具栏自身的高度',
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.floatingToolbarHeight ?? '40px';
-      const currentValue = parseInt(currentValueStr) || 40;
+      const currentValue = parseLengthSliderInt(currentValueStr, 40);
       const slider = createCustomSliderWithoutLabel(
         currentValue,
         24, 60, 'px',
@@ -2186,7 +2186,7 @@ export function createMobileSettingLayout(
     description: '💡胶囊工具栏的圆角弧度，值越大越圆',
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.floatingToolbarBorderRadius ?? '24px';
-      const currentValue = parseInt(currentValueStr) || 24;
+      const currentValue = parseLengthSliderInt(currentValueStr, 24);
       const slider = createCustomSliderWithoutLabel(
         currentValue,
         0, 40, 'px',
@@ -2210,7 +2210,7 @@ export function createMobileSettingLayout(
     description: '💡胶囊工具栏自身的固定宽度（0=自动适应按钮宽度）',
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.floatingToolbarWidth ?? '280';
-      const currentValue = parseInt(currentValueStr) || 0;
+      const currentValue = parseLengthSliderInt(currentValueStr, 0);
       const slider = createCustomSliderWithoutLabel(
         currentValue,
         0, 500, 'px',
@@ -2234,7 +2234,7 @@ export function createMobileSettingLayout(
     description: '💡扩展工具栏与胶囊之间的间距',
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.floatingToolbarOverflowDistance ?? '8';
-      const currentValue = parseInt(currentValueStr) || 8;
+      const currentValue = parseLengthSliderInt(currentValueStr, 8);
       const slider = createCustomSliderWithoutLabel(
         currentValue,
         0, 30, 'px',

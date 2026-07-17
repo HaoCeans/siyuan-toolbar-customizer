@@ -90,7 +90,7 @@ export interface ButtonConfig {
   targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
   mobileTargetDocId?: string; // 打开指定ID块：目标块ID（移动端），支持文档ID或块ID
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
-		  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock'; // 鲸鱼定制工具子类型
+			  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock' | 'quick-attach'; // 鲸鱼定制工具子类型
 	  unlockIcon?: string;       // 解锁图标（仅 toggle-lock 使用，默认 🔓）
 	  lockIcon?: string;         // 锁定图标（仅 toggle-lock 使用，默认 🔒）
 	  toolbarAutoHide?: boolean; // 锁定时工具栏滚动隐藏（仅 toggle-lock + 移动端，默认 false）
@@ -186,8 +186,8 @@ export const DEFAULT_GLOBAL_BUTTON_CONFIG = DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG
 
 // ===== 默认配置 =====
 export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
-  // 底部工具栏配置
-  enableBottomToolbar: true,
+  // 底部工具栏配置（默认禁用，由底部胶囊替代）
+  enableBottomToolbar: false,
   openInputOffset: '50px',
   closeInputOffset: '0px',
   heightThreshold: 70,
@@ -205,15 +205,15 @@ export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
   topToolbarOffset: '50px',   // 距离顶部 50px
   topToolbarPaddingLeft: '0px', // 顶部工具栏左边距（居中显示）
 
-	  // 底部胶囊工具栏配置（默认不启用）
-	  enableFloatingToolbar: false,
-	  floatingToolbarMargin: '12px',
+	  // 底部胶囊工具栏配置（默认启用）
+	  enableFloatingToolbar: true,
+	  floatingToolbarMargin: '50px',
 	  floatingToolbarBorderRadius: '24px',
 	  floatingToolbarHeight: '40px',
-	  floatingToolbarWidth: '0',     // 0=自动
+	  floatingToolbarWidth: '280',     // 固定宽度 280px（'0'=自动）
 	  floatingToolbarOverflowDistance: '8',  // 扩展工具栏间距（px）
       floatingToolbarStyle: 'normal',
-      floatingToolbarScrollHide: false,
+      floatingToolbarScrollHide: true,
 	}
 
 export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = []
@@ -243,7 +243,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
     name: '更多',
     type: 'click-sequence',
     clickSequence: ['more'],
-    icon: '✨',
+    icon: 'lucide:Menu',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
@@ -256,7 +256,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
     name: '打开菜单',
     type: 'click-sequence',
     clickSequence: ['doc'],
-    icon: '🧩',
+    icon: 'lucide:Blocks',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
@@ -269,8 +269,8 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
 	    name: '锁住文档',
 	    type: 'author-tool',
 	    authorToolSubtype: 'toggle-lock',
-	    lockIcon: '🔒',
-	    icon: '🔓',
+	    lockIcon: 'lucide:Lock',
+	    icon: 'lucide:LockOpen',
 	    iconSize: 18,
 	    minWidth: 32,
 	    marginRight: 8,
@@ -283,7 +283,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
     name: '插件设置',
     type: 'click-sequence',
     clickSequence: ['barPlugins', 'text:思源手机端增强'],
-    icon: '⚙️',
+    icon: 'lucide:Settings',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
@@ -296,7 +296,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
     name: '打开日记',
     type: 'shortcut',
     shortcutKey: 'Alt+5',
-    icon: '🗓️',
+    icon: 'lucide:CalendarDays',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
@@ -309,7 +309,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
     name: '插入时间',
     type: 'template',
     template: '{{hour}}时{{minute}}分',
-    icon: '⏰',
+    icon: 'lucide:TimerReset',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
@@ -321,8 +321,8 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
     id: 'open-browser-desktop',
     name: '伺服浏览器',
     type: 'click-sequence',
-    clickSequence: ['barWorkspace', 'config', 'text:关于', 'text:打开浏览器'],
-    icon: '🔗',
+    clickSequence: ['barWorkspace', 'config', 'text:鉴权', 'text:打开浏览器'],
+    icon: 'lucide:Link',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
@@ -335,11 +335,24 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
     name: '最近文档',
     type: 'shortcut',
     shortcutKey: 'Ctrl+E',
-    icon: '📸',
+    icon: 'lucide:BookText',
     iconSize: 18,
     minWidth: 32,
     marginRight: 8,
     sort: 8,
+    platform: 'desktop',
+    showNotification: true
+  },
+  {
+    id: 'slide-comment-desktop',
+    name: '鲸鱼快速批注',
+    type: 'author-tool',
+    authorToolSubtype: 'slide-comment',
+    icon: 'lucide:FormInput',
+    iconSize: 18,
+    minWidth: 32,
+    marginRight: 8,
+    sort: 9,
     platform: 'desktop',
     showNotification: true
   }
@@ -366,7 +379,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     name: '更多',
     type: 'builtin',
     builtinId: 'more',
-    icon: '✨',
+    icon: 'lucide:Menu',
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
@@ -379,7 +392,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     name: '打开菜单',
     type: 'builtin',
     builtinId: 'doc',
-    icon: '🧩',
+    icon: 'lucide:Blocks',
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
@@ -388,12 +401,12 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     showNotification: true
   },
 	  {
-	    id: 'readonly-mobile',
-	    name: '锁住文档',
-	    type: 'author-tool',
-	    authorToolSubtype: 'toggle-lock',
-	    lockIcon: '🔒',
-	    icon: '🔓',
+		    id: 'readonly-mobile',
+		    name: '锁住文档',
+		    type: 'author-tool',
+		    authorToolSubtype: 'toggle-lock',
+		    lockIcon: 'lucide:Lock',
+		    icon: 'lucide:LockOpen',
 	    iconSize: 23,
 	    minWidth: 23,
 	    marginRight: 10,
@@ -406,7 +419,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     name: '插件设置',
     type: 'click-sequence',
     clickSequence: ['toolbarMore', 'menuPlugin', 'text:思源手机端增强'],
-    icon: '⚙️',
+    icon: 'lucide:Settings',
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
@@ -419,7 +432,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     name: '打开日记',
     type: 'shortcut',
     shortcutKey: 'Alt+5',
-    icon: '🗓️',
+    icon: 'lucide:CalendarDays',
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
@@ -432,7 +445,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     name: '插入时间',
     type: 'template',
     template: '{{hour}}时{{minute}}分',
-    icon: '⏰',
+    icon: 'lucide:TimerReset',
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
@@ -445,7 +458,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     name: '搜索',
     type: 'builtin',
     builtinId: 'menuSearch',
-    icon: '🔎',
+    icon: 'lucide:Search',
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
@@ -458,11 +471,24 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     name: '最近文档',
     type: 'builtin',
     builtinId: 'menuRecent',
-    icon: '📸',
+    icon: 'lucide:BookText',
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
     sort: 8,
+    platform: 'mobile',
+    showNotification: true
+  },
+  {
+    id: 'slide-comment-mobile',
+    name: '鲸鱼快速批注',
+    type: 'author-tool',
+    authorToolSubtype: 'slide-comment',
+    icon: 'lucide:FormInput',
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
+    sort: 9,
     platform: 'mobile',
     showNotification: true
   }
@@ -592,7 +618,13 @@ export function getBottomToolbarWidth(): number {
  * @returns 可用宽度（px）
  */
 export function getToolbarAvailableWidth(): number {
-  const breadcrumb = document.querySelector('.protyle-breadcrumb:not(.protyle-breadcrumb__bar)') as HTMLElement ||
+  // 优先读带 data-input-method 的元素（胶囊/底部固定模式下这才是真实宽度的容器）。
+  // 胶囊模式 CSS（width:固定值/position:fixed）只挂在 [data-input-method] 上，
+  // 外层 .protyle-breadcrumb 没有限宽，读它会把原生全屏宽度当成可用宽度，
+  // 导致算法误判主层能放更多按钮（实际胶囊窄，按钮挤不下）。
+  const breadcrumb = document.querySelector('.protyle-breadcrumb[data-input-method]') as HTMLElement ||
+                     document.querySelector('.protyle-breadcrumb__bar[data-input-method]') as HTMLElement ||
+                     document.querySelector('.protyle-breadcrumb:not(.protyle-breadcrumb__bar)') as HTMLElement ||
                      document.querySelector('.protyle-breadcrumb__bar') as HTMLElement
 
   if (!breadcrumb) {
@@ -657,9 +689,15 @@ export function calculateButtonOverflow(
   const reserveWidth = Math.max(0, Number(externalButtonsReserveWidth) || 0)
   mainAvailableWidth -= reserveWidth
 
-  // 扩展工具栏实际渲染有 left:10px; right:10px; 共 20px 边距 + border:1px 左右共 2px
-  // toolbarAvailableWidth 是面包屑宽度减去面包屑内边距，不含扩展工具栏的这 22px
-  const overflowAvailableWidth = toolbarAvailableWidth - 22
+  // 扩展工具栏可用宽度 = 主工具栏可用宽度 - 扩展面板相对多出的尺寸
+  // 底部固定模式：扩展面板 left:10px + right:10px + border:1px×2 = 22px
+  // 胶囊模式：扩展面板用 getBoundingClientRect 跟随胶囊（无 left:10/right:10），
+  //   仅多出 border:1px×2 = 2px（扩展面板 padding:0 12px 的 24px 中，16px 已被按钮 padding 覆盖，不重复扣）
+  // 注意：预览场景传入 availableWidth 时按底部固定模式计算（模拟旧逻辑）
+  const isFloatingMode = availableWidth == null &&
+    (window as any).__mobileToolbarConfig?.enableFloatingToolbar === true
+  const overflowExtra = isFloatingMode ? 2 : 22
+  const overflowAvailableWidth = toolbarAvailableWidth - overflowExtra
 
     if (mainAvailableWidth <= 0 || overflowAvailableWidth <= 0) {
       return buttons.map(btn => ({ ...btn, overflowLevel: btn.overflowLevel ?? 0 }))
@@ -961,7 +999,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
         if (disableCustomButtons) {
           style.textContent = ''
         } else {
-          const floatMargin = config.floatingToolbarMargin || '12px'
+          const floatMargin = config.floatingToolbarMargin || '20px'
           const floatRadius = config.floatingToolbarBorderRadius || '24px'
           if (isFloating) {
             const capHeight = config.floatingToolbarHeight || config.toolbarHeight || '40px'
@@ -1066,6 +1104,33 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
           }
         `
       }
+
+      // 底部固定 + 胶囊模式共用：隐藏原生面包屑元素
+      // （顶部模式在 top-toolbar-custom-style 里有自己的版本，这里只处理底部两种模式）
+      // breadcrumb 在这两种模式下都带 data-input-method 属性
+      style.textContent += `
+        @media (max-width: 768px) {
+          /* 隐藏空白占位符（flex:1 会吸走空余空间，胶囊模式下尤其明显） */
+          .protyle-breadcrumb__bar[data-input-method] > .protyle-breadcrumb__space,
+          .protyle-breadcrumb[data-input-method] > .protyle-breadcrumb__space {
+            display: none !important;
+          }
+
+          /* 隐藏原生「面包屑」文字按钮和退出聚焦按钮 */
+          .protyle-breadcrumb__bar[data-input-method] > .protyle-breadcrumb__icon[data-type="mobile-menu"],
+          .protyle-breadcrumb__bar[data-input-method] > .protyle-breadcrumb__icon[data-type="exit-focus"],
+          .protyle-breadcrumb[data-input-method] > .protyle-breadcrumb__icon[data-type="mobile-menu"],
+          .protyle-breadcrumb[data-input-method] > .protyle-breadcrumb__icon[data-type="exit-focus"] {
+            display: none !important;
+          }
+
+          /* 最左侧自定义按钮去掉左边距 */
+          .protyle-breadcrumb__bar[data-input-method] > .first-custom-button,
+          .protyle-breadcrumb[data-input-method] > .first-custom-button {
+            margin-left: 0 !important;
+          }
+        }
+      `
     }
   }
 
@@ -1508,11 +1573,14 @@ function setupEditorButtons(configs: ButtonConfig[]) {
   (window as any).__mobileButtonConfigs = configs
 
   // 等待 initMobileToolbarAdjuster 初始化完成后再溢出计算
-  // 必须要有 data-input-method 胶囊 CSS (position:fixed, width:xxx) 才生效，
-  // 否则 getToolbarAvailableWidth() 读到的是 SiYuan 原生全屏宽度，不是胶囊真实宽度。
-  const toolbarReady = document.querySelector(
-    '.protyle-breadcrumb[data-input-method], .protyle-breadcrumb__bar[data-input-method]'
-  )
+  // 底部固定/胶囊模式：必须要有 data-input-method CSS (position:fixed, width:xxx) 才生效，
+  //   否则 getToolbarAvailableWidth() 读到的是 SiYuan 原生全屏宽度，不是胶囊真实宽度。
+  // 顶部模式：breadcrumb 不带 data-input-method（设计如此），用 body.siyuan-toolbar-top-mode
+  //   + breadcrumb 存在作为 ready 信号，否则顶部模式按钮永远无法注入。
+  const isTopMode = document.body.classList.contains('siyuan-toolbar-top-mode')
+  const toolbarReady = isTopMode
+    ? document.querySelector('.protyle-breadcrumb, .protyle-breadcrumb__bar')
+    : document.querySelector('.protyle-breadcrumb[data-input-method], .protyle-breadcrumb__bar[data-input-method]')
   if (isMobileDevice() && !toolbarReady) {
     requestAnimationFrame(() => setupEditorButtons(configs))
     return
@@ -1560,7 +1628,7 @@ export function createButtonsForEditors(editors: NodeListOf<Element>, configs: B
   // 获取工具栏样式配置（根据当前平台读取对应配置）
   const isMobile = pluginInstance?.isMobile
   const featureConfig = isMobile ? pluginInstance?.mobileFeatureConfig : pluginInstance?.desktopFeatureConfig
-  const toolbarStyle = featureConfig?.toolbarStyle || 'default'
+  const toolbarStyle = featureConfig?.toolbarStyle || (isMobile ? 'divider' : 'default')
   const disableCustomButtons = featureConfig?.disableCustomButtons || false
   const useDivider = !disableCustomButtons && toolbarStyle === 'divider'
 
@@ -1584,11 +1652,14 @@ export function createButtonsForEditors(editors: NodeListOf<Element>, configs: B
     })
   }
 
+  let hasAnyReadonlyBtn = false // 标记是否有编辑器成功找到锁定按钮并创建了按钮
+
   editors.forEach(editor => {
     // 找到锁定编辑按钮
     const readonlyBtn = editor.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]') ||
                         editor.querySelector('.protyle-breadcrumb [data-type="readonly"]')
     if (!readonlyBtn) return
+    hasAnyReadonlyBtn = true // 找到了，标记成功
 
     // 过滤并排序按钮（sort降序：大→小，这样sort 0在最右边，紧挨锁定按钮）
     const buttonsToAdd = configs
@@ -1660,7 +1731,29 @@ export function createButtonsForEditors(editors: NodeListOf<Element>, configs: B
 	      }
 	    })
 	  })
-}
+
+	  // 重试机制：当编辑器已存在但 breadcrumb 尚未渲染完成（readonlyBtn 未找到）时，
+	  // 延迟重试，避免切标签页后按钮消失。
+	  if (editors.length > 0 && !hasAnyReadonlyBtn) {
+	    const retryKey = `createButtons_retry_${Date.now()}`
+	    let retryCount = 0
+	    const doRetry = () => {
+	      retryCount++
+	      if (retryCount > 10) return // 最多重试 10 次（约 3 秒）
+	      const readonlyBtn = document.querySelector(
+	        '.protyle-breadcrumb__bar [data-type="readonly"]'
+	      ) || document.querySelector(
+	        '.protyle-breadcrumb [data-type="readonly"]'
+	      )
+	      if (readonlyBtn) {
+	        createButtonsForEditors(document.querySelectorAll('.protyle'), configs)
+	      } else {
+	        safeSetTimeout(doRetry, 300)
+	      }
+	    }
+	    safeSetTimeout(doRetry, 300)
+	  }
+	}
 
 /**
  * 获取按钮的通用样式（与扩展工具栏保持一致的完全控制）
@@ -1996,7 +2089,7 @@ function showOverflowToolbar(config: ButtonConfig) {
 	  let bottomOffset = 60
 	  if (mobileConfig) {
 	    if (isCapsuleMode) {
-	      const _margin = parseInt(String(mobileConfig.floatingToolbarMargin ?? '12'), 10)
+	      const _margin = parseInt(String(mobileConfig.floatingToolbarMargin ?? '20'), 10)
 	      const _height = parseInt(String(mobileConfig.floatingToolbarHeight ?? '40'), 10)
 	      const _dist = parseInt(String(mobileConfig.floatingToolbarOverflowDistance ?? '8'), 10)
 	      bottomOffset = (Number.isNaN(_margin) ? 12 : _margin)
@@ -2025,7 +2118,7 @@ function showOverflowToolbar(config: ButtonConfig) {
   // 获取工具栏样式配置（根据当前平台读取对应配置）
   const isMobile = pluginInstance?.isMobile
   const featureConfig = isMobile ? pluginInstance?.mobileFeatureConfig : pluginInstance?.desktopFeatureConfig
-  const toolbarStyle = featureConfig?.toolbarStyle || 'default'
+  const toolbarStyle = featureConfig?.toolbarStyle || (isMobile ? 'divider' : 'default')
   const disableCustomButtons = featureConfig?.disableCustomButtons || false
   const useDivider = !disableCustomButtons && toolbarStyle === 'divider'
 
@@ -4546,23 +4639,23 @@ function getToolbarElementsForAutoHide(): HTMLElement[] {
 				          el.classList.add('toolbar-scroll-hidden')
 				          // 胶囊模式需要保持 translateX(-50%) 居中对齐
 				          // 注意：不能读 el.style.transform 判断，CSS 中的 translateX 不在内联样式里
-				          el.style.transform = toolbarAutoHideCapsuleMode
-				            ? 'translateX(-50%) translateY(calc(100% + 30px))'
-				            : slideTransform
-				        })
-				      }, 80)
-				    } else {
-				      // 底部模式：先收 protyle 间距 + 状态栏，再滑走工具栏
-				      document.body.classList.add('toolbar-autohide-active')
-				      toolbarAutoHidePendingTimer = setTimeout(() => {
-				        toolbarAutoHidePendingTimer = null
-				        getToolbarElementsForAutoHide().forEach(el => {
-				          el.classList.add('toolbar-scroll-hidden')
-				          // 胶囊模式需要保持 translateX(-50%) 居中对齐
-				          // 注意：不能读 el.style.transform 判断，CSS 中的 translateX 不在内联样式里
-				          el.style.transform = toolbarAutoHideCapsuleMode
-				            ? 'translateX(-50%) translateY(calc(100% + 30px))'
-				            : slideTransform
+          el.style.transform = toolbarAutoHideCapsuleMode
+	            ? 'translateX(-50%) translateY(calc(100% + 200px))'
+	            : slideTransform
+	        })
+	      }, 80)
+	    } else {
+	      // 底部模式：先收 protyle 间距 + 状态栏，再滑走工具栏
+	      document.body.classList.add('toolbar-autohide-active')
+	      toolbarAutoHidePendingTimer = setTimeout(() => {
+	        toolbarAutoHidePendingTimer = null
+	        getToolbarElementsForAutoHide().forEach(el => {
+	          el.classList.add('toolbar-scroll-hidden')
+	          // 胶囊模式需要保持 translateX(-50%) 居中对齐
+	          // 注意：不能读 el.style.transform 判断，CSS 中的 translateX 不在内联样式里
+	          el.style.transform = toolbarAutoHideCapsuleMode
+	            ? 'translateX(-50%) translateY(calc(100% + 200px))'
+	            : slideTransform
 			        })
 			      }, 50)
 		    }
@@ -4949,11 +5042,17 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
 	    return
 	  }
 
-	  // ⑧图片快捷导入日记
-  if (subtype === 'image-upload') {
-    await executeImageUpload(config, savedSelection, lastActiveElement)
-    return
-  }
+		  // ⑧图片快捷导入日记
+	  if (subtype === 'image-upload') {
+	    await executeImageUpload(config, savedSelection, lastActiveElement)
+	    return
+	  }
+
+		  // ⑯快速添加附件（同图片快捷导入，但接受所有文件类型）
+	  if (subtype === 'quick-attach') {
+	    await executeImageUpload(config, savedSelection, lastActiveElement, true)
+	    return
+	  }
 
   // ⑨标签页Tab（桌面端和移动端分别实现）
   if (subtype === 'mobile-tabs' || subtype === 'desktop-tabs') {
@@ -5143,7 +5242,7 @@ async function appendToDailyNote(config: ButtonConfig, uploadedPath: string): Pr
   }
 }
 
-async function executeImageUpload(config: ButtonConfig, preSavedRange: Range | null = null, preSavedActiveEl: HTMLElement | null = null) {
+async function executeImageUpload(config: ButtonConfig, preSavedRange: Range | null = null, preSavedActiveEl: HTMLElement | null = null, acceptAllFiles: boolean = false) {
   // ===== 优先使用 mousedown/touchstart 阶段预存的光标（最可靠） =====
   let savedRange: Range | null = preSavedRange
   let savedEditEl: HTMLElement | null = null
@@ -5196,7 +5295,7 @@ async function executeImageUpload(config: ButtonConfig, preSavedRange: Range | n
   // 创建文件选择器
   const fileInput = document.createElement('input')
   fileInput.type = 'file'
-  fileInput.accept = 'image/*'
+	  fileInput.accept = acceptAllFiles ? '*/*' : 'image/*'
   fileInput.multiple = true
   fileInput.style.display = 'none'
   document.body.appendChild(fileInput)

@@ -184,13 +184,52 @@ export function showIconPicker(options: IconPickerOptions): void {
   // ===== 搜索框占位符根据分区动态变化 =====
   const updateSearchPlaceholder = () => {
     const map: Record<PartitionType, string> = {
-      lucide: '极简图标搜索，请用拼音...',
-      ali: '阿里图标搜索，请用拼音...',
-      siyuan: '思源图标搜索，请用汉字...',
+      lucide: '极简图标搜索，请用"英文"...',
+      ali: '阿里图标搜索，请用"中文拼音"...',
+      siyuan: '思源图标搜索，请用"中文"...',
     }
     searchInput.placeholder = map[activePartition]
   }
   updateSearchPlaceholder()
+
+  // ===== 手机端触摸反馈 =====
+  // 在手机 WebView 中，<button> 首次 tap 常被吞用于激活 hover/focus 态，表现为"点两次才选中"。
+  // 这里在 touchend 时主动触发 click，使首次 tap 即可生效；同时给出按下视觉反馈。
+  const bindTouchSelect = (btn: HTMLElement, onClick: () => void, {
+    normalBg = 'var(--b3-theme-background)',
+    hoverBg = 'var(--b3-theme-surface)',
+    pressedBg = 'var(--b3-theme-primary-lightest)',
+    borderColor = 'var(--b3-border-color)',
+  }: { normalBg?: string; hoverBg?: string; pressedBg?: string; borderColor?: string } = {}) => {
+    btn.onclick = onClick
+    btn.onmouseenter = () => {
+      btn.style.background = hoverBg
+      btn.style.borderColor = 'var(--b3-theme-primary)'
+    }
+    btn.onmouseleave = () => {
+      btn.style.background = normalBg
+      btn.style.borderColor = borderColor
+    }
+    let touchPressed = false
+    btn.addEventListener('touchstart', () => {
+      touchPressed = true
+      btn.style.background = pressedBg
+      btn.style.borderColor = 'var(--b3-theme-primary)'
+    }, { passive: true })
+    btn.addEventListener('touchend', (e) => {
+      if (!touchPressed) return
+      touchPressed = false
+      // 触摸命中：直接执行选择并关闭弹窗，避免等待合成 click 的延迟
+      if (e.cancelable) e.preventDefault()
+      onClick()
+    }, { passive: false })
+    btn.addEventListener('touchmove', () => {
+      // 手指移开原位视作取消，恢复常态
+      touchPressed = false
+      btn.style.background = normalBg
+      btn.style.borderColor = borderColor
+    }, { passive: true })
+  }
 
   // ===== 通用：创建图标按钮 =====
   const createIconButton = (icon: string, onClick: () => void): HTMLElement => {
@@ -222,15 +261,7 @@ export function showIconPicker(options: IconPickerOptions): void {
     updateIconDisplay(iconSpan, icon)
     btn.appendChild(iconSpan)
 
-    btn.onclick = onClick
-    btn.onmouseenter = () => {
-      btn.style.background = 'var(--b3-theme-surface)'
-      btn.style.borderColor = 'var(--b3-theme-primary)'
-    }
-    btn.onmouseleave = () => {
-      btn.style.background = 'var(--b3-theme-background)'
-      btn.style.borderColor = 'var(--b3-border-color)'
-    }
+    bindTouchSelect(btn, onClick)
     return btn
   }
 
@@ -256,7 +287,7 @@ export function showIconPicker(options: IconPickerOptions): void {
       padding: 0;
     `
 
-	    const svgHtml = lucideToSvg(iconName, iconSize)
+	  const svgHtml = lucideToSvg(iconName, iconSize)
     if (svgHtml) {
       btn.innerHTML = svgHtml
       btn.style.color = 'var(--b3-theme-on-surface)'
@@ -266,15 +297,7 @@ export function showIconPicker(options: IconPickerOptions): void {
       btn.textContent = iconName.substring(0, 2)
     }
 
-    btn.onclick = onClick
-    btn.onmouseenter = () => {
-      btn.style.background = 'var(--b3-theme-surface)'
-      btn.style.borderColor = 'var(--b3-theme-primary)'
-    }
-    btn.onmouseleave = () => {
-      btn.style.background = 'var(--b3-theme-background)'
-      btn.style.borderColor = 'var(--b3-border-color)'
-    }
+    bindTouchSelect(btn, onClick)
     return btn
   }
 
@@ -425,21 +448,11 @@ export function showIconPicker(options: IconPickerOptions): void {
         btn.textContent = unicodeToEmoji(item.unicode)
       }
 
-      btn.onclick = () => {
+      bindTouchSelect(btn, () => {
         const emoji = unicodeToEmoji(item.unicode)
         onSelect(emoji)
         document.body.removeChild(dialog)
-      }
-
-      btn.onmouseenter = () => {
-        btn.style.background = 'var(--b3-theme-surface)'
-        btn.style.borderColor = 'var(--b3-theme-primary)'
-      }
-
-      btn.onmouseleave = () => {
-        btn.style.background = 'var(--b3-theme-background)'
-        btn.style.borderColor = 'var(--b3-border-color)'
-      }
+      })
 
       grid.appendChild(btn)
     })

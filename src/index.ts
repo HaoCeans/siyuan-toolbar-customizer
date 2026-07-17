@@ -187,6 +187,7 @@ export default class ToolbarCustomizer extends Plugin {
     showAllNotifications: true, // 一键开启所有按钮右上角提示
     authorActivated: false,     // 鲸鱼定制工具箱是否已激活
     authorCode: '',              // 鲸鱼定制工具箱激活码
+    authorAccount: '',           // 绑定的思源账号
     quickNoteGlobalCaptureEnabled: true,  // 电脑端：全局快捷键唤起一键记事
     quickNoteToolbarVisible: true, // 电脑端：记事弹窗开关工具栏
     quickNoteInputFormat: 'plain' as 'plain' | 'block', // 电脑端：一键记事输入格式（独立于手机端）
@@ -200,6 +201,7 @@ export default class ToolbarCustomizer extends Plugin {
     hideReadonlyButton: true,   // 锁定编辑按钮隐藏
     hideDocMenuButton: true,    // 文档菜单按钮隐藏
     hideMoreButton: true,       // 更多按钮隐藏
+    toolbarStyle: 'divider' as 'default' | 'divider',  // 工具栏样式：默认或带分割线（手机端默认分割线）
     disableCustomButtons: false,// 禁用所有自定义按钮
     disableMobileSwipe: true,   // 手机端禁止左右滑动弹出
     showMobileLineBreakButton: false, // 顶部工具栏云同步左侧显示 H 换行按钮
@@ -209,6 +211,7 @@ export default class ToolbarCustomizer extends Plugin {
     showAllNotifications: true, // 一键开启所有按钮右上角提示
     authorActivated: false,     // 鲸鱼定制工具箱是否已激活
     authorCode: '',             // 鲸鱼定制工具箱激活码
+    authorAccount: '',           // 绑定的思源账号
     popupConfig: 'bothModes' as const, // 弹窗配置：'disabled'|'smallWindowOnly'|'bothModes'
     quickNoteNotebookId: '',     // 自启动一键记事默认笔记本ID
     quickNoteFontSize: 14,       // 弹窗输入框字体大小（px）
@@ -222,20 +225,36 @@ export default class ToolbarCustomizer extends Plugin {
     quickNoteAutoFocusButton: true,   // 按钮触发时自动弹出输入法
     quickNoteAutoFocusFirstPopup: true, // 自启动首次弹出时自动聚焦
     quickNoteAutoFocusRestore: true,  // 切后台再切回时自动恢复键盘
+    quickNoteButtonIds: ['more-mobile', 'doc-mobile', 'plugin-settings-mobile', 'open-diary-mobile', 'template-time-mobile', 'search-mobile', 'recent-docs-mobile'],  // 弹窗按钮显示：默认排除「锁住文档」
   }
 
   // 检查作者功能是否已激活
   private isAuthorToolActivated(): boolean {
-    // 电脑端和手机端共享激活状态
-    return this.desktopFeatureConfig.authorActivated || this.mobileFeatureConfig.authorActivated
+    // 旧用户：authorActivated 为 true 且无绑定账号 -> 视为已激活（向后兼容）
+    if (!this.desktopFeatureConfig.authorAccount && this.desktopFeatureConfig.authorActivated) return true
+    if (!this.mobileFeatureConfig.authorAccount && this.mobileFeatureConfig.authorActivated) return true
+
+    // 新用户：需要校验当前登录账号是否与绑定的账号一致
+    const currentUser = this.getCurrentUserName()
+    if (this.desktopFeatureConfig.authorActivated && this.desktopFeatureConfig.authorAccount === currentUser) return true
+    if (this.mobileFeatureConfig.authorActivated && this.mobileFeatureConfig.authorAccount === currentUser) return true
+    return false
+  }
+
+  /** 获取当前思源登录账号名 */
+  private getCurrentUserName(): string {
+    const u = (window as any).siyuan?.user
+    return (u && typeof u.userName === 'string' && u.userName) || ''
   }
 
   // 安全清除激活状态（通过命令调用）
   private async clearActivationStatusSafely(): Promise<void> {
     this.desktopFeatureConfig.authorActivated = false
     this.desktopFeatureConfig.authorCode = ''
+    this.desktopFeatureConfig.authorAccount = ''
     this.mobileFeatureConfig.authorActivated = false
     this.mobileFeatureConfig.authorCode = ''
+    this.mobileFeatureConfig.authorAccount = ''
     await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
     await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
   }
@@ -275,6 +294,11 @@ export default class ToolbarCustomizer extends Plugin {
         this.mobileConfig = {
           ...DEFAULT_MOBILE_CONFIG,
           ...savedMobileConfig
+        }
+        // 旧用户升级兼容：saved 中无 enableFloatingToolbar 字段说明是旧版配置，
+        // 此时不应默认启用底部胶囊，以免覆盖用户原有的底部/顶部工具栏设置
+        if (savedMobileConfig.enableFloatingToolbar === undefined) {
+          this.mobileConfig.enableFloatingToolbar = false
         }
       }
       // 历史：长度类字段若存成无单位纯数字串（如 "45"），写入 CSS 会无效；统一补 px
@@ -474,46 +498,15 @@ export default class ToolbarCustomizer extends Plugin {
       }
 
       // ===== 首次安装提示 =====
-      // 检查是否显示过首次安装提示
       const hasShownWelcome = await this.loadData('hasShownWelcome')
-      const v3MigrationAsked = await this.loadData('v3MigrationAsked')
 
-      // v3.0.0 大版本迁移：检测老用户并询问是否覆盖配置
-      if (hasShownWelcome && !v3MigrationAsked) {
-        // 这是老用户，且未询问过迁移
-        setTimeout(async () => {
-          const shouldReset = await this.showConfirmDialogModal({
-            title: '🎉 检测到《工具栏定制器》插件大版本更新 (v3.0.0)',
-            message: '本版本正式更名为《思源手机端增强》，进行了重大重构，推荐使用新的默认配置。\n\n是否覆盖旧配置？\n\n• 选择"覆盖配置"：使用新的默认按钮和设置\n• 选择"保留配置"：继续使用现有配置',
-            hint: '⚠️ 提示：若保留配置，可能会出现部分问题。\n欢迎进群反馈 QQ：1018010924',
-            confirmText: '覆盖配置',
-            cancelText: '保留配置'
-          })
-
-          if (shouldReset) {
-            // 用户选择覆盖配置：删除所有配置数据
-            await this.resetAllConfigs()
-            showMessage('已重置为新的默认配置，正在重载...', 3000, 'info')
-            // 保存迁移标记
-            await this.saveData('v3MigrationAsked', true)
-            // 重载界面
-            setTimeout(() => {
-              fetchSyncPost('/api/ui/reloadUI', {})
-            }, 1000)
-          } else {
-            // 用户选择保留配置
-            showMessage('已保留现有配置', 2000, 'info')
-            // 保存迁移标记
-            await this.saveData('v3MigrationAsked', true)
-          }
-        }, 1000)
-      } else if (!hasShownWelcome) {
+      if (!hasShownWelcome) {
         // 新用户，显示欢迎提示
         setTimeout(() => {
           if (this.isMobile) {
-            showMessage('欢迎使用本插件！🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦搜索\n⑧最近文档', 0, 'info')
+            showMessage('欢迎使用本插件！🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦搜索\n⑧最近文档\n⑨鲸鱼快速批注', 0, 'info')
           } else {
-            showMessage('欢迎使用本插件🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦伺服浏览器\n⑧最近文档', 0, 'info')
+            showMessage('欢迎使用本插件🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦②打开伺服浏览器\n⑧最近文档\n⑨鲸鱼快速批注', 0, 'info')
           }
           // 立即写入标记，不再依赖用户打开设置面板
           this.saveData('hasShownWelcome', true).catch(() => { /* ignore */ })
@@ -1190,27 +1183,6 @@ export default class ToolbarCustomizer extends Plugin {
   // 自定义确认对话框（已迁移到 ui/dialog.ts，兼容鸿蒙系统）
   private showConfirmDialog(message: string): Promise<boolean> {
     return showConfirmDialogModal({ message, confirmText: '删除', cancelText: '取消' })
-  }
-
-  // 带标题的确认对话框（用于 v3.0.0 迁移询问）
-  private showConfirmDialogModal(options: { title?: string; message: string; hint?: string; confirmText?: string; cancelText?: string }): Promise<boolean> {
-    return showConfirmDialogModal(options)
-  }
-
-  // 重置所有配置（用于 v3.0.0 迁移）
-  private async resetAllConfigs() {
-    // 删除所有配置数据
-    await this.removeData('desktopButtonConfigs')
-    await this.removeData('mobileButtonConfigs')
-    await this.removeData('desktopGlobalButtonConfig')
-    await this.removeData('mobileGlobalButtonConfig')
-    await this.removeData('desktopFeatureConfig')
-    await this.removeData('mobileFeatureConfig')
-    await this.removeData('mobileToolbarConfig')
-    await this.removeData('featureConfig')  // 旧版配置
-    await this.removeData('buttonConfigs')  // 旧版错误 key
-    await this.removeData('mobileConfig')   // 旧版错误 key
-    // 注意：不删除 hasShownWelcome 和 v3MigrationAsked
   }
 
   // 图标选择器（已迁移到 ui/iconPicker.ts）

@@ -344,8 +344,30 @@ export function createMobileButtonItem(
     color: var(--b3-theme-on-surface-light);
     cursor: move;
     touch-action: none;
+    padding: 4px 2px;
+    border-radius: 4px;
+    transition: background 0.15s ease, color 0.15s ease;
   `
   dragHandle.title = '长按拖动排序'
+
+  // 手机端拖拽手柄触感反馈：触摸时立即变色，让用户知道"这个可以交互"
+  // 用 pointerdown 覆盖 touch 和 mouse 两种场景
+  let touchActive = false
+  dragHandle.addEventListener('pointerdown', () => {
+    touchActive = true
+    dragHandle.style.background = 'var(--b3-theme-primary-lightest)'
+    dragHandle.style.color = 'var(--b3-theme-primary)'
+  })
+  dragHandle.addEventListener('pointerup', () => {
+    touchActive = false
+    dragHandle.style.background = 'transparent'
+    dragHandle.style.color = 'var(--b3-theme-on-surface-light)'
+  })
+  dragHandle.addEventListener('pointercancel', () => {
+    touchActive = false
+    dragHandle.style.background = 'transparent'
+    dragHandle.style.color = 'var(--b3-theme-on-surface-light)'
+  })
 
   // 桌面端拖拽：只有拖拽手柄可发起拖拽（扩展工具栏不可拖动）
   if (!isOverflowButton) {
@@ -857,15 +879,16 @@ export function createMobileButtonItem(
         <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>⑨ 悬浮标签页Tab</option>
         <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>⑩ 悬浮大纲</option>
         <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 前一篇/后一篇文档</option>
-	        <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
+	        <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
 	        <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
 		        <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
 		        <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 沉浸阅读模式${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
+		        <option value="quick-attach" ${currentSubtype === 'quick-attach' ? 'selected' : ''}>⑯ 快速添加附件</option>
 	      `
 	      subtypeSelect.onchange = () => {
 	        button.authorToolSubtype = subtypeSelect.value as any
 	        // 未激活时仅允许 toggle-lock
-	        if (!context.isAuthorToolActivated() && subtypeSelect.value !== 'toggle-lock') {
+	        if (!context.isAuthorToolActivated() && subtypeSelect.value !== 'toggle-lock' && subtypeSelect.value !== 'slide-comment') {
 	          subtypeSelect.value = 'toggle-lock'
 	          button.authorToolSubtype = 'toggle-lock'
 	        }

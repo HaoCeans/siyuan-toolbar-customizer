@@ -904,6 +904,10 @@ export function createMobileSettingLayout(
 
 	      const renderList = () => {
 	        flushSliderDrags()
+	        // 保存 dialog 滚动位置，防止全量重建后跳到顶部
+	        const dialogContent = listContainer.closest('.b3-dialog__content') as HTMLElement | null
+	        const savedScrollTop = dialogContent?.scrollTop ?? 0
+
 	        listContainer.innerHTML = ''
 	        const sortedButtons = [...context.buttonConfigs].sort((a, b) => a.sort - b.sort)
 
@@ -954,8 +958,14 @@ export function createMobileSettingLayout(
               lastAddedButtonId = null
             }, 100)
           }
-        })
-        // 同步刷新工具栏预览（反映卡片列表里的删除/启用禁用/图标改动）
+	        })
+	        // 恢复 dialog 滚动位置（防止新增按钮时的 scrollIntoView 干扰，用 RAF 确保在所有布局变化后执行）
+	        if (dialogContent && savedScrollTop > 0) {
+	          requestAnimationFrame(() => {
+	            dialogContent.scrollTop = savedScrollTop
+	          })
+	        }
+	        // 同步刷新工具栏预览（反映卡片列表里的删除/启用禁用/图标改动）
         previewEl?.refresh()
         updateCountHint()
       }
@@ -1308,7 +1318,7 @@ export function createMobileSettingLayout(
       container.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
       const config = context.mobileFeatureConfig as any
-      const currentStyle = config.toolbarStyle || 'default'
+      const currentStyle = config.toolbarStyle || 'divider'
 
       // 默认样式选项
       const defaultOption = document.createElement('div')
@@ -1612,8 +1622,8 @@ export function createMobileSettingLayout(
       // 确定当前选中的值
       const getCurrentValue = () => {
         if (context.mobileConfig.enableTopToolbar) return 'top'
-        if (context.mobileConfig.enableFloatingToolbar) return 'floating'
-        return 'bottom'  // 默认底部
+        if (context.mobileConfig.enableBottomToolbar) return 'bottom'
+        return 'floating'  // 默认底部胶囊
       }
 
       options.forEach(option => {
@@ -2127,11 +2137,11 @@ export function createMobileSettingLayout(
     title: '①胶囊距底部距离',
     description: '💡胶囊工具栏距离屏幕底部的间距',
     createActionElement: () => {
-      const currentValueStr = context.mobileConfig.floatingToolbarMargin ?? '12px';
-      const currentValue = parseInt(currentValueStr) || 12;
+      const currentValueStr = context.mobileConfig.floatingToolbarMargin ?? '50px';
+      const currentValue = parseInt(currentValueStr) || 50;
       const slider = createCustomSliderWithoutLabel(
         currentValue,
-        0, 20, 'px',
+	        0, 80, 'px',
         async (value) => {
           context.mobileConfig.floatingToolbarMargin = value + 'px';
           await context.saveData('mobileToolbarConfig', context.mobileConfig);
@@ -2199,7 +2209,7 @@ export function createMobileSettingLayout(
     title: '④胶囊自身宽度',
     description: '💡胶囊工具栏自身的固定宽度（0=自动适应按钮宽度）',
     createActionElement: () => {
-      const currentValueStr = context.mobileConfig.floatingToolbarWidth ?? '0';
+      const currentValueStr = context.mobileConfig.floatingToolbarWidth ?? '280';
       const currentValue = parseInt(currentValueStr) || 0;
       const slider = createCustomSliderWithoutLabel(
         currentValue,
@@ -2250,7 +2260,7 @@ export function createMobileSettingLayout(
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
       toggle.className = 'b3-switch'
-      toggle.checked = !!context.mobileConfig.floatingToolbarScrollHide
+      toggle.checked = context.mobileConfig.floatingToolbarScrollHide !== false
       toggle.style.cssText = 'transform: scale(1.2);'
       toggle.onchange = async () => {
         context.mobileConfig.floatingToolbarScrollHide = toggle.checked
@@ -3897,10 +3907,8 @@ export function createMobileSettingLayout(
         <div style="font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>
       `
 
-      const __activated = context.isAuthorToolActivated()
-      const rowTr = (num: string, name: string, desc: string): string => `<tr>
-          <td style="padding:10px 4px;text-align:center;color:var(--b3-theme-primary);font-weight:500;">${num}</td>
-          <td style="padding:10px;font-weight:500;">${name}</td>
+	      const rowTr = (num: string, name: string, desc: string): string => `<tr>
+          <td style="padding:10px;font-weight:500;"><span style="color:var(--b3-theme-primary);margin-right:4px;">${num}</span>${name}</td>
           <td style="padding:10px;color:var(--b3-theme-on-surface);font-size:12px;">${desc}</td>
         </tr>`
 
@@ -3918,17 +3926,18 @@ export function createMobileSettingLayout(
         rowTr('⑨', '手机端悬浮标签页Tab', '手机端多文档快速切换，苹果风格悬浮Tab栏，自动管理，告别反复返回'),
         rowTr('⑩', '手机端悬浮大纲', '左侧悬浮大纲面板，标题快速跳转，实时跟踪当前位置，阅读长文必备'),
         rowTr('⑪', '手机端前一篇/后一篇文档', '底部悬浮导航栏，按文件树顺序浏览文档，前后翻页，阅读更流畅'),
-        rowTr('⑫', '滑动快速批注', __activated ? '配合「鲸鱼快速批注」插件，手指滑动即可标注文字' : '配合「鲸鱼快速批注」插件，手指滑动即可标注文字（🔒 激活后可用）'),
+		        rowTr('⑫', '滑动快速批注<br><span style="color:#10b981;font-size:11px;">免费</span>', '完美联动「鲸鱼快速批注」插件，请先下载该插件才能使用！'),
         rowTr('⑬', '文档朗读', '使用浏览器语音合成朗读当前文档，支持语速调节、段落高亮'),
         rowTr('⑭', '一键清理空块', '自动扫描并删除文档中空块（无文本段落/标题/列表项），预览确认后批量删除'),
-        rowTr('⑮', '沉浸阅读模式<span style="color:#10b981;font-size:11px;margin-left:4px;">免费</span>', '🔒一键锁定文档防误编辑 + 📱上滑自动隐藏工具栏，全屏沉浸阅读'),
+        rowTr('⑮', '沉浸阅读模式<br><span style="color:#10b981;font-size:11px;">免费</span>', '🔒一键锁定文档防误编辑 + 📱上滑自动隐藏工具栏，全屏沉浸阅读'),
+        rowTr('⑯', '快速添加附件', '📎选择任意文件上传，可自定义名称，图片支持压缩；有光标插光标处，无光标追加日记（记事弹窗中不生效）'),
       ]
 
       interface __TabData { key: string; label: string; sub: string; icon: string; rows: string[] }
       const __tabs: __TabData[] = [
-        { key: 'all', label: '全部功能', sub: '15项', icon: '📋', rows: __allRows },
+        { key: 'all', label: '全部功能', sub: '17项', icon: '📋', rows: __allRows },
         { key: 'reading', label: '批注阅读', sub: '6项', icon: '📖', rows: [__allRows[9], __allRows[10], __allRows[11], __allRows[13], __allRows[15], __allRows[12]] },
-        { key: 'notes', label: '笔记与日记', sub: '4项', icon: '✍️', rows: [__allRows[0], __allRows[4], __allRows[5], __allRows[8]] },
+        { key: 'notes', label: '笔记与日记', sub: '5项', icon: '✍️', rows: [__allRows[0], __allRows[4], __allRows[5], __allRows[8], __allRows[16]] },
         { key: 'edit', label: '编辑提效', sub: '3项', icon: '⚡', rows: [__allRows[1], __allRows[6], __allRows[14]] },
         { key: 'nav', label: '导航与浏览', sub: '3项', icon: '🧭', rows: [__allRows[2], __allRows[3], __allRows[7]] },
       ]
@@ -3950,7 +3959,6 @@ export function createMobileSettingLayout(
           <table style="width:100%;font-size:13px;border-collapse:collapse;margin-top:8px;">
             <thead>
               <tr style="background:var(--b3-theme-primary-lightest);">
-                <th style="padding:10px;text-align:center;width:36px;">序号</th>
                 <th style="padding:10px;text-align:left;">功能名称</th>
                 <th style="padding:10px;text-align:left;">功能说明</th>
               </tr>

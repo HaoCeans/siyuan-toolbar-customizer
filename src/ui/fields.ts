@@ -299,7 +299,13 @@ export function createInputField(
     box-sizing: border-box;
     width: 100%;
   `
-  input.onchange = () => onChange(input.value)
+  // 数字类型用 change（失焦触发），避免输入清空等中间态被 parseInt 成 NaN 后回弹默认值；
+  // 文本类型用 input（实时触发），避免手机端失焦时焦点/滚动跳到相邻区块（如「全局按钮配置」）
+  if (type === 'number') {
+    input.onchange = () => onChange(input.value)
+  } else {
+    input.oninput = () => onChange(input.value)
+  }
 
   field.appendChild(labelEl)
   field.appendChild(input)
@@ -395,7 +401,7 @@ export function createTextareaField(
     box-sizing: border-box;
     width: 100%;
   `
-  textarea.onchange = () => onChange(textarea.value)
+  textarea.oninput = () => onChange(textarea.value)
 
   field.appendChild(labelEl)
   field.appendChild(textarea)

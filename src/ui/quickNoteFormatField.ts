@@ -26,8 +26,8 @@ export interface QuickNoteFormatFieldOptions {
 
 function navigateToDesktopActivationTab(): void {
   requestAnimationFrame(() => {
-    const versionTab = document.querySelector('button[data-tab="version"]') as HTMLElement
-    versionTab?.click()
+    const activationTab = document.querySelector('button[data-tab="activation"]') as HTMLElement
+    activationTab?.click()
   })
 }
 

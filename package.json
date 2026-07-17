@@ -18,19 +18,24 @@
     "mobile",
     "automation"
   ],
-  "scripts": {
-    "dev": "vite build --watch",
-    "release": "node ./release.js",
-    "release:manual": "node ./release.js --mode=manual",
-    "release:patch": "node ./release.js --mode=patch",
-    "release:minor": "node ./release.js --mode=minor",
-    "release:major": "node ./release.js --mode=major",
-    "build": "vite build"
-  },
-  "dependencies": {
-    "lucide": "^0.562.0",
-    "vue": "^3.3.8"
-  },
+	  "scripts": {
+	    "dev": "vite build --watch",
+	    "release": "node ./release.js",
+	    "release:manual": "node ./release.js --mode=manual",
+	    "release:patch": "node ./release.js --mode=patch",
+	    "release:minor": "node ./release.js --mode=minor",
+	    "release:major": "node ./release.js --mode=major",
+	    "build": "vite build",
+	    "keygen": "node scripts/gen-keypair.mjs",
+	    "gencode": "node scripts/gen-code.mjs",
+	    "setup": "node scripts/setup.mjs"
+	  },
+	  "dependencies": {
+	    "@noble/ed25519": "^2.1.0",
+	    "@noble/hashes": "^1.4.0",
+	    "lucide": "^0.562.0",
+	    "vue": "^3.3.8"
+	  },
   "devDependencies": {
     "@antfu/eslint-config": "^4.8.1",
     "@types/node": "^20.2.0",

@@ -373,28 +373,28 @@ export function createDesktopButtonItem(
       { value: 'author-tool', label: '⑥鲸鱼定制工具箱' }
     )
   } else {
-    // 未激活时：toggle-lock 按钮显示"免费试用"，其他显示"跳转激活"
-    const isFreeTrial = button.type === 'author-tool' && button.authorToolSubtype === 'toggle-lock'
+    // 未激活时：toggle-lock / slide-comment 显示"免费试用"，其他显示"跳转激活"
+    const isFreeTrial = button.type === 'author-tool' && (button.authorToolSubtype === 'toggle-lock' || button.authorToolSubtype === 'slide-comment')
     typeOptions.push({
       value: 'author-tool',
       label: isFreeTrial ? '⑥鲸鱼定制工具箱（免费试用）' : '⑥鲸鱼定制工具箱（跳转激活）'
     })
   }
 
-  const typeSelectField = createDesktopSelectField('选择功能', button.type, typeOptions, (v) => {
-    // 选择鲸鱼定制工具箱但未激活：仅 toggle-lock 允许，其他跳转激活
-    if (v === 'author-tool' && !context.isAuthorToolActivated()) {
-      const isFreeTrial2 = button.authorToolSubtype === 'toggle-lock'
-      if (isFreeTrial2) {
-        // toggle-lock 免费试用：允许切换类型
-        button.type = v as any
+	  const typeSelectField = createDesktopSelectField('选择功能', button.type, typeOptions, (v) => {
+	    // 选择鲸鱼定制工具箱但未激活：仅 toggle-lock / slide-comment 允许，其他跳转激活
+	    if (v === 'author-tool' && !context.isAuthorToolActivated()) {
+	      const isFreeTrial2 = button.authorToolSubtype === 'toggle-lock' || button.authorToolSubtype === 'slide-comment'
+	      if (isFreeTrial2) {
+	        // 免费试用：允许切换类型
+	        button.type = v as any
       } else {
         // 其他情况：恢复原值，跳转激活页
         const selectElement = typeSelectField.querySelector('select') as HTMLSelectElement
         if (selectElement) { selectElement.value = button.type || 'builtin-refresh' }
         requestAnimationFrame(() => {
-          const versionTab = document.querySelector('button[data-tab="version"]') as HTMLElement
-          if (versionTab) versionTab.click()
+          const activationTab = document.querySelector('button[data-tab="activation"]') as HTMLElement
+          if (activationTab) activationTab.click()
         })
         const newForm = document.createElement('div')
         newForm.className = 'toolbar-customizer-edit-form'
@@ -763,15 +763,16 @@ export function createDesktopButtonItem(
       <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>⑨ 悬浮标签页Tab</option>
       <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>⑩ 悬浮大纲</option>
       <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 前一篇/后一篇文档</option>
-	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
+	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
 	      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
 	      <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
 	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 沉浸阅读模式${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
+	      <option value="quick-attach" ${currentSubtype === 'quick-attach' ? 'selected' : ''}>⑯ 快速添加附件</option>
 	    `
 	    subtypeSelect.onchange = () => {
 	      button.authorToolSubtype = subtypeSelect.value as any
 		      // 未激活时仅允许 toggle-lock
-		      if (!context.isAuthorToolActivated() && subtypeSelect.value !== 'toggle-lock') {
+		      if (!context.isAuthorToolActivated() && subtypeSelect.value !== 'toggle-lock' && subtypeSelect.value !== 'slide-comment') {
 		        subtypeSelect.value = 'toggle-lock'
 		        button.authorToolSubtype = 'toggle-lock'
 		      }
@@ -1916,13 +1917,13 @@ export function populateDesktopEditForm(
         selectElement.value = button.type || 'builtin-refresh'
       }
     
-      // 直接点击"更新、Q 群、激活码获取"标签按钮
+      // 直接点击"激活与权益"标签按钮
       requestAnimationFrame(() => {
-        const versionTab = document.querySelector('button[data-tab="version"]') as HTMLElement
-        if (versionTab) {
-          versionTab.click()
+        const activationTab = document.querySelector('button[data-tab="activation"]') as HTMLElement
+        if (activationTab) {
+          activationTab.click()
         } else {
-          console.warn('[Desktop Debug] version tab button not found!')
+          console.warn('[Desktop Debug] activation tab button not found!')
         }
       })
       
@@ -2306,15 +2307,16 @@ export function populateDesktopEditForm(
       <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>⑨ 悬浮标签页Tab</option>
       <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>⑩ 悬浮大纲</option>
       <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 前一篇/后一篇文档</option>
-	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注</option>
+	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
 	      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
 	      <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
 	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 沉浸阅读模式${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
+	      <option value="quick-attach" ${currentSubtype === 'quick-attach' ? 'selected' : ''}>⑯ 快速添加附件</option>
 	    `
 	    subtypeSelect.onchange = () => {
 	      button.authorToolSubtype = subtypeSelect.value as any
 		      // 未激活时仅允许 toggle-lock
-		      if (!context.isAuthorToolActivated() && subtypeSelect.value !== 'toggle-lock') {
+		      if (!context.isAuthorToolActivated() && subtypeSelect.value !== 'toggle-lock' && subtypeSelect.value !== 'slide-comment') {
 		        subtypeSelect.value = 'toggle-lock'
 		        button.authorToolSubtype = 'toggle-lock'
 		      }

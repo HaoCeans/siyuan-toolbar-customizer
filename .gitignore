@@ -9,3 +9,8 @@ dist
 build
 tmp
 .env
+scripts/private-key.json
+scripts/issued-codes.log
+
+# ZCode session files
+.zcode/

@@ -124,43 +124,50 @@ export function injectTabSwitcher(): void {
       border-radius: 4px;
     `
 
-    // 更新、Q群、激活码获取标签
+    // 数据迁移标签
     const versionTab = document.createElement('button')
     versionTab.className = 'b3-button'
     versionTab.dataset.tab = 'version'
-    versionTab.textContent = '🔍 更新、Q群、激活码获取'
+    versionTab.textContent = '📋 数据迁移'
     versionTab.style.cssText = `
       flex: 1;
       padding: 8px 16px;
       font-size: 13px;
       border-radius: 4px;
-	    `
+    `
 
-	    // 切换函数
-	    const switchTab = (type: 'desktop' | 'mobile' | 'version') => {
-	      // 更新按钮样式
-	      if (type === 'desktop') {
-	        desktopTab.classList.add('b3-button--primary')
-	        desktopTab.classList.remove('b3-button--outline')
-	        mobileTab.classList.remove('b3-button--primary')
-	        mobileTab.classList.add('b3-button--outline')
-	        versionTab.classList.remove('b3-button--primary')
-	        versionTab.classList.add('b3-button--outline')
-	      } else if (type === 'mobile') {
-	        mobileTab.classList.add('b3-button--primary')
-	        mobileTab.classList.remove('b3-button--outline')
-	        desktopTab.classList.remove('b3-button--primary')
-	        desktopTab.classList.add('b3-button--outline')
-	        versionTab.classList.remove('b3-button--primary')
-	        versionTab.classList.add('b3-button--outline')
-	      } else { // type === 'version'
-	        versionTab.classList.add('b3-button--primary')
-	        versionTab.classList.remove('b3-button--outline')
-	        desktopTab.classList.remove('b3-button--primary')
-	        desktopTab.classList.add('b3-button--outline')
-	        mobileTab.classList.remove('b3-button--primary')
-	        mobileTab.classList.add('b3-button--outline')
-	      }
+    // 激活与权益标签
+    const activationTab = document.createElement('button')
+    activationTab.className = 'b3-button'
+    activationTab.dataset.tab = 'activation'
+    activationTab.textContent = '🔐 激活与权益'
+    activationTab.style.cssText = `
+      flex: 1;
+      padding: 8px 16px;
+      font-size: 13px;
+      border-radius: 4px;
+    `
+
+    // 切换函数
+    const switchTab = (type: 'desktop' | 'mobile' | 'version' | 'activation') => {
+      // 更新按钮样式 - 先全部重置为outline
+      const allTabs = [desktopTab, mobileTab, versionTab, activationTab]
+      allTabs.forEach(tab => {
+        tab.classList.remove('b3-button--primary')
+        tab.classList.add('b3-button--outline')
+      })
+      // 高亮当前选中的tab
+      const activeMap: Record<string, HTMLElement> = {
+        desktop: desktopTab,
+        mobile: mobileTab,
+        version: versionTab,
+        activation: activationTab,
+      }
+      const activeEl = activeMap[type]
+      if (activeEl) {
+        activeEl.classList.add('b3-button--primary')
+        activeEl.classList.remove('b3-button--outline')
+      }
 
       // 显示/隐藏对应的配置项
       // 遍历所有配置项，根据 toolbar-customizer-content 的 data-tabGroup 属性切换显示
@@ -178,13 +185,15 @@ export function injectTabSwitcher(): void {
       })
     }
 
-    desktopTab.onclick = () => switchTab('desktop')
-    mobileTab.onclick = () => switchTab('mobile')
-    versionTab.onclick = () => switchTab('version')
+	    desktopTab.onclick = () => switchTab('desktop')
+	    mobileTab.onclick = () => switchTab('mobile')
+	    versionTab.onclick = () => switchTab('version')
+	    activationTab.onclick = () => switchTab('activation')
 
-    tabsContainer.appendChild(desktopTab)
-    tabsContainer.appendChild(mobileTab)
+	    tabsContainer.appendChild(desktopTab)
+	    tabsContainer.appendChild(mobileTab)
 	    tabsContainer.appendChild(versionTab)
+	    tabsContainer.appendChild(activationTab)
 
 	    // 插入到内容区域顶部
 	    dialogContent.insertBefore(tabsContainer, dialogContent.firstChild)

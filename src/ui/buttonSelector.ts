@@ -16,11 +16,13 @@ export interface ButtonSelectorOptions {
   onSelect: (result: ButtonInfo) => void
 }
 
-// 思源内置按钮列表
+// 思源内置按钮列表（v3.7+ 手机端菜单 ID 已更新）
 const BUILTIN_BUTTONS: ButtonInfo[] = [
-  { id: 'toolbarMore', name: '右上角：设置', icon: 'iconSettings' },
+  // ===== 顶部工具栏 =====
+  { id: 'toolbarMore', name: '右上角：设置（☰ 菜单）', icon: 'iconSettings' },
   { id: 'toolbarFile', name: '左上角：文档树', icon: 'iconFolder' },
-  { id: 'menuAccount', name: '个人信息', icon: 'iconAccount' },
+
+  // ===== 菜单内 - 常用功能（无需展开子菜单）=====
   { id: 'menuRecent', name: '最近的文档', icon: 'iconList' },
   { id: 'menuSearch', name: '搜索', icon: 'iconSearch' },
   { id: 'menuCommand', name: '命令面板', icon: 'iconTerminal' },
@@ -31,17 +33,53 @@ const BUILTIN_BUTTONS: ButtonInfo[] = [
   { id: 'menuCard', name: '间隔重复', icon: 'iconRiffCard' },
   { id: 'menuLock', name: '锁屏', icon: 'iconLock' },
   { id: 'menuHistory', name: '数据历史', icon: 'iconHistory' },
-  { id: 'menuEditor', name: '编辑器', icon: 'iconEdit' },
-  { id: 'menuFileTree', name: '文档树', icon: 'iconFolder' },
-  { id: 'menuRiffCard', name: '闪卡', icon: 'iconSparkles' },
-  { id: 'menuAI', name: 'AI', icon: 'iconSparkles' },
-  { id: 'menuAssets', name: '资源', icon: 'iconImage' },
-  { id: 'menuAppearance', name: '外观', icon: 'iconTheme' },
-  { id: 'menuSync', name: '云端', icon: 'iconCloud' },
-  { id: 'menuPublish', name: '发布', icon: 'iconUpload' },
-  { id: 'menuAbout', name: '关于', icon: 'iconInfo' },
-  { id: 'menuPlugin', name: '插件', icon: 'iconPlugin' }
+
+  // ===== 菜单内 - 设置项（v3.7+ 已改名 menuConfig*）=====
+  { id: 'menuConfigEditor', name: '编辑器', icon: 'iconEdit' },
+  { id: 'menuConfigFile', name: '文档', icon: 'iconFiles' },
+  { id: 'menuConfigAppearance', name: '外观', icon: 'iconTheme' },
+  { id: 'menuConfigFlashcard', name: '闪卡', icon: 'iconRiffCard' },
+  { id: 'menuConfigAi', name: '人工智能', icon: 'iconSparkles' },
+  { id: 'menuConfigSecretsVariables', name: '密钥和变量', icon: 'iconSquareAsterisk' },
+  { id: 'menuConfigAssets', name: '资源', icon: 'iconImage' },
+  { id: 'menuConfigExport', name: '导出', icon: 'iconUpload' },
+  { id: 'menuConfigSearch', name: '搜索（设置）', icon: 'iconSearch' },
+  { id: 'menuConfigSync', name: '账号与同步', icon: 'iconCloud' },
+  { id: 'menuConfigAccess', name: '鉴权', icon: 'iconLock' },
+  { id: 'menuConfigApp', name: '应用', icon: 'iconLayoutGrid' },
+  { id: 'menuConfigAbout', name: '关于', icon: 'iconInfo' },
+
+  // ===== 菜单内 - 其他 =====
+  { id: 'menuPlugin', name: '插件', icon: 'iconPlugin' },
+  { id: 'menuHelp', name: '用户指南', icon: 'iconHelp' },
 ]
+
+/**
+ * 旧 ID → 新 ID 别名映射表
+ * 思源 v3.7 重构了手机端菜单，部分按钮改名。旧配置自动映射，无需用户手动改。
+ */
+export const BUILTIN_ID_ALIASES: Record<string, string> = {
+  // 旧 ID                // 新 ID（v3.7+）
+  'menuAccount':          'menuConfigSync',      // 个人信息 已合并到"账号与同步"
+  'menuEditor':           'menuConfigEditor',
+  'menuFileTree':         'menuConfigFile',      // 注意：旧版叫"文档树"，新版"文档"
+  'menuAppearance':       'menuConfigAppearance',
+  'menuRiffCard':         'menuConfigFlashcard',
+  'menuAI':               'menuConfigAi',
+  'menuAssets':           'menuConfigAssets',
+  'menuPublish':          'menuConfigExport',
+  'menuSync':             'menuConfigSync',
+  'menuAbout':            'menuConfigAbout',
+}
+
+/**
+ * 解析 builtinId：应用别名映射，返回实际要查找的 ID。
+ * 旧配置的 menuAccount 等会自动转成新的 menuConfigSync。
+ */
+export function resolveBuiltinId(rawId: string): string {
+  if (!rawId) return rawId
+  return BUILTIN_ID_ALIASES[rawId] || rawId
+}
 
 /**
  * 显示按钮选择器弹窗

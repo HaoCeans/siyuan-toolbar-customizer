@@ -2323,6 +2323,29 @@ function handleVisibilityChange() {
         }
       }, 400);
     }
+
+    // ===== 工具栏自愈：杀后台冷启动后胶囊/底部工具栏可能丢失 =====
+    // 思源被系统杀掉重新启动时，onLayoutReady 里 .protyle-breadcrumb 可能还没渲染，
+    // setupToolbar 错过窗口后没有任何兜底（eventBus 也可能已在监听前发完），导致胶囊永久消失。
+    // 这里在"切回前台"时检查一次：若 breadcrumb 已出现但缺 data-input-method，立即重建。
+    // 这不属于 README v3.3.1 提到的"复杂检测逻辑"（那种是周期性轮询/冻结状态判断），
+    // 仅是切前台这一明确事件上的轻量状态自愈，且只在确实丢失时才动手。
+    try {
+      const breadcrumb = document.querySelector('.protyle-breadcrumb:not(.protyle-breadcrumb__bar)')
+        || document.querySelector('.protyle-breadcrumb__bar');
+      if (breadcrumb) {
+        const hasInputMethod = (breadcrumb as HTMLElement).hasAttribute('data-input-method');
+        // 顶部模式 breadcrumb 不带 data-input-method（设计如此），通过 body class 区分
+        const isTopMode = document.body.classList.contains('siyuan-toolbar-top-mode');
+        if (!hasInputMethod && !isTopMode) {
+          setTimeout(() => {
+            pluginInstance?.reinitMobileToolbarIfMissing?.();
+          }, 300);  // 让思源先恢复完 UI 状态
+        }
+      }
+    } catch {
+      // 自愈失败不应影响一键记事弹窗的正常流程
+    }
   }
 }
 

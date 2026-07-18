@@ -24,6 +24,8 @@ import { destroyMobileTTSEngine } from "./tts/mobileTtsEngine";
 import { destroyEdgeTTSEngine, destroyGoogleTTSEngine } from "./tts/edgeTtsEngine";
 // 确认对话框
 import { showConfirmDialog } from "./ui/dialog";
+// 内置按钮 ID 别名解析（思源 v3.7 重构菜单后兼容旧配置）
+import { resolveBuiltinId } from "./ui/buttonSelector";
 // API 工具
 import { deleteBlock } from "./api";
 import { uploadImageFile, insertProtyleImageAtCaret } from "./quickNote/imageInsert";
@@ -1189,12 +1191,24 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
 
     // 尝试设置工具栏
     if (!setupToolbar()) {
-      // 如果没找到，根据配置延迟尝试
-      const retryDelay = config.bottomToolbarRetryDelay ?? 2000;  // 默认 2000ms
-      if (retryDelay > 0) {
-        safeSetTimeout(() => {
-          setupToolbar()
-        }, retryDelay)
+      // 如果没找到，按退避序列多轮重试（覆盖冷启动慢机型，例如鸿蒙/安卓杀后台后恢复）
+      // 原"单次 2 秒重试"在冷启动场景下经常错过窗口（breadcrumb 晚于 2 秒才渲染）。
+      // 用户显式设置 bottomToolbarRetryDelay=0 时禁用重试（保留原语义）。
+      const userRetryDelay = config.bottomToolbarRetryDelay
+      if (userRetryDelay === 0) {
+        // 用户明确禁用重试：什么都不做
+      } else if (userRetryDelay && userRetryDelay > 0) {
+        // 用户自定义了重试延迟：沿用旧语义（单次），向后兼容
+        safeSetTimeout(() => { setupToolbar() }, userRetryDelay)
+      } else {
+        // 默认：6 轮退避序列（2s/3s/4s/6s/8s/12s，累计约 35 秒）
+        // setupToolbar 内部对已设置元素短路（data-toolbar-customized），任一成功即停
+        const backoffSchedule = [2000, 3000, 4000, 6000, 8000, 12000]
+        let elapsed = 0
+        for (const step of backoffSchedule) {
+          elapsed += step
+          safeSetTimeout(() => { setupToolbar() }, elapsed)
+        }
       }
     }
 
@@ -1568,7 +1582,7 @@ function cleanupCustomButtons() {
   oldDividers.forEach(div => div.remove())
 }
 
-function setupEditorButtons(configs: ButtonConfig[]) {
+function setupEditorButtons(configs: ButtonConfig[], waitFrameBudget = 60) {
   // 保存按钮配置到全局变量，供扩展工具栏使用
   (window as any).__mobileButtonConfigs = configs
 
@@ -1582,7 +1596,13 @@ function setupEditorButtons(configs: ButtonConfig[]) {
     ? document.querySelector('.protyle-breadcrumb, .protyle-breadcrumb__bar')
     : document.querySelector('.protyle-breadcrumb[data-input-method], .protyle-breadcrumb__bar[data-input-method]')
   if (isMobileDevice() && !toolbarReady) {
-    requestAnimationFrame(() => setupEditorButtons(configs))
+    // 等工具栏就绪信号；但加 60 帧（约 1 秒）上限，避免冷启动失败时无限 rAF 空转耗电。
+    // 上限到达后停止，依赖：①补丁1的退避重试 ②补丁2的 onLayoutReady 自检 ③补丁3的切前台自愈
+    //   ④EventBus(loaded-protyle-*/switch-protyle) ⑤点击编辑器时的 customButtonClickHandler
+    // 这些信号在工具栏就绪后都会重新触发 setupEditorButtons(currentButtonConfigs)。
+    if (waitFrameBudget > 0) {
+      requestAnimationFrame(() => setupEditorButtons(configs, waitFrameBudget - 1))
+    }
     return
   }
 
@@ -1591,13 +1611,19 @@ function setupEditorButtons(configs: ButtonConfig[]) {
   const overflowLayers = (overflowBtn && overflowBtn.enabled !== false) ? (overflowBtn.layers || 1) : 0
 
   // 使用 requestAnimationFrame 确保工具栏已经渲染完成后再计算溢出
-  const calculateOverflowWithDelay = () => {
+  const calculateOverflowWithDelay = (widthFrameBudget = 60) => {
     if (overflowLayers > 0) {
       // 尝试获取工具栏宽度，如果为0则等待重试
       const availableWidth = getToolbarAvailableWidth()
       if (availableWidth <= 0) {
-        // 工具栏还没渲染完成，延迟重试
-        requestAnimationFrame(() => calculateOverflowWithDelay())
+        // 工具栏还没渲染完成，延迟重试（同样加 60 帧上限，避免无限空转）
+        if (widthFrameBudget > 0) {
+          requestAnimationFrame(() => calculateOverflowWithDelay(widthFrameBudget - 1))
+        } else {
+          // 宽度等不到：放弃溢出计算，但仍尝试创建按钮（用默认全宽估算，下次 eventBus/click 会修正）
+          const editors = document.querySelectorAll('.protyle')
+          createButtonsForEditors(editors, configs)
+        }
         return
       }
 
@@ -1618,7 +1644,7 @@ function setupEditorButtons(configs: ButtonConfig[]) {
   }
 
   // 启动溢出计算（完成后会创建按钮）
-  requestAnimationFrame(calculateOverflowWithDelay)
+  requestAnimationFrame(() => calculateOverflowWithDelay())
 }
 
 /**
@@ -2864,40 +2890,43 @@ function executeBuiltinFunction(config: ButtonConfig) {
     Notify.showErrorButtonNotConfigured(config.name)
     return
   }
-  
+
+  // 应用别名映射（思源 v3.7 重构手机端菜单后，旧 ID 自动转新 ID）
+  const targetId = resolveBuiltinId(config.builtinId)
+
   // 尝试多种方式查找按钮
   let menuItem: HTMLElement | null = null
-  
+
   // 1. 通过 id 查找
-  menuItem = document.getElementById(config.builtinId)
+  menuItem = document.getElementById(targetId)
   if (menuItem) {
     clickElement(menuItem)
     return
   }
-  
+
   // 2. 通过 data-id 查找
-  menuItem = document.querySelector(`[data-id="${config.builtinId}"]`) as HTMLElement
+  menuItem = document.querySelector(`[data-id="${targetId}"]`) as HTMLElement
   if (menuItem) {
     clickElement(menuItem)
     return
   }
-  
+
   // 3. 通过 data-menu-id 查找
-  menuItem = document.querySelector(`[data-menu-id="${config.builtinId}"]`) as HTMLElement
+  menuItem = document.querySelector(`[data-menu-id="${targetId}"]`) as HTMLElement
   if (menuItem) {
     clickElement(menuItem)
     return
   }
-  
+
   // 4. 通过 data-type 查找
-  menuItem = document.querySelector(`[data-type="${config.builtinId}"]`) as HTMLElement
+  menuItem = document.querySelector(`[data-type="${targetId}"]`) as HTMLElement
   if (menuItem) {
     clickElement(menuItem)
     return
   }
-  
+
   // 5. 通过 class 查找（支持多个class，用空格分隔）
-  const classNames = config.builtinId.split(' ')
+  const classNames = targetId.split(' ')
   if (classNames.length > 0) {
     const classSelector = classNames.map(c => `.${c}`).join('')
     menuItem = document.querySelector(classSelector) as HTMLElement
@@ -2906,19 +2935,44 @@ function executeBuiltinFunction(config: ButtonConfig) {
       return
     }
   }
-  
+
   // 6. 通过文本内容查找按钮
   const allButtons = document.querySelectorAll('button')
   for (const btn of allButtons) {
     const label = btn.querySelector('.b3-menu__label')?.textContent?.trim()
-    if (label === config.builtinId) {
+    if (label === targetId) {
       clickElement(btn as HTMLElement)
       return
     }
   }
-  
+
+  // 7. 手机端兜底：menu* 系列按钮藏在 #menu 里，需先打开菜单
+  // 手机端思源的"搜索/日记/命令面板..."等 menu 开头的按钮，
+  // 都在右上角设置(☰)按钮 #toolbarMore 打开的 #menu 菜单内。
+  // 菜单关闭时这些元素不存在，需要先点 toolbarMore 打开菜单，再延迟点击目标。
+  if (targetId.startsWith('menu') && isMobileUIContext()) {
+    const toolbarMore = document.getElementById('toolbarMore') as HTMLElement
+    if (toolbarMore) {
+      clickElement(toolbarMore)
+      // 等菜单渲染后重试（菜单渲染是异步的，最多重试 8 次 ≈ 640ms）
+      const retryClick = (attemptsLeft: number) => {
+        const target = document.getElementById(targetId) ||
+                       document.querySelector(`[data-id="${targetId}"]`) as HTMLElement
+        if (target) {
+          clickElement(target)
+        } else if (attemptsLeft > 0) {
+          setTimeout(() => retryClick(attemptsLeft - 1), 80)
+        } else {
+          Notify.showErrorBuiltinNotFound(targetId)
+        }
+      }
+      retryClick(8)
+      return
+    }
+  }
+
   // 所有方法都失败
-  Notify.showErrorBuiltinNotFound(config.builtinId)
+  Notify.showErrorBuiltinNotFound(targetId)
 }
 
 /**

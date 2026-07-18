@@ -598,6 +598,14 @@ export default class ToolbarCustomizer extends Plugin {
         this.mobileFeatureConfig.showMobileLineBreakButton === true,
         this.mobileFeatureConfig.disableCustomButtons
       )
+
+      // ===== 健康自检：冷启动慢机型上 .protyle-breadcrumb 可能晚于初始化窗口才渲染 =====
+      // 此时 setupToolbar/setupEditorButtons 都会失败，且无任何兜底恢复入口（eventBus
+      // 也可能已在监听器注册前触发完），导致胶囊永久消失。
+      // 8 秒后自检一次：若工具栏就绪信号未成立则重建（仅 1 次，靠 reinit 内部短路防重复）。
+      setTimeout(() => {
+        this.reinitMobileToolbarIfMissing()
+      }, 8000)
     }
   }
 
@@ -829,6 +837,55 @@ export default class ToolbarCustomizer extends Plugin {
       showTemplateContextMenu(e, textarea)
     }
     document.addEventListener('contextmenu', this.quickNoteTextareaContextMenuHandler, true)
+  }
+
+  /**
+   * 工具栏自愈：检测当前激活模式的"就绪信号"是否丢失，丢失则重建。
+   *
+   * 触发场景：
+   *  - onLayoutReady 8 秒自检（补丁2）
+   *  - visibilitychange 切回前台（补丁3，windowDetector 调用）
+   *
+   * 就绪信号：
+   *  - 底部固定/胶囊模式：.protyle-breadcrumb[__bar][data-input-method] 存在
+   *  - 顶部模式：body.siyuan-toolbar-top-mode 生效（纯 CSS 驱动，breadcrumb 出现即生效，通常无需重建）
+   *
+   * 防重复：initMobileToolbarAdjuster 内部对 data-toolbar-customized==='true' 短路；
+   *        initCustomButtons 内部做按钮差异判断。两者都允许安全重复调用。
+   */
+  reinitMobileToolbarIfMissing(): void {
+    if (!this.isMobile) return
+    // 禁用自定义按钮时不重建（与 initPluginFunctions 的跳过条件一致）
+    if (this.mobileFeatureConfig.disableCustomButtons) return
+
+    const cfg = this.mobileConfig
+    const isTopMode = cfg.enableTopToolbar === true
+    const isBottomOrFloating = cfg.enableBottomToolbar === true || cfg.enableFloatingToolbar === true
+
+    // 判断"工具栏是否已就绪"
+    let toolbarReady = false
+    if (isTopMode) {
+      // 顶部模式靠 body class + 纯 CSS 生效，breadcrumb 出现即认为就绪
+      toolbarReady = document.body.classList.contains('siyuan-toolbar-top-mode')
+        && !!document.querySelector('.protyle-breadcrumb, .protyle-breadcrumb__bar')
+    } else if (isBottomOrFloating) {
+      // 底部/胶囊模式：breadcrumb 必须被打上 data-input-method 属性才算 setup 成功
+      toolbarReady = !!document.querySelector(
+        '.protyle-breadcrumb[data-input-method], .protyle-breadcrumb__bar[data-input-method]'
+      )
+    }
+
+    if (toolbarReady) return  // 一切正常，无需重建
+
+    // breadcrumb 还没出现：不重建（避免提前 setup 再次失败），交给退避重试/EventBus 兜底
+    const breadcrumbExists = !!document.querySelector(
+      '.protyle-breadcrumb:not(.protyle-breadcrumb__bar), .protyle-breadcrumb__bar'
+    )
+    if (!breadcrumbExists) return
+
+    // breadcrumb 已存在但 data-input-method 缺失：说明 setupToolbar 错过了窗口，立即重建
+    initMobileToolbarAdjuster(this.mobileConfig, this.mobileFeatureConfig.disableCustomButtons)
+    initCustomButtons(this.mobileButtonConfigs)
   }
 
   /** 思源同步仅变更插件存储数据（dataChangePlugins）时调用，不会触发 onunload/onload */

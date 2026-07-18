@@ -5,6 +5,19 @@ All notable changes to the Toolbar Customizer plugin will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.2] - 2026-07-18
+
+### Fixed
+
+- **手机端"思源内置功能"按钮失效**：思源 v3.7 重构手机端设置菜单，按钮 ID 全部改名（`menuAccount` → `menuConfigSync` 等）。新增旧 ID → 新 ID 别名映射表，老用户配置无需任何改动自动兼容。
+- **手机端激活码无法激活**：手机端激活逻辑未传入思源账号导致账号绑定校验失败；激活后未保存 `authorAccount`，重启后激活态丢失。现与电脑端激活逻辑完全对齐。
+
+### Added
+
+- 内置按钮选择器列表更新为思源 v3.7 最新 ID（27 项），新增"密钥和变量"、"鉴权"、"应用"、"用户指南"等。
+- `menu*` 系列按钮的手机端兜底逻辑：找不到时自动先打开 `#toolbarMore` 菜单再点击。
+- `isMobileUIContext()`：综合 UA / URL pathname / DOM 特征判断手机端，修复 PC 浏览器预览 `/mobile/` 路径时判断失效。
+
 ## [1.0.0] - 2026-01-15
 
 ### Added

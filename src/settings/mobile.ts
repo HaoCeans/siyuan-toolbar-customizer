@@ -89,6 +89,7 @@ export interface MobileFeatureConfig {
   disableMobileSwipe?: boolean
   authorCode?: string
   authorActivated?: boolean
+  authorAccount?: string  // 绑定的思源账号（与电脑端一致，重启后用于校验激活态是否仍属于当前账号）
   popupConfig?: 'disabled' | 'smallWindowOnly' | 'bothModes'
   quickNoteNotebookId?: string
   quickNoteDocumentId?: string  // 新增：一键记事目标文档ID
@@ -3836,23 +3837,49 @@ export function createMobileSettingLayout(
       btn.textContent = '验证激活'
       btn.onclick = async () => {
         const code = input.value.trim()
-        if (validateActivationCode(code)) {
-          // 同时激活两端
-          context.mobileFeatureConfig.authorActivated = true
-          context.mobileFeatureConfig.authorCode = code
-          context.desktopFeatureConfig.authorActivated = true
-          context.desktopFeatureConfig.authorCode = code
-          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
-          await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
-          statusEl.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px; background: rgba(34, 197, 94, 0.2); color: #22c55e;'
-          statusEl.textContent = '✓ 已激活'
-          Notify.showInfoAuthorToolActivated()
+
+        // 获取当前思源登录账号（与电脑端逻辑保持一致）
+        // validateActivationCode 会校验激活码绑定的是不是当前账号
+        const userObj = (window as any).siyuan?.user
+        const userName = (userObj && typeof userObj.userName === 'string' && userObj.userName) || ''
+
+        // 前置检查：必须登录思源账号
+        if (!userName) {
+          showMessage('未检测到思源账号，请先在思源登录账号后再激活', 3000, 'error')
+          return
+        }
+
+        // 禁用按钮防重复点击
+        btn.disabled = true
+        btn.textContent = '验证中...'
+        try {
+          if (validateActivationCode(code, userName)) {
+            // 同时激活两端（保存 authorAccount，否则重启后 isAuthorToolActivated 校验失败）
+            context.mobileFeatureConfig.authorActivated = true
+            context.mobileFeatureConfig.authorCode = code
+            context.mobileFeatureConfig.authorAccount = userName
+            context.desktopFeatureConfig.authorActivated = true
+            context.desktopFeatureConfig.authorCode = code
+            context.desktopFeatureConfig.authorAccount = userName
+            await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+            await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+            statusEl.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px; background: rgba(34, 197, 94, 0.2); color: #22c55e;'
+            statusEl.textContent = '✓ 已激活'
+            Notify.showInfoAuthorToolActivated()
           // 延迟后重新加载设置页面
           setTimeout(() => {
             window.location.reload()
           }, 1500)
-        } else {
+          } else {
+            Notify.showErrorActivationCodeInvalid()
+          }
+        } catch (err) {
+          console.error('[MobileActivation] 验证失败:', err)
           Notify.showErrorActivationCodeInvalid()
+        } finally {
+          // 恢复按钮可点击状态（激活成功的情况下页面会刷新，不影响）
+          btn.disabled = false
+          btn.textContent = '验证激活'
         }
       }
 

@@ -36,11 +36,13 @@ import {
   calculateButtonOverflow,
   setPluginInstance,
   setGlobalToolbarManager,
+  applyDesktopFloatingToolbar,
   applyToolbarBackgroundColor,
   insertTemplate,
   showTemplateContextMenu,
   refreshToolbarAutoHide,
   refreshKmindZenCompat,
+  refreshDesktopFloatingScrollOnSwitch,
   triggerDesktopLifelogGlobalCapture
 } from './toolbarManager'
 
@@ -193,6 +195,14 @@ export default class ToolbarCustomizer extends Plugin {
     quickNoteInputFormat: 'plain' as 'plain' | 'block', // 电脑端：一键记事输入格式（独立于手机端）
     quickNoteBlockWindowPersist: false, // 块格式弹窗后台常驻：默认关闭
     quickNoteBlockAutoCleanup: 5,  // 块格式弹窗隐藏后 X 秒自动清理草稿块（0=不自动清理）
+    // ===== 工具栏位置选择（原生顶部 / 悬浮胶囊）=====
+    enableFloatingToolbar: true,   // 是否启用底部悬浮胶囊工具栏（true=悬浮胶囊，false=思源原生顶部）
+    floatingToolbarMargin: 40,      // 胶囊距底部距离（px）
+    floatingToolbarBorderRadius: 20,// 胶囊圆角（px）
+    floatingToolbarHeight: 40,      // 胶囊自身高度（px）
+    floatingToolbarWidth: 0,        // 胶囊宽度（0=auto 自适应内容，>0=固定宽度）
+    floatingToolbarStyle: 'glass' as 'glass' | 'solid',  // 胶囊样式：glass=毛玻璃 / solid=实心
+    floatingToolbarScrollHide: true,  // 胶囊滚动隐藏：上滑隐藏、下滑显示
   }
 
   // 手机端小功能配置
@@ -407,6 +417,19 @@ export default class ToolbarCustomizer extends Plugin {
         this.desktopFeatureConfig = {
           ...this.desktopFeatureConfig,
           ...savedDesktopFeatureConfig
+        }
+        // 老用户升级提示：已保存配置中缺少 enableFloatingToolbar 字段，说明是老用户首次升级到带悬浮胶囊的版本
+        // 仅提示一次（通过 hasSeenDesktopFloatingNotice 标记控制）
+        const isUpgradingOldUser = savedDesktopFeatureConfig.enableFloatingToolbar === undefined
+            && !savedDesktopFeatureConfig.hasSeenDesktopFloatingNotice
+        if (isUpgradingOldUser) {
+          // 延迟到 DOM 就绪后显示（onload 阶段 DOM 可能还没渲染完）
+          setTimeout(() => {
+            showMessage('🆕 新增底部悬浮胶囊工具栏，可在「插件设置 → 电脑端全局工具栏配置」中调整位置和样式', 8000, 'info')
+          }, 2000)
+          // 保存标记，避免重复提示
+          this.desktopFeatureConfig.hasSeenDesktopFloatingNotice = true
+          await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
         }
       }
 
@@ -655,6 +678,8 @@ export default class ToolbarCustomizer extends Plugin {
       }
       // 刷新工具栏滚动隐藏状态（切文档时锁状态可能变了）
       refreshToolbarAutoHide()
+      // 刷新电脑端胶囊滚动隐藏（切文档/标签页时重置滚动基准，避免 delta 错乱导致失效）
+      refreshDesktopFloatingScrollOnSwitch()
       // 刷新 Kmind-Zen 兼容检测（切文档时文档树状态可能变了）
       refreshKmindZenCompat()
     }
@@ -1186,6 +1211,7 @@ export default class ToolbarCustomizer extends Plugin {
       showButtonIdPicker: (currentValue, onSelect) => this.showButtonIdPicker(currentValue, onSelect),
       saveData: (key, value) => this.saveData(key, value),
       applyFeatures: () => this.applyFeatures(),
+      applyDesktopToolbarPosition: () => this.applyDesktopToolbarPosition(),
       applyMobileToolbarStyle: () => this.applyMobileToolbarStyle(),
       updateMobileToolbar: () => {
         initMobileToolbarAdjuster(this.mobileConfig, this.mobileFeatureConfig.disableCustomButtons)
@@ -1491,10 +1517,36 @@ export default class ToolbarCustomizer extends Plugin {
       document.head.appendChild(hlStyle)
     }
 
+    // 应用电脑端悬浮胶囊工具栏（位置/样式）
+    // 与其他 feature 样式一起应用，确保禁用自定义按钮时也会被正确清理
+    this.applyDesktopToolbarPosition()
+
     syncMobileTopLineBreakButton(
       this.isMobile,
       this.mobileFeatureConfig.showMobileLineBreakButton === true,
       disableCustomButtons
+    )
+  }
+
+  /**
+   * 应用电脑端工具栏位置（原生顶部 / 悬浮胶囊）。
+   * 由 applyFeatures() 统一调用，以及设置面板滑杆 onChange 时调用。
+   * 仅电脑端、未禁用自定义按钮时执行；其余情况会清理胶囊痕迹并恢复原生顶部。
+   */
+  private applyDesktopToolbarPosition() {
+    if (this.isMobile) return
+    const cfg = this.desktopFeatureConfig
+    applyDesktopFloatingToolbar(
+      {
+        enableFloatingToolbar: cfg.enableFloatingToolbar === true,
+        floatingToolbarMargin: cfg.floatingToolbarMargin ?? 40,
+        floatingToolbarBorderRadius: cfg.floatingToolbarBorderRadius ?? 20,
+        floatingToolbarHeight: cfg.floatingToolbarHeight ?? 40,
+        floatingToolbarWidth: cfg.floatingToolbarWidth ?? 0,
+        floatingToolbarStyle: cfg.floatingToolbarStyle === 'solid' ? 'solid' : 'glass',
+        floatingToolbarScrollHide: cfg.floatingToolbarScrollHide === true,
+      },
+      cfg.disableCustomButtons === true
     )
   }
 
@@ -1646,5 +1698,12 @@ export default class ToolbarCustomizer extends Plugin {
     if (hlStyle) {
       hlStyle.remove()
     }
+    // 兜底清理电脑端悬浮胶囊样式（applyDesktopFloatingToolbar 在 disableCustomButtons 时也会清理，
+    // 这里作为 removeFeatureStyles 的双保险）
+    const floatingStyle = document.getElementById('desktop-floating-toolbar-style')
+    if (floatingStyle) {
+      floatingStyle.remove()
+    }
+    document.body.classList.remove('siyuan-toolbar-desktop-floating')
   }
 }

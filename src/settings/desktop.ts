@@ -393,6 +393,7 @@ export interface DesktopSettingsContext {
   showIconPicker: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void
   saveData: (key: string, value: any) => Promise<void>
   applyFeatures: () => void
+  applyDesktopToolbarPosition: () => void
   refreshButtons: () => void
 }
 
@@ -1237,11 +1238,9 @@ export function createDesktopSettingLayout(
         pricingPrincipleContainer.appendChild(row)
       })
 
-      container.appendChild(pricingPrincipleContainer)
+	      container.appendChild(pricingPrincipleContainer)
 
-      container.appendChild(accountBlock)
-
-      // ========== 方案网格（2×2 卡片） ==========
+	      // ========== 方案网格（2×2 卡片） ==========
       const plansContainer = document.createElement('div')
       plansContainer.style.cssText = 'padding: 16px; margin-top: 16px; border: 1px solid var(--b3-border-color); border-radius: 6px;'
 
@@ -1368,10 +1367,12 @@ export function createDesktopSettingLayout(
         plansGrid.appendChild(planCard)
       })
 
-      plansContainer.appendChild(plansGrid)
-      container.appendChild(plansContainer)
+	      plansContainer.appendChild(plansGrid)
+	      container.appendChild(plansContainer)
 
-      // 注入收款码弹窗样式
+	      container.appendChild(accountBlock)
+
+	      // 注入收款码弹窗样式
       if (!document.getElementById('toolbar-customizer-pay-style')) {
         const payStyle = document.createElement('style')
         payStyle.id = 'toolbar-customizer-pay-style'
@@ -1516,7 +1517,7 @@ export function createDesktopSettingLayout(
       const tip = document.createElement('div')
       tip.className = 'toolbar-customizer-pay-tip'
       tip.innerHTML = `
-        付款后请将用户名和付款截图发至 17114555244@qq.com 邮箱或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入QQ群</a>联系群主。
+        付款后请将用户名${currentUserName() ? '<strong>' + currentUserName() + '</strong>' : '（你的思源账号）'}和付款截图发至 17114555244@qq.com 邮箱或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入QQ群</a>联系群主。
       `
 
       dialog.appendChild(closeBtn)
@@ -1545,8 +1546,8 @@ export function createDesktopSettingLayout(
 
       const steps = [
         { title: '选择方案', desc: '选择适合你的套餐方案，点击「扫码购买」' },
-        { title: '扫码转账', desc: '使用微信或支付宝扫码付款，付款备注请提供用户名「' + (context.isAuthorToolActivated() ? '已激活用户' : '你的思源账号用户名') + '」' },
-        { title: '提供信息', desc: '将付款截图和用户名发送至 17114555244@qq.com 邮箱，或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主' },
+        { title: '扫码转账', desc: '使用微信或支付宝扫码付款，付款备注请提供用户名「<strong>' + (currentUserName() || (context.isAuthorToolActivated() ? '已激活用户' : '你的思源账号用户名')) + '</strong>」' },
+        { title: '提供信息', desc: '将付款截图和用户名<strong>' + (currentUserName() || '（你的思源账号）') + '</strong>发送至 17114555244@qq.com 邮箱，或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主' },
         { title: '获取激活码', desc: '群主核实后发放激活码，回到本页粘贴激活即可解锁全部功能' },
       ]
 
@@ -2092,6 +2093,285 @@ export function createDesktopSettingLayout(
       styleContainer.appendChild(dividerOption)
       styleItem.appendChild(styleContainer)
       toolbarBox.appendChild(styleItem)
+
+      // ===== ③工具栏位置选择（原生顶部 / 悬浮胶囊）=====
+      const positionItem = document.createElement('div')
+      positionItem.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+      const positionLabel = document.createElement('label')
+      positionLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
+      positionLabel.textContent = '③工具栏位置选择'
+      positionItem.appendChild(positionLabel)
+
+      const positionContainer = document.createElement('div')
+      positionContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
+
+      const cfg = context.desktopFeatureConfig as any
+      const currentPosition = cfg.enableFloatingToolbar === true ? 'floating' : 'native'
+
+      const positionOptions = [
+        { value: 'native', label: '原生顶部（思源默认）' },
+        { value: 'floating', label: '底部悬浮胶囊' },
+      ]
+
+      const positionRadios: HTMLInputElement[] = []
+      const positionOptionEls: HTMLElement[] = []
+
+      positionOptions.forEach(opt => {
+        const optionEl = document.createElement('div')
+        optionEl.style.cssText = `
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          border: 1px solid ${currentPosition === opt.value ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'};
+          border-radius: 6px;
+          cursor: pointer;
+          background: ${currentPosition === opt.value ? 'rgba(66, 133, 244, 0.08)' : 'transparent'};
+        `
+        const radio = document.createElement('input')
+        radio.type = 'radio'
+        radio.name = 'desktop-toolbar-position'
+        radio.value = opt.value
+        radio.checked = currentPosition === opt.value
+        radio.style.cssText = 'cursor: pointer;'
+        positionRadios.push(radio)
+        positionOptionEls.push(optionEl)
+
+        const labelEl = document.createElement('span')
+        labelEl.textContent = opt.label
+        labelEl.style.cssText = 'font-size: 13px; flex: 1;'
+
+        optionEl.appendChild(radio)
+        optionEl.appendChild(labelEl)
+        positionContainer.appendChild(optionEl)
+      })
+
+      const updatePositionSelection = () => {
+        positionRadios.forEach((r, i) => {
+          const opt = positionOptions[i]
+          positionOptionEls[i].style.borderColor = r.checked ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
+          positionOptionEls[i].style.background = r.checked ? 'rgba(66, 133, 244, 0.08)' : 'transparent'
+        })
+      }
+
+      // 胶囊分区显隐辅助函数（与 mobile.ts 一致：通过 closest 找到 .config-item 行容器）
+      const toggleFloatingSection = (show: boolean) => {
+        const section = document.getElementById('desktop-floating-toolbar-section')
+        if (section) {
+          // 分区容器本身是 toolbarBox 内的一个 div，直接显隐即可（它在 toolbarBox 内，不依赖 .config-item）
+          section.style.display = show ? '' : 'none'
+        }
+        // 同步显隐"会隐藏面包屑"提示
+        const hint = document.getElementById('desktop-floating-toolbar-hint')
+        if (hint) {
+          hint.style.display = show ? '' : 'none'
+        }
+      }
+
+      const handlePositionChange = async (value: string) => {
+        cfg.enableFloatingToolbar = (value === 'floating')
+        updatePositionSelection()
+        await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+        toggleFloatingSection(value === 'floating')
+        context.applyDesktopToolbarPosition()
+      }
+
+      positionRadios.forEach((r, i) => {
+        positionOptionEls[i].onclick = async () => {
+          r.checked = true
+          await handlePositionChange(r.value)
+        }
+      })
+
+      positionItem.appendChild(positionContainer)
+
+      // 选中"底部悬浮胶囊"时显示的提示：会自动隐藏文档路径（面包屑）
+      const floatingHint = document.createElement('div')
+      floatingHint.id = 'desktop-floating-toolbar-hint'
+      floatingHint.style.cssText = `display: ${currentPosition === 'floating' ? '' : 'none'}; font-size: 12px; color: var(--b3-theme-on-surface); padding: 6px 10px; background: var(--b3-theme-primary-lightest); border-radius: 4px; line-height: 1.5;`
+      floatingHint.textContent = '⚠️ 请注意：切换为悬浮胶囊后会自动隐藏文档面包屑（路径条），胶囊中只保留工具按钮。'
+      positionItem.appendChild(floatingHint)
+
+      toolbarBox.appendChild(positionItem)
+
+      // ===== ④悬浮胶囊样式配置（仅 enableFloatingToolbar=true 时显示）=====
+      const floatingSection = document.createElement('div')
+      floatingSection.id = 'desktop-floating-toolbar-section'
+      floatingSection.style.cssText = `display: ${currentPosition === 'floating' ? '' : 'none'}; flex-direction: column; gap: 10px; padding-top: 8px; border-top: 1px dashed var(--b3-border-color); margin-top: 4px;`
+
+      const floatingSectionTitle = document.createElement('div')
+      floatingSectionTitle.style.cssText = 'font-size: 13px; font-weight: 600; color: var(--b3-theme-primary);'
+      floatingSectionTitle.textContent = '💊 悬浮胶囊样式配置'
+      floatingSection.appendChild(floatingSectionTitle)
+
+      // 通用：创建一个带 range 滑杆的配置行
+      const createSliderRow = (
+        labelText: string,
+        currentValue: number,
+        min: number,
+        max: number,
+        unit: string,
+        onSave: (value: number) => Promise<void>
+      ): HTMLElement => {
+        const row = document.createElement('div')
+        row.style.cssText = 'display: flex; align-items: center; gap: 10px;'
+
+        const label = document.createElement('label')
+        label.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 110px;'
+        label.textContent = labelText
+
+        const slider = document.createElement('input')
+        slider.type = 'range'
+        slider.className = 'b3-slider'
+        slider.min = String(min)
+        slider.max = String(max)
+        slider.value = String(currentValue)
+        slider.style.cssText = 'flex: 1; cursor: pointer;'
+
+        const valueDisplay = document.createElement('span')
+        valueDisplay.style.cssText = 'min-width: 56px; text-align: right; font-size: 12px; color: var(--b3-theme-on-surface); font-variant-numeric: tabular-nums;'
+        valueDisplay.textContent = `${currentValue}${unit}`
+
+        slider.oninput = () => {
+          valueDisplay.textContent = `${slider.value}${unit}`
+        }
+        slider.onchange = async () => {
+          const v = parseInt(slider.value, 10)
+          if (!Number.isNaN(v)) {
+            await onSave(v)
+          }
+        }
+
+        row.appendChild(label)
+        row.appendChild(slider)
+        row.appendChild(valueDisplay)
+        return row
+      }
+
+      // 距底部距离
+      floatingSection.appendChild(createSliderRow(
+        '距底部距离',
+        cfg.floatingToolbarMargin ?? 20, 0, 100, 'px',
+        async (v) => {
+          cfg.floatingToolbarMargin = v
+          await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+          context.applyDesktopToolbarPosition()
+        }
+      ))
+
+      // 圆角大小
+      floatingSection.appendChild(createSliderRow(
+        '圆角大小',
+        cfg.floatingToolbarBorderRadius ?? 24, 0, 50, 'px',
+        async (v) => {
+          cfg.floatingToolbarBorderRadius = v
+          await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+          context.applyDesktopToolbarPosition()
+        }
+      ))
+
+      // 胶囊高度
+      floatingSection.appendChild(createSliderRow(
+        '胶囊高度',
+        cfg.floatingToolbarHeight ?? 40, 24, 80, 'px',
+        async (v) => {
+          cfg.floatingToolbarHeight = v
+          await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+          context.applyDesktopToolbarPosition()
+        }
+      ))
+
+      // 胶囊宽度（0=auto 自适应）
+      floatingSection.appendChild(createSliderRow(
+        '胶囊宽度 (0=自适应)',
+        cfg.floatingToolbarWidth ?? 0, 0, 1200, 'px',
+        async (v) => {
+          cfg.floatingToolbarWidth = v
+          await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+          context.applyDesktopToolbarPosition()
+        }
+      ))
+
+      // 毛玻璃 / 实心 样式选择（radio 二选一，复用上面的卡片样式）
+      const styleModeRow = document.createElement('div')
+      styleModeRow.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
+      const styleModeLabel = document.createElement('label')
+      styleModeLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
+      styleModeLabel.textContent = '胶囊样式'
+      styleModeRow.appendChild(styleModeLabel)
+
+      const styleModeContainer = document.createElement('div')
+      styleModeContainer.style.cssText = 'display: flex; gap: 8px;'
+      const currentStyleMode = cfg.floatingToolbarStyle === 'solid' ? 'solid' : 'glass'
+      const styleModeOptions = [
+        { value: 'glass', label: '毛玻璃（半透明）' },
+        { value: 'solid', label: '实心（跟随主题）' },
+      ]
+      const styleModeRadios: HTMLInputElement[] = []
+      const styleModeOptionEls: HTMLElement[] = []
+      styleModeOptions.forEach(opt => {
+        const optEl = document.createElement('div')
+        optEl.style.cssText = `
+          display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+          border: 1px solid ${currentStyleMode === opt.value ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'};
+          border-radius: 6px; cursor: pointer;
+          background: ${currentStyleMode === opt.value ? 'rgba(66, 133, 244, 0.08)' : 'transparent'};
+          flex: 1;
+        `
+        const radio = document.createElement('input')
+        radio.type = 'radio'
+        radio.name = 'desktop-floating-style'
+        radio.value = opt.value
+        radio.checked = currentStyleMode === opt.value
+        styleModeRadios.push(radio)
+        styleModeOptionEls.push(optEl)
+        const lbl = document.createElement('span')
+        lbl.textContent = opt.label
+        lbl.style.cssText = 'font-size: 13px;'
+        optEl.appendChild(radio)
+        optEl.appendChild(lbl)
+        styleModeContainer.appendChild(optEl)
+      })
+      styleModeRadios.forEach((r, i) => {
+        styleModeOptionEls[i].onclick = async () => {
+          r.checked = true
+          styleModeOptionEls.forEach((el, j) => {
+            el.style.borderColor = styleModeRadios[j].checked ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
+            el.style.background = styleModeRadios[j].checked ? 'rgba(66, 133, 244, 0.08)' : 'transparent'
+          })
+          cfg.floatingToolbarStyle = r.value as 'glass' | 'solid'
+          await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+          context.applyDesktopToolbarPosition()
+        }
+      })
+      styleModeRow.appendChild(styleModeContainer)
+      floatingSection.appendChild(styleModeRow)
+
+      // 滚动隐藏开关（上滑隐藏、下滑显示）
+      const scrollHideRow = document.createElement('div')
+      scrollHideRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 4px;'
+
+      const scrollHideLabel = document.createElement('label')
+      scrollHideLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); flex: 1;'
+      scrollHideLabel.textContent = '🔄 滚动隐藏（上滑隐藏，下滑显示）'
+
+      const scrollHideToggle = document.createElement('input')
+      scrollHideToggle.type = 'checkbox'
+      scrollHideToggle.className = 'b3-switch'
+      scrollHideToggle.checked = cfg.floatingToolbarScrollHide === true
+      scrollHideToggle.style.cssText = 'cursor: pointer;'
+      scrollHideToggle.onchange = async () => {
+        cfg.floatingToolbarScrollHide = scrollHideToggle.checked
+        await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+        context.applyDesktopToolbarPosition()
+      }
+
+      scrollHideRow.appendChild(scrollHideLabel)
+      scrollHideRow.appendChild(scrollHideToggle)
+      floatingSection.appendChild(scrollHideRow)
+
+      toolbarBox.appendChild(floatingSection)
 
       container.appendChild(toolbarBox)
 

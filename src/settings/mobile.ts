@@ -40,6 +40,434 @@ function parseLengthSliderInt(raw: unknown, fallback: number): number {
 }
 
 /**
+ * 注入收款码弹窗样式（与电脑端 desktop.ts 共用同一套 class 名，id 检查避免重复注入）。
+ */
+function ensurePayStyle(): void {
+  if (document.getElementById('toolbar-customizer-pay-style')) return
+  const payStyle = document.createElement('style')
+  payStyle.id = 'toolbar-customizer-pay-style'
+  payStyle.textContent = `
+    .toolbar-customizer-pay-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,0.45);
+      display: flex; align-items: center; justify-content: center;
+      padding: 16px;
+    }
+    .toolbar-customizer-pay-dialog {
+      position: relative;
+      background: var(--b3-theme-background);
+      border-radius: 14px;
+      padding: 20px;
+      max-width: 300px; width: 100%;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    }
+    .toolbar-customizer-pay-close {
+      position: absolute; top: 8px; right: 12px;
+      background: transparent; border: none; font-size: 22px;
+      color: var(--b3-theme-on-surface); cursor: pointer; line-height: 1;
+    }
+    .toolbar-customizer-pay-title {
+      font-size: 14px; font-weight: 600; text-align: center;
+      margin-bottom: 14px; color: var(--b3-theme-on-background);
+    }
+    .toolbar-customizer-pay-current {
+      display: flex; justify-content: center; margin-bottom: 14px;
+    }
+    .toolbar-customizer-pay-qr {
+      width: 240px; height: auto; aspect-ratio: 1; border-radius: 8px;
+      border: 1px solid var(--b3-border-color); object-fit: contain;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; color: var(--b3-theme-on-surface); text-align: center;
+      background: var(--b3-theme-surface);
+    }
+    .toolbar-customizer-pay-tabs {
+      display: flex; gap: 8px; justify-content: center; margin-bottom: 14px;
+    }
+    .toolbar-customizer-pay-tab {
+      padding: 6px 22px; font-size: 13px; cursor: pointer;
+      background: transparent; color: var(--b3-theme-on-surface);
+      border: 1px solid var(--b3-border-color); border-radius: 20px;
+      transition: all 0.15s;
+    }
+    .toolbar-customizer-pay-tab.active {
+      background: var(--b3-theme-primary); color: var(--b3-theme-on-primary);
+      border-color: var(--b3-theme-primary);
+    }
+    .toolbar-customizer-pay-tip {
+      font-size: 11px; color: var(--b3-theme-on-surface);
+      text-align: center; line-height: 1.5;
+    }
+  `
+  document.head.appendChild(payStyle)
+}
+
+/**
+ * 弹出收款码弹窗（手机端，逻辑与电脑端 showPayModal 一致，复用同一套 class 名）。
+ */
+function showPayModalMobile(planName: string, userName: string): void {
+  ensurePayStyle()
+  const overlay = document.createElement('div')
+  overlay.className = 'toolbar-customizer-pay-overlay'
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove() }
+
+  const dialog = document.createElement('div')
+  dialog.className = 'toolbar-customizer-pay-dialog'
+
+  const closeBtn = document.createElement('button')
+  closeBtn.className = 'toolbar-customizer-pay-close'
+  closeBtn.textContent = '×'
+  closeBtn.onclick = () => overlay.remove()
+
+  const titleEl = document.createElement('div')
+  titleEl.className = 'toolbar-customizer-pay-title'
+  titleEl.textContent = planName
+
+  const qrCurrent = document.createElement('div')
+  qrCurrent.className = 'toolbar-customizer-pay-current'
+
+  const tabContainer = document.createElement('div')
+  tabContainer.className = 'toolbar-customizer-pay-tabs'
+
+  const wechatTab = document.createElement('button')
+  wechatTab.className = 'toolbar-customizer-pay-tab active'
+  wechatTab.textContent = '微信'
+
+  const alipayTab = document.createElement('button')
+  alipayTab.className = 'toolbar-customizer-pay-tab'
+  alipayTab.textContent = '支付宝'
+
+  const loadQr = (tab: 'wechat' | 'alipay') => {
+    qrCurrent.innerHTML = ''
+    const fileName = tab === 'wechat' ? 'pay-wechat.png' : 'pay-alipay.png'
+    const url = `/plugins/siyuan-toolbar-customizer/${fileName}?_t=${Date.now()}`
+    const img = document.createElement('img')
+    img.className = 'toolbar-customizer-pay-qr'
+    img.alt = '收款码'
+    img.onload = () => { qrCurrent.appendChild(img) }
+    img.onerror = () => {
+      const placeholder = document.createElement('div')
+      placeholder.className = 'toolbar-customizer-pay-qr'
+      placeholder.textContent = '收款码占位'
+      qrCurrent.appendChild(placeholder)
+    }
+    img.src = url
+  }
+
+  wechatTab.onclick = () => {
+    wechatTab.classList.add('active')
+    alipayTab.classList.remove('active')
+    loadQr('wechat')
+  }
+  alipayTab.onclick = () => {
+    alipayTab.classList.add('active')
+    wechatTab.classList.remove('active')
+    loadQr('alipay')
+  }
+
+  tabContainer.appendChild(wechatTab)
+  tabContainer.appendChild(alipayTab)
+
+  const tip = document.createElement('div')
+  tip.className = 'toolbar-customizer-pay-tip'
+  tip.innerHTML = `付款后请将用户名<strong>${userName}</strong>和付款截图发至 17114555244@qq.com 邮箱或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入QQ群</a>联系群主。`
+
+  dialog.appendChild(closeBtn)
+  dialog.appendChild(titleEl)
+  dialog.appendChild(qrCurrent)
+  dialog.appendChild(tabContainer)
+  dialog.appendChild(tip)
+  overlay.appendChild(dialog)
+  document.body.appendChild(overlay)
+
+  loadQr('wechat')
+}
+
+/**
+ * 弹出"激活方式说明"弹窗（手机端）。
+ * 内容与电脑端激活说明一致：定价原则 + 激活码方案 + 付款账号（含复制）+ 付款发码流程。
+ * 布局针对手机窄屏适配：宽度铺满、字号略小、间距收紧、内容可滚动。
+ *
+ * 复用项目通用的"全屏遮罩 + 居中面板"弹窗模式（与 showIconPicker/showPayModal 一致）。
+ */
+function showActivationInfoModal(isActivated: boolean): void {
+  // 获取当前思源账号用户名（与电脑端 currentUserName 一致）
+  const currentUserName = (): string => {
+    const u = (window as any).siyuan?.user
+    return (u && typeof u.userName === 'string' && u.userName) || ''
+  }
+
+  // 遮罩
+  const overlay = document.createElement('div')
+  overlay.style.cssText = `
+    position: fixed; inset: 0; z-index: 2000;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px; box-sizing: border-box;
+  `
+
+  // 弹窗面板（手机端：宽度铺满，最大 420px，最大高度 85vh，内容滚动）
+  const panel = document.createElement('div')
+  panel.style.cssText = `
+    background: var(--b3-theme-background);
+    border-radius: 12px;
+    width: 100%; max-width: 420px;
+    max-height: 85vh;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  `
+
+  // 标题栏（含关闭按钮）
+  const header = document.createElement('div')
+  header.style.cssText = `
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-bottom: 1px solid var(--b3-border-color);
+    flex-shrink: 0;
+  `
+  const title = document.createElement('div')
+  title.style.cssText = 'font-size: 16px; font-weight: 700; color: #722ed1;'
+  title.textContent = '🔐 激活方式说明'
+  const closeBtn = document.createElement('button')
+  closeBtn.className = 'b3-button b3-button--text'
+  closeBtn.textContent = '✕'
+  closeBtn.style.cssText = 'font-size: 18px; padding: 2px 8px; color: var(--b3-theme-on-surface);'
+  closeBtn.onclick = () => overlay.remove()
+  header.appendChild(title)
+  header.appendChild(closeBtn)
+  panel.appendChild(header)
+
+  // 内容区（可滚动）
+  const content = document.createElement('div')
+  content.style.cssText = 'padding: 14px 16px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px;'
+
+  // ===== 区块1：定价原则 =====
+  const pricingBox = document.createElement('div')
+  pricingBox.style.cssText = 'padding: 12px; border: 1px solid var(--b3-border-color); border-radius: 6px; background: var(--b3-theme-surface);'
+
+  const pricingTitle = document.createElement('div')
+  pricingTitle.style.cssText = 'font-size: 14px; font-weight: bold; color: var(--b3-theme-on-background); margin-bottom: 10px;'
+  pricingTitle.textContent = '📐 激活方案定价原则'
+  pricingBox.appendChild(pricingTitle)
+
+  const principles = [
+    { text: '免费功能已经占据80%，通常免费功能已经可以满足需求', highlight: false },
+    { text: '鲸鱼定制工具箱功能均为定制，每项功能，作者均额外花费大量时间制作，并调整适配', highlight: false },
+    { text: '目前鲸鱼定制工具箱有17项定制功能，其中2项免费，共15项付费功能', highlight: false },
+    { text: '基于花费的时间和精力，以及前期的定制均为免费，作者决定每项定制定价为3元，进而决定永久价格', highlight: true },
+    { text: '后续将继续增加定制功能，价格也会适当上涨', highlight: false },
+    { text: '同时适当增加部分免费定制功能，不大幅调整价格', highlight: false },
+  ]
+  principles.forEach((item, idx) => {
+    const row = document.createElement('div')
+    row.style.cssText = `display: flex; gap: 6px; font-size: 12px; line-height: 1.55; margin-bottom: 5px; padding: ${item.highlight ? '7px 8px' : '0'}; border-radius: ${item.highlight ? '6px' : '0'}; background: ${item.highlight ? 'color-mix(in srgb, var(--b3-theme-primary) 10%, transparent)' : 'transparent'};`
+    const num = document.createElement('span')
+    num.style.cssText = `flex: none; font-weight: 600; color: ${item.highlight ? '#d4380d' : 'var(--b3-theme-primary)'};`
+    num.textContent = `${idx + 1}.`
+    const txt = document.createElement('span')
+    txt.style.cssText = `flex: 1; color: var(--b3-theme-on-background); font-weight: ${item.highlight ? '600' : '400'};`
+    txt.textContent = item.text
+    row.appendChild(num)
+    row.appendChild(txt)
+    pricingBox.appendChild(row)
+  })
+  content.appendChild(pricingBox)
+
+  // ===== 区块2：激活码方案（4 卡片，手机端单列） =====
+  const plansBox = document.createElement('div')
+  plansBox.style.cssText = 'padding: 12px; border: 1px solid var(--b3-border-color); border-radius: 6px;'
+
+  const plansTitle = document.createElement('div')
+  plansTitle.style.cssText = 'font-size: 15px; font-weight: bold; color: #722ed1; margin-bottom: 12px; text-align: center;'
+  plansTitle.textContent = '📦 激活码方案'
+  plansBox.appendChild(plansTitle)
+
+  // 手机端单列排列（与电脑端 2×2 网格不同）
+  const plansWrapper = document.createElement('div')
+  plansWrapper.style.cssText = 'display: flex; flex-direction: column; gap: 10px;'
+
+  const planCards = [
+    { name: '永久正价', price: '45', unit: '元', duration: '永久', badge: '', hot: false, desc: '鲸鱼定制工具箱永久激活码（电脑+手机），解锁全部15项付费功能', features: ['永久激活码（电脑+手机）', '15项付费功能全解锁'] },
+    { name: '普通优惠', price: '36', unit: '元', duration: '8折', badge: '推荐', hot: true, desc: '鲸鱼定制工具箱永久激活码（电脑+手机），限时优惠 10 个，送完即止', features: ['永久激活码（电脑+手机）', '限时8折优惠'] },
+    { name: '学生优惠', price: '22.5', unit: '元', duration: '5折', badge: '', hot: false, desc: '需提供可证明在读学生身份的信息', features: ['永久激活码（电脑+手机）', '限时5折优惠', '需学生身份证明'] },
+    { name: '定制开发', price: '100', unit: '元起', duration: '手工费', badge: '', hot: false, desc: '有专门需求的可联系作者开发专属功能，只展示给你自己使用，也可决定是否纳入工具箱', features: ['专属功能定制', '仅自己可见/纳入工具箱', '作者评估实现'] },
+  ]
+
+  planCards.forEach(card => {
+    const cardEl = document.createElement('div')
+    const borderClr = card.hot ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
+    const bgClr = card.hot ? 'color-mix(in srgb, var(--b3-theme-primary) 5%, var(--b3-theme-background))' : 'var(--b3-theme-background)'
+    cardEl.style.cssText = `position: relative; border: 1px solid ${borderClr}; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 3px; background: ${bgClr};`
+
+    if (card.badge) {
+      const badge = document.createElement('div')
+      badge.textContent = card.badge
+      badge.style.cssText = 'position: absolute; top: -8px; right: 10px; background: var(--b3-theme-primary); color: var(--b3-theme-on-primary); font-size: 10px; padding: 2px 8px; border-radius: 10px;'
+      cardEl.appendChild(badge)
+    }
+
+    const nameEl = document.createElement('div')
+    nameEl.style.cssText = 'font-size: 13px; font-weight: 600; color: var(--b3-theme-on-background);'
+    nameEl.textContent = card.name
+    cardEl.appendChild(nameEl)
+
+    const durationEl = document.createElement('div')
+    durationEl.style.cssText = 'font-size: 10px; color: var(--b3-theme-on-surface);'
+    durationEl.textContent = card.duration
+    cardEl.appendChild(durationEl)
+
+    const priceRow = document.createElement('div')
+    priceRow.style.cssText = 'margin: 2px 0;'
+    const priceNum = document.createElement('span')
+    priceNum.style.cssText = 'font-size: 20px; font-weight: 700; color: var(--b3-theme-primary);'
+    priceNum.textContent = card.price
+    priceRow.appendChild(priceNum)
+    if (card.unit) {
+      const priceUnit = document.createElement('span')
+      priceUnit.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); margin-left: 2px;'
+      priceUnit.textContent = card.unit
+      priceRow.appendChild(priceUnit)
+    }
+    cardEl.appendChild(priceRow)
+
+    const descEl = document.createElement('div')
+    descEl.style.cssText = 'font-size: 10px; color: var(--b3-theme-on-surface); line-height: 1.5; margin: 2px 0 6px;'
+    descEl.textContent = card.desc
+    cardEl.appendChild(descEl)
+
+    card.features.forEach(f => {
+      const feat = document.createElement('div')
+      feat.style.cssText = 'font-size: 9px; color: var(--b3-theme-on-surface); line-height: 1.4; padding-left: 6px;'
+      feat.textContent = '• ' + f
+      cardEl.appendChild(feat)
+    })
+
+    const buyBtn = document.createElement('button')
+    const btnBg = card.hot ? 'var(--b3-theme-primary)' : 'transparent'
+    const btnClr = card.hot ? 'var(--b3-theme-on-primary)' : 'var(--b3-theme-on-background)'
+    const btnBdr = card.hot ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
+    buyBtn.style.cssText = `margin-top: 8px; padding: 6px 0; font-size: 11px; cursor: pointer; background: ${btnBg}; color: ${btnClr}; border: 1px solid ${btnBdr}; border-radius: 6px;`
+    buyBtn.textContent = '扫码购买'
+    buyBtn.onclick = () => showPayModalMobile(card.name, currentUserName())
+    cardEl.appendChild(buyBtn)
+
+    plansWrapper.appendChild(cardEl)
+  })
+
+  plansBox.appendChild(plansWrapper)
+  content.appendChild(plansBox)
+
+  // ===== 区块3：付款账号（含复制） =====
+  const accountBox = document.createElement('div')
+  accountBox.style.cssText = 'padding: 10px 12px; background: var(--b3-theme-surface); border-radius: 10px;'
+
+  const accountHint = document.createElement('div')
+  accountHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); margin-bottom: 6px;'
+  accountHint.textContent = '付款时请提供以下用户名'
+  accountBox.appendChild(accountHint)
+
+  const accountRow = document.createElement('div')
+  accountRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
+  const accountName = document.createElement('span')
+  accountName.style.cssText = 'font-size: 15px; font-weight: 700; color: var(--b3-theme-on-background);'
+  accountName.textContent = currentUserName() || '未登录思源账号'
+  accountRow.appendChild(accountName)
+
+  const copyBtn = document.createElement('button')
+  copyBtn.style.cssText = 'padding: 2px 10px; font-size: 12px; color: var(--b3-theme-primary); background: transparent; border: 1px solid var(--b3-theme-primary); border-radius: 4px; cursor: pointer;'
+  copyBtn.textContent = '复制'
+  copyBtn.onclick = async () => {
+    const name = currentUserName()
+    if (!name) {
+      copyBtn.textContent = '未登录'
+      setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
+      return
+    }
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(name)
+      } else {
+        const ta = document.createElement('textarea')
+        ta.value = name
+        ta.style.position = 'fixed'
+        ta.style.opacity = '0'
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+      }
+      copyBtn.textContent = '已复制！'
+      setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
+    } catch {
+      copyBtn.textContent = '复制失败'
+      setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
+    }
+  }
+  accountRow.appendChild(copyBtn)
+  accountBox.appendChild(accountRow)
+
+  const accountNotice = document.createElement('div')
+  accountNotice.style.cssText = 'font-size: 11px; color: #d4380d; margin-top: 6px; padding: 6px 8px; background: color-mix(in srgb, #ff4d4f 8%, transparent); border-radius: 4px; line-height: 1.5; font-weight: 500;'
+  accountNotice.textContent = '激活码将根据该用户名直接绑定你的思源账号，请务必发送'
+  accountBox.appendChild(accountNotice)
+
+  const accountTip = document.createElement('div')
+  accountTip.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); margin-top: 6px; line-height: 1.5;'
+  accountTip.innerHTML = '无法在付款备注提供时，可将用户名和付款截图发送至 17114555244@qq.com，或 <a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主。'
+  accountBox.appendChild(accountTip)
+  content.appendChild(accountBox)
+
+  // ===== 区块4：付款发码流程 =====
+  const flowBox = document.createElement('div')
+  flowBox.style.cssText = 'padding: 12px; border: 1px solid var(--b3-border-color); border-radius: 6px;'
+
+  const flowTitle = document.createElement('div')
+  flowTitle.style.cssText = 'font-size: 14px; font-weight: bold; color: #722ed1; margin-bottom: 12px;'
+  flowTitle.textContent = '📋 付款发码流程'
+  flowBox.appendChild(flowTitle)
+
+  const flowSteps = document.createElement('div')
+  flowSteps.style.cssText = 'display: flex; flex-direction: column; gap: 10px;'
+  const steps = [
+    { title: '选择方案', desc: '选择适合你的套餐方案，点击「扫码购买」' },
+    { title: '扫码转账', desc: '使用微信或支付宝扫码付款，付款备注请提供用户名「<strong>' + (currentUserName() || (isActivated ? '已激活用户' : '你的思源账号用户名')) + '</strong>」' },
+    { title: '提供信息', desc: '将付款截图和用户名<strong>' + (currentUserName() || '（你的思源账号）') + '</strong>发送至 17114555244@qq.com 邮箱，或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主' },
+    { title: '获取激活码', desc: '群主核实后发放激活码，回到本页粘贴激活即可解锁全部功能' },
+  ]
+  steps.forEach((step, i) => {
+    const stepRow = document.createElement('div')
+    stepRow.style.cssText = 'display: flex; gap: 8px;'
+    const stepNum = document.createElement('span')
+    stepNum.textContent = String(i + 1)
+    stepNum.style.cssText = 'flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--b3-theme-primary); color: var(--b3-theme-on-primary); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;'
+    stepRow.appendChild(stepNum)
+    const stepContent = document.createElement('div')
+    stepContent.style.cssText = 'flex: 1;'
+    const stepH = document.createElement('div')
+    stepH.style.cssText = 'font-size: 12px; font-weight: 600; color: var(--b3-theme-on-background);'
+    stepH.textContent = step.title
+    stepContent.appendChild(stepH)
+    const stepD = document.createElement('div')
+    stepD.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); line-height: 1.5; margin-top: 2px;'
+    stepD.innerHTML = step.desc
+    stepContent.appendChild(stepD)
+    stepRow.appendChild(stepContent)
+    flowSteps.appendChild(stepRow)
+  })
+  flowBox.appendChild(flowSteps)
+  content.appendChild(flowBox)
+
+  panel.appendChild(content)
+  overlay.appendChild(panel)
+
+  // 点击遮罩外部关闭
+  overlay.onclick = (e) => {
+    if (e.target === overlay) overlay.remove()
+  }
+
+  document.body.appendChild(overlay)
+}
+
+/**
  * 手机端工具栏配置接口
  */
 export interface MobileToolbarConfig {
@@ -3364,10 +3792,15 @@ export function createMobileSettingLayout(
       wrapper.style.display = 'none';
     }
 
-    // 监听切换事件
-    window.addEventListener('quicknote-button-style-changed', ((e: CustomEvent) => {
+    // 监听切换事件（先移除旧的 listener 防止累积泄漏）
+    if ((window as any).__quicknoteButtonStyleHandler) {
+      window.removeEventListener('quicknote-button-style-changed', (window as any).__quicknoteButtonStyleHandler)
+    }
+    const styleHandler = ((e: CustomEvent) => {
       wrapper.style.display = e.detail ? 'flex' : 'none';
-    }) as EventListener);
+    }) as EventListener
+    ;(window as any).__quicknoteButtonStyleHandler = styleHandler
+    window.addEventListener('quicknote-button-style-changed', styleHandler)
 
     // 使用自定义滑杆组件
     wrapper.appendChild(createCustomSlider('按钮高度:', config.quickNoteButtonHeight || 40, 24, 66, 'px', async (value) => {
@@ -3885,6 +4318,14 @@ export function createMobileSettingLayout(
 
       inputRow.appendChild(input)
       inputRow.appendChild(btn)
+
+      // "查看激活方式"按钮（与"验证激活"并排，未激活态显示）
+      const infoBtn = document.createElement('button')
+      infoBtn.className = 'b3-button b3-button--text'
+      infoBtn.style.cssText = 'color: #722ed1; flex-shrink: 0;'
+      infoBtn.textContent = '查看激活方式'
+      infoBtn.onclick = () => showActivationInfoModal(false)
+      inputRow.appendChild(infoBtn)
       
       // 根据激活状态决定是否显示输入框和验证按钮
       if (context.isAuthorToolActivated()) {
@@ -3905,6 +4346,14 @@ export function createMobileSettingLayout(
         }
         btnContainer.appendChild(statusEl)
         btnContainer.appendChild(reActivateBtn)
+
+        // "查看激活方式"按钮（与"重新激活"并排，已激活态显示）
+        const infoBtnActivated = document.createElement('button')
+        infoBtnActivated.className = 'b3-button b3-button--text'
+        infoBtnActivated.style.cssText = 'color: #722ed1; flex-shrink: 0;'
+        infoBtnActivated.textContent = '查看激活方式'
+        infoBtnActivated.onclick = () => showActivationInfoModal(true)
+        btnContainer.appendChild(infoBtnActivated)
 
         container.appendChild(btnContainer)
       }

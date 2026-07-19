@@ -5,7 +5,7 @@ import { fetchSyncPost, showMessage } from 'siyuan'
 import { createQuickNoteDraftBlock, deleteQuickNoteDraftBlock, type QuickNoteSaveTarget } from './kernelBlock'
 import { pluginInstance } from '../toolbarManager'
 
-const WIN_W = 600, WIN_H = 500, BOUNDS_KEY = '__qn_block_window_bounds'
+const WIN_W = 300, WIN_H = 300, BOUNDS_KEY = '__qn_block_window_bounds'
 const QUICKNOTE_TITLE = '⚡ 快捷记事'
 const BASE_HIDE = '.layout-tab-bar,.protyle-title,.protyle-background,.protyle-scroll,#status{display:none!important}'
 const BREADCRUMB_HIDE = '.protyle-breadcrumb{display:none!important}'
@@ -19,6 +19,7 @@ function _syncDraftBlockId(): void {
 }
 let _hideTimer: ReturnType<typeof setTimeout> | null = null  // 隐藏后 5 秒自动清理
 let _saveBoundsTimer: ReturnType<typeof setTimeout> | null = null
+let _lastBounds: { x: number; y: number; width: number; height: number } | null = null  // 最后已知的窗口位置缓存（在 closed 事件中兜底使用）
 
 function getBW(): any { try { return (window as any).require?.('@electron/remote')?.BrowserWindow ?? null } catch { return null } }
 function getMainId(): number | null { try { return (window as any).require?.('@electron/remote')?.getCurrentWindow?.()?.id ?? null } catch { return null } }
@@ -43,7 +44,18 @@ export function cleanupOrphanBlockWindows(): void {
   destroyAllBlockWindows()
 }
 function loadBounds(): any { try { const r = localStorage.getItem(BOUNDS_KEY); return r ? JSON.parse(r) : null } catch { return null } }
-function saveBounds(win: any): void { try { if (!win || win.isDestroyed?.()) return; const b = win.getBounds?.(); if (b) localStorage.setItem(BOUNDS_KEY, JSON.stringify(b)) } catch {} }
+function saveBounds(win: any): void {
+  try {
+    let b: any = null
+    if (win && !win.isDestroyed?.()) {
+      b = win.getBounds?.()
+    }
+    // 窗口已销毁时用缓存的最后位置（因为 close 事件走 destroy() 会跳过 close 事件，
+    // 而 closed 事件中 isDestroyed() 可能已为 true，此时 getBounds() 不可用）
+    if (!b) b = _lastBounds
+    if (b) { _lastBounds = b; localStorage.setItem(BOUNDS_KEY, JSON.stringify(b)) }
+  } catch { if (_lastBounds) { try { localStorage.setItem(BOUNDS_KEY, JSON.stringify(_lastBounds)) } catch {} } }
+}
 
 function saveBoundsThrottled(win: any): void {
   if (_saveBoundsTimer) return
@@ -51,8 +63,8 @@ function saveBoundsThrottled(win: any): void {
 }
 function getBounds() {
   const s = loadBounds(); if (s) return s
-  try { const sc = (window as any).require?.('@electron/remote')?.screen?.getPrimaryDisplay?.(); if (sc) { const { width: sw, height: sh } = sc.workAreaSize; return { x: Math.round((sw - WIN_W) / 2), y: Math.round((sh - WIN_H) / 2), width: WIN_W, height: WIN_H } } } catch {}
-  return { x: 100, y: 100, width: WIN_W, height: WIN_H }
+  try { const sc = (window as any).require?.('@electron/remote')?.screen?.getPrimaryDisplay?.(); if (sc) { const { width: sw, height: sh } = sc.workAreaSize; return { x: Math.round(sw - WIN_W - 40), y: Math.round((sh - WIN_H) / 2), width: WIN_W, height: WIN_H } } } catch {}
+  return { x: Math.round(window.screen.availWidth - WIN_W - 40), y: Math.round((window.screen.availHeight - WIN_H) / 2), width: WIN_W, height: WIN_H }
 }
 
 function _clearDraftTracking(): void {
@@ -231,6 +243,7 @@ function createOneWindow(blockId: string): boolean {
     win.on('move', () => saveBoundsThrottled(win))
     win.on('closed', () => {
       // 先保存位置（win.destroy() 只触发 closed，不触发 close，必须在此保存）
+      if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null }
       if (_saveBoundsTimer) { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = null }
       saveBounds(win)
       const closingBlockId = _currentDraftBlockId
@@ -331,7 +344,7 @@ export function destroyDesktopQuickNoteBlockWindow(): void {
   const draftToDelete = _currentDraftBlockId
   _currentDraftBlockId = null
   _syncDraftBlockId()
-  try { const BW = getBW(), mainId = getMainId(); if (BW) { for (const w of (BW.getAllWindows?.() || [])) { try { if (!w || w.isDestroyed?.() || w.id === mainId) continue; if ((w.getTitle?.() || '') === QUICKNOTE_TITLE) w.destroy?.() } catch {} } } } catch {}
+  try { const BW = getBW(), mainId = getMainId(); if (BW) { for (const w of (BW.getAllWindows?.() || [])) { try { if (!w || w.isDestroyed?.() || w.id === mainId) continue; if ((w as any).__qn_block_window) w.destroy?.() } catch {} } } } catch {}
   qnWinId = null
   // 作为兜底：如果窗口 closed 事件中未删块，这里直接删（插件卸载时内容不重要）
   if (draftToDelete) {

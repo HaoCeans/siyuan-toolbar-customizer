@@ -5,18 +5,18 @@ All notable changes to the Toolbar Customizer plugin will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [3.7.2] - 2026-07-18
+## [3.7.3] - 2026-07-19
 
 ### Fixed
 
-- **手机端"思源内置功能"按钮失效**：思源 v3.7 重构手机端设置菜单，按钮 ID 全部改名（`menuAccount` → `menuConfigSync` 等）。新增旧 ID → 新 ID 别名映射表，老用户配置无需任何改动自动兼容。
-- **手机端激活码无法激活**：手机端激活逻辑未传入思源账号导致账号绑定校验失败；激活后未保存 `authorAccount`，重启后激活态丢失。现与电脑端激活逻辑完全对齐。
+- **电脑端块格式一键记事弹窗关闭后窗口尺寸记忆丢失**：× 按钮关闭走 `win.destroy()`（只触发 `closed` 不触发 `close`），`closed` 事件中 `saveBounds` 因 `win.isDestroyed()` 为 true 而跳过保存。新增 `_lastBounds` 缓存兜底，窗口销毁时用最后已知位置写入 localStorage。
+- **电脑端块格式弹窗隐藏后销毁导致孤立草稿块**：`closed` 事件处理器漏清 `_hideTimer`（隐藏后 5 秒自动清理定时器），窗口销毁后定时器仍触发，创建无人清理的空草稿块。
+- **电脑端块格式弹窗卸载时 `getTitle()` 窗口匹配不可靠**：思源内部覆盖窗口标题后 `getTitle()` 返回的不是 `'⚡ 快捷记事'`，改用 `__qn_block_window` 标记匹配，与 `destroyAllBlockWindows` 统一。
+- **电脑端块格式弹窗卸载/重启后可能出现居中默认尺寸**：同上 `deadBounds` 保存失败的连锁后果。
 
-### Added
+### Changed
 
-- 内置按钮选择器列表更新为思源 v3.7 最新 ID（27 项），新增"密钥和变量"、"鉴权"、"应用"、"用户指南"等。
-- `menu*` 系列按钮的手机端兜底逻辑：找不到时自动先打开 `#toolbarMore` 菜单再点击。
-- `isMobileUIContext()`：综合 UA / URL pathname / DOM 特征判断手机端，修复 PC 浏览器预览 `/mobile/` 路径时判断失效。
+- **电脑端块格式一键记事弹窗默认尺寸**：600×500 → 300×300，位置改为屏幕靠右居中（右侧贴边 40px）。
 
 ## [1.0.0] - 2026-01-15
 

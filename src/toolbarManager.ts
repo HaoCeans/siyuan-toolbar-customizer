@@ -4853,29 +4853,31 @@ function getToolbarElementsForAutoHide(): HTMLElement[] {
 }
 
 			/** 处理滚动事件 */
-			function handleToolbarAutoHideScroll(): void {
-			  if (!toolbarAutoHideConfigured && !toolbarAutoHideForceActive) return
-			  // 胶囊模式不检查文档锁定；toggle-lock 模式下文档解锁时恢复工具栏
-			  // 读缓存的锁状态（refreshToolbarAutoHide 切文档/锁切换时更新），省掉每帧 querySelector
-			  // 胶囊模式（forceActive）不检查锁定状态
-			  if (!toolbarAutoHideDocLocked && !toolbarAutoHideForceActive) {
-				    // 文档已解锁，立即恢复工具栏
-				    if (toolbarHiddenByScroll) {
-				      toolbarHiddenByScroll = false
-				      const unlockRestoreTransform = toolbarAutoHideCapsuleMode ? 'translateX(-50%) translateY(0)' : 'translateZ(0) translateY(0)'
-				      document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
-				        const htmlEl = el as HTMLElement
-				        htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
-				        htmlEl.classList.remove('toolbar-scroll-hidden');
-				        htmlEl.style.transform = unlockRestoreTransform
-			      })
-		      document.body.classList.remove('toolbar-autohide-active')
-		    }
-		    return
-		  }
-		  // 静默期内只跟踪滚动位置，不执行动作（防止布局变化产生的反馈滚动）
-		  const now = Date.now()
-		  const scrollEl = toolbarAutoHideBoundEl || getMobileScrollElementForToolbar()
+function handleToolbarAutoHideScroll(scrollElOverride?: HTMLElement): void {
+  if (!toolbarAutoHideConfigured && !toolbarAutoHideForceActive) return
+  // 胶囊模式不检查文档锁定；toggle-lock 模式下文档解锁时恢复工具栏
+  // 读缓存的锁状态（refreshToolbarAutoHide 切文档/锁切换时更新），省掉每帧 querySelector
+  // 胶囊模式（forceActive）不检查锁定状态
+  if (!toolbarAutoHideDocLocked && !toolbarAutoHideForceActive) {
+    // 文档已解锁，立即恢复工具栏
+    if (toolbarHiddenByScroll) {
+      toolbarHiddenByScroll = false
+      const unlockRestoreTransform = toolbarAutoHideCapsuleMode ? 'translateX(-50%) translateY(0)' : 'translateZ(0) translateY(0)'
+      document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
+        const htmlEl = el as HTMLElement
+        htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
+        htmlEl.classList.remove('toolbar-scroll-hidden');
+        htmlEl.style.transform = unlockRestoreTransform
+      })
+      document.body.classList.remove('toolbar-autohide-active')
+    }
+    return
+  }
+  // 静默期内只跟踪滚动位置，不执行动作（防止布局变化产生的反馈滚动）
+  const now = Date.now()
+  // scrollElOverride: 桌面端传入 desktopFloatingScrollBoundEl，避免共享变量污染
+  // toolbarAutoHideBoundEl: 手机端在 bindToolbarAutoHideScroll 中设置
+  const scrollEl = scrollElOverride || toolbarAutoHideBoundEl || getMobileScrollElementForToolbar()
 		  if (now < toolbarAutoHideIgnoreUntil) {
 		    toolbarLastScrollTop = scrollEl?.scrollTop ?? null
 		    return
@@ -5091,32 +5093,33 @@ function unbindDesktopScrollForFloating(): void {
  * - 绑定 scroll 监听 + 重试 + 标签页切换轮询（电脑端特有）
  */
 function startDesktopScrollForFloating(): void {
-  if (!isMobileDevice()) {
-    // 1. 注入 CSS（设备无关，电脑端也能用）
-    ensureToolbarAutoHideStyle()
-    // 2. 设置共享状态：让 handleToolbarAutoHideScroll 能跑 + transform 保留 translateX(-50%)
-    toolbarAutoHideForceActive = true
-    toolbarAutoHideCapsuleMode = true
-    // 3. scroll handler 复用手机端的 handleToolbarAutoHideScroll（无 isMobile 守卫）
-    //    用闭包包装一下存到 desktopFloatingScrollHandler 以便解绑
-    if (!desktopFloatingScrollHandler) {
-      desktopFloatingScrollHandler = () => handleToolbarAutoHideScroll()
-    }
-  }
+	  if (!isMobileDevice()) {
+	    // 1. 注入 CSS（设备无关，电脑端也能用）
+	    ensureToolbarAutoHideStyle()
+	    // 2. 设置共享状态：让 handleToolbarAutoHideScroll 能跑 + transform 保留 translateX(-50%)
+	    toolbarAutoHideForceActive = true
+	    toolbarAutoHideCapsuleMode = true
+	    // 3. scroll handler 复用手机端的 handleToolbarAutoHideScroll（无 isMobile 守卫）
+	    //    用闭包包装，把 desktopFloatingScrollBoundEl 传入，避免污染共享的 toolbarAutoHideBoundEl
+	    if (!desktopFloatingScrollHandler) {
+	      desktopFloatingScrollHandler = () => {
+	        if (desktopFloatingScrollBoundEl) {
+	          handleToolbarAutoHideScroll(desktopFloatingScrollBoundEl)
+	        }
+	      }
+	    }
+	  }
 
-  // 4. 绑定 + 重试（活动 protyle 可能还没建好）
-  const tryBind = () => {
-    if (desktopFloatingScrollBoundEl) return  // 已绑定
-    const el = getDesktopScrollElementForFloating()
-    if (el) {
-      el.addEventListener('scroll', desktopFloatingScrollHandler!, { passive: true })
-      desktopFloatingScrollBoundEl = el
-      // 同步设置共享变量，让 handleToolbarAutoHideScroll 内部的 scrollEl 也读到同一个元素
-      // （否则它会走 fallback 到 getMobileScrollElementForToolbar，取到非当前活动的 protyle）
-      toolbarAutoHideBoundEl = el
-      toolbarLastScrollTop = el.scrollTop  // 初始化基准（复用手机端变量）
-    }
-  }
+	  // 4. 绑定 + 重试（活动 protyle 可能还没建好）
+	  const tryBind = () => {
+	    if (desktopFloatingScrollBoundEl) return  // 已绑定
+	    const el = getDesktopScrollElementForFloating()
+	    if (el) {
+	      el.addEventListener('scroll', desktopFloatingScrollHandler!, { passive: true })
+	      desktopFloatingScrollBoundEl = el
+	      toolbarLastScrollTop = el.scrollTop  // 初始化基准（复用手机端变量）
+	    }
+	  }
   tryBind()
   if (!desktopFloatingScrollRetryTimer) {
     let retryCount = 0
@@ -5143,7 +5146,8 @@ function startDesktopScrollForFloating(): void {
 	        desktopFloatingScrollBoundEl = null
 	        activeEl.addEventListener('scroll', desktopFloatingScrollHandler!, { passive: true })
 	        desktopFloatingScrollBoundEl = activeEl
-	        toolbarAutoHideBoundEl = activeEl
+	        // 注意：不写 toolbarAutoHideBoundEl（桌面端有独立的 desktopFloatingScrollBoundEl，
+	        // 写共享变量会破坏手机端的滚动绑定）
 	        toolbarLastScrollTop = activeEl.scrollTop
         // 切换标签页时如果工具栏处于隐藏状态，立即恢复（避免新页面看不到工具栏）
         if (toolbarHiddenByScroll) {

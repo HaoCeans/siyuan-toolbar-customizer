@@ -5909,6 +5909,8 @@ function showCloseConfirmDialog(): Promise<boolean> {
       e.stopImmediatePropagation()
     }
     window.addEventListener('keydown', onKey, true)
+    // 保存引用，供插件 unload 时清理（避免插件卸载时模态未关导致 listener 泄漏）
+    ;(window as any).__showConfirmKeydownHandler = onKey
   })
 }
 
@@ -7304,6 +7306,12 @@ export function cleanup() {
   if (toolbarStyleChangeHandler) {
     window.removeEventListener('toolbar-style-changed', toolbarStyleChangeHandler)
     toolbarStyleChangeHandler = null
+  }
+
+  // 清理模态确认框 keydown 监听器（防止插件卸载时模态未关导致 listener 泄漏）
+  if ((window as any).__showConfirmKeydownHandler) {
+    window.removeEventListener('keydown', (window as any).__showConfirmKeydownHandler, true)
+    delete (window as any).__showConfirmKeydownHandler
   }
 
   // 清理移动端样式

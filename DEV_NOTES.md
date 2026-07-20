@@ -207,3 +207,119 @@ return buttons.map(btn => ({ ...btn, overflowLevel: btn.overflowLevel ?? 0 }))
 
 **修复**：把所有变量声明（`overflowExpanded`、`SCALE_KEY`、`scaleFactor`）移到所有 UI 代码之前。
 
+---
+
+## 手机端/桌面端底部胶囊滚动隐藏
+
+**文件**：`src/toolbarManager.ts`
+
+**相关函数**：`handleToolbarAutoHideScroll`（手机端）、`handleDesktopToolbarAutoHideScroll`（桌面端）、`refreshToolbarAutoHide`、`refreshDesktopFloatingScrollOnSwitch`、`refreshMobileCapsuleScrollBinding`
+
+### 核心原则
+
+**桌面端和手机端使用完全独立的状态变量**，不得共享：
+
+| 桌面端 | 手机端 | 用途 |
+|--------|--------|------|
+| `desktopHiddenByScroll` | `toolbarHiddenByScroll` | 当前是否因滚动而隐藏 |
+| `desktopLastScrollTop` | `toolbarLastScrollTop` | 上一次滚动位置基准 |
+| `desktopAutoHideIgnoreUntil` | `toolbarAutoHideIgnoreUntil` | hide/show 后的静默期截止时间 |
+| `desktopAutoHideLastHide/Show` | `toolbarAutoHideLastHide/Show` | 上次隐藏/显示的时间戳 |
+| `desktopAutoHidePendingTimer` | `toolbarAutoHidePendingTimer` | 延迟执行隐藏/显示的定时器 |
+| `desktopAutoHideForceActive` | `toolbarAutoHideForceActive` | 滚动隐藏开关 |
+| `desktopAutoHideCapsuleMode` | `toolbarAutoHideCapsuleMode` | 胶囊布局模式 |
+
+桌面端的 handler `handleDesktopToolbarAutoHideScroll(scrollEl)` 直接接受 HTMLElement 参数（由闭包传入 `desktopFloatingScrollBoundEl`），手机端的 `handleToolbarAutoHideScroll` 接受浏览器传入的 Event 对象，经由 `instanceof HTMLElement` 过滤后落到 `toolbarAutoHideBoundEl`。
+
+### 已知陷阱
+
+#### ① 滚动容器：手机端用 `protyle.contentElement`
+
+所有手机面板（大纲 `mobileOutline.ts`、标签栏 `mobileTabs.ts`、文档导航 `mobileDocNav.ts`）均使用 `protyle.contentElement`（`.protyle-content`）作为滚动容器。
+
+**不要改为 `.protyle-wysiwyg`**。虽然直觉上 `.protyle-wysiwyg` 更像"可滚动区域"，但思源在移动端的滚动容器就是 `.protyle-content`。三个面板都验证过。
+
+#### ② 键盘检测：不要用 viewport 高度阈值
+
+```typescript
+// ❌ 错误的做法——80px 阈值在某些设备上（地址栏+底部导航 >80px）永久误判
+function isKeyboardOpenForToolbar(): boolean {
+  return window.visualViewport.height < window.innerHeight - 80
+}
+
+// ✅ 正确的做法——事件驱动（参考 mobileOutline.ts 的 hiddenByKeyboard）
+// focusin → hideForKeyboard(), focusout → restoreAfterKeyboard()
+// 或直接跳过——胶囊 CSS 已用 data-input-method="open" → display:none 处理键盘遮挡
+```
+
+胶囊滚动隐藏模式下（`toolbarAutoHideForceActive === true`）应跳过键盘检测，因为胶囊 CSS 已通过 `data-input-method="open" → display:none` 处理了键盘遮挡场景。
+
+#### ③ 初始化时序竞态：`toolbarHiddenByScroll` 不能先于元素就绪设置
+
+```typescript
+// 隐藏分支中必须先检查有没有元素可隐藏
+const hideTargets = getToolbarElementsForAutoHide()
+if (hideTargets.length === 0) return  // ← 必须！否则标志位设上后永远无法再次触发隐藏
+toolbarHiddenByScroll = true
+```
+
+**原因**：`initMobileToolbarAdjuster` 中滚动隐藏的启动（`startToolbarScrollBindRetry`）在 `setupToolbarForElement`（设置 `data-toolbar-customized` 属性）之前。用户可能在退避重试成功前滚动，导致 `toolbarHiddenByScroll = true` 但没元素可隐藏，**后续所有滚动都不再进入隐藏分支**，永久卡死。
+
+#### ④ CSS `opacity: 0 !important` 可能被覆盖
+
+`applyToolbarBackgroundColor` 注入的 `.protyle-breadcrumb { opacity: 0.9 !important; }` 虽然特异性低于 `.protyle-breadcrumb.toolbar-scroll-hidden { opacity: 0 !important; }`，但在某些构建/运行时环境下仍然会覆盖。
+
+**最终修复方案**：不用 CSS class，直接在 JS 中用 inline `!important`：
+
+```typescript
+// 隐藏
+el.style.setProperty('opacity', '0', 'important')
+
+// 显示
+el.style.removeProperty('opacity')
+```
+
+`inline !important` 的优先级高于任何样式表的 `!important`，彻底避免 CSS 级联问题。`toolbar-scroll-hidden` class 保留用于样式标记（调试时可确认 class 已加上）。
+
+#### ⑤ 切文档时需重绑 scroll 监听
+
+切换文档时，protyle 可能被重建（新的 `.protyle-content`），旧的 scroll 监听器挂在已脱离 DOM 的元素上。
+
+- **桌面端**：`refreshDesktopFloatingScrollOnSwitch()` 在 `switch-protyle` / `loaded-protyle-dynamic` 事件中重绑
+- **手机端**：`refreshMobileCapsuleScrollBinding()` 在 `refreshToolbarAutoHide()` 中调用，检查 `getMobileScrollElementForToolbar()` 返回的元素是否与 `toolbarAutoHideBoundEl` 一致，不一致则解绑旧 + 绑定新
+
+```typescript
+function refreshMobileCapsuleScrollBinding(): void {
+  if (toolbarHiddenByScroll) { /* 恢复可见 */ }
+  toolbarLastScrollTop = null
+  toolbarAutoHideIgnoreUntil = 0
+
+  const activeEl = getMobileScrollElementForToolbar()
+  if (activeEl && activeEl !== toolbarAutoHideBoundEl) {
+    // 容器变了 → 解绑旧的，绑定新的
+    toolbarAutoHideBoundEl.removeEventListener('scroll', ...)
+    toolbarAutoHideBoundEl = null
+    bindToolbarAutoHideScroll()
+  } else if (activeEl && activeEl === toolbarAutoHideBoundEl) {
+    // 同一容器 → 只重置基准
+    toolbarLastScrollTop = activeEl.scrollTop
+  }
+}
+```
+
+#### ⑥ 桌面端 tab 轮询不要污染手机端变量
+
+`startDesktopScrollForFloating` 中有一个 1 秒间隔的 `desktopFloatingTabPollTimer`，用于检测活动标签页切换。**不要在这个定时器里写 `toolbarAutoHideBoundEl` 或 `toolbarLastScrollTop`**——它们是手机端变量。桌面端应使用自己的 `desktopFloatingScrollBoundEl` 和 `desktopLastScrollTop`。
+
+### 调试方法
+
+在 `handleToolbarAutoHideScroll` 中已埋入 `[TB-AutoHide]` 前缀的日志，在控制台过滤即可看到完整链路：
+
+| 日志 | 含义 |
+|------|------|
+| `scrollEvent` | 收到 scroll 事件，显示 forceActive/boundEl/hiddenByScroll |
+| `delta: N` | 本次 delta、scrollTop、距上次 hide/show 的时间 |
+| `HIDE, targets: N` | 进入隐藏分支，找到 N 个元素 |
+| `no targets to hide` | 元素还没就绪（`setupToolbarForElement` 未完成） |
+| `applied (bottom), opacity: N` | 已应用隐藏，N 应为 0（否则 CSS 覆盖问题） |
+| `SHOW` | 执行显示 |

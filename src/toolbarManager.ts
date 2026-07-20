@@ -1247,12 +1247,17 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
 	                background: rgba(255, 255, 255, 0.25) !important;
 	                border-color: rgba(0, 0, 0, 0.06) !important;
 	              }
-              html[data-theme-mode="dark"] .protyle-breadcrumb__bar[data-input-method],
-              html[data-theme-mode="dark"] .protyle-breadcrumb[data-input-method] {
-                background: rgba(30, 30, 30, 0.3) !important;
-                border-color: rgba(255, 255, 255, 0.06) !important;
-              }` : ''}
-          `
+	              html[data-theme-mode="dark"] .protyle-breadcrumb__bar[data-input-method],
+	              html[data-theme-mode="dark"] .protyle-breadcrumb[data-input-method] {
+	                background: rgba(30, 30, 30, 0.3) !important;
+	                border-color: rgba(255, 255, 255, 0.06) !important;
+	              }` : ''}
+	              /* 输入法打开时思源 #keyboardToolbar 会覆盖胶囊（层叠上下文问题），直接隐藏 */
+	              .protyle-breadcrumb__bar[data-input-method="open"],
+	              .protyle-breadcrumb[data-input-method="open"] {
+	                display: none !important;
+	              }
+	          `
         } else {
           // 底部固定模式 CSS（原有）
           style.textContent = `
@@ -1286,7 +1291,7 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
 
             .protyle-breadcrumb__bar[data-input-method="open"],
             .protyle-breadcrumb[data-input-method="open"] {
-              bottom: calc(var(--mobile-toolbar-offset) + env(safe-area-inset-bottom)) !important;
+              display: none !important;
             }
 
             .protyle-breadcrumb__bar[data-input-method="close"],
@@ -4875,9 +4880,12 @@ function handleToolbarAutoHideScroll(scrollElOverride?: HTMLElement): void {
   }
   // 静默期内只跟踪滚动位置，不执行动作（防止布局变化产生的反馈滚动）
   const now = Date.now()
-  // scrollElOverride: 桌面端传入 desktopFloatingScrollBoundEl，避免共享变量污染
-  // toolbarAutoHideBoundEl: 手机端在 bindToolbarAutoHideScroll 中设置
-  const scrollEl = scrollElOverride || toolbarAutoHideBoundEl || getMobileScrollElementForToolbar()
+  // scrollElOverride: 桌面端传入 desktopFloatingScrollBoundEl（HTMLElement），避免共享变量污染
+  // 注意：移动端绑定 handleToolbarAutoHideScroll 到 scroll 事件时，浏览器会传入 Event 对象作为第一个参数，
+  // 因此要判断 scrollElOverride 是不是真正的 HTMLElement，避免 Event 被当成 scrollEl 导致 scrollTop 为 undefined
+  const scrollEl = (scrollElOverride instanceof HTMLElement ? scrollElOverride : null)
+    || toolbarAutoHideBoundEl
+    || getMobileScrollElementForToolbar()
 		  if (now < toolbarAutoHideIgnoreUntil) {
 		    toolbarLastScrollTop = scrollEl?.scrollTop ?? null
 		    return

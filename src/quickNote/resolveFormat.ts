@@ -1,13 +1,7 @@
 import { getFrontend } from 'siyuan'
 import { pluginInstance } from '../toolbarManager'
+import { isPaidFeatureUnlocked } from '../utils/licenseManager'
 import { DEFAULT_QUICK_NOTE_INPUT_FORMAT, type QuickNoteInputFormat } from './types'
-
-function isAuthorToolActivated(): boolean {
-  return !!(
-    pluginInstance?.desktopFeatureConfig?.authorActivated
-    || pluginInstance?.mobileFeatureConfig?.authorActivated
-  )
-}
 
 function isDesktopClient(): boolean {
   const frontEnd = getFrontend()
@@ -21,7 +15,7 @@ export function resolveQuickNoteInputFormat(isFromButton: boolean): QuickNoteInp
   // 电脑端：格式统一读「电脑端设置 → 一键记事」全局配置
   if (isDesktopClient()) {
     format = pluginInstance?.desktopFeatureConfig?.quickNoteInputFormat || DEFAULT_QUICK_NOTE_INPUT_FORMAT
-    if (format === 'block' && !isAuthorToolActivated()) {
+    if (format === 'block' && !isPaidFeatureUnlocked()) {
       return 'plain'
     }
     return format || DEFAULT_QUICK_NOTE_INPUT_FORMAT
@@ -39,7 +33,7 @@ export function resolveQuickNoteInputFormat(isFromButton: boolean): QuickNoteInp
       || DEFAULT_QUICK_NOTE_INPUT_FORMAT
   }
 
-  if (format === 'block' && !isAuthorToolActivated()) {
+  if (format === 'block' && !isPaidFeatureUnlocked()) {
     return 'plain'
   }
   return format || DEFAULT_QUICK_NOTE_INPUT_FORMAT

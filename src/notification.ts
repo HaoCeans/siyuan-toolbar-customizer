@@ -349,17 +349,91 @@ export function showInfoExternalButtonsReserveWidthModified(): void {
 // ===== 作者工具通知 =====
 
 /**
- * 显示作者工具已激活通知
+ * 显示作者工具已激活通知（旧版兼容，建议改用 showLicenseActivated）
  */
 export function showInfoAuthorToolActivated(): void {
   showMessage('鲸鱼定制工具箱已激活！请重新打开设置页面', NOTIFICATION_DURATION.ERROR, 'info')
 }
 
 /**
- * 显示激活码错误通知
+ * 显示激活码错误通知（按失败原因给出更具体的提示）
+ * @param reason 失败原因（来自 ValidationResult.reason）
  */
-export function showErrorActivationCodeInvalid(): void {
-  showMessage('激活码错误，请重试', NOTIFICATION_DURATION.ERROR, 'error')
+export function showErrorActivationCodeInvalid(reason?: string): void {
+  let msg = '激活码错误，请重试'
+  switch (reason) {
+    case 'format':
+      msg = '激活码格式错误，请检查是否完整复制（应为 6 段以 WHALE- 开头）'
+      break
+    case 'plan':
+      msg = '不支持的套餐类型'
+      break
+    case 'date':
+      msg = '激活码日期格式错误'
+      break
+    case 'signature':
+      msg = '激活码签名验证失败，可能已被篡改'
+      break
+    case 'account':
+      msg = '激活码与当前思源账号不匹配，请用绑定该码的账号登录'
+      break
+    case 'expired':
+      msg = '激活码已超过最后激活期限，请联系作者重新发放'
+      break
+    case 'trial_used':
+      msg = '本设备已使用过免费试用，无法再次试用'
+      break
+  }
+  showMessage(msg, NOTIFICATION_DURATION.ERROR, 'error')
+}
+
+// ===== 授权状态通知（试用/月卡/永久/过期）=====
+
+/**
+ * 显示试用期已开始通知
+ * @param daysLeft 剩余试用天数（不含宽限期）
+ */
+export function showTrialStarted(daysLeft: number): void {
+  showMessage(`🎉 免费试用已开始！${daysLeft} 天内可使用全部付费功能`, NOTIFICATION_DURATION.LONG, 'info')
+}
+
+/**
+ * 显示试用期已结束通知（点击付费按钮时触发）
+ */
+export function showTrialExpired(): void {
+  showMessage('⏰ 试用期已结束，请在「插件设置 → 激活与权益」中续费', NOTIFICATION_DURATION.ERROR, 'error')
+}
+
+/**
+ * 显示激活已过期通知（点击付费按钮时触发，月卡过期）
+ */
+export function showLicenseExpired(): void {
+  showMessage('❌ 激活已过期，请在「插件设置 → 激活与权益」中续费', NOTIFICATION_DURATION.ERROR, 'error')
+}
+
+/**
+ * 显示激活即将过期提醒（剩余 ≤ 3 天时，每天最多提示一次）
+ * @param daysLeft 剩余天数（含宽限期）
+ */
+export function showLicenseExpiringSoon(daysLeft: number): void {
+  showMessage(`⏳ 激活即将过期，剩余 ${daysLeft} 天，请及时续费`, NOTIFICATION_DURATION.LONG, 'info')
+}
+
+/**
+ * 显示需要激活通知（点击付费按钮但未激活/未试用时触发）
+ */
+export function showActivationRequired(): void {
+  showMessage('🔒 此功能需激活，请在「插件设置 → 激活与权益」中激活', NOTIFICATION_DURATION.ERROR, 'error')
+}
+
+/**
+ * 显示激活成功通知（含套餐信息）
+ * @param planText 套餐文案（"免费试用" / "月卡" / "永久"）
+ * @param daysLeftText 剩余天数文案（"3 天" / "30 天" / "永久"）
+ */
+export function showLicenseActivated(planText: string, daysLeftText: string | number): void {
+  const daysStr = typeof daysLeftText === 'number' ? `${daysLeftText} 天` : daysLeftText
+  showMessage(`✅ 激活成功！套餐：${planText}，有效期：${daysStr}`, NOTIFICATION_DURATION.ERROR, 'info')
 }
 
 // ===== 桌面端设置通知 =====

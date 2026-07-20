@@ -4,6 +4,8 @@
  */
 
 import { validateActivationCode } from '../utils/activationCodeValidator'
+import type { LicenseStatus } from '../utils/licenseManager'
+import { TRIAL_CODE, clearTrial } from '../utils/licenseManager'
 
 import type { Setting } from 'siyuan'
 import type { GlobalButtonConfig, ButtonConfig } from '../toolbarManager'
@@ -159,6 +161,10 @@ export interface FeatureConfig {
   authorCode?: string
   authorActivated?: boolean
   authorAccount?: string
+  // 新版授权字段（v3.8+）
+  licensePlan?: 'none' | 'trial' | 'm30' | 'perm'
+  licenseExpiry?: string  // YYYYMMDD 或 'PERM'
+  licenseGraceEnd?: string
   quickNoteGlobalCaptureEnabled?: boolean
   quickNoteOverflowToolbarEnabled?: boolean
   quickNoteToolbarVisible?: boolean
@@ -390,6 +396,7 @@ export interface DesktopSettingsContext {
   mobileConfig: any
   version?: string
   isAuthorToolActivated: () => boolean
+  getLicenseStatus: () => LicenseStatus
   showConfirmDialog: (message: string) => Promise<boolean>
   showIconPicker: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void
   saveData: (key: string, value: any) => Promise<void>
@@ -933,9 +940,26 @@ export function createDesktopSettingLayout(
       
       const activationStatus = document.createElement('span')
       activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px;'
-      if (context.isAuthorToolActivated()) {
-        activationStatus.style.cssText += ' background: rgba(34, 197, 94, 0.2); color: #22c55e;'
-        activationStatus.textContent = '✓ 已激活'
+      // 动态状态徽章：根据 licenseManager 状态显示对应文案和颜色
+      const licenseStatus = context.getLicenseStatus()
+      if (licenseStatus.active) {
+        if (licenseStatus.expired) {
+          // 不会到这里（active=true 时 expired 必为 false）
+          activationStatus.style.cssText += ' background: rgba(255, 159, 67, 0.2); color: #ff9f43;'
+          activationStatus.textContent = '⏳ ' + licenseStatus.statusText
+        } else if (licenseStatus.plan === 'perm') {
+          activationStatus.style.cssText += ' background: rgba(34, 197, 94, 0.2); color: #22c55e;'
+          activationStatus.textContent = '✓ ' + licenseStatus.statusText
+        } else {
+          // 试用中 / 月卡中（含宽限期）
+          const bgClr = licenseStatus.inGracePeriod ? 'rgba(255, 159, 67, 0.2)' : 'rgba(48, 164, 232, 0.2)'
+          const fgClr = licenseStatus.inGracePeriod ? '#ff9f43' : '#30a4e8'
+          activationStatus.style.cssText += ` background: ${bgClr}; color: ${fgClr};`
+          activationStatus.textContent = '⏳ ' + licenseStatus.statusText
+        }
+      } else if (licenseStatus.expired) {
+        activationStatus.style.cssText += ' background: rgba(255, 77, 77, 0.2); color: #ff4d4d;'
+        activationStatus.textContent = '❌ ' + licenseStatus.statusText
       } else {
         activationStatus.style.cssText += ' background: rgba(255, 77, 77, 0.2); color: #ff4d4d;'
         activationStatus.textContent = '✗ 未激活'
@@ -960,19 +984,27 @@ export function createDesktopSettingLayout(
         clearBtn.className = 'b3-button b3-button--danger'
         clearBtn.textContent = '清除激活'
         clearBtn.style.cssText = 'padding: 2px 8px; font-size: 12px; height: 24px; margin-left: 4px;'
-        clearBtn.onclick = async () => {
-          if (!window.confirm('确定要清除激活状态吗？\n\n此操作会立即清空当前激活码与账号绑定，所有付费功能将无法使用，需要重新输入有效激活码才能恢复。')) return
-          try {
-            clearBtn.disabled = true
-            clearBtn.textContent = '清除中...'
-            context.desktopFeatureConfig.authorActivated = false
-            context.desktopFeatureConfig.authorCode = ''
-            context.desktopFeatureConfig.authorAccount = ''
-            context.mobileFeatureConfig.authorActivated = false
-            context.mobileFeatureConfig.authorCode = ''
-            context.mobileFeatureConfig.authorAccount = ''
-            await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
-            await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+	        clearBtn.onclick = async () => {
+	          if (!window.confirm('确定要清除激活状态吗？\n\n此操作会立即清空当前激活码与账号绑定，所有付费功能将无法使用，需要重新输入有效激活码才能恢复。')) return
+	          try {
+	            clearBtn.disabled = true
+	            clearBtn.textContent = '清除中...'
+	            context.desktopFeatureConfig.authorActivated = false
+	            context.desktopFeatureConfig.authorCode = ''
+	            context.desktopFeatureConfig.authorAccount = ''
+	            context.desktopFeatureConfig.licensePlan = 'none'
+	            context.desktopFeatureConfig.licenseExpiry = ''
+	            context.desktopFeatureConfig.licenseGraceEnd = ''
+	            context.mobileFeatureConfig.authorActivated = false
+	            context.mobileFeatureConfig.authorCode = ''
+	            context.mobileFeatureConfig.authorAccount = ''
+	            context.mobileFeatureConfig.licensePlan = 'none'
+	            context.mobileFeatureConfig.licenseExpiry = ''
+            context.mobileFeatureConfig.licenseGraceEnd = ''
+            // 同时清除 localStorage 试用标记
+            clearTrial()
+	            await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+	            await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
             showMessage('激活状态已清除，正在重载...', 2000, 'info')
             setTimeout(() => window.location.reload(), 1000)
           } catch (err) {
@@ -1021,25 +1053,42 @@ export function createDesktopSettingLayout(
         activationBtn.disabled = true
         activationBtn.textContent = '验证中...'
         try {
-          if (validateActivationCode(code, userName)) {
-            // 同时激活两端
+          const result = validateActivationCode(code, userName)
+          if (result.ok) {
+            // 同时激活两端，写入新版 license 字段 + 兼容旧 authorXxx 字段
+            const planLower = result.plan!.toLowerCase() as 'trial' | 'm30' | 'perm'
+            // 桌面端
             context.desktopFeatureConfig.authorActivated = true
             context.desktopFeatureConfig.authorCode = code
             context.desktopFeatureConfig.authorAccount = userName
+            context.desktopFeatureConfig.licensePlan = planLower
+            context.desktopFeatureConfig.licenseExpiry = result.expiryDate || ''
+            context.desktopFeatureConfig.licenseGraceEnd = result.graceEnd || ''
+            // 手机端（同步）
             context.mobileFeatureConfig.authorActivated = true
             context.mobileFeatureConfig.authorCode = code
             context.mobileFeatureConfig.authorAccount = userName
+            context.mobileFeatureConfig.licensePlan = planLower
+            context.mobileFeatureConfig.licenseExpiry = result.expiryDate || ''
+            context.mobileFeatureConfig.licenseGraceEnd = result.graceEnd || ''
             await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
             await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
             activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px; background: rgba(34, 197, 94, 0.2); color: #22c55e;'
             activationStatus.textContent = '✓ 已激活'
-            Notify.showInfoAuthorToolActivated()
-            // 延迟后重新加载设置页面
+            // 套餐文案
+            const planText = planLower === 'trial' ? '免费试用' : planLower === 'm30' ? '月卡' : '永久'
+            const daysText = result.expiryDate === 'PERM' ? '永久' : (result as any).expiryDate
+            Notify.showLicenseActivated(planText, result.expiryDate === 'PERM' ? '永久' : '30 天内')
+            // 试用期单独提示剩余天数
+            if (planLower === 'trial') {
+              Notify.showTrialStarted(3)
+            }
+            // 延迟后重新加载设置页面（刷新状态徽章）
             setTimeout(() => {
               window.location.reload()
             }, 1500)
           } else {
-            Notify.showErrorActivationCodeInvalid()
+            Notify.showErrorActivationCodeInvalid(result.reason)
           }
         } finally {
           activationBtn.disabled = false
@@ -1067,7 +1116,15 @@ export function createDesktopSettingLayout(
       infoBtn.className = 'b3-button b3-button--text'
       infoBtn.style.cssText = 'width: 100%; margin-top: 8px; padding: 8px; border: 1px solid #722ed1; border-radius: 6px; background: rgba(114, 46, 209, 0.08); color: #722ed1; font-weight: 600;'
       infoBtn.textContent = '📘 查看激活方式'
-      infoBtn.onclick = () => showActivationInfoModal(context.isAuthorToolActivated())
+      infoBtn.onclick = () => showActivationInfoModal(
+        context.isAuthorToolActivated(),
+        () => {
+          // 「开始试用」回调：填入硬编码试用码并自动触发验证
+          activationInput.value = TRIAL_CODE
+          activationInputRow.style.display = 'flex'  // 确保输入框可见
+          activationBtn.click()
+        }
+      )
       whaleToolboxContainer.appendChild(infoBtn)
             
       // 鲸鱼定制工具箱功能列表说明
@@ -1335,7 +1392,7 @@ export function createDesktopSettingLayout(
        * 内容与手机端 showActivationInfoModal 一致：定价原则 + 激活码方案 + 付款账号（含复制）+ 付款发码流程。
        * 布局为电脑端宽屏适配：2×2 方案卡片网格、面板更宽。
        */
-      const showActivationInfoModal = (isActivated: boolean): void => {
+      const showActivationInfoModal = (isActivated: boolean, onStartTrial?: () => void): void => {
         // 遮罩
         const overlay = document.createElement('div')
         overlay.style.cssText = `
@@ -1426,9 +1483,11 @@ export function createDesktopSettingLayout(
         plansWrapper.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 10px;'
 
         const planCards = [
+          { name: '免费试用', price: '0', unit: '元', duration: '3 天', badge: '免费', hot: false, isTrial: true, desc: '全部 15 项付费功能免费体验 3 天，每设备限一次', features: ['全功能体验', '无需付款', '每设备限一次'] },
+          { name: '月卡', price: '12', unit: '元', duration: '30 天', badge: '推荐', hot: true, desc: '30 天激活码（电脑+手机），适合短期高强度使用', features: ['30 天激活码（电脑+手机）', '15项付费功能全解锁', '含 5 天宽限期'] },
           { name: '永久正价', price: '45', unit: '元', duration: '永久', badge: '', hot: false, desc: '鲸鱼定制工具箱永久激活码（电脑+手机），解锁全部15项付费功能', features: ['永久激活码（电脑+手机）', '15项付费功能全解锁'] },
-          { name: '普通优惠', price: '36', unit: '元', duration: '8折', badge: '推荐', hot: true, desc: '鲸鱼定制工具箱永久激活码（电脑+手机），限时优惠 10 个，送完即止', features: ['永久激活码（电脑+手机）', '限时8折优惠'] },
-          { name: '学生优惠', price: '22.5', unit: '元', duration: '5折', badge: '', hot: false, desc: '需提供可证明在读学生身份的信息', features: ['永久激活码（电脑+手机）', '限时5折优惠', '需学生身份证明'] },
+          { name: '普通优惠', price: '36', unit: '元', duration: '永久(8折)', badge: '', hot: false, desc: '鲸鱼定制工具箱永久激活码（电脑+手机），限时优惠 10 个，送完即止', features: ['永久激活码（电脑+手机）', '限时8折优惠'] },
+          { name: '学生优惠', price: '22.5', unit: '元', duration: '永久(5折)', badge: '', hot: false, desc: '需提供可证明在读学生身份的信息', features: ['永久激活码（电脑+手机）', '限时5折优惠', '需学生身份证明'] },
           { name: '定制开发', price: '100', unit: '元起', duration: '手工费', badge: '', hot: false, desc: '有专门需求的可联系作者开发专属功能，只展示给你自己使用，也可决定是否纳入工具箱', features: ['专属功能定制', '仅自己可见/纳入工具箱', '作者评估实现'] },
         ]
 
@@ -1486,9 +1545,21 @@ export function createDesktopSettingLayout(
           const btnClr = card.hot ? 'var(--b3-theme-on-primary)' : 'var(--b3-theme-on-background)'
           const btnBdr = card.hot ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
           buyBtn.style.cssText = `margin-top: 8px; padding: 7px 0; font-size: 12px; cursor: pointer; background: ${btnBg}; color: ${btnClr}; border: 1px solid ${btnBdr}; border-radius: 6px;`
-          buyBtn.textContent = '扫码购买'
-          // 电脑端：复用闭包内的 showPayModal（单参版，用户名走闭包）
-          buyBtn.onclick = () => showPayModal(card.name)
+          if ((card as any).isTrial) {
+            // 免费试用卡：直接回调 onStartTrial（填入试用码并验证）
+            buyBtn.textContent = '立即试用'
+            buyBtn.onclick = () => {
+              if (onStartTrial) {
+                onStartTrial()
+                // 关闭弹窗
+                overlay.remove()
+              }
+            }
+          } else {
+            buyBtn.textContent = '扫码购买'
+            // 电脑端：复用闭包内的 showPayModal（单参版，用户名走闭包）
+            buyBtn.onclick = () => showPayModal(card.name)
+          }
           cardEl.appendChild(buyBtn)
 
           plansWrapper.appendChild(cardEl)

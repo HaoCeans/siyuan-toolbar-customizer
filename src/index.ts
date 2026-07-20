@@ -74,6 +74,10 @@ import {
   cleanupStressThreshold
 } from './stressThreshold'
 
+// 导入授权管理（试用期/月卡/永久统一判定）
+import * as licenseManager from './utils/licenseManager'
+import type { LicenseStatus } from './utils/licenseManager'
+
 // 导入 UI 组件
 import { showConfirmDialog as showConfirmDialogModal } from './ui/dialog'
 import { showButtonSelector, type ButtonInfo } from './ui/buttonSelector'
@@ -187,9 +191,13 @@ export default class ToolbarCustomizer extends Plugin {
     toolbarStyle: 'default' as 'default' | 'divider',  // 工具栏样式：默认或带分割线
     disableCustomButtons: false,// 禁用所有自定义按钮（恢复思源原始状态，仅桌面端）
     showAllNotifications: true, // 一键开启所有按钮右上角提示
-    authorActivated: false,     // 鲸鱼定制工具箱是否已激活
-    authorCode: '',              // 鲸鱼定制工具箱激活码
+    authorActivated: false,     // 鲸鱼定制工具箱是否已激活（兼容字段，新逻辑读 licensePlan）
+    authorCode: '',              // 鲸鱼定制工具箱激活码（原始码，含签名）
     authorAccount: '',           // 绑定的思源账号
+    // ===== 新版授权字段（v3.8+，支持 TRIAL/M30/PERM 多套餐）=====
+    licensePlan: 'none' as 'none' | 'trial' | 'm30' | 'perm',  // 当前授权套餐
+    licenseExpiry: '',           // 到期日 YYYYMMDD 或 'PERM'（不含宽限期）
+    licenseGraceEnd: '',         // 宽限期结束日 YYYYMMDD（PERM 时为空）
     quickNoteGlobalCaptureEnabled: true,  // 电脑端：全局快捷键唤起一键记事
     quickNoteToolbarVisible: true, // 电脑端：记事弹窗开关工具栏
     quickNoteInputFormat: 'plain' as 'plain' | 'block', // 电脑端：一键记事输入格式（独立于手机端）
@@ -220,9 +228,13 @@ export default class ToolbarCustomizer extends Plugin {
     disableFileTree: true,      // 禁止右滑弹出文档树
     disableSettingMenu: true,   // 禁止左滑弹出设置菜单
     showAllNotifications: true, // 一键开启所有按钮右上角提示
-    authorActivated: false,     // 鲸鱼定制工具箱是否已激活
-    authorCode: '',             // 鲸鱼定制工具箱激活码
+    authorActivated: false,     // 鲸鱼定制工具箱是否已激活（兼容字段，新逻辑读 licensePlan）
+    authorCode: '',             // 鲸鱼定制工具箱激活码（原始码，含签名）
     authorAccount: '',           // 绑定的思源账号
+    // ===== 新版授权字段（v3.8+，支持 TRIAL/M30/PERM 多套餐）=====
+    licensePlan: 'none' as 'none' | 'trial' | 'm30' | 'perm',  // 当前授权套餐
+    licenseExpiry: '',           // 到期日 YYYYMMDD 或 'PERM'（不含宽限期）
+    licenseGraceEnd: '',         // 宽限期结束日 YYYYMMDD（PERM 时为空）
     popupConfig: 'bothModes' as const, // 弹窗配置：'disabled'|'smallWindowOnly'|'bothModes'
     quickNoteNotebookId: '',     // 自启动一键记事默认笔记本ID
     quickNoteFontSize: 14,       // 弹窗输入框字体大小（px）
@@ -239,17 +251,16 @@ export default class ToolbarCustomizer extends Plugin {
     quickNoteButtonIds: ['more-mobile', 'doc-mobile', 'plugin-settings-mobile', 'open-diary-mobile', 'template-time-mobile', 'search-mobile', 'recent-docs-mobile'],  // 弹窗按钮显示：默认排除「锁住文档」
   }
 
-  // 检查作者功能是否已激活
+  // 检查作者功能是否已激活（含试用期/月卡/永久/宽限期，统一由 licenseManager 判定）
   private isAuthorToolActivated(): boolean {
-    // 旧用户：authorActivated 为 true 且无绑定账号 -> 视为已激活（向后兼容）
-    if (!this.desktopFeatureConfig.authorAccount && this.desktopFeatureConfig.authorActivated) return true
-    if (!this.mobileFeatureConfig.authorAccount && this.mobileFeatureConfig.authorActivated) return true
+    // licenseManager.isPaidFeatureUnlocked 内部会读取 pluginInstance（即 this）的配置
+    // 综合判断：永久有效 / 月卡未过期 / 试用期内 / 月卡试用宽限期内
+    return licenseManager.isPaidFeatureUnlocked()
+  }
 
-    // 新用户：需要校验当前登录账号是否与绑定的账号一致
-    const currentUser = this.getCurrentUserName()
-    if (this.desktopFeatureConfig.authorActivated && this.desktopFeatureConfig.authorAccount === currentUser) return true
-    if (this.mobileFeatureConfig.authorActivated && this.mobileFeatureConfig.authorAccount === currentUser) return true
-    return false
+  /** 获取当前授权详细状态（供 UI 显示"试用中/月卡/永久/已过期"等动态文案） */
+  private getLicenseStatus(): LicenseStatus {
+    return licenseManager.getLicenseStatus()
   }
 
   /** 获取当前思源登录账号名 */
@@ -263,11 +274,19 @@ export default class ToolbarCustomizer extends Plugin {
     this.desktopFeatureConfig.authorActivated = false
     this.desktopFeatureConfig.authorCode = ''
     this.desktopFeatureConfig.authorAccount = ''
+    this.desktopFeatureConfig.licensePlan = 'none'
+    this.desktopFeatureConfig.licenseExpiry = ''
+    this.desktopFeatureConfig.licenseGraceEnd = ''
     this.mobileFeatureConfig.authorActivated = false
     this.mobileFeatureConfig.authorCode = ''
     this.mobileFeatureConfig.authorAccount = ''
+    this.mobileFeatureConfig.licensePlan = 'none'
+    this.mobileFeatureConfig.licenseExpiry = ''
+    this.mobileFeatureConfig.licenseGraceEnd = ''
     await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
     await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
+    // 同时清除 localStorage 试用标记
+    licenseManager.clearTrial()
   }
 
   // 获取当前平台的功能配置（向后兼容）
@@ -523,6 +542,20 @@ export default class ToolbarCustomizer extends Plugin {
 
       // ===== 首次安装提示 =====
       const hasShownWelcome = await this.loadData('hasShownWelcome')
+
+      // ===== 老用户授权迁移 =====
+      // 旧版本只有 authorActivated + authorCode(WHALE-PERM-...) 字段；
+      // 新版本（v3.8+）需补全 licensePlan/licenseExpiry/licenseGraceEnd 字段。
+      // pluginInstance 已在 onload 开头通过 setPluginInstance(this) 注入，此处可直接调用。
+      try {
+        if (licenseManager.migrateLegacyPerm()) {
+          await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
+          await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
+          console.log('[License] 老用户授权字段已迁移为 perm')
+        }
+      } catch (migrateErr) {
+        console.warn('[License] 迁移老用户授权字段失败（不影响使用）:', migrateErr)
+      }
 
       if (!hasShownWelcome) {
         // 新用户，显示欢迎提示
@@ -1170,6 +1203,7 @@ export default class ToolbarCustomizer extends Plugin {
         mobileConfig: this.mobileConfig,
         version: this.version,
         isAuthorToolActivated: () => this.isAuthorToolActivated(),
+        getLicenseStatus: () => this.getLicenseStatus(),
         showConfirmDialog: (msg) => this.showConfirmDialog(msg),
         showIconPicker: (current, onSelect) => this.showIconPicker(current, onSelect),
         saveData: (key, value) => this.saveData(key, value),
@@ -1207,6 +1241,7 @@ export default class ToolbarCustomizer extends Plugin {
       mobileConfig: this.mobileConfig,
       desktopFeatureConfig: this.desktopFeatureConfig,
       isAuthorToolActivated: () => this.isAuthorToolActivated(),
+      getLicenseStatus: () => this.getLicenseStatus(),
       showConfirmDialog: (message) => this.showConfirmDialog(message),
       showIconPicker: (currentValue, onSelect) => this.showIconPicker(currentValue, onSelect),
       showButtonIdPicker: (currentValue, onSelect) => this.showButtonIdPicker(currentValue, onSelect),

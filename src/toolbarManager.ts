@@ -30,6 +30,7 @@ import { resolveBuiltinId } from "./ui/buttonSelector";
 import { deleteBlock } from "./api";
 import { uploadImageFile, insertProtyleImageAtCaret } from "./quickNote/imageInsert";
 import { lucideToSvg } from "./utils/lucideHelper";
+import * as licenseManager from "./utils/licenseManager";
 
 // ===== 插件实例（用于需要 app 参数的 API 调用） =====
 export let pluginInstance: any = null;
@@ -39,6 +40,8 @@ export let pluginInstance: any = null;
  */
 export function setPluginInstance(plugin: any): void {
   pluginInstance = plugin;
+  // 暴露到全局，供 licenseManager 等避免循环引用的模块使用
+  (window as any).__pluginInstance = plugin;
 }
 
 // ===== 配置接口 =====
@@ -5420,6 +5423,28 @@ async function executeClearEmptyBlocks(): Promise<void> {
  */
 async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
   const subtype = config.authorToolSubtype || 'button-sequence'
+
+  // ===== 授权检查（运行时拦截，防止过期/未激活用户使用付费功能）=====
+  // 永远免费的两项不拦截：toggle-lock（沉浸阅读）、slide-comment（滑动批注）
+  const FREE_SUBTYPES = ['toggle-lock', 'slide-comment']
+  if (!FREE_SUBTYPES.includes(subtype)) {
+    const status = licenseManager.getLicenseStatus()
+    if (!status.active) {
+      // 已过期或未激活：弹对应通知，引导用户到设置页激活
+      if (status.plan === 'trial' && status.expired) {
+        Notify.showTrialExpired()
+      } else if (status.expired) {
+        Notify.showLicenseExpired()
+      } else {
+        Notify.showActivationRequired()
+      }
+      return  // 不执行付费功能
+    }
+    // 即将到期提醒（剩余 ≤ 3 天，且非永久），每天最多提示一次
+    if (status.daysLeft !== Infinity && licenseManager.shouldNotifyExpiring(status.plan, status.daysLeft)) {
+      Notify.showLicenseExpiringSoon(status.daysLeft)
+    }
+  }
 
   // 弹窗框模板选择类型
   if (subtype === 'popup-select') {

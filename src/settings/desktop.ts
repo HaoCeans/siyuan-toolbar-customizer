@@ -164,6 +164,7 @@ export interface FeatureConfig {
   quickNoteToolbarVisible?: boolean
   quickNoteFontSize?: number  // 电脑端弹窗字体大小（独立于手机端）
   quickNoteBlockWindowPersist?: boolean  // 块格式弹窗后台常驻
+  quickNoteHideFloatingToolbar?: boolean  // 块格式弹窗中是否隐藏底部悬浮胶囊
 }
 
 /**
@@ -893,70 +894,11 @@ export function createDesktopSettingLayout(
       container.style.cssText = 'display: flex; flex-direction: column; gap: 12px; padding: 16px; background: var(--b3-theme-background); border-radius: 8px;'
 
       // ========== 付款用户账号块 ==========
+      // 账号块已迁移到「查看激活方式」弹窗内（showActivationInfoModal），这里仅保留 currentUserName 闭包供弹窗复用
       const currentUserName = () => {
         const u = (window as any).siyuan?.user
         return (u && typeof u.userName === 'string' && u.userName) || ''
       }
-      const accountBlock = document.createElement('div')
-      accountBlock.style.cssText =
-        'padding: 12px 14px; background: var(--b3-theme-surface); border-radius: 10px;'
-
-      const accountHint = document.createElement('div')
-      accountHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 6px;'
-      accountHint.textContent = '付款时请提供以下用户名'
-      accountBlock.appendChild(accountHint)
-
-      const accountRow = document.createElement('div')
-      accountRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
-
-      const accountName = document.createElement('span')
-      accountName.style.cssText = 'font-size: 16px; font-weight: 700; color: var(--b3-theme-on-background);'
-      accountName.textContent = currentUserName() || '未登录思源账号'
-      accountRow.appendChild(accountName)
-
-      const copyBtn = document.createElement('button')
-      copyBtn.style.cssText =
-        'padding: 2px 10px; font-size: 12px; color: var(--b3-theme-primary); background: transparent; border: 1px solid var(--b3-theme-primary); border-radius: 4px; cursor: pointer;'
-      copyBtn.textContent = '复制'
-      copyBtn.onclick = async () => {
-        const name = currentUserName()
-        if (!name) {
-          copyBtn.textContent = '未登录'
-          setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
-          return
-        }
-        try {
-          if (navigator.clipboard?.writeText) {
-            await navigator.clipboard.writeText(name)
-          } else {
-            const ta = document.createElement('textarea')
-            ta.value = name
-            ta.style.position = 'fixed'
-            ta.style.opacity = '0'
-            document.body.appendChild(ta)
-            ta.select()
-            document.execCommand('copy')
-            document.body.removeChild(ta)
-          }
-          copyBtn.textContent = '已复制！'
-          setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
-        } catch {
-          copyBtn.textContent = '复制失败'
-          setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
-        }
-      }
-      accountRow.appendChild(copyBtn)
-      accountBlock.appendChild(accountRow)
-
-      const accountNotice = document.createElement('div')
-      accountNotice.style.cssText = 'font-size: 11px; color: #d4380d; margin-top: 6px; padding: 6px 8px; background: color-mix(in srgb, #ff4d4f 8%, transparent); border-radius: 4px; line-height: 1.5; font-weight: 500;'
-      accountNotice.textContent = '激活码将根据该用户名直接绑定你的思源账号，请务必发送'
-      accountBlock.appendChild(accountNotice)
-
-      const accountTip = document.createElement('div')
-      accountTip.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); margin-top: 6px; line-height: 1.5;'
-      accountTip.innerHTML = '无法在付款备注提供时，可将用户名和付款截图发送至 17114555244@qq.com，或 <a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主。'
-      accountBlock.appendChild(accountTip)
 
       // 鲸鱼定制工具箱整体框
       const whaleToolboxContainer = document.createElement('div')
@@ -1012,6 +954,35 @@ export function createDesktopSettingLayout(
           ;(reActivateBtn.parentElement as HTMLElement).style.display = 'none'
         }
         statusContainer.appendChild(reActivateBtn)
+
+        // 「清除激活」按钮：真正撤销激活状态（临时调试/特殊场景用，不可逆）
+        const clearBtn = document.createElement('button')
+        clearBtn.className = 'b3-button b3-button--danger'
+        clearBtn.textContent = '清除激活'
+        clearBtn.style.cssText = 'padding: 2px 8px; font-size: 12px; height: 24px; margin-left: 4px;'
+        clearBtn.onclick = async () => {
+          if (!window.confirm('确定要清除激活状态吗？\n\n此操作会立即清空当前激活码与账号绑定，所有付费功能将无法使用，需要重新输入有效激活码才能恢复。')) return
+          try {
+            clearBtn.disabled = true
+            clearBtn.textContent = '清除中...'
+            context.desktopFeatureConfig.authorActivated = false
+            context.desktopFeatureConfig.authorCode = ''
+            context.desktopFeatureConfig.authorAccount = ''
+            context.mobileFeatureConfig.authorActivated = false
+            context.mobileFeatureConfig.authorCode = ''
+            context.mobileFeatureConfig.authorAccount = ''
+            await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+            await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+            showMessage('激活状态已清除，正在重载...', 2000, 'info')
+            setTimeout(() => window.location.reload(), 1000)
+          } catch (err) {
+            console.error('[ClearActivation] 清除失败:', err)
+            showMessage('清除失败，请重试', 3000, 'error')
+            clearBtn.disabled = false
+            clearBtn.textContent = '清除激活'
+          }
+        }
+        statusContainer.appendChild(clearBtn)
       }
       
       statusContainer.appendChild(activationStatus)
@@ -1021,22 +992,7 @@ export function createDesktopSettingLayout(
             
       const activationDesc = document.createElement('div')
       activationDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-      activationDesc.innerHTML = '💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型。若想获得激活码，<a href="javascript:void(0)" style="color:#1a1a1a;background:linear-gradient(135deg,#fbbf24,#f59e0b);text-decoration:none;cursor:pointer;font-weight:600;padding:3px 14px;border-radius:20px;font-size:13px;border:1px solid rgba(0,0,0,0.08);box-shadow:0 2px 6px rgba(245,158,11,0.4);">点击此链接</a>'
-      activationDesc.querySelector('a')!.onclick = (e) => {
-        e.preventDefault()
-        const dialogBody = container.closest('.b3-dialog__body') || container.closest('.b3-dialog__content')
-        if (dialogBody) {
-          // 找到定价原则区块并滚动到它
-          const allChildren = container.children
-          for (let i = 0; i < allChildren.length; i++) {
-            const child = allChildren[i] as HTMLElement
-            if (child.textContent?.includes('📐 激活方案定价原则')) {
-              child.scrollIntoView({ behavior: 'smooth', block: 'start' })
-              break
-            }
-          }
-        }
-      }
+      activationDesc.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型。若想获得激活码，请点击下方「📘 查看激活方式」按钮查看方案与定价。'
             
       const activationInputRow = document.createElement('div')
       activationInputRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-top: 4px;'
@@ -1104,6 +1060,15 @@ export function createDesktopSettingLayout(
       activationItem.appendChild(activationInputRow)
       
       whaleToolboxContainer.appendChild(activationItem)
+
+      // "查看激活方式"按钮：紧跟激活码输入区，独立成全宽一行，点击弹出激活方式说明弹窗（与手机端一致）
+      // showActivationInfoModal 在后面定义，onclick 是异步闭包引用，调用时已存在
+      const infoBtn = document.createElement('button')
+      infoBtn.className = 'b3-button b3-button--text'
+      infoBtn.style.cssText = 'width: 100%; margin-top: 8px; padding: 8px; border: 1px solid #722ed1; border-radius: 6px; background: rgba(114, 46, 209, 0.08); color: #722ed1; font-weight: 600;'
+      infoBtn.textContent = '📘 查看激活方式'
+      infoBtn.onclick = () => showActivationInfoModal(context.isAuthorToolActivated())
+      whaleToolboxContainer.appendChild(infoBtn)
             
       // 鲸鱼定制工具箱功能列表说明
       const whaleFunctionListContainer = document.createElement('div')
@@ -1205,174 +1170,7 @@ export function createDesktopSettingLayout(
             
       container.appendChild(whaleToolboxContainer)
 
-      // ========== 定价原则 ==========
-      const pricingPrincipleContainer = document.createElement('div')
-      pricingPrincipleContainer.style.cssText = 'padding: 16px; margin-top: 16px; border: 1px solid var(--b3-border-color); border-radius: 6px; background: var(--b3-theme-surface);'
-
-      const pricingPrincipleTitle = document.createElement('div')
-      pricingPrincipleTitle.style.cssText = 'font-size: 15px; font-weight: bold; color: var(--b3-theme-on-background); margin-bottom: 12px;'
-      pricingPrincipleTitle.textContent = '📐 激活方案定价原则'
-      pricingPrincipleContainer.appendChild(pricingPrincipleTitle)
-
-      const principles = [
-        { text: '免费功能已经占据80%，通常免费功能已经可以满足需求', highlight: false },
-        { text: '鲸鱼定制工具箱功能均为定制，每项功能，作者均额外花费大量时间制作，并调整适配', highlight: false },
-        { text: '目前鲸鱼定制工具箱有17项定制功能，其中2项免费，共15项付费功能', highlight: false },
-        { text: '基于花费的时间和精力，以及前期的定制均为免费，作者决定每项定制定价为3元，进而决定永久价格', highlight: true },
-        { text: '后续将继续增加定制功能，价格也会适当上涨', highlight: false },
-        { text: '同时适当增加部分免费定制功能，不大幅调整价格', highlight: false },
-      ]
-
-      principles.forEach((item) => {
-        const row = document.createElement('div')
-        const isHighlight = item.highlight
-        row.style.cssText = `display: flex; gap: 8px; font-size: 13px; line-height: 1.6; margin-bottom: 6px; padding: ${isHighlight ? '8px 10px' : '0'}; border-radius: ${isHighlight ? '6px' : '0'}; background: ${isHighlight ? 'color-mix(in srgb, var(--b3-theme-primary) 10%, transparent)' : 'transparent'};`
-        const num = document.createElement('span')
-        num.style.cssText = `flex: none; font-weight: 600; color: ${isHighlight ? '#d4380d' : 'var(--b3-theme-primary)'};`
-        num.textContent = `${principles.indexOf(item) + 1}.`
-        const content = document.createElement('span')
-        content.style.cssText = `flex: 1; color: ${isHighlight ? 'var(--b3-theme-on-background)' : 'var(--b3-theme-on-background)'}; font-weight: ${isHighlight ? '600' : '400'};`
-        content.textContent = item.text
-        row.appendChild(num)
-        row.appendChild(content)
-        pricingPrincipleContainer.appendChild(row)
-      })
-
-	      container.appendChild(pricingPrincipleContainer)
-
-	      // ========== 方案网格（2×2 卡片） ==========
-      const plansContainer = document.createElement('div')
-      plansContainer.style.cssText = 'padding: 16px; margin-top: 16px; border: 1px solid var(--b3-border-color); border-radius: 6px;'
-
-      const plansTitle = document.createElement('div')
-      plansTitle.style.cssText = 'font-size: 18px; font-weight: bold; color: #722ed1; margin-bottom: 16px; text-align: center;'
-      plansTitle.textContent = '📦 激活码方案'
-      plansContainer.appendChild(plansTitle)
-
-      // 2×2 网格
-      const plansGrid = document.createElement('div')
-      plansGrid.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 10px;'
-
-      // 卡片数据
-      const planCards = [
-        {
-          name: '永久正价', price: '45', unit: '元', duration: '永久',
-          badge: '', cls: '',
-          desc: '鲸鱼定制工具箱永久激活码（电脑+手机），解锁全部15项付费功能',
-          features: ['永久激活码（电脑+手机）', '15项付费功能全解锁']
-        },
-        {
-          name: '普通优惠', price: '36', unit: '元', duration: '8折',
-          badge: '推荐', cls: 'hot',
-          desc: '鲸鱼定制工具箱永久激活码（电脑+手机），限时优惠 10 个，送完即止',
-          features: ['永久激活码（电脑+手机）', '限时8折优惠']
-        },
-        {
-          name: '学生优惠', price: '22.5', unit: '元', duration: '5折',
-          badge: '', cls: '',
-          desc: '鲸鱼定制工具箱永久激活码（电脑+手机），需提供可证明在读学生身份的信息',
-          features: ['永久激活码（电脑+手机）', '限时5折优惠', '需学生身份证明']
-        },
-        {
-          name: '定制开发', price: '100', unit: '元起', duration: '手工费',
-          badge: '', cls: '',
-          desc: '有专门需求的可联系作者开发专属功能，根据绑定的账号名称，只展示给你自己使用，也可决定是否纳入工具箱',
-          features: ['专属功能定制', '仅自己可见/纳入工具箱', '作者评估实现']
-        },
-      ]
-
-      planCards.forEach(card => {
-        const planCard = document.createElement('div')
-        const cardBorder = card.cls === 'hot' ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
-        const cardBg = card.cls === 'hot' ? 'color-mix(in srgb, var(--b3-theme-primary) 5%, var(--b3-theme-background))' : 'var(--b3-theme-background)'
-        planCard.style.cssText = `
-          position: relative;
-          border: 1px solid ${cardBorder};
-          border-radius: 12px;
-          padding: 14px;
-          display: flex;
-          flex-direction: column;
-          gap: 4px;
-          background: ${cardBg};
-        `
-
-        // 推荐徽章（悬空右上角）
-        if (card.badge) {
-          const badge = document.createElement('div')
-          badge.textContent = card.badge
-          badge.style.cssText = `
-            position: absolute; top: -8px; right: 10px;
-            background: var(--b3-theme-primary); color: var(--b3-theme-on-primary);
-            font-size: 10px; padding: 2px 8px; border-radius: 10px;
-          `
-          planCard.appendChild(badge)
-        }
-
-        // 名称
-        const nameEl = document.createElement('div')
-        nameEl.style.cssText = 'font-size: 14px; font-weight: 600; color: var(--b3-theme-on-background);'
-        nameEl.textContent = card.name
-        planCard.appendChild(nameEl)
-
-        // 时长
-        const durationEl = document.createElement('div')
-        durationEl.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface);'
-        durationEl.textContent = card.duration
-        planCard.appendChild(durationEl)
-
-        // 价格
-        const priceEl = document.createElement('div')
-        priceEl.style.cssText = 'margin: 4px 0;'
-        const priceNum = document.createElement('span')
-        priceNum.style.cssText = 'font-size: 22px; font-weight: 700; color: var(--b3-theme-primary);'
-        priceNum.textContent = card.price
-        priceEl.appendChild(priceNum)
-        if (card.unit) {
-          const priceUnit = document.createElement('span')
-          priceUnit.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); margin-left: 2px;'
-          priceUnit.textContent = card.unit
-          priceEl.appendChild(priceUnit)
-        }
-        planCard.appendChild(priceEl)
-
-        // 描述
-        const descEl = document.createElement('div')
-        descEl.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); line-height: 1.5; margin: 4px 0 8px;'
-        descEl.textContent = card.desc
-        planCard.appendChild(descEl)
-
-        // 特性列表
-        card.features.forEach(f => {
-          const feat = document.createElement('div')
-          feat.style.cssText = 'font-size: 10px; color: var(--b3-theme-on-surface); line-height: 1.4; padding-left: 8px;'
-          feat.textContent = '• ' + f
-          planCard.appendChild(feat)
-        })
-
-        // 按钮
-        const btn = document.createElement('button')
-        const btnBg = card.cls === 'hot' ? 'var(--b3-theme-primary)' : 'transparent'
-        const btnColor = card.cls === 'hot' ? 'var(--b3-theme-on-primary)' : 'var(--b3-theme-on-background)'
-        const btnBorder = card.cls === 'hot' ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
-        btn.style.cssText = `
-          margin-top: auto; padding: 7px 0; font-size: 12px; cursor: pointer;
-          background: ${btnBg}; color: ${btnColor};
-          border: 1px solid ${btnBorder}; border-radius: 6px;
-          margin-top: 8px;
-        `
-        btn.textContent = '扫码购买'
-        btn.onclick = () => showPayModal(card.name)
-        planCard.appendChild(btn)
-
-        plansGrid.appendChild(planCard)
-      })
-
-	      plansContainer.appendChild(plansGrid)
-	      container.appendChild(plansContainer)
-
-	      container.appendChild(accountBlock)
-
-	      // 注入收款码弹窗样式
+      // 注入收款码弹窗样式
       if (!document.getElementById('toolbar-customizer-pay-style')) {
         const payStyle = document.createElement('style')
         payStyle.id = 'toolbar-customizer-pay-style'
@@ -1532,58 +1330,283 @@ export function createDesktopSettingLayout(
       loadQr('wechat')
       }
 
-      // ========== 付款发码流程（4步引导） ==========
-      const flowContainer = document.createElement('div')
-      flowContainer.style.cssText = 'padding: 16px; margin-top: 16px; border: 1px solid var(--b3-border-color); border-radius: 6px;'
-
-      const flowTitle = document.createElement('div')
-      flowTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #722ed1; margin-bottom: 16px;'
-      flowTitle.textContent = '📋 付款发码流程'
-      flowContainer.appendChild(flowTitle)
-
-      const flowSteps = document.createElement('div')
-      flowSteps.style.cssText = 'display: flex; flex-direction: column; gap: 12px;'
-
-      const steps = [
-        { title: '选择方案', desc: '选择适合你的套餐方案，点击「扫码购买」' },
-        { title: '扫码转账', desc: '使用微信或支付宝扫码付款，付款备注请提供用户名「<strong>' + (currentUserName() || (context.isAuthorToolActivated() ? '已激活用户' : '你的思源账号用户名')) + '</strong>」' },
-        { title: '提供信息', desc: '将付款截图和用户名<strong>' + (currentUserName() || '（你的思源账号）') + '</strong>发送至 17114555244@qq.com 邮箱，或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主' },
-        { title: '获取激活码', desc: '群主核实后发放激活码，回到本页粘贴激活即可解锁全部功能' },
-      ]
-
-      steps.forEach((step, i) => {
-        const stepRow = document.createElement('div')
-        stepRow.style.cssText = 'display: flex; gap: 10px;'
-
-        const stepNum = document.createElement('span')
-        stepNum.textContent = String(i + 1)
-        stepNum.style.cssText = `
-          flex: none; width: 22px; height: 22px; border-radius: 50%;
-          background: var(--b3-theme-primary); color: var(--b3-theme-on-primary);
+      /**
+       * 弹出"激活方式说明"弹窗（电脑端）。
+       * 内容与手机端 showActivationInfoModal 一致：定价原则 + 激活码方案 + 付款账号（含复制）+ 付款发码流程。
+       * 布局为电脑端宽屏适配：2×2 方案卡片网格、面板更宽。
+       */
+      const showActivationInfoModal = (isActivated: boolean): void => {
+        // 遮罩
+        const overlay = document.createElement('div')
+        overlay.style.cssText = `
+          position: fixed; inset: 0; z-index: 2000;
+          background: rgba(0, 0, 0, 0.5);
           display: flex; align-items: center; justify-content: center;
-          font-size: 12px; font-weight: 600;
+          padding: 16px; box-sizing: border-box;
         `
-        stepRow.appendChild(stepNum)
 
-        const stepContent = document.createElement('div')
-        stepContent.style.cssText = 'flex: 1;'
+        // 弹窗面板（电脑端：最大宽 560px，最大高度 85vh，内容滚动）
+        const panel = document.createElement('div')
+        panel.style.cssText = `
+          background: var(--b3-theme-background);
+          border-radius: 12px;
+          width: 100%; max-width: 560px;
+          max-height: 85vh;
+          display: flex; flex-direction: column;
+          overflow: hidden;
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        `
 
-        const stepH = document.createElement('div')
-        stepH.style.cssText = 'font-size: 13px; font-weight: 600; color: var(--b3-theme-on-background);'
-        stepH.textContent = step.title
-        stepContent.appendChild(stepH)
+        // 标题栏（含关闭按钮）
+        const header = document.createElement('div')
+        header.style.cssText = `
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 14px 16px; border-bottom: 1px solid var(--b3-border-color);
+          flex-shrink: 0;
+        `
+        const title = document.createElement('div')
+        title.style.cssText = 'font-size: 16px; font-weight: 700; color: #722ed1;'
+        title.textContent = '🔐 激活方式说明'
+        const closeBtn = document.createElement('button')
+        closeBtn.className = 'b3-button b3-button--text'
+        closeBtn.textContent = '✕'
+        closeBtn.style.cssText = 'font-size: 18px; padding: 2px 8px; color: var(--b3-theme-on-surface);'
+        closeBtn.onclick = () => overlay.remove()
+        header.appendChild(title)
+        header.appendChild(closeBtn)
+        panel.appendChild(header)
 
-        const stepD = document.createElement('div')
-        stepD.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; margin-top: 2px;'
-        stepD.innerHTML = step.desc
-        stepContent.appendChild(stepD)
+        // 内容区（可滚动）
+        const content = document.createElement('div')
+        content.style.cssText = 'padding: 14px 16px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 14px;'
 
-        stepRow.appendChild(stepContent)
-        flowSteps.appendChild(stepRow)
-      })
+        // ===== 区块1：定价原则 =====
+        const pricingBox = document.createElement('div')
+        pricingBox.style.cssText = 'padding: 12px; border: 1px solid var(--b3-border-color); border-radius: 6px; background: var(--b3-theme-surface);'
 
-      flowContainer.appendChild(flowSteps)
-      container.appendChild(flowContainer)
+        const pricingTitle = document.createElement('div')
+        pricingTitle.style.cssText = 'font-size: 14px; font-weight: bold; color: var(--b3-theme-on-background); margin-bottom: 10px;'
+        pricingTitle.textContent = '📐 激活方案定价原则'
+        pricingBox.appendChild(pricingTitle)
+
+        const principles = [
+          { text: '免费功能已经占据80%，通常免费功能已经可以满足需求', highlight: false },
+          { text: '鲸鱼定制工具箱功能均为定制，每项功能，作者均额外花费大量时间制作，并调整适配', highlight: false },
+          { text: '目前鲸鱼定制工具箱有17项定制功能，其中2项免费，共15项付费功能', highlight: false },
+          { text: '基于花费的时间和精力，以及前期的定制均为免费，作者决定每项定制定价为3元，进而决定永久价格', highlight: true },
+          { text: '后续将继续增加定制功能，价格也会适当上涨', highlight: false },
+          { text: '同时适当增加部分免费定制功能，不大幅调整价格', highlight: false },
+        ]
+        principles.forEach((item, idx) => {
+          const row = document.createElement('div')
+          row.style.cssText = `display: flex; gap: 6px; font-size: 13px; line-height: 1.55; margin-bottom: 5px; padding: ${item.highlight ? '7px 8px' : '0'}; border-radius: ${item.highlight ? '6px' : '0'}; background: ${item.highlight ? 'color-mix(in srgb, var(--b3-theme-primary) 10%, transparent)' : 'transparent'};`
+          const num = document.createElement('span')
+          num.style.cssText = `flex: none; font-weight: 600; color: ${item.highlight ? '#d4380d' : 'var(--b3-theme-primary)'};`
+          num.textContent = `${idx + 1}.`
+          const txt = document.createElement('span')
+          txt.style.cssText = `flex: 1; color: var(--b3-theme-on-background); font-weight: ${item.highlight ? '600' : '400'};`
+          txt.textContent = item.text
+          row.appendChild(num)
+          row.appendChild(txt)
+          pricingBox.appendChild(row)
+        })
+        content.appendChild(pricingBox)
+
+        // ===== 区块2：激活码方案（4 卡片，电脑端 2×2 网格） =====
+        const plansBox = document.createElement('div')
+        plansBox.style.cssText = 'padding: 12px; border: 1px solid var(--b3-border-color); border-radius: 6px;'
+
+        const plansTitle = document.createElement('div')
+        plansTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #722ed1; margin-bottom: 12px; text-align: center;'
+        plansTitle.textContent = '📦 激活码方案'
+        plansBox.appendChild(plansTitle)
+
+        // 电脑端 2×2 网格
+        const plansWrapper = document.createElement('div')
+        plansWrapper.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 10px;'
+
+        const planCards = [
+          { name: '永久正价', price: '45', unit: '元', duration: '永久', badge: '', hot: false, desc: '鲸鱼定制工具箱永久激活码（电脑+手机），解锁全部15项付费功能', features: ['永久激活码（电脑+手机）', '15项付费功能全解锁'] },
+          { name: '普通优惠', price: '36', unit: '元', duration: '8折', badge: '推荐', hot: true, desc: '鲸鱼定制工具箱永久激活码（电脑+手机），限时优惠 10 个，送完即止', features: ['永久激活码（电脑+手机）', '限时8折优惠'] },
+          { name: '学生优惠', price: '22.5', unit: '元', duration: '5折', badge: '', hot: false, desc: '需提供可证明在读学生身份的信息', features: ['永久激活码（电脑+手机）', '限时5折优惠', '需学生身份证明'] },
+          { name: '定制开发', price: '100', unit: '元起', duration: '手工费', badge: '', hot: false, desc: '有专门需求的可联系作者开发专属功能，只展示给你自己使用，也可决定是否纳入工具箱', features: ['专属功能定制', '仅自己可见/纳入工具箱', '作者评估实现'] },
+        ]
+
+        planCards.forEach(card => {
+          const cardEl = document.createElement('div')
+          const borderClr = card.hot ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
+          const bgClr = card.hot ? 'color-mix(in srgb, var(--b3-theme-primary) 5%, var(--b3-theme-background))' : 'var(--b3-theme-background)'
+          cardEl.style.cssText = `position: relative; border: 1px solid ${borderClr}; border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 3px; background: ${bgClr};`
+
+          if (card.badge) {
+            const badge = document.createElement('div')
+            badge.textContent = card.badge
+            badge.style.cssText = 'position: absolute; top: -8px; right: 10px; background: var(--b3-theme-primary); color: var(--b3-theme-on-primary); font-size: 10px; padding: 2px 8px; border-radius: 10px;'
+            cardEl.appendChild(badge)
+          }
+
+          const nameEl = document.createElement('div')
+          nameEl.style.cssText = 'font-size: 14px; font-weight: 600; color: var(--b3-theme-on-background);'
+          nameEl.textContent = card.name
+          cardEl.appendChild(nameEl)
+
+          const durationEl = document.createElement('div')
+          durationEl.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface);'
+          durationEl.textContent = card.duration
+          cardEl.appendChild(durationEl)
+
+          const priceRow = document.createElement('div')
+          priceRow.style.cssText = 'margin: 2px 0;'
+          const priceNum = document.createElement('span')
+          priceNum.style.cssText = 'font-size: 22px; font-weight: 700; color: var(--b3-theme-primary);'
+          priceNum.textContent = card.price
+          priceRow.appendChild(priceNum)
+          if (card.unit) {
+            const priceUnit = document.createElement('span')
+            priceUnit.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); margin-left: 2px;'
+            priceUnit.textContent = card.unit
+            priceRow.appendChild(priceUnit)
+          }
+          cardEl.appendChild(priceRow)
+
+          const descEl = document.createElement('div')
+          descEl.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); line-height: 1.5; margin: 2px 0 6px;'
+          descEl.textContent = card.desc
+          cardEl.appendChild(descEl)
+
+          card.features.forEach(f => {
+            const feat = document.createElement('div')
+            feat.style.cssText = 'font-size: 10px; color: var(--b3-theme-on-surface); line-height: 1.4; padding-left: 6px;'
+            feat.textContent = '• ' + f
+            cardEl.appendChild(feat)
+          })
+
+          const buyBtn = document.createElement('button')
+          const btnBg = card.hot ? 'var(--b3-theme-primary)' : 'transparent'
+          const btnClr = card.hot ? 'var(--b3-theme-on-primary)' : 'var(--b3-theme-on-background)'
+          const btnBdr = card.hot ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
+          buyBtn.style.cssText = `margin-top: 8px; padding: 7px 0; font-size: 12px; cursor: pointer; background: ${btnBg}; color: ${btnClr}; border: 1px solid ${btnBdr}; border-radius: 6px;`
+          buyBtn.textContent = '扫码购买'
+          // 电脑端：复用闭包内的 showPayModal（单参版，用户名走闭包）
+          buyBtn.onclick = () => showPayModal(card.name)
+          cardEl.appendChild(buyBtn)
+
+          plansWrapper.appendChild(cardEl)
+        })
+
+        plansBox.appendChild(plansWrapper)
+        content.appendChild(plansBox)
+
+        // ===== 区块3：付款账号（含复制） =====
+        const accountBox = document.createElement('div')
+        accountBox.style.cssText = 'padding: 10px 12px; background: var(--b3-theme-surface); border-radius: 10px;'
+
+        const accountHint = document.createElement('div')
+        accountHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); margin-bottom: 6px;'
+        accountHint.textContent = '付款时请提供以下用户名'
+        accountBox.appendChild(accountHint)
+
+        const accountRow = document.createElement('div')
+        accountRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
+        const accountName = document.createElement('span')
+        accountName.style.cssText = 'font-size: 15px; font-weight: 700; color: var(--b3-theme-on-background);'
+        accountName.textContent = currentUserName() || '未登录思源账号'
+        accountRow.appendChild(accountName)
+
+        const copyBtn = document.createElement('button')
+        copyBtn.style.cssText = 'padding: 2px 10px; font-size: 12px; color: var(--b3-theme-primary); background: transparent; border: 1px solid var(--b3-theme-primary); border-radius: 4px; cursor: pointer;'
+        copyBtn.textContent = '复制'
+        copyBtn.onclick = async () => {
+          const name = currentUserName()
+          if (!name) {
+            copyBtn.textContent = '未登录'
+            setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
+            return
+          }
+          try {
+            if (navigator.clipboard?.writeText) {
+              await navigator.clipboard.writeText(name)
+            } else {
+              const ta = document.createElement('textarea')
+              ta.value = name
+              ta.style.position = 'fixed'
+              ta.style.opacity = '0'
+              document.body.appendChild(ta)
+              ta.select()
+              document.execCommand('copy')
+              document.body.removeChild(ta)
+            }
+            copyBtn.textContent = '已复制！'
+            setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
+          } catch {
+            copyBtn.textContent = '复制失败'
+            setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
+          }
+        }
+        accountRow.appendChild(copyBtn)
+        accountBox.appendChild(accountRow)
+
+        const accountNotice = document.createElement('div')
+        accountNotice.style.cssText = 'font-size: 11px; color: #d4380d; margin-top: 6px; padding: 6px 8px; background: color-mix(in srgb, #ff4d4f 8%, transparent); border-radius: 4px; line-height: 1.5; font-weight: 500;'
+        accountNotice.textContent = '激活码将根据该用户名直接绑定你的思源账号，请务必发送'
+        accountBox.appendChild(accountNotice)
+
+        const accountTip = document.createElement('div')
+        accountTip.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); margin-top: 6px; line-height: 1.5;'
+        accountTip.innerHTML = '无法在付款备注提供时，可将用户名和付款截图发送至 17114555244@qq.com，或 <a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主。'
+        accountBox.appendChild(accountTip)
+        content.appendChild(accountBox)
+
+        // ===== 区块4：付款发码流程 =====
+        const flowBox = document.createElement('div')
+        flowBox.style.cssText = 'padding: 12px; border: 1px solid var(--b3-border-color); border-radius: 6px;'
+
+        const flowTitle = document.createElement('div')
+        flowTitle.style.cssText = 'font-size: 15px; font-weight: bold; color: #722ed1; margin-bottom: 12px;'
+        flowTitle.textContent = '📋 付款发码流程'
+        flowBox.appendChild(flowTitle)
+
+        const flowSteps = document.createElement('div')
+        flowSteps.style.cssText = 'display: flex; flex-direction: column; gap: 10px;'
+        const steps = [
+          { title: '选择方案', desc: '选择适合你的套餐方案，点击「扫码购买」' },
+          { title: '扫码转账', desc: '使用微信或支付宝扫码付款，付款备注请提供用户名「<strong>' + (currentUserName() || (isActivated ? '已激活用户' : '你的思源账号用户名')) + '</strong>」' },
+          { title: '提供信息', desc: '将付款截图和用户名<strong>' + (currentUserName() || '（你的思源账号）') + '</strong>发送至 17114555244@qq.com 邮箱，或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主' },
+          { title: '获取激活码', desc: '群主核实后发放激活码，回到本页粘贴激活即可解锁全部功能' },
+        ]
+        steps.forEach((step, i) => {
+          const stepRow = document.createElement('div')
+          stepRow.style.cssText = 'display: flex; gap: 8px;'
+          const stepNum = document.createElement('span')
+          stepNum.textContent = String(i + 1)
+          stepNum.style.cssText = 'flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--b3-theme-primary); color: var(--b3-theme-on-primary); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;'
+          stepRow.appendChild(stepNum)
+          const stepContent = document.createElement('div')
+          stepContent.style.cssText = 'flex: 1;'
+          const stepH = document.createElement('div')
+          stepH.style.cssText = 'font-size: 13px; font-weight: 600; color: var(--b3-theme-on-background);'
+          stepH.textContent = step.title
+          stepContent.appendChild(stepH)
+          const stepD = document.createElement('div')
+          stepD.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; margin-top: 2px;'
+          stepD.innerHTML = step.desc
+          stepContent.appendChild(stepD)
+          stepRow.appendChild(stepContent)
+          flowSteps.appendChild(stepRow)
+        })
+        flowBox.appendChild(flowSteps)
+        content.appendChild(flowBox)
+
+        panel.appendChild(content)
+        overlay.appendChild(panel)
+
+        // 点击遮罩外部关闭
+        overlay.onclick = (e) => {
+          if (e.target === overlay) overlay.remove()
+        }
+
+        document.body.appendChild(overlay)
+      }
 
       return container
     }
@@ -2370,6 +2393,25 @@ export function createDesktopSettingLayout(
       scrollHideRow.appendChild(scrollHideLabel)
       scrollHideRow.appendChild(scrollHideToggle)
       floatingSection.appendChild(scrollHideRow)
+
+      // 在记事弹窗（块格式）中隐藏底部胶囊
+      const qnHideRow = document.createElement('div')
+      qnHideRow.style.cssText = 'display: flex; align-items: center; gap: 8px; padding: 4px 0;'
+      const qnHideLabel = document.createElement('label')
+      qnHideLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); flex: 1;'
+      qnHideLabel.textContent = '📝 记事弹窗中隐藏底部胶囊'
+      const qnHideToggle = document.createElement('input')
+      qnHideToggle.type = 'checkbox'
+      qnHideToggle.className = 'b3-switch'
+      qnHideToggle.checked = cfg.quickNoteHideFloatingToolbar !== false
+      qnHideToggle.style.cssText = 'cursor: pointer;'
+      qnHideToggle.onchange = async () => {
+        cfg.quickNoteHideFloatingToolbar = qnHideToggle.checked
+        await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+      }
+      qnHideRow.appendChild(qnHideLabel)
+      qnHideRow.appendChild(qnHideToggle)
+      floatingSection.appendChild(qnHideRow)
 
       toolbarBox.appendChild(floatingSection)
 

@@ -195,6 +195,7 @@ export default class ToolbarCustomizer extends Plugin {
     quickNoteInputFormat: 'plain' as 'plain' | 'block', // 电脑端：一键记事输入格式（独立于手机端）
     quickNoteBlockWindowPersist: false, // 块格式弹窗后台常驻：默认关闭
     quickNoteBlockAutoCleanup: 5,  // 块格式弹窗隐藏后 X 秒自动清理草稿块（0=不自动清理）
+    quickNoteHideFloatingToolbar: true, // 块格式弹窗中隐藏底部悬浮胶囊：默认开启
     // ===== 工具栏位置选择（原生顶部 / 悬浮胶囊）=====
     enableFloatingToolbar: true,   // 是否启用底部悬浮胶囊工具栏（true=悬浮胶囊，false=思源原生顶部）
     floatingToolbarMargin: 40,      // 胶囊距底部距离（px）
@@ -1037,7 +1038,7 @@ export default class ToolbarCustomizer extends Plugin {
 
     const setting = new Setting({
       width: this.isMobile ? '100%' : '800px',
-      height: this.isMobile ? '100%' : '70vh',
+      height: this.isMobile ? '100%' : '90vh',
       confirmCallback: async () => {
         // 同步全局按钮配置到所有按钮（在保存前）
         // 只有启用了全局配置时才批量应用

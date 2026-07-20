@@ -11,6 +11,7 @@ const BASE_HIDE = '.layout-tab-bar,.protyle-title,.protyle-background,.protyle-s
 const BREADCRUMB_HIDE = '.protyle-breadcrumb{display:none!important}'
 const BREADCRUMB_SHOW = '.protyle-breadcrumb{margin-top:25px!important}'
 const DRAG_CSS = '#qn-drag-handle{position:fixed;top:0;left:0;width:50%;height:36px;z-index:9999;-webkit-app-region:drag;cursor:grab}'
+const FLOATING_RESET = '.protyle-breadcrumb[data-input-method]{position:static!important;bottom:auto!important;top:auto!important;left:auto!important;right:auto!important;transform:none!important;width:auto!important;max-width:none!important;border-radius:0!important;height:auto!important;min-height:auto!important;margin-top:25px!important;padding:8px 12px!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:transparent!important;border:none!important;z-index:auto!important;display:flex!important}'
 const BLOCK_EMPTY_KEY = '__qn_block_empty'  // localStorage key：Protyle 是否为空
 let qnWinId: number | null = null
 let _currentDraftBlockId: string | null = null
@@ -140,7 +141,9 @@ const HASH_FIX_JS = `(function(){
 
 function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string } {
   const toolbarOn = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteToolbarVisible !== false
-  const hideCSS = BASE_HIDE + (toolbarOn ? BREADCRUMB_SHOW : BREADCRUMB_HIDE) + DRAG_CSS
+  const hideFloating = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteHideFloatingToolbar !== false
+  let hideCSS = BASE_HIDE + (toolbarOn ? BREADCRUMB_SHOW : BREADCRUMB_HIDE) + DRAG_CSS
+  if (hideFloating) hideCSS += FLOATING_RESET
   return {
     hideJS: `(function(){
       var s=document.createElement('style');s.textContent=${JSON.stringify(hideCSS)};document.head.appendChild(s);

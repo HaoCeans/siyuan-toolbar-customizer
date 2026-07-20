@@ -1071,9 +1071,9 @@ export function applyDesktopFloatingToolbar(config: DesktopFloatingToolbarConfig
       box-shadow: ${shadow} !important;
       backdrop-filter: ${blur};
       -webkit-backdrop-filter: ${blur};
-      ${isGlass ? 'background: rgba(255, 255, 255, 0.45) !important; border: 1px solid rgba(0, 0, 0, 0.06) !important;' : 'background: var(--b3-theme-background) !important; border: 1px solid var(--b3-border-color) !important;'}
-      transition: opacity 0.16s ease, transform 0.16s ease !important;
-      -webkit-backface-visibility: hidden;
+	      ${isGlass ? 'background: rgba(255, 255, 255, 0.45) !important; border: 1px solid rgba(0, 0, 0, 0.06) !important;' : 'background: var(--b3-theme-background) !important; border: 1px solid var(--b3-border-color) !important;'}
+	      transition: opacity 0.16s ease !important;
+	      -webkit-backface-visibility: hidden;
       backface-visibility: hidden;
       will-change: transform;
     }
@@ -1109,6 +1109,13 @@ export function applyDesktopFloatingToolbar(config: DesktopFloatingToolbarConfig
     if (desktopObserverTimer) clearTimeout(desktopObserverTimer)
     desktopObserverTimer = safeSetTimeout(() => {
       markDesktopBreadcrumbForFloating()
+      // 同时注入按钮到新出现的编辑器，避免胶囊先浮起来（空的）再加载按钮的闪烁
+      if (currentButtonConfigs.length > 0) {
+        const editors = document.querySelectorAll('.protyle')
+        if (editors.length > 0) {
+          createButtonsForEditors(editors, currentButtonConfigs)
+        }
+      }
     }, 100)
   })
   const observeTarget = document.querySelector('.layout__center') ||
@@ -1188,55 +1195,55 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
         }
         if (disableCustomButtons) {
           style.textContent = ''
-        } else {
-          const floatMargin = config.floatingToolbarMargin || '20px'
-          const floatRadius = config.floatingToolbarBorderRadius || '24px'
-          if (isFloating) {
-            const capHeight = config.floatingToolbarHeight || config.toolbarHeight || '40px'
-            const floatWidthVal = config.floatingToolbarWidth && parseInt(config.floatingToolbarWidth) > 0
-            const floatWidth = floatWidthVal ? `${config.floatingToolbarWidth}px` : 'auto'
-            const floatMaxWidth = floatWidthVal ? 'none' : '95vw'
-            const isGlass = config.floatingToolbarStyle === 'glass'
-            const floatBlur = isGlass ? 'blur(20px) saturate(180%)' : 'blur(10px)'
-            // 投影保持轻盈：仅一层柔和阴影，与电脑端胶囊一致，避免显得过重
-            const floatShadow = isGlass
-              ? '0 2px 10px rgba(0,0,0,0.10)'
-              : '0 2px 8px rgba(0, 0, 0, 0.08)'
-            style.textContent = `
-            @media (max-width: 768px) {
-              .protyle-breadcrumb__bar[data-input-method],
-              .protyle-breadcrumb[data-input-method] {
-                position: fixed !important;
-                bottom: calc(${floatMargin} + var(--mobile-toolbar-offset) + env(safe-area-inset-bottom)) !important;
-                top: auto !important;
-                left: 50% !important;
-                transform: translateX(-50%) translateY(0);
-                width: ${floatWidth} !important;
-                max-width: ${floatMaxWidth} !important;
-                z-index: ${config.toolbarZIndex} !important;
-                border: 1px solid var(--b3-border-color) !important;
-                border-radius: ${floatRadius} !important;
-                padding: 8px 12px !important;
-                display: flex !important;
-                justify-content: center !important;
-                align-items: center !important;
-                box-shadow: ${floatShadow} !important;
-                transition: opacity 0.16s ease, transform 0.16s ease !important;
-                backdrop-filter: ${floatBlur};
-                -webkit-backdrop-filter: ${floatBlur};
-                height: ${capHeight} !important;
-                min-height: ${capHeight} !important;
-                -webkit-backface-visibility: hidden;
-                backface-visibility: hidden;
-                will-change: transform;
-              }
-              ${isGlass ? `
-              /* 毛玻璃模式 */
-              .protyle-breadcrumb__bar[data-input-method],
-              .protyle-breadcrumb[data-input-method] {
-                background: rgba(255, 255, 255, 0.25) !important;
-                border-color: rgba(0, 0, 0, 0.06) !important;
-              }
+	        } else {
+	          const floatMargin = config.floatingToolbarMargin || '20px'
+	          const floatRadius = config.floatingToolbarBorderRadius || '24px'
+	          if (isFloating) {
+	            const capHeight = config.floatingToolbarHeight || config.toolbarHeight || '40px'
+	            const floatWidthVal = config.floatingToolbarWidth && parseInt(config.floatingToolbarWidth) > 0
+	            const floatWidth = floatWidthVal ? `${config.floatingToolbarWidth}px` : 'auto'
+	            const floatMaxWidth = floatWidthVal ? 'none' : '95vw'
+	            const isGlass = config.floatingToolbarStyle === 'glass'
+	            const floatBlur = isGlass ? 'blur(20px) saturate(180%)' : 'blur(10px)'
+	            // 投影保持轻盈：仅一层柔和阴影，与电脑端胶囊一致，避免显得过重
+	            const floatShadow = isGlass
+	              ? '0 2px 10px rgba(0,0,0,0.10)'
+	              : '0 2px 8px rgba(0, 0, 0, 0.08)'
+	            style.textContent = `
+	            @media (max-width: 768px) {
+	              .protyle-breadcrumb__bar[data-input-method],
+	              .protyle-breadcrumb[data-input-method] {
+	                position: fixed !important;
+	                bottom: calc(${floatMargin} + var(--mobile-toolbar-offset) + env(safe-area-inset-bottom)) !important;
+	                top: auto !important;
+	                left: 50% !important;
+	                transform: translateX(-50%) translateY(0);
+	                width: ${floatWidth} !important;
+	                max-width: ${floatMaxWidth} !important;
+	                z-index: ${config.toolbarZIndex} !important;
+	                border: 1px solid var(--b3-border-color) !important;
+	                border-radius: ${floatRadius} !important;
+	                padding: 8px 12px !important;
+	                display: flex !important;
+	                justify-content: center !important;
+	                align-items: center !important;
+	                box-shadow: ${floatShadow} !important;
+	                transition: opacity 0.16s ease, transform 0.16s ease !important;
+	                backdrop-filter: ${floatBlur};
+	                -webkit-backdrop-filter: ${floatBlur};
+	                height: ${capHeight} !important;
+	                min-height: ${capHeight} !important;
+	                -webkit-backface-visibility: hidden;
+	                backface-visibility: hidden;
+	                will-change: transform;
+	              }
+	              ${isGlass ? `
+	              /* 毛玻璃模式 */
+	              .protyle-breadcrumb__bar[data-input-method],
+	              .protyle-breadcrumb[data-input-method] {
+	                background: rgba(255, 255, 255, 0.25) !important;
+	                border-color: rgba(0, 0, 0, 0.06) !important;
+	              }
               html[data-theme-mode="dark"] .protyle-breadcrumb__bar[data-input-method],
               html[data-theme-mode="dark"] .protyle-breadcrumb[data-input-method] {
                 background: rgba(30, 30, 30, 0.3) !important;
@@ -1386,8 +1393,9 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
 	    })
 	  }
 
-    // 尝试设置工具栏
-    if (!setupToolbar()) {
+
+	    // 尝试设置工具栏
+	    if (!setupToolbar()) {
       // 如果没找到，按退避序列多轮重试（覆盖冷启动慢机型，例如鸿蒙/安卓杀后台后恢复）
       // 原"单次 2 秒重试"在冷启动场景下经常错过窗口（breadcrumb 晚于 2 秒才渲染）。
       // 用户显式设置 bottomToolbarRetryDelay=0 时禁用重试（保留原语义）。
@@ -4904,25 +4912,25 @@ function getToolbarElementsForAutoHide(): HTMLElement[] {
 				        toolbarAutoHidePendingTimer = null
 			        getToolbarElementsForAutoHide().forEach(el => {
 				          el.classList.add('toolbar-scroll-hidden')
-				          // 胶囊模式需要保持 translateX(-50%) 居中对齐
-				          // 注意：不能读 el.style.transform 判断，CSS 中的 translateX 不在内联样式里
-          el.style.transform = toolbarAutoHideCapsuleMode
-	            ? 'translateX(-50%) translateY(calc(100% + 200px))'
-	            : slideTransform
-	        })
-	      }, 80)
-	    } else {
-	      // 底部模式：先收 protyle 间距 + 状态栏，再滑走工具栏
-	      document.body.classList.add('toolbar-autohide-active')
-	      toolbarAutoHidePendingTimer = setTimeout(() => {
-	        toolbarAutoHidePendingTimer = null
-	        getToolbarElementsForAutoHide().forEach(el => {
-	          el.classList.add('toolbar-scroll-hidden')
-	          // 胶囊模式需要保持 translateX(-50%) 居中对齐
-	          // 注意：不能读 el.style.transform 判断，CSS 中的 translateX 不在内联样式里
-	          el.style.transform = toolbarAutoHideCapsuleMode
-	            ? 'translateX(-50%) translateY(calc(100% + 200px))'
-	            : slideTransform
+		          // 胶囊模式：不滑走（原地淡出即可），保持 translateX(-50%) 居中对齐
+		          // 注意：不能读 el.style.transform 判断，CSS 中的 translateX 不在内联样式里
+		          el.style.transform = toolbarAutoHideCapsuleMode
+		            ? 'translateX(-50%) translateY(0)'
+		            : slideTransform
+		        })
+		      }, 80)
+		    } else {
+		      // 底部模式：先收 protyle 间距 + 状态栏，再滑走工具栏
+		      document.body.classList.add('toolbar-autohide-active')
+		      toolbarAutoHidePendingTimer = setTimeout(() => {
+		        toolbarAutoHidePendingTimer = null
+		        getToolbarElementsForAutoHide().forEach(el => {
+		          el.classList.add('toolbar-scroll-hidden')
+		          // 胶囊模式：不滑走（原地淡出即可），保持 translateX(-50%) 居中对齐
+		          // 注意：不能读 el.style.transform 判断，CSS 中的 translateX 不在内联样式里
+		          el.style.transform = toolbarAutoHideCapsuleMode
+		            ? 'translateX(-50%) translateY(0)'
+		            : slideTransform
 			        })
 			      }, 50)
 		    }
@@ -5042,6 +5050,7 @@ function unbindDesktopScrollForFloating(): void {
   }
   desktopFloatingScrollHandler = null
   desktopFloatingScrollBoundEl = null
+  toolbarAutoHideBoundEl = null  // 同步清理，防止 handleToolbarAutoHideScroll 读到旧引用
   if (desktopFloatingScrollRetryTimer) {
     clearInterval(desktopFloatingScrollRetryTimer)
     desktopFloatingScrollRetryTimer = null
@@ -5099,6 +5108,9 @@ function startDesktopScrollForFloating(): void {
     if (el) {
       el.addEventListener('scroll', desktopFloatingScrollHandler!, { passive: true })
       desktopFloatingScrollBoundEl = el
+      // 同步设置共享变量，让 handleToolbarAutoHideScroll 内部的 scrollEl 也读到同一个元素
+      // （否则它会走 fallback 到 getMobileScrollElementForToolbar，取到非当前活动的 protyle）
+      toolbarAutoHideBoundEl = el
       toolbarLastScrollTop = el.scrollTop  // 初始化基准（复用手机端变量）
     }
   }
@@ -5125,10 +5137,11 @@ function startDesktopScrollForFloating(): void {
         if (desktopFloatingScrollHandler && desktopFloatingScrollBoundEl) {
           desktopFloatingScrollBoundEl.removeEventListener('scroll', desktopFloatingScrollHandler)
         }
-        desktopFloatingScrollBoundEl = null
-        activeEl.addEventListener('scroll', desktopFloatingScrollHandler!, { passive: true })
-        desktopFloatingScrollBoundEl = activeEl
-        toolbarLastScrollTop = activeEl.scrollTop
+	        desktopFloatingScrollBoundEl = null
+	        activeEl.addEventListener('scroll', desktopFloatingScrollHandler!, { passive: true })
+	        desktopFloatingScrollBoundEl = activeEl
+	        toolbarAutoHideBoundEl = activeEl
+	        toolbarLastScrollTop = activeEl.scrollTop
         // 切换标签页时如果工具栏处于隐藏状态，立即恢复（避免新页面看不到工具栏）
         if (toolbarHiddenByScroll) {
           toolbarHiddenByScroll = false
@@ -5177,15 +5190,16 @@ export function refreshDesktopFloatingScrollOnSwitch(): void {
   toolbarLastScrollTop = null
   toolbarAutoHideIgnoreUntil = 0
 
-  // 3. 重绑到当前活动 protyle 的滚动容器（覆盖跨标签页切换的情况）
-  const activeEl = getDesktopScrollElementForFloating()
-  if (activeEl && activeEl !== desktopFloatingScrollBoundEl) {
-    if (desktopFloatingScrollBoundEl) {
-      desktopFloatingScrollBoundEl.removeEventListener('scroll', desktopFloatingScrollHandler)
-    }
-    activeEl.addEventListener('scroll', desktopFloatingScrollHandler, { passive: true })
-    desktopFloatingScrollBoundEl = activeEl
-    toolbarLastScrollTop = activeEl.scrollTop
+	  // 3. 重绑到当前活动 protyle 的滚动容器（覆盖跨标签页切换的情况）
+	  const activeEl = getDesktopScrollElementForFloating()
+	  if (activeEl && activeEl !== desktopFloatingScrollBoundEl) {
+	    if (desktopFloatingScrollBoundEl) {
+	      desktopFloatingScrollBoundEl.removeEventListener('scroll', desktopFloatingScrollHandler)
+	    }
+	    activeEl.addEventListener('scroll', desktopFloatingScrollHandler, { passive: true })
+	    desktopFloatingScrollBoundEl = activeEl
+	    toolbarAutoHideBoundEl = activeEl  // 同步更新，保证 handleToolbarAutoHideScroll 读到正确的 scrollTop
+	    toolbarLastScrollTop = activeEl.scrollTop
   } else if (activeEl && activeEl === desktopFloatingScrollBoundEl) {
     // 同一容器（同标签页切文档）：只重置基准为新文档的当前 scrollTop
     toolbarLastScrollTop = activeEl.scrollTop
@@ -7228,7 +7242,7 @@ export function cleanup() {
   })
   toolbarCheckTimers.clear()
 
-  // 清理焦点事件监听器
+  // 清理旧的 per-element 监听器
   focusEventHandlers.forEach(({ element, focusHandler, blurHandler }) => {
     element.removeEventListener('focus', focusHandler)
     element.removeEventListener('blur', blurHandler)

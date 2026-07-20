@@ -183,6 +183,9 @@ export function injectTabSwitcher(): void {
           }
         }
       })
+
+      // 切换 tab 后把滚动位置重置到顶部，避免因前一个 tab 的滚动位置导致内容偏移
+      dialogContent.scrollTo({ top: 0, behavior: 'instant' })
     }
 
 	    desktopTab.onclick = () => switchTab('desktop')

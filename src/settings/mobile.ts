@@ -4319,14 +4319,6 @@ export function createMobileSettingLayout(
       inputRow.appendChild(input)
       inputRow.appendChild(btn)
 
-      // "查看激活方式"按钮（与"验证激活"并排，未激活态显示）
-      const infoBtn = document.createElement('button')
-      infoBtn.className = 'b3-button b3-button--text'
-      infoBtn.style.cssText = 'color: #722ed1; flex-shrink: 0;'
-      infoBtn.textContent = '查看激活方式'
-      infoBtn.onclick = () => showActivationInfoModal(false)
-      inputRow.appendChild(infoBtn)
-      
       // 根据激活状态决定是否显示输入框和验证按钮
       if (context.isAuthorToolActivated()) {
         inputRow.style.display = 'none'  // 激活后隐藏输入框和验证按钮
@@ -4337,6 +4329,7 @@ export function createMobileSettingLayout(
         // 添加重新激活按钮
         const reActivateBtn = document.createElement('button')
         reActivateBtn.className = 'b3-button b3-button--info'
+        reActivateBtn.style.cssText = 'flex: 1;'
         reActivateBtn.textContent = '重新激活'
         reActivateBtn.onclick = () => {
           // 显示输入框和验证按钮
@@ -4347,18 +4340,48 @@ export function createMobileSettingLayout(
         btnContainer.appendChild(statusEl)
         btnContainer.appendChild(reActivateBtn)
 
-        // "查看激活方式"按钮（与"重新激活"并排，已激活态显示）
-        const infoBtnActivated = document.createElement('button')
-        infoBtnActivated.className = 'b3-button b3-button--text'
-        infoBtnActivated.style.cssText = 'color: #722ed1; flex-shrink: 0;'
-        infoBtnActivated.textContent = '查看激活方式'
-        infoBtnActivated.onclick = () => showActivationInfoModal(true)
-        btnContainer.appendChild(infoBtnActivated)
+        // 「清除激活」按钮：真正撤销激活状态（临时调试/特殊场景用，不可逆）
+        const clearBtn = document.createElement('button')
+        clearBtn.className = 'b3-button b3-button--danger'
+        clearBtn.style.cssText = 'flex: 1;'
+        clearBtn.textContent = '清除激活'
+        clearBtn.onclick = async () => {
+          if (!window.confirm('确定要清除激活状态吗？\n\n此操作会立即清空当前激活码与账号绑定，所有付费功能将无法使用，需要重新输入有效激活码才能恢复。')) return
+          try {
+            clearBtn.disabled = true
+            clearBtn.textContent = '清除中...'
+            context.mobileFeatureConfig.authorActivated = false
+            context.mobileFeatureConfig.authorCode = ''
+            context.mobileFeatureConfig.authorAccount = ''
+            context.desktopFeatureConfig.authorActivated = false
+            context.desktopFeatureConfig.authorCode = ''
+            context.desktopFeatureConfig.authorAccount = ''
+            await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+            await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+            showMessage('激活状态已清除，正在重载...', 2000, 'info')
+            setTimeout(() => window.location.reload(), 1000)
+          } catch (err) {
+            console.error('[ClearActivation] 清除失败:', err)
+            showMessage('清除失败，请重试', 3000, 'error')
+            clearBtn.disabled = false
+            clearBtn.textContent = '清除激活'
+          }
+        }
+        btnContainer.appendChild(clearBtn)
 
         container.appendChild(btnContainer)
       }
       
       container.appendChild(inputRow)
+
+      // "查看激活方式"按钮：独立成全宽一行，不与输入框/验证按钮并排，避免窄屏被挤出
+      // 两种激活状态共用此按钮，参数根据当前激活状态自动传 true/false
+      const infoBtn = document.createElement('button')
+      infoBtn.className = 'b3-button b3-button--text'
+      infoBtn.style.cssText = 'width: 100%; margin-top: 4px; padding: 8px; border: 1px solid #722ed1; border-radius: 6px; background: rgba(114, 46, 209, 0.08); color: #722ed1; font-weight: 600;'
+      infoBtn.textContent = '📘 查看激活方式'
+      infoBtn.onclick = () => showActivationInfoModal(context.isAuthorToolActivated())
+      container.appendChild(infoBtn)
 
       return container
     }
@@ -4379,7 +4402,7 @@ export function createMobileSettingLayout(
         box-sizing: border-box;
       `
       container.innerHTML = `
-        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（15项）</div>
+        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（17项）</div>
         <div style="font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>
       `
 

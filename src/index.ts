@@ -43,7 +43,8 @@ import {
   refreshToolbarAutoHide,
   refreshKmindZenCompat,
   refreshDesktopFloatingScrollOnSwitch,
-  triggerDesktopLifelogGlobalCapture
+  triggerDesktopLifelogGlobalCapture,
+  markDesktopBreadcrumbForFloating
 } from './toolbarManager'
 
 // TTS 设置持久化初始化
@@ -687,6 +688,9 @@ export default class ToolbarCustomizer extends Plugin {
       initCustomButtons(buttonsToInit)
     }
 
+    // cleanup() 会清理掉胶囊状态（body class / style / data-input-method），这里重新应用
+    this.applyDesktopToolbarPosition()
+
     // ===== 使用思源 EventBus 监听编辑器加载事件（替代 MutationObserver，避免卡顿） =====
     // 先移除旧的监听器（避免重复监听）
     if (this.eventBusRefreshHandler) {
@@ -709,6 +713,8 @@ export default class ToolbarCustomizer extends Plugin {
         if (editors.length > 0) {
           createButtonsForEditors(editors, this.desktopButtonConfigs)
         }
+        // 给刚出现的面包屑打 data-input-method 属性，确保胶囊 CSS 即时生效
+        markDesktopBreadcrumbForFloating()
       }
       // 刷新工具栏滚动隐藏状态（切文档时锁状态可能变了）
       refreshToolbarAutoHide()
@@ -1208,6 +1214,7 @@ export default class ToolbarCustomizer extends Plugin {
         showIconPicker: (current, onSelect) => this.showIconPicker(current, onSelect),
         saveData: (key, value) => this.saveData(key, value),
         applyFeatures: () => this.applyFeatures(),
+        applyDesktopToolbarPosition: () => this.applyDesktopToolbarPosition(),
         refreshButtons: () => {
           // 刷新桌面端按钮
           initCustomButtons(this.desktopButtonConfigs)

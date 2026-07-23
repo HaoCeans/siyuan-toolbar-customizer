@@ -981,9 +981,10 @@ export interface DesktopFloatingToolbarConfig {
  * .protyle-breadcrumb 上，是 .protyle-breadcrumb__bar 的兄弟节点。若只给 __bar 打属性，
  * fixed 的只是文档路径条，按钮会留在顶部原位——这就是之前的 bug。
  */
-function markDesktopBreadcrumbForFloating(): void {
+export function markDesktopBreadcrumbForFloating(): void {
   // 只匹配外层（排除 __bar）；排除已标记的，避免重复
   const outers = document.querySelectorAll('.protyle-breadcrumb:not(.protyle-breadcrumb__bar):not([data-input-method])')
+  if (outers.length > 0) invalidateAutoHideElsCache()
   outers.forEach(outer => {
     ;(outer as HTMLElement).setAttribute('data-input-method', 'close')
   })
@@ -993,6 +994,7 @@ function markDesktopBreadcrumbForFloating(): void {
  * 清理电脑端悬浮胶囊的所有痕迹（切回原生顶部 / 禁用自定义按钮 / unload 时调用）。
  */
 function cleanupDesktopFloatingToolbar(): void {
+  invalidateAutoHideElsCache()
   // 先解绑滚动隐藏（包括清除残留的 toolbar-scroll-hidden class / inline transform / 共享状态）
   unbindDesktopScrollForFloating()
   // 移除 body class
@@ -1030,6 +1032,7 @@ function cleanupDesktopFloatingToolbar(): void {
 export function applyDesktopFloatingToolbar(config: DesktopFloatingToolbarConfig, disableCustomButtons: boolean = false) {
   // 仅电脑端执行
   if (isMobileDevice()) return
+  invalidateAutoHideElsCache()
   // 禁用自定义按钮 或 未启用胶囊：清理后退出
   if (disableCustomButtons || !config?.enableFloatingToolbar) {
     cleanupDesktopFloatingToolbar()
@@ -1110,8 +1113,9 @@ export function applyDesktopFloatingToolbar(config: DesktopFloatingToolbarConfig
   // 3. 给当前所有外层 .protyle-breadcrumb 打属性
   markDesktopBreadcrumbForFloating()
 
-  // 4. MutationObserver 兜底：切文档/开新标签页后新出现的 breadcrumb 也要打属性
-  //    （电脑端没有杀后台冷启动问题，只需这一条 observer 即可，无需退避重试）
+  // 4. MutationObserver 一次性兜底：标记当前已存在的 breadcrumb
+  //    后续新文档靠 eventBus（loaded-protyle-dynamic / switch-protyle）处理，
+  //    不需要持续观察，避免按钮注入触发 DOM 变化陷入死循环。
   if (desktopFloatingObserver) {
     desktopFloatingObserver.disconnect()
   }
@@ -1121,12 +1125,17 @@ export function applyDesktopFloatingToolbar(config: DesktopFloatingToolbarConfig
     if (desktopObserverTimer) clearTimeout(desktopObserverTimer)
     desktopObserverTimer = safeSetTimeout(() => {
       markDesktopBreadcrumbForFloating()
-      // 同时注入按钮到新出现的编辑器，避免胶囊先浮起来（空的）再加载按钮的闪烁
+      // 注入按钮到新出现的编辑器
       if (currentButtonConfigs.length > 0) {
         const editors = document.querySelectorAll('.protyle')
         if (editors.length > 0) {
           createButtonsForEditors(editors, currentButtonConfigs)
         }
+      }
+      // 执行一次后断开，后续靠 eventBus
+      if (desktopFloatingObserver) {
+        desktopFloatingObserver.disconnect()
+        desktopFloatingObserver = null
       }
     }, 100)
   })
@@ -1392,8 +1401,11 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
 	      }
 	    }, 100)
 
-	    resizeHandler = updateToolbarPosition
-	    window.addEventListener('resize', resizeHandler)
+    if (resizeHandler) {
+      window.removeEventListener('resize', resizeHandler)
+    }
+    resizeHandler = updateToolbarPosition
+    window.addEventListener('resize', resizeHandler)
 
 	    const textInputs = document.querySelectorAll('textarea, input[type="text"], .protyle-wysiwyg, .protyle-content, .protyle-input')
 	    textInputs.forEach(input => {
@@ -4850,7 +4862,18 @@ function ensureToolbarAutoHideStyle(): void {
 }
 
 /** 获取需要隐藏/显示的工具栏元素（覆盖底部和顶部两种模式） */
+let cachedAutoHideEls: HTMLElement[] | null = null
+let autoHideElsCacheDirty = true
+
+function invalidateAutoHideElsCache(): void {
+  autoHideElsCacheDirty = true
+  cachedAutoHideEls = null
+}
+
 function getToolbarElementsForAutoHide(): HTMLElement[] {
+  if (!autoHideElsCacheDirty && cachedAutoHideEls) {
+    return cachedAutoHideEls
+  }
   const els: HTMLElement[] = []
   // 底部模式：带 data-toolbar-customized 属性
   document.querySelectorAll('.protyle-breadcrumb[data-toolbar-customized], .protyle-breadcrumb__bar[data-toolbar-customized]').forEach(el => els.push(el as HTMLElement))
@@ -4862,6 +4885,8 @@ function getToolbarElementsForAutoHide(): HTMLElement[] {
   if (document.body.classList.contains('siyuan-toolbar-desktop-floating')) {
     document.querySelectorAll('.protyle-breadcrumb[data-input-method]:not(.protyle-breadcrumb__bar)').forEach(el => els.push(el as HTMLElement))
   }
+  cachedAutoHideEls = els
+  autoHideElsCacheDirty = false
   return els
 }
 
@@ -7487,6 +7512,17 @@ export function cleanup() {
     }
   })
 
+  // 关闭所有打开的桌面端溢出工具栏（先移除 document 监听，再删 DOM）
+  document.querySelectorAll('.desktop-overflow-toolbar-layer').forEach(layer => {
+    const breadcrumbBar = (layer as HTMLElement).closest('.protyle-breadcrumb__bar, .protyle-breadcrumb:not(.protyle-breadcrumb__bar)') as HTMLElement
+    if (breadcrumbBar) {
+      const overflowBtn = breadcrumbBar.querySelector('.overflow-active') as HTMLElement
+      if (overflowBtn) {
+        closeDesktopOverflowToolbar(breadcrumbBar, overflowBtn)
+      }
+    }
+  })
+
   // 清理扩展工具栏弹出层 DOM
   document.querySelectorAll('.overflow-toolbar-layer, .desktop-overflow-toolbar-layer').forEach(el => el.remove())
   document.documentElement.style.removeProperty('--mobile-toolbar-offset')
@@ -8538,6 +8574,7 @@ import {
 // 一键记事执行函数
 async function executeQuickNote(_config: ButtonConfig) {
   try {
+    const originalPluginInstance = (window as any).__pluginInstance;
     const tempPlugin = {
       mobileFeatureConfig: {
         ...(pluginInstance?.mobileFeatureConfig || {}),
@@ -8558,8 +8595,11 @@ async function executeQuickNote(_config: ButtonConfig) {
     const message = `按钮 "${_config.name}" 的一键记事功能执行失败`;
     showMessage(message, 3000, 'error');
   } finally {
-    // 清理按钮触发标记，防止残留导致后续自启动弹窗被误判为按钮触发
-    if ((window as any).__pluginInstance?.mobileFeatureConfig) {
+    // 恢复原始的 __pluginInstance（非桌面 return 分支也要恢复）
+    if ((window as any).__pluginInstance === tempPlugin) {
+      (window as any).__pluginInstance = originalPluginInstance;
+    } else if ((window as any).__pluginInstance?.mobileFeatureConfig) {
+      // 兼容：如果已被其他代码修改，至少清理触发标记
       delete (window as any).__pluginInstance.mobileFeatureConfig.__quickNoteButtonTrigger;
     }
   }

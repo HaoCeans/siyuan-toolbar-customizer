@@ -5,6 +5,20 @@ All notable changes to the Toolbar Customizer plugin will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.7.5] - 2026-07-22
+
+### Fixed
+- 电脑端悬浮胶囊重载后不生效：`cleanup()` 清除胶囊状态后未重新应用
+- 一键记事弹窗中底部胶囊未隐藏：CSS 时序问题，改用 MutationObserver + inline style
+- 设置面板切换胶囊报错：`DesktopSettingsContext` 缺少 `applyDesktopToolbarPosition`
+- 一键记事 `FLOATING_RESET` 选择器特异性不足，无法覆盖主 CSS
+
+### Optimized
+- `executeQuickNote` 中临时覆盖 `__pluginInstance` 后恢复原始引用
+- `getToolbarElementsForAutoHide()` 添加缓存 + dirty 标志，避免滚动事件中重复 DOM 查询
+- `resizeHandler` 注册前先移除旧监听器，防止累积
+- 关闭插件时先关闭所有桌面溢出栏，再移除 DOM，防止 document 监听器泄漏
+
 ## [3.7.3] - 2026-07-19
 
 ### Fixed

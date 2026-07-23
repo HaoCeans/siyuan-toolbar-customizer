@@ -111,6 +111,43 @@ HIDE_CSS 常量：
   | `getTitle()` 匹配销毁旧窗口 | 思源覆盖了窗口标题，永远匹配不上 |
   | Dialog + Protyle（同窗口） | 需要独立 BrowserWindow（副屏、拖拽等） |
 
+### 电脑端底部胶囊的隐藏：JS MutationObserver + inline style
+
+**问题**：一键记事弹窗中，电脑端底部胶囊（悬浮工具栏）需要隐藏。但通过注入 `<style>` 标签设置 `display:none` 无效。
+
+**根因**：
+- `executeJavaScript` 注入 `<style>` 的时机是 `did-finish-load`（页面资源加载完毕）
+- 但插件自身的 `applyDesktopFloatingToolbar()` 在 SPA 初始化完成后才执行，向 `<head>` 注入 `#desktop-floating-toolbar-style`，它在 `did-finish-load` 之后
+- 即使 CSS 选择器特异性更高，如果两方都用了 `!important`，**后注入的样式表覆盖先注入的**——插件的样式总是最后的
+
+**解决方案**（`hideFloatingJS`）：
+- 不使用 CSS，而是注入一个 **MutationObserver** 监听 `document.body` 的子节点变化
+- 当 `.protyle-breadcrumb` 出现时，直接调用 `el.style.setProperty('display', 'none', 'important')` 设置行内样式
+- **行内样式的优先级高于任何样式表**（包括 `!important`），彻底避免 CSS 级联问题
+- observer 找到元素后立即 `disconnect()`，并设置 5 秒超时兜底，防止一直监听
+
+```typescript
+hideFloatingJS: `(function(){
+  var el=document.querySelector('.protyle-breadcrumb');
+  if(el){el.style.setProperty('display','none','important');return;}
+  var obs=new MutationObserver(function(){
+    var el2=document.querySelector('.protyle-breadcrumb');
+    if(!el2)return;
+    el2.style.setProperty('display','none','important');
+    obs.disconnect();
+  });
+  obs.observe(document.body,{childList:true,subtree:true});
+  setTimeout(function(){try{obs.disconnect()}catch(e){}},5000);
+})()`,
+```
+
+**注入时机**：在 `did-finish-load` 阶段 `_injectScripts` 中执行，与 `hideJS`、`titleJS` 等同级。
+
+**为什么不直接用 CSS 特异性解决**：
+之前尝试过 `html body .protyle-breadcrumb[data-input-method]:not(.protyle-breadcrumb__bar)`（特异性 (0,4,2) 对 (0,4,0)），但插件 CSS 在 SPA 初始化后才注入，晚于 `did-finish-load`，CSS 顺序覆盖规则使插件样式胜出。CSS 方式在双向 `!important` 的场景下不可靠，**JS inline style 是唯一保证**。
+
+**关联的配置项**：`desktopFeatureConfig.quickNoteHideFloatingToolbar`（默认 true）
+
 ---
 
 ## 手机端顶部工具栏 → #status 上漂问题

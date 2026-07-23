@@ -574,6 +574,7 @@ export interface MobileSettingsContext {
   showButtonIdPicker: (currentValue: string, onSelect: (result: any) => void) => void
   saveData: (key: string, value: any) => Promise<void>
   applyFeatures: () => void
+  applyDesktopToolbarPosition: () => void
   applyMobileToolbarStyle: () => void
   updateMobileToolbar: () => void
   recalculateOverflow: () => void

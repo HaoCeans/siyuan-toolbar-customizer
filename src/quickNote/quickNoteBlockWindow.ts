@@ -11,7 +11,7 @@ const BASE_HIDE = '.layout-tab-bar,.protyle-title,.protyle-background,.protyle-s
 const BREADCRUMB_HIDE = '.protyle-breadcrumb{display:none!important}'
 const BREADCRUMB_SHOW = '.protyle-breadcrumb{margin-top:25px!important}'
 const DRAG_CSS = '#qn-drag-handle{position:fixed;top:0;left:0;width:50%;height:36px;z-index:9999;-webkit-app-region:drag;cursor:grab}'
-const FLOATING_RESET = '.protyle-breadcrumb[data-input-method]{position:static!important;bottom:auto!important;top:auto!important;left:auto!important;right:auto!important;transform:none!important;width:auto!important;max-width:none!important;border-radius:0!important;height:auto!important;min-height:auto!important;margin-top:25px!important;padding:8px 12px!important;box-shadow:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:transparent!important;border:none!important;z-index:auto!important;display:flex!important}'
+const FLOATING_RESET = 'html body .protyle-breadcrumb[data-input-method]:not(.protyle-breadcrumb__bar){display:none!important}'
 const BLOCK_EMPTY_KEY = '__qn_block_empty'  // localStorage key：Protyle 是否为空
 let qnWinId: number | null = null
 let _currentDraftBlockId: string | null = null
@@ -139,7 +139,7 @@ const HASH_FIX_JS = `(function(){
 	  }, 50);
 	})()`
 
-function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string } {
+function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string; hideFloatingJS: string } {
   const toolbarOn = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteToolbarVisible !== false
   const hideFloating = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteHideFloatingToolbar !== false
   let hideCSS = BASE_HIDE + (toolbarOn ? BREADCRUMB_SHOW : BREADCRUMB_HIDE) + DRAG_CSS
@@ -194,14 +194,28 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
     // 用 localStorage 当前值作为真源（而非 window 变量缓存）：弹窗隐藏 5 秒重建时
     // 父窗口会 removeItem 清空，若用变量缓存会与 localStorage 脱节，可能误删非空块。
     pollJS: `window.__qnPollTimer=setInterval(function(){var w=document.querySelector('.protyle-wysiwyg');var v=(!w||(w.textContent||'').replace(/\\u200b/g,'').trim().length===0)?'1':'0';try{if(localStorage.getItem('${BLOCK_EMPTY_KEY}')!==v)localStorage.setItem('${BLOCK_EMPTY_KEY}',v)}catch(ex){}},500)`,
+    hideFloatingJS: `(function(){
+      var el=document.querySelector('.protyle-breadcrumb');
+      if(el){el.style.setProperty('display','none','important');return;}
+      var obs=new MutationObserver(function(){
+        var el2=document.querySelector('.protyle-breadcrumb');
+        if(!el2)return;
+        el2.style.setProperty('display','none','important');
+        obs.disconnect();
+      });
+      obs.observe(document.body,{childList:true,subtree:true});
+      setTimeout(function(){try{obs.disconnect()}catch(e){}},5000);
+    })()`,
   }
 }
 
-function _injectScripts(win: any, scripts: { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string }, show: boolean): void {
+function _injectScripts(win: any, scripts: { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string; hideFloatingJS: string }, show: boolean): void {
   win.webContents.executeJavaScript(scripts.hideJS).catch(()=>{})
   win.webContents.executeJavaScript(scripts.titleJS).catch(()=>{})
   win.webContents.executeJavaScript(scripts.closeHookJS).catch(()=>{})
   win.webContents.executeJavaScript(scripts.pollJS).catch(()=>{})
+  // 注入隐藏胶囊的脚本
+  win.webContents.executeJavaScript(scripts.hideFloatingJS).catch((e: any) => console.error('[QN-FLOAT] inject failed', e))
   try { win.setTitle(QUICKNOTE_TITLE) } catch {}
   if (show) { win.show(); win.focus() }
 }

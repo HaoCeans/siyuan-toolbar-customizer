@@ -360,7 +360,9 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 
 
 <details>
-<summary>📜 查看历史版本</summary>
+  <summary style="font-size: 17px; font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ 查看历史版本
+  </summary>
 
 ### v3.7.5 — A few annoying bugs squashed 🐛
 

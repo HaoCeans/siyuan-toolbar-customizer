@@ -4960,10 +4960,11 @@ function handleToolbarAutoHideScroll(scrollElOverride?: HTMLElement): void {
     if (toolbarHiddenByScroll) {
       toolbarHiddenByScroll = false
       const unlockRestoreTransform = toolbarAutoHideCapsuleMode ? 'translateX(-50%) translateY(0)' : 'translateZ(0) translateY(0)'
-      getToolbarElementsForAutoHide().forEach(el => {
-        el.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
-        el.classList.remove('toolbar-scroll-hidden');
-        el.style.transform = unlockRestoreTransform
+      document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
+        const htmlEl = el as HTMLElement
+        htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
+        htmlEl.classList.remove('toolbar-scroll-hidden');
+        htmlEl.style.transform = unlockRestoreTransform
       })
       document.body.classList.remove('toolbar-autohide-active')
     }
@@ -5055,11 +5056,12 @@ function handleToolbarAutoHideScroll(scrollElOverride?: HTMLElement): void {
 	    const isTop = document.body.classList.contains('siyuan-toolbar-top-mode')
 		    if (isTop) {
 		      // 顶部模式：先滑入工具栏，再恢复原生顶栏
-		      getToolbarElementsForAutoHide().forEach(el => {
-		        el.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
-		        el.classList.remove('toolbar-scroll-hidden')
-		        el.style.removeProperty('opacity')
-		        el.style.transform = 'translateZ(0) translateY(0)'
+		      document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
+		        const htmlEl = el as HTMLElement
+		        htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
+		        htmlEl.classList.remove('toolbar-scroll-hidden')
+		        htmlEl.style.removeProperty('opacity')
+		        htmlEl.style.transform = 'translateZ(0) translateY(0)'
 		      })
 		      toolbarAutoHidePendingTimer = setTimeout(() => {
 		        toolbarAutoHidePendingTimer = null
@@ -5067,13 +5069,14 @@ function handleToolbarAutoHideScroll(scrollElOverride?: HTMLElement): void {
 		      }, 50)
 		    } else {
 		      // 底部模式：先滑回工具栏，再恢复 protyle 间距 + 状态栏
-		      getToolbarElementsForAutoHide().forEach(el => {
-		        el.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
-		        el.classList.remove('toolbar-scroll-hidden')
-		        el.style.removeProperty('opacity')
+		      document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
+		        const htmlEl = el as HTMLElement
+		        htmlEl.style.transition = 'opacity 0.2s ease-out, transform 0.2s ease-out'
+		        htmlEl.classList.remove('toolbar-scroll-hidden')
+		        htmlEl.style.removeProperty('opacity')
 		        // 胶囊模式需要保持 translateX(-50%) 居中对齐
 		        // 注意：不能读 el.style.transform 判断，CSS 中的 translateX 不在内联样式里
-		    el.style.transform = toolbarAutoHideCapsuleMode
+		    htmlEl.style.transform = toolbarAutoHideCapsuleMode
 		          ? 'translateX(-50%) translateY(0)'
 		          : 'translateZ(0) translateY(0)'
 		      });
@@ -5176,11 +5179,12 @@ function unbindDesktopScrollForFloating(): void {
     desktopAutoHidePendingTimer = null
   }
   // 恢复所有被隐藏的工具栏（清除残留的 toolbar-scroll-hidden class 和 inline transform）
-  getToolbarElementsForAutoHide().forEach(el => {
-    el.classList.remove('toolbar-scroll-hidden')
+  document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
+    const htmlEl = el as HTMLElement
+    htmlEl.classList.remove('toolbar-scroll-hidden')
     // 胶囊模式需要保留 translateX(-50%) 居中（由 applyDesktopFloatingToolbar 的 CSS 提供，清除 inline 即可）
-    el.style.transform = ''
-    el.style.transition = ''
+    htmlEl.style.transform = ''
+    htmlEl.style.transition = ''
   })
   document.body.classList.remove('toolbar-autohide-active')
   // 复位桌面端独立的滚动隐藏状态变量

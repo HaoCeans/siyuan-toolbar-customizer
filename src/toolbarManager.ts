@@ -3731,18 +3731,14 @@ async function executeClickSequence(config: ButtonConfig, clickedButton?: HTMLEl
           throw new Error(`未找到元素: ${actualSelector}`)
         }
 
-        // 编辑器限定查找：仅对面包屑工具栏内的 [data-type] 按钮生效
+        // 编辑器限定查找：仅对 more / doc 两个原生按钮生效
         // （切换文档后旧编辑器的 fn__none 隐藏元素会被 querySelector 优先命中，
         //  其坐标 (0,0) 导致菜单跑左上角）
-        // 注意：barPlugins、text:xxx 等全局元素不在 .protyle 内，不能走此分支，
-        //       否则会导致弹窗菜单项点不到
-        if (clickedButton && !actualSelector.startsWith('text:') &&
-            !actualSelector.startsWith('#') && !actualSelector.startsWith('*') &&
-            !actualSelector.includes('.') && !actualSelector.includes('[')) {
+        // 其他所有选择器（barPlugins、text:xxx、#id、.class 等）完全走原逻辑，不受影响
+        if (clickedButton && (actualSelector === 'more' || actualSelector === 'doc')) {
           const pluginEditor = clickedButton.closest('.protyle')
-          if (pluginEditor && !pluginEditor.contains(element) &&
-              element.matches('.protyle-breadcrumb__bar button, .protyle-breadcrumb button')) {
-            // 仅当目标元素本身是面包屑工具栏按钮时才在编辑器内重新查找
+          if (pluginEditor && !pluginEditor.contains(element)) {
+            // 在插件按钮所在编辑器内重新查找
             const scopedEl = pluginEditor.querySelector(
               `[data-type="${actualSelector}"]`
             )
@@ -3761,14 +3757,15 @@ async function executeClickSequence(config: ButtonConfig, clickedButton?: HTMLEl
         if (isHover) {
           hoverElement(element)
         } else {
-          // ===== 隐藏按钮菜单位置修正 =====
-          // 如果原生按钮被 CSS 完全隐藏（transform: scale(0); width: 0），
+          // ===== 隐藏按钮菜单位置修正（仅 more / doc）=====
+          // 这两个原生按钮被 CSS 完全隐藏后（transform: scale(0); width: 0），
           // getBoundingClientRect() 返回 width=0，导致思源 {x: rect.right, y: rect.bottom} 定位到错误位置,
           // 或按钮位于隐藏编辑器内坐标 (0,0) → 菜单跑左上角。
           // 用插件按钮坐标临时恢复尺寸，使思源定位函数读到正确坐标。
-          const nativeRect = element.getBoundingClientRect()
-          const needsPositionFix = clickedButton &&
-              element.matches('.protyle-breadcrumb__bar button, .protyle-breadcrumb button') &&
+          const isHideMenuTarget = actualSelector === 'more' || actualSelector === 'doc'
+          const nativeRect = isHideMenuTarget ? element.getBoundingClientRect() : null
+          const needsPositionFix = clickedButton && isHideMenuTarget &&
+              nativeRect &&
               (nativeRect.width === 0 ||
                (nativeRect.left === 0 && nativeRect.top === 0))
 

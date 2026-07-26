@@ -334,33 +334,33 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 
 # 📌 Changelog
 
-### v3.7.6 — Hidden native buttons no longer break click-sequence menus 🎯
+### v3.7.6 — 修复隐藏原生按钮后点击序列菜单跑偏 🎯
 
-> 💡 **If you use "Hide More/Doc menu buttons" with click-sequence toolbar buttons, this update fixes menu positioning.**
+> 💡 **如果你开启了「更多按钮隐藏」或「文档菜单按钮隐藏」，并且用点击序列按钮来触发更多/菜单，这个版本修好了菜单位置问题。**
 
-#### 🐛 Fixes
+#### 🐛 修复
 
-**1. Menu appears at wrong position when native buttons are hidden**
-- When "More button hidden" or "Doc menu button hidden" is enabled, the native buttons get `transform: scale(0); width: 0` via CSS
-- The default "更多" and "打开菜单" buttons use `clickSequence: ['more']` / `['doc']` to programmatically click the hidden native button
-- SiYuan's menu positioning uses `target.getBoundingClientRect()` — with `width: 0`, `rect.right = rect.left`, so the menu appears offset to the left
-- **Fix**: Before clicking, temporarily restore the hidden button's dimensions (`transform: none` + proper `width`/`height`) so SiYuan reads correct coordinates, then restore hiding immediately after
+**1. 隐藏按钮后菜单位置偏移**
+- 隐藏更多/菜单按钮用的是 CSS `transform: scale(0); width: 0`，按钮还在 DOM 里但宽高为 0
+- 默认的「更多」「打开菜单」按钮是点击序列类型，会去点那个被隐藏的原生按钮
+- 思源弹出菜单时用 `getBoundingClientRect()` 定位——宽度为 0 时 `rect.right = rect.left`，菜单位置就歪了
+- **修复**：点击前临时恢复按钮尺寸（`transform: none` + 正常宽高），让思源读到正确坐标，点完立即恢复隐藏
 
-**2. Bottom capsule toolbar causes menu to jump to bottom-right corner**
-- The floating capsule container uses `transform: translateX(-50%)` for centering
-- CSS spec: any ancestor with `transform` becomes the containing block for `position: fixed` children
-- An earlier fix attempted to use `position: fixed` to reposition the native button, but it was positioned relative to the capsule container instead of the viewport
-- **Fix**: Don't change `position` at all — the native button is already in the correct DOM position, only its dimensions need restoring
+**2. 底部胶囊模式下菜单跑到右下角**
+- 胶囊容器用了 `transform: translateX(-50%)` 居中
+- CSS 规范：祖先元素有 `transform` 时，`position: fixed` 的子元素会相对于该祖先定位，不是视口
+- 之前尝试用 `position: fixed` 去定位隐藏按钮，结果坐标全偏了
+- **修复**：不改 `position`，只恢复尺寸——按钮本来就在面包屑工具栏的正确位置上
 
-**3. Menu appears at top-left after switching documents**
-- When switching docs, the old editor stays in DOM with `fn__none` class
-- `querySelector` picks the first match in document order, which may be the hidden editor's button
-- `getBoundingClientRect()` on a hidden element returns `{left:0, top:0}` → menu at top-left
-- **Fix**: After finding the native button, verify it's in the same `.protyle` editor as the clicked plugin button; if not, re-search within the correct editor
+**3. 切换文档后菜单跑到左上角**
+- 切文档时旧编辑器加 `fn__none` 隐藏但不销毁 DOM
+- `querySelector` 按文档顺序找第一个 `[data-type="more"]`，可能命中隐藏编辑器的按钮
+- 隐藏元素的 `getBoundingClientRect()` 返回 `{left:0, top:0}` → 菜单开在左上角
+- **修复**：找到按钮后检查它和插件按钮是否在同一个 `.protyle` 编辑器里，不是的话在正确编辑器内重新查找
 
 
 <details>
-<summary>📜 Historical versions</summary>
+<summary>📜 查看历史版本</summary>
 
 ### v3.7.5 — A few annoying bugs squashed 🐛
 
@@ -436,35 +436,6 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 **8. 修复清除激活没清干净的问题**
 - licensePlan / licenseExpiry / licenseGraceEnd 这三个新增字段之前没清，现在一起清
 - localStorage 里的试用标记也清掉了
-
-
-### v3.7.5 — Fix desktop floating toolbar init failure + quick note capsule hiding
-
-> 💡 **Fixed compatibility issue with SiYuan v3.7.3 plugin load timing change.**
-
-## 🐛 Fixes
-
-**1. Desktop floating toolbar not working after reload**
-- **Root cause**: `initPluginFunctions()` calls `cleanup()` which clears capsule state (body class, style tag, data-input-method) without re-applying
-- **Fix**: Added `this.applyDesktopToolbarPosition()` after `cleanup()`
-
-**2. Floating capsule not hidden in quick note popup**
-- **Root cause**: CSS timing issue — injected `<style>` at `did-finish-load`, but plugin's CSS injects later after SPA init, overriding it
-- **Fix**: Use MutationObserver to directly set inline `style.setProperty('display','none','important')` (highest priority)
-
-**3. Settings panel error `context.applyDesktopToolbarPosition is not a function`**
-- **Root cause**: `DesktopSettingsContext` interface declares the method but actual context object omitted it
-
-**4. `FLOATING_RESET` selector specificity mismatch in quick note**
-- Missing `:not(.protyle-breadcrumb__bar)` — couldn't override `display:flex !important`
-
-## ✨ Optimizations
-
-**5. Code health review fixes**
-- `executeQuickNote` doesn't restore original `__pluginInstance` (restored in finally)
-- `getToolbarElementsForAutoHide()` runs 2-3 `querySelectorAll` per scroll tick (cached with dirty flag)
-- `resizeHandler` not removed before re-registration (remove old first)
-- Desktop overflow toolbar `document click` listener may leak on unload (close all overflow toolbars before removing DOM)
 
 
 ### v3.7.3 — 桌面端悬浮胶囊多项修复
@@ -559,14 +530,6 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 - 顶部工具栏模式（纯 CSS 驱动）逻辑不变，本就在面包屑出现后自愈
 	- 一键记事弹窗的切前后台逻辑完全保留，不受影响
 
-</details>
-
----
-
-<details>
-  <summary style="font-size: 17px; font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ 查看历史版本
-  </summary>
 
 ### v3.7.1 — 工具栏预览 + 底部悬浮工具栏 + Lucide 极简图标 + 弹窗增强
 

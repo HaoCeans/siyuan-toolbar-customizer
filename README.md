@@ -334,6 +334,34 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 
 # 📌 Changelog
 
+### v3.7.6 — Hidden native buttons no longer break click-sequence menus 🎯
+
+> 💡 **If you use "Hide More/Doc menu buttons" with click-sequence toolbar buttons, this update fixes menu positioning.**
+
+#### 🐛 Fixes
+
+**1. Menu appears at wrong position when native buttons are hidden**
+- When "More button hidden" or "Doc menu button hidden" is enabled, the native buttons get `transform: scale(0); width: 0` via CSS
+- The default "更多" and "打开菜单" buttons use `clickSequence: ['more']` / `['doc']` to programmatically click the hidden native button
+- SiYuan's menu positioning uses `target.getBoundingClientRect()` — with `width: 0`, `rect.right = rect.left`, so the menu appears offset to the left
+- **Fix**: Before clicking, temporarily restore the hidden button's dimensions (`transform: none` + proper `width`/`height`) so SiYuan reads correct coordinates, then restore hiding immediately after
+
+**2. Bottom capsule toolbar causes menu to jump to bottom-right corner**
+- The floating capsule container uses `transform: translateX(-50%)` for centering
+- CSS spec: any ancestor with `transform` becomes the containing block for `position: fixed` children
+- An earlier fix attempted to use `position: fixed` to reposition the native button, but it was positioned relative to the capsule container instead of the viewport
+- **Fix**: Don't change `position` at all — the native button is already in the correct DOM position, only its dimensions need restoring
+
+**3. Menu appears at top-left after switching documents**
+- When switching docs, the old editor stays in DOM with `fn__none` class
+- `querySelector` picks the first match in document order, which may be the hidden editor's button
+- `getBoundingClientRect()` on a hidden element returns `{left:0, top:0}` → menu at top-left
+- **Fix**: After finding the native button, verify it's in the same `.protyle` editor as the clicked plugin button; if not, re-search within the correct editor
+
+
+<details>
+<summary>📜 Historical versions</summary>
+
 ### v3.7.5 — A few annoying bugs squashed 🐛
 
 > 💡 **If you use the desktop floating capsule or the quick note popup, this one's for you.**
@@ -362,9 +390,6 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 - Window resize listener could pile up if re-initialized multiple times (remove old one first)
 - Overflow toolbar's click listener could leak if plugin was unloaded while it was open (close all overflow toolbars before cleanup)
 
-
-<details>
-<summary>📜 Historical versions</summary>
 
 ### v3.7.4 — 新增免费试用 + 月卡 30 天 + 过期拦截，授权体系大升级 🐋
 

@@ -246,6 +246,124 @@ return buttons.map(btn => ({ ...btn, overflowLevel: btn.overflowLevel ?? 0 }))
 
 ---
 
+## 隐藏原生按钮时菜单定位修正
+
+**文件**：`src/toolbarManager.ts`
+**相关函数**：`executeClickSequence`（L3709）、`waitForElement`（L4079）
+
+### 问题背景
+
+思源「更多按钮隐藏」和「文档菜单按钮隐藏」功能通过 CSS 将原生按钮彻底隐藏：
+```css
+.protyle-breadcrumb__bar button[data-type="more"],
+.protyle-breadcrumb button[data-type="more"] {
+  transform: scale(0) !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+```
+
+而插件的默认「更多」和「打开菜单」按钮是 `click-sequence` 类型（`clickSequence: ['more']` / `['doc']`），它找到原生按钮并程序化点击，让思源弹出原生菜单。
+
+埋了三个坑：
+
+### 坑①：`getBoundingClientRect()` 返回 `right=left`
+
+思源的面包屑更多菜单定位代码：
+```typescript
+// app/src/protyle/breadcrumb/index.ts
+const targetRect = target.getBoundingClientRect();
+this.showMenu(protyle, {
+    x: targetRect.right,   // width=0 → right === left ❌
+    y: targetRect.bottom,  // height≠0（CSS 没设 height:0）→ 正常
+    isLeft: true,
+});
+```
+
+原生按钮 `width: 0` 导致 `rect.right = rect.left`，菜单应该出现在按钮右侧，结果出现在左侧边缘（x = left 而非 left + width）。
+
+**修复**（`executeClickSequence` 内 L3764-3794）：
+检测到目标按钮是工具栏按钮且 `width === 0`（或被 CSS 隐藏）时，**临时恢复其尺寸**再点：
+```typescript
+if (needsPositionFix) {
+    const pluginRect = clickedButton.getBoundingClientRect()
+    // 临时覆盖隐藏样式，只恢复尺寸不改变 position
+    element.style.setProperty('transform', 'none', 'important')
+    element.style.setProperty('width', `${pluginRect.width}px`, 'important')
+    element.style.setProperty('height', `${pluginRect.height}px`, 'important')
+    clickElement(element)
+    // 立即恢复隐藏（移除 inline 覆盖，CSS !important 重新生效）
+    restoredProps.forEach(prop => element.style.removeProperty(prop))
+}
+```
+
+关键：**不设 `position: fixed`**（见坑②）。
+
+### 坑②：底部胶囊 `transform` 污染 `position: fixed`
+
+底部胶囊工具栏容器使用 `transform: translateX(-50%)` 居中（`toolbarManager.ts:1074`）：
+```css
+.protyle-breadcrumb[data-input-method]:not(.protyle-breadcrumb__bar) {
+  position: fixed !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+}
+```
+
+在 CSS 规范中，任何 `transform` 值的祖先元素会成为 `position: fixed` 子元素的**包含块**。如果坑①的修复用了 `position: fixed` 来定位原生按钮，它会相对于胶囊容器而非视口，坐标全部偏移，菜单跑到右下角。
+
+**规则**：永远不要对隐藏的原生按钮设 `position: fixed`，只恢复 `transform` / `width` / `height` 即可——按钮本来就在面包屑工具栏内，位置是天然正确的。
+
+### 坑③：`querySelector` 命中隐藏编辑器的按钮
+
+切换文档时，旧编辑器 `classList.add('fn__none')` 但 DOM 不销毁。`waitForElement` 的 `[data-type="more"]` 查询用 `document.querySelector` 匹配文档顺序的第一个，在 `fn__none` 编辑器内的元素 `getBoundingClientRect()` 返回 `{left:0, top:0, width:0, height:0}` → 菜单跑左上角。
+
+**修复**（L3734-3748）：找到元素后校验是否与插件按钮同属一个 `.protyle`，否则在插件按钮所在编辑器内重新查找：
+```typescript
+if (clickedButton) {
+    const pluginEditor = clickedButton.closest('.protyle')
+    if (pluginEditor && !pluginEditor.contains(element)) {
+        const scopedEl = pluginEditor.querySelector(
+            `#${actualSelector}, [data-id="${actualSelector}"], [data-type="${actualSelector}"]`
+        )
+        if (scopedEl) element = scopedEl as HTMLElement
+    }
+}
+```
+
+同时 `needsPositionFix` 的触发条件也追加了 `(left===0 && top===0)` 检测，兜住编辑器内也找不到的极端情况。
+
+### 判断坐标有效性的双重保险
+
+```typescript
+const nativeRect = element.getBoundingClientRect()
+const needsPositionFix = clickedButton &&
+    element.matches('.protyle-breadcrumb__bar button, .protyle-breadcrumb button') &&
+    (nativeRect.width === 0 ||                  // 被 CSS 隐藏
+     (nativeRect.left === 0 && nativeRect.top === 0))  // 在隐藏编辑器内
+
+// 修正前还要验证插件按钮坐标有效
+if (pluginRect.width > 0 && pluginRect.left > 0) {
+    // 执行修正
+} else {
+    // 插件按钮坐标也无效 → 直接点击，接受思源自身的定位行为
+    clickElement(element)
+}
+```
+
+### 调用链改动
+
+| 位置 | 改动 | 原因 |
+|------|------|------|
+| `button.click` 监听器 L2274 | `null` → `button` | 把被点击的插件按钮元素传给调用链 |
+| `handleButtonClick` L3106 | 新增 `clickedButton` 参数 | 透传给 `executeClickSequence` |
+| `executeClickSequence` L3709 | 新增 `clickedButton?` 参数 | 位置修正和编辑器限定都需要它 |
+
+---
+
 ## 手机端/桌面端底部胶囊滚动隐藏
 
 **文件**：`src/toolbarManager.ts`

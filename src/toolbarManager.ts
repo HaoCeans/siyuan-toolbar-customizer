@@ -2271,7 +2271,7 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     }
 
     // 将保存的选区和按钮元素传递给处理函数（使用 await 保持 async 链条）
-    await handleButtonClick(config, savedSelection, lastActiveElement, null)
+    await handleButtonClick(config, savedSelection, lastActiveElement, button)
 
     // builtin 类型的按钮不恢复焦点，让输入法自然关闭
     // 其他类型恢复焦点（preventScroll 防止浏览器自动滚动到顶部）
@@ -3102,8 +3102,8 @@ async function handleButtonClick(
     // 插入模板，传递保存的选区和焦点元素
     insertTemplate(config, savedSelection, lastActiveElement)
   } else if (config.type === 'click-sequence') {
-    // 执行点击序列
-    executeClickSequence(config)
+    // 执行点击序列，传入插件按钮用于修正隐藏按钮的菜单位置
+    executeClickSequence(config, clickedButton)
   } else if (config.type === 'shortcut') {
     // 执行快捷键，传递保存的选区
     executeShortcut(config, savedSelection, lastActiveElement)
@@ -3706,7 +3706,7 @@ export function showTemplateContextMenu(e: MouseEvent, textarea: HTMLTextAreaEle
 /**
  * 执行点击序列
  */
-async function executeClickSequence(config: ButtonConfig) {
+async function executeClickSequence(config: ButtonConfig, clickedButton?: HTMLElement | null) {
   if (!config.clickSequence || config.clickSequence.length === 0) {
     Notify.showErrorClickSequenceNotConfigured(config.name)
     return
@@ -3725,10 +3725,26 @@ async function executeClickSequence(config: ButtonConfig) {
     for (let retry = 0; retry <= 2; retry++) {
       try {
         // 等待元素出现（最多5秒）
-        const element = await waitForElement(actualSelector, 5000)
+        let element = await waitForElement(actualSelector, 5000)
 
         if (!element) {
           throw new Error(`未找到元素: ${actualSelector}`)
+        }
+
+        // 如果存在插件按钮引用，确保找到的元素隶属于同一个可见编辑器
+        // （切换文档后旧编辑器的 fn__none 隐藏元素会被 querySelector 优先命中，其坐标 (0,0) 导致菜单跑左上角）
+        if (clickedButton) {
+          const pluginEditor = clickedButton.closest('.protyle')
+          if (pluginEditor && !pluginEditor.contains(element)) {
+            // 在插件按钮所在编辑器内重新查找
+            const scopedEl = pluginEditor.querySelector(
+              `#${actualSelector}, [data-id="${actualSelector}"], [data-type="${actualSelector}"]`
+            )
+            if (scopedEl) {
+              element = scopedEl as HTMLElement
+            }
+            // 如果编辑器内也找不到，保留原始的 element（后续会尝试用 position: fixed 修正坐标）
+          }
         }
 
         // 检查元素是否可见
@@ -3740,7 +3756,42 @@ async function executeClickSequence(config: ButtonConfig) {
         if (isHover) {
           hoverElement(element)
         } else {
-          clickElement(element)
+          // ===== 隐藏按钮菜单位置修正 =====
+          // 如果原生按钮被 CSS 完全隐藏（transform: scale(0); width: 0），
+          // getBoundingClientRect() 返回 width=0，导致思源 {x: rect.right, y: rect.bottom} 定位到错误位置,
+          // 或按钮位于隐藏编辑器内坐标 (0,0) → 菜单跑左上角。
+          // 用插件按钮坐标临时恢复尺寸，使思源定位函数读到正确坐标。
+          const nativeRect = element.getBoundingClientRect()
+          const needsPositionFix = clickedButton &&
+              element.matches('.protyle-breadcrumb__bar button, .protyle-breadcrumb button') &&
+              (nativeRect.width === 0 ||
+               (nativeRect.left === 0 && nativeRect.top === 0))
+
+          if (needsPositionFix) {
+            const pluginRect = clickedButton.getBoundingClientRect()
+            if (pluginRect.width > 0 && pluginRect.left > 0) {
+              // 插件按钮坐标有效 → 用它给原生按钮恢复尺寸
+              // 不改变 position，因为底部胶囊父容器有 transform: translateX(-50%)，
+              // 设 position: fixed 会相对该容器定位而非视口，导致偏移。
+              element.style.setProperty('transform', 'none', 'important')
+              element.style.setProperty('width', `${pluginRect.width}px`, 'important')
+              element.style.setProperty('min-width', `${pluginRect.width}px`, 'important')
+              element.style.setProperty('height', `${pluginRect.height}px`, 'important')
+
+              clickElement(element)
+
+              // 立即恢复隐藏样式（移除临时 inline 覆盖，CSS !important 重新生效）
+              const restoredProps = ['transform', 'width', 'min-width', 'height']
+              for (const prop of restoredProps) {
+                element.style.removeProperty(prop)
+              }
+            } else {
+              // 插件按钮坐标也无效 → 直接点击，接受思源自身的定位行为
+              clickElement(element)
+            }
+          } else {
+            clickElement(element)
+          }
         }
         success = true
         break // 成功后跳出重试循环

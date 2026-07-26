@@ -3731,19 +3731,24 @@ async function executeClickSequence(config: ButtonConfig, clickedButton?: HTMLEl
           throw new Error(`未找到元素: ${actualSelector}`)
         }
 
-        // 如果存在插件按钮引用，确保找到的元素隶属于同一个可见编辑器
-        // （切换文档后旧编辑器的 fn__none 隐藏元素会被 querySelector 优先命中，其坐标 (0,0) 导致菜单跑左上角）
-        if (clickedButton) {
+        // 编辑器限定查找：仅对面包屑工具栏内的 [data-type] 按钮生效
+        // （切换文档后旧编辑器的 fn__none 隐藏元素会被 querySelector 优先命中，
+        //  其坐标 (0,0) 导致菜单跑左上角）
+        // 注意：barPlugins、text:xxx 等全局元素不在 .protyle 内，不能走此分支，
+        //       否则会导致弹窗菜单项点不到
+        if (clickedButton && !actualSelector.startsWith('text:') &&
+            !actualSelector.startsWith('#') && !actualSelector.startsWith('*') &&
+            !actualSelector.includes('.') && !actualSelector.includes('[')) {
           const pluginEditor = clickedButton.closest('.protyle')
-          if (pluginEditor && !pluginEditor.contains(element)) {
-            // 在插件按钮所在编辑器内重新查找
+          if (pluginEditor && !pluginEditor.contains(element) &&
+              element.matches('.protyle-breadcrumb__bar button, .protyle-breadcrumb button')) {
+            // 仅当目标元素本身是面包屑工具栏按钮时才在编辑器内重新查找
             const scopedEl = pluginEditor.querySelector(
-              `#${actualSelector}, [data-id="${actualSelector}"], [data-type="${actualSelector}"]`
+              `[data-type="${actualSelector}"]`
             )
             if (scopedEl) {
               element = scopedEl as HTMLElement
             }
-            // 如果编辑器内也找不到，保留原始的 element（后续会尝试用 position: fixed 修正坐标）
           }
         }
 

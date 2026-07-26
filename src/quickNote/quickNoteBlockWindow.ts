@@ -133,10 +133,11 @@ const HASH_FIX_JS = `(function(){
 	    console.log('[QN-HASH] history API 拦截失败:', e);
 	  }
 
-	  // 3. 兜底：50ms 轮询（捕获通过 location.href 等其他途径设置的 hash）
+	  // 3. 兜底：200ms 轮询（捕获通过 location.href 等其他途径设置的 hash）
+	  //    间隔从 50ms 提升到 200ms：hash 重置对用户无即时感知，但 50ms 持续轮询会占用 CPU
 	  window.__qn_hashTimer = setInterval(function() {
 	    if (window.location.hash) window.location.hash = '';
-	  }, 50);
+	  }, 200);
 	})()`
 
 function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string; hideFloatingJS: string } {

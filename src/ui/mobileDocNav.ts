@@ -21,6 +21,7 @@ interface DocNavContext {
   eventBus: any
   floatOpacity?: number
   autoHideOnScroll?: boolean
+  bottomDistance?: number
 }
 
 interface MobileDocNavState {
@@ -76,6 +77,8 @@ let lastAutoHideToggleAt = 0
 const SCROLL_HIDE_THRESHOLD_PX = 15
 const SCROLL_TOGGLE_COOLDOWN_MS = 200
 const SCROLL_FADE_MS = 160
+
+let currentBottomDistance = 80
 
 function fadeOutNavBar(): void {
   if (!navBar) return
@@ -522,10 +525,9 @@ function injectStyles(): void {
   style.id = 'mobile-doc-nav-bar-style'
   style.textContent = `
     #mobile-doc-nav-bar {
-      position: fixed;
-      bottom: 80px;
-      left: 50%;
-      transform: translateX(-50%);
+	      position: fixed;
+	      left: 50%;
+	      transform: translateX(-50%);
       width: 100px;
       /* 与主工具栏同层级；仍低于扩展工具栏(1000+) */
       z-index: 5;
@@ -600,6 +602,7 @@ function createNavBar(): void {
 
   navBar = document.createElement('div')
   navBar.id = 'mobile-doc-nav-bar'
+  navBar.style.bottom = currentBottomDistance + 'px'
 
   const prevBtn = document.createElement('button')
   prevBtn.id = 'docnav-prev'
@@ -669,6 +672,7 @@ export async function init(context: DocNavContext): Promise<void> {
 
   autoHideOnScrollEnabled = !!context.autoHideOnScroll
   currentFloatOpacityForAutoHide = context.floatOpacity
+  currentBottomDistance = context.bottomDistance ?? 80
   hiddenByScroll = false
   lastScrollTopForAutoHide = null
   lastAutoHideToggleAt = 0
@@ -735,6 +739,7 @@ export function toggleVisibility(config: ButtonConfig): void {
     // 更新滚动隐藏开关配置与用于恢复的透明度
     autoHideOnScrollEnabled = !!config.autoHideOnScroll
     currentFloatOpacityForAutoHide = config.floatOpacity
+    currentBottomDistance = config.bottomDistance ?? 80
     hiddenByScroll = false
     lastScrollTopForAutoHide = null
     lastAutoHideToggleAt = 0
@@ -746,6 +751,7 @@ export function toggleVisibility(config: ButtonConfig): void {
 
     createNavBar()
     applyOpacity(navBar, config.floatOpacity)
+    if (navBar) navBar.style.bottom = currentBottomDistance + 'px'
     ensureScrollListenerBound()
 
     // 重新注册事件监听
@@ -855,6 +861,7 @@ export function cleanup(): void {
   lastScrollTopForAutoHide = null
   lastAutoHideToggleAt = 0
   scrollBindRetryCount = 0
+  currentBottomDistance = 80
 
   ctx = null
 }

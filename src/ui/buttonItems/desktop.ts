@@ -759,7 +759,7 @@ export function createDesktopButtonItem(
       <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>⑤ 叶归LifeLog适配</option>
       <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
       <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
-      <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>⑧ 图片快捷导入日记</option>
+      <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>⑧ 图片快捷导入</option>
       <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>⑨ 悬浮标签页Tab</option>
       <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>⑩ 悬浮大纲</option>
       <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 前一篇/后一篇文档</option>
@@ -1333,7 +1333,7 @@ export function createDesktopButtonItem(
     scrollDocConfigDiv.appendChild(radioContainer)
     authorToolField.appendChild(scrollDocConfigDiv)
 
-    // 图片快捷导入日记配置区
+    // 图片快捷导入配置区
     const img1UploadConfigDiv = document.createElement('div')
     img1UploadConfigDiv.id = 'image-upload-config'
     img1UploadConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
@@ -1566,7 +1566,78 @@ export function createDesktopButtonItem(
 	      collapseStyleConfigDiv.appendChild(radioWrap)
 	    })
 
-	    authorToolField.appendChild(collapseStyleConfigDiv)
+		    authorToolField.appendChild(collapseStyleConfigDiv)
+
+		    // 前一篇/后一篇文档配置区（底部距离 + 滚动隐藏）
+		    const docNavConfigDiv = document.createElement('div')
+		    docNavConfigDiv.id = 'doc-nav-config-desktop'
+		    docNavConfigDiv.style.cssText = 'display: none; flex-direction: column; gap: 8px; margin-top: 8px; padding: 10px 12px; background: rgba(66, 133, 244, 0.06); border-radius: 6px; border: 1px solid rgba(66, 133, 244, 0.15);'
+
+		    // 底部距离
+		    const docNavDistLabel = document.createElement('div')
+		    docNavDistLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
+		    docNavDistLabel.textContent = '距离底部高度'
+		    docNavConfigDiv.appendChild(docNavDistLabel)
+
+		    const docNavDistRow = document.createElement('div')
+		    docNavDistRow.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+
+		    const docNavDistSlider = document.createElement('input')
+		    docNavDistSlider.type = 'range'
+		    docNavDistSlider.min = '0'
+		    docNavDistSlider.max = '200'
+		    docNavDistSlider.step = '5'
+		    docNavDistSlider.value = String(button.bottomDistance ?? 20)
+		    docNavDistSlider.style.cssText = 'flex: 1; accent-color: var(--b3-theme-primary);'
+
+		    const docNavDistValue = document.createElement('span')
+		    docNavDistValue.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface-light); min-width: 40px; text-align: right;'
+		    docNavDistValue.textContent = (button.bottomDistance ?? 20) + 'px'
+
+		    docNavDistSlider.addEventListener('input', () => {
+		      const val = parseInt(docNavDistSlider.value)
+		      button.bottomDistance = val
+		      docNavDistValue.textContent = val + 'px'
+		      const navBar = document.getElementById('desktop-doc-nav-bar')
+		      if (navBar) navBar.style.bottom = val + 'px'
+		    })
+
+		    docNavDistRow.appendChild(docNavDistSlider)
+		    docNavDistRow.appendChild(docNavDistValue)
+		    docNavConfigDiv.appendChild(docNavDistRow)
+
+		    const docNavDistHint = document.createElement('div')
+		    docNavDistHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
+		    docNavDistHint.textContent = '💡 调整导航栏距离屏幕底部的距离（0~200px）'
+		    docNavConfigDiv.appendChild(docNavDistHint)
+
+		    // 滚动隐藏开关
+		    const docNavAutoHideRow = document.createElement('div')
+		    docNavAutoHideRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px;'
+
+		    const docNavAutoHideLabel = document.createElement('label')
+		    docNavAutoHideLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
+		    docNavAutoHideLabel.textContent = '滚动隐藏/显示'
+
+		    const docNavAutoHideSwitch = document.createElement('input')
+		    docNavAutoHideSwitch.type = 'checkbox'
+		    docNavAutoHideSwitch.className = 'b3-switch'
+		    docNavAutoHideSwitch.checked = button.autoHideOnScroll ?? false
+
+		    docNavAutoHideRow.appendChild(docNavAutoHideLabel)
+		    docNavAutoHideRow.appendChild(docNavAutoHideSwitch)
+
+		    const docNavAutoHideHint = document.createElement('div')
+		    docNavAutoHideHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
+		    docNavAutoHideHint.textContent = '向上滚动：导航栏消失；向下滚动：导航栏重新出现'
+
+		    docNavAutoHideSwitch.onchange = () => {
+		      button.autoHideOnScroll = docNavAutoHideSwitch.checked
+		    }
+
+		    docNavConfigDiv.appendChild(docNavAutoHideRow)
+		    docNavConfigDiv.appendChild(docNavAutoHideHint)
+		    authorToolField.appendChild(docNavConfigDiv)
 
 	    // 根据当前选择显示/隐藏配置区
     const updateVisibility = () => {
@@ -1656,16 +1727,18 @@ export function createDesktopButtonItem(
         buttonSequenceConfigDiv.style.display = 'none'
         scrollDocConfigDiv.style.display = 'none'
         img1UploadConfigDiv.style.display = 'flex'
-	    } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts' || subtype === 'clear-empty-blocks' || subtype === 'toggle-lock') {
-	      docConfigDiv.style.display = 'none'
-	      dbConfigDiv.style.display = 'none'
-	      diaryConfigDiv.style.display = 'none'
-	      lifeLogConfigDiv.style.display = 'none'
-	      popupSelectConfigDiv.style.display = 'none'
-	      buttonSequenceConfigDiv.style.display = 'none'
-	      scrollDocConfigDiv.style.display = 'none'
-	      img1UploadConfigDiv.style.display = 'none'
+		    } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts' || subtype === 'clear-empty-blocks' || subtype === 'toggle-lock') {
+		      docConfigDiv.style.display = 'none'
+		      dbConfigDiv.style.display = 'none'
+		      diaryConfigDiv.style.display = 'none'
+		      lifeLogConfigDiv.style.display = 'none'
+		      popupSelectConfigDiv.style.display = 'none'
+		      buttonSequenceConfigDiv.style.display = 'none'
+		      scrollDocConfigDiv.style.display = 'none'
+		      img1UploadConfigDiv.style.display = 'none'
 		      collapseStyleConfigDiv.style.display = (subtype === 'mobile-tabs' || subtype === 'mobile-outline') ? 'flex' : 'none'
+		      // 前一篇/后一篇：显示底部距离 + 滚动隐藏配置
+		      docNavConfigDiv.style.display = subtype === 'doc-nav' ? 'flex' : 'none'
 		      // 沉浸阅读模式：显示/隐藏锁定图标+滚动隐藏开关
 		      const toggleExtras = editForm.querySelector('.toggle-lock-extras') as HTMLElement | null
 		      if (toggleExtras) toggleExtras.style.display = (subtype === 'toggle-lock') ? '' : 'none'
@@ -2303,7 +2376,7 @@ export function populateDesktopEditForm(
       <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>⑤ 叶归LifeLog适配</option>
       <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
       <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
-      <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>⑧ 图片快捷导入日记</option>
+      <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>⑧ 图片快捷导入</option>
       <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>⑨ 悬浮标签页Tab</option>
       <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>⑩ 悬浮大纲</option>
       <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 前一篇/后一篇文档</option>
@@ -3054,7 +3127,7 @@ export function populateDesktopEditForm(
     scrollDocConfigDiv.appendChild(radioContainer2)
     authorToolField.appendChild(scrollDocConfigDiv)
 
-    // 图片快捷导入日记配置区
+    // 图片快捷导入配置区
     const img2UploadConfigDiv = document.createElement('div')
     img2UploadConfigDiv.id = 'image-upload-config-2'
     img2UploadConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
@@ -3131,7 +3204,78 @@ export function populateDesktopEditForm(
 	      collapseStyleConfigDiv2.appendChild(radioWrap)
 	    })
 
-	    authorToolField.appendChild(collapseStyleConfigDiv2)
+		    authorToolField.appendChild(collapseStyleConfigDiv2)
+
+		    // 前一篇/后一篇文档配置区（底部距离 + 滚动隐藏）
+		    const docNavConfigDiv2 = document.createElement('div')
+		    docNavConfigDiv2.id = 'doc-nav-config-desktop-2'
+		    docNavConfigDiv2.style.cssText = 'display: none; flex-direction: column; gap: 8px; margin-top: 8px; padding: 10px 12px; background: rgba(66, 133, 244, 0.06); border-radius: 6px; border: 1px solid rgba(66, 133, 244, 0.15);'
+
+		    // 底部距离
+		    const docNavDistLabel2 = document.createElement('div')
+		    docNavDistLabel2.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
+		    docNavDistLabel2.textContent = '距离底部高度'
+		    docNavConfigDiv2.appendChild(docNavDistLabel2)
+
+		    const docNavDistRow2 = document.createElement('div')
+		    docNavDistRow2.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+
+		    const docNavDistSlider2 = document.createElement('input')
+		    docNavDistSlider2.type = 'range'
+		    docNavDistSlider2.min = '0'
+		    docNavDistSlider2.max = '200'
+		    docNavDistSlider2.step = '5'
+		    docNavDistSlider2.value = String(button.bottomDistance ?? 20)
+		    docNavDistSlider2.style.cssText = 'flex: 1; accent-color: var(--b3-theme-primary);'
+
+		    const docNavDistValue2 = document.createElement('span')
+		    docNavDistValue2.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface-light); min-width: 40px; text-align: right;'
+		    docNavDistValue2.textContent = (button.bottomDistance ?? 20) + 'px'
+
+		    docNavDistSlider2.addEventListener('input', () => {
+		      const val = parseInt(docNavDistSlider2.value)
+		      button.bottomDistance = val
+		      docNavDistValue2.textContent = val + 'px'
+		      const navBar = document.getElementById('desktop-doc-nav-bar')
+		      if (navBar) navBar.style.bottom = val + 'px'
+		    })
+
+		    docNavDistRow2.appendChild(docNavDistSlider2)
+		    docNavDistRow2.appendChild(docNavDistValue2)
+		    docNavConfigDiv2.appendChild(docNavDistRow2)
+
+		    const docNavDistHint2 = document.createElement('div')
+		    docNavDistHint2.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
+		    docNavDistHint2.textContent = '💡 调整导航栏距离屏幕底部的距离（0~200px）'
+		    docNavConfigDiv2.appendChild(docNavDistHint2)
+
+		    // 滚动隐藏开关
+		    const docNavAutoHideRow2 = document.createElement('div')
+		    docNavAutoHideRow2.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px;'
+
+		    const docNavAutoHideLabel2 = document.createElement('label')
+		    docNavAutoHideLabel2.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
+		    docNavAutoHideLabel2.textContent = '滚动隐藏/显示'
+
+		    const docNavAutoHideSwitch2 = document.createElement('input')
+		    docNavAutoHideSwitch2.type = 'checkbox'
+		    docNavAutoHideSwitch2.className = 'b3-switch'
+		    docNavAutoHideSwitch2.checked = button.autoHideOnScroll ?? false
+
+		    docNavAutoHideRow2.appendChild(docNavAutoHideLabel2)
+		    docNavAutoHideRow2.appendChild(docNavAutoHideSwitch2)
+
+		    const docNavAutoHideHint2 = document.createElement('div')
+		    docNavAutoHideHint2.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
+		    docNavAutoHideHint2.textContent = '向上滚动：导航栏消失；向下滚动：导航栏重新出现'
+
+		    docNavAutoHideSwitch2.onchange = () => {
+		      button.autoHideOnScroll = docNavAutoHideSwitch2.checked
+		    }
+
+		    docNavConfigDiv2.appendChild(docNavAutoHideRow2)
+		    docNavConfigDiv2.appendChild(docNavAutoHideHint2)
+		    authorToolField.appendChild(docNavConfigDiv2)
 
 	    // 根据当前选择显示/隐藏配置区
     const updateVisibility = () => {
@@ -3230,10 +3374,12 @@ export function populateDesktopEditForm(
 	        buttonSequenceConfigDiv.style.display = 'none'
 	        scrollDocConfigDiv.style.display = 'none'
 	        img2UploadConfigDiv.style.display = 'none'
-		        collapseStyleConfigDiv2.style.display = (subtype === 'mobile-tabs' || subtype === 'mobile-outline') ? 'flex' : 'none'
-		        // 沉浸阅读模式：显示/隐藏锁定图标+滚动隐藏开关
-		        const toggleExtras2 = form.querySelector('.toggle-lock-extras') as HTMLElement | null
-		        if (toggleExtras2) toggleExtras2.style.display = (subtype === 'toggle-lock') ? '' : 'none'
+	        collapseStyleConfigDiv2.style.display = (subtype === 'mobile-tabs' || subtype === 'mobile-outline') ? 'flex' : 'none'
+	        // 前一篇/后一篇：显示底部距离 + 滚动隐藏配置
+	        docNavConfigDiv2.style.display = subtype === 'doc-nav' ? 'flex' : 'none'
+	        // 沉浸阅读模式：显示/隐藏锁定图标+滚动隐藏开关
+	        const toggleExtras2 = form.querySelector('.toggle-lock-extras') as HTMLElement | null
+	        if (toggleExtras2) toggleExtras2.style.display = (subtype === 'toggle-lock') ? '' : 'none'
 	      } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'

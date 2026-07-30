@@ -17,6 +17,7 @@ interface DocNavContext {
   saveData: (key: string, value: any) => Promise<void>
   loadData: (key: string) => Promise<any>
   eventBus: any
+  bottomDistance?: number
 }
 
 interface DesktopDocNavState {
@@ -43,6 +44,19 @@ let themeModeUnsubscribe: (() => void) | null = null
 let prevDoc: { id: string; title: string } | null = null
 let nextDoc: { id: string; title: string } | null = null
 let isLoading = false
+
+// ===== 滚动隐藏状态 =====
+let hiddenByScroll = false
+let autoHideEnabled = false
+let lastScrollTopForAutoHide: number | null = null
+let lastAutoHideToggleAt = 0
+const SCROLL_HIDE_THRESHOLD_PX = 15
+const SCROLL_TOGGLE_COOLDOWN_MS = 200
+const SCROLL_FADE_MS = 160
+let boundScrollEl: HTMLElement | null = null
+let scrollBindRetryTimer: ReturnType<typeof setInterval> | null = null
+let scrollBindRetryCount = 0
+let currentBottomDistance = 20
 
 // ===== 获取当前活动的 protyle 元素和文档信息 =====
 function getCurrentDocId(): string | undefined {
@@ -176,6 +190,16 @@ function createSwitchProtyleHandler(): () => void {
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
       debounceTimer = null
+      // 重置滚动基准
+      lastScrollTopForAutoHide = null
+      lastAutoHideToggleAt = 0
+      // 如果之前被滚动隐藏了，切文档时恢复可见
+      if (hiddenByScroll && navBar) {
+        hiddenByScroll = false
+        navBar.style.transition = 'none'
+        navBar.style.opacity = '1'
+        navBar.style.pointerEvents = ''
+      }
       fetchAdjacentDocs()
     }, 300)
   }
@@ -272,13 +296,109 @@ function truncateTitle(title: string, maxLen = 20): string {
   return title.length > maxLen ? title.substring(0, maxLen) + '...' : title
 }
 
-function createNavBar(): void {
+// ===== 滚动自动隐藏 =====
+function handleScrollAutoHide(): void {
+  if (!state.isVisible) return
+  if (!autoHideEnabled) return
+  if (!navBar) return
+
+  const scrollEl = boundScrollEl || getDesktopContentScrollElement()
+  if (!scrollEl) return
+
+  const now = Date.now()
+  const st = scrollEl.scrollTop
+
+  if (lastScrollTopForAutoHide == null) {
+    lastScrollTopForAutoHide = st
+    return
+  }
+
+  const delta = st - lastScrollTopForAutoHide
+  lastScrollTopForAutoHide = st
+
+  if (now - lastAutoHideToggleAt < SCROLL_TOGGLE_COOLDOWN_MS) return
+
+  if (!hiddenByScroll && delta > SCROLL_HIDE_THRESHOLD_PX) {
+    // 上滑 → 隐藏
+    hiddenByScroll = true
+    lastAutoHideToggleAt = now
+    navBar.style.transition = `opacity ${SCROLL_FADE_MS}ms ease`
+    navBar.style.opacity = '0'
+    navBar.style.pointerEvents = 'none'
+  } else if (hiddenByScroll && delta < -SCROLL_HIDE_THRESHOLD_PX) {
+    // 下滑 → 显示
+    hiddenByScroll = false
+    lastAutoHideToggleAt = now
+    navBar.style.transition = `opacity ${SCROLL_FADE_MS}ms ease`
+    navBar.style.opacity = '1'
+    navBar.style.pointerEvents = ''
+  }
+}
+
+function getDesktopContentScrollElement(): HTMLElement | null {
+  const protyle = getActiveProtyle()
+  if (protyle?.contentElement) return protyle.contentElement as HTMLElement
+  const visibleProtyle = document.querySelector('.protyle:not(.fn__hidden):not(.fn__none)')
+  if (visibleProtyle) {
+    return visibleProtyle.querySelector('.protyle-content') as HTMLElement | null
+  }
+  return null
+}
+
+function bindScrollListener(): void {
+  const el = getDesktopContentScrollElement()
+  if (!el) return
+
+  if (boundScrollEl && boundScrollEl !== el) {
+    boundScrollEl.removeEventListener('scroll', handleScrollAutoHide as any)
+    boundScrollEl = null
+  }
+
+  if (boundScrollEl === el) return
+  boundScrollEl = el
+  boundScrollEl.addEventListener('scroll', handleScrollAutoHide as any, { passive: true })
+}
+
+function startScrollBindRetry(): void {
+  if (boundScrollEl) return
+  if (scrollBindRetryTimer) return
+
+  scrollBindRetryCount = 0
+  scrollBindRetryTimer = setInterval(() => {
+    scrollBindRetryCount++
+    bindScrollListener()
+    if (boundScrollEl || scrollBindRetryCount >= 30) {
+      if (scrollBindRetryTimer) clearInterval(scrollBindRetryTimer)
+      scrollBindRetryTimer = null
+    }
+  }, 200)
+}
+
+function ensureScrollListenerBound(): void {
+  bindScrollListener()
+  if (!boundScrollEl) startScrollBindRetry()
+}
+
+function detachScrollListener(): void {
+  if (boundScrollEl) {
+    boundScrollEl.removeEventListener('scroll', handleScrollAutoHide as any)
+    boundScrollEl = null
+  }
+  if (scrollBindRetryTimer) {
+    clearInterval(scrollBindRetryTimer)
+    scrollBindRetryTimer = null
+  }
+}
+
+function createNavBar(bottomDistance?: number): void {
   if (navBar) return
 
   injectStyles()
 
   navBar = document.createElement('div')
   navBar.id = 'desktop-doc-nav-bar'
+  // 初始可见
+  navBar.style.opacity = '1'
 
   const prevBtn = document.createElement('button')
   prevBtn.className = 'desktop-doc-nav-btn desktop-doc-nav-prev'
@@ -299,24 +419,31 @@ function createNavBar(): void {
 
   fetchAdjacentDocs()
 
-  // 恢复位置或使用默认位置
-  const restored = restorePosition(navBar)
-  if (restored) {
-    navBar.style.left = 'auto'
-    navBar.style.bottom = 'auto'
-  } else {
-    // 默认位置：底部居中
-    navBar.style.left = '50%'
-    navBar.style.bottom = '20px'
-    navBar.style.right = 'auto'
-    navBar.style.transform = 'translateX(-50%)'
-  }
+	  // 恢复位置或使用默认位置
+	  const bd = bottomDistance ?? currentBottomDistance
+	  const restored = restorePosition(navBar)
+	  if (restored) {
+	    // 恢复保存的 left 位置，但用配置的底部距离覆盖垂直位置
+	    navBar.style.top = 'auto'
+	    navBar.style.bottom = bd + 'px'
+	  } else {
+	    // 默认位置：底部居中，距离底部可配置
+	    navBar.style.left = '50%'
+	    navBar.style.bottom = bd + 'px'
+	    navBar.style.right = 'auto'
+	    navBar.style.transform = 'translateX(-50%)'
+	  }
 
   // 启用拖拽
   dragCleanup = makeDraggable(navBar, {
     handleSelector: undefined,
     boundary: 'window'
   })
+
+  // 绑定滚动隐藏
+  if (autoHideEnabled) {
+    ensureScrollListenerBound()
+  }
 }
 
 function removeNavBar(): void {
@@ -324,6 +451,8 @@ function removeNavBar(): void {
     dragCleanup()
     dragCleanup = null
   }
+
+  detachScrollListener()
 
   if (navBar) {
     navBar.remove()
@@ -336,7 +465,8 @@ function removeNavBar(): void {
 async function persistState(): Promise<void> {
   if (!ctx) return
   await ctx.saveData(PERSIST_KEY, {
-    isVisible: state.isVisible
+    isVisible: state.isVisible,
+    bottomDistance: currentBottomDistance
   })
 }
 
@@ -347,6 +477,9 @@ async function loadState(): Promise<void> {
     if (saved) {
       state = {
         isVisible: saved.isVisible ?? false
+      }
+      if (typeof saved.bottomDistance === 'number') {
+        currentBottomDistance = saved.bottomDistance
       }
     }
   } catch (err) {
@@ -368,6 +501,11 @@ export async function init(context: DocNavContext): Promise<void> {
   }
 
   await loadState()
+
+  // 如果 loadState 没有恢复 bottomDistance（旧格式升级），尝试从 context 读取
+  if (context.bottomDistance !== undefined && currentBottomDistance === 20) {
+    currentBottomDistance = context.bottomDistance
+  }
 
   if (state.isVisible) {
     createNavBar()
@@ -399,10 +537,18 @@ export function toggleVisibility(config: ButtonConfig): void {
     return
   }
 
-  state.isVisible = !state.isVisible
+	  state.isVisible = !state.isVisible
 
-  if (state.isVisible) {
-    createNavBar()
+	  if (state.isVisible) {
+	    // 从配置读取滚动隐藏开关和底部距离（配置优先，其次持久化状态，最后默认值）
+	    autoHideEnabled = config.autoHideOnScroll ?? false
+	    console.log('[DocNav] config.bottomDistance =', config.bottomDistance, 'currentBottomDistance =', currentBottomDistance)
+	    currentBottomDistance = config.bottomDistance ?? currentBottomDistance
+    hiddenByScroll = false
+    lastScrollTopForAutoHide = null
+    lastAutoHideToggleAt = 0
+
+    createNavBar(config.bottomDistance)
     applyFloatPanelBackground(navBar, config.floatOpacity, 0.85)
     // 注册 EventBus 监听（先 off 旧再 on 新，处理 init 时 handler 为空的情况）
     if (ctx) {
@@ -426,6 +572,11 @@ export function toggleVisibility(config: ButtonConfig): void {
       ctx.eventBus.off('loaded-protyle-dynamic', switchProtyleHandler)
     }
 
+    // 重置滚动隐藏状态
+    autoHideEnabled = false
+    hiddenByScroll = false
+    lastScrollTopForAutoHide = null
+
     if (config.showNotification !== false) {
       showMessage('文档导航已隐藏', 1500, 'info')
     }
@@ -448,9 +599,15 @@ export function cleanup(): void {
     themeModeUnsubscribe = null
   }
 
+  detachScrollListener()
+
   prevDoc = null
   nextDoc = null
   isLoading = false
   ctx = null
   state = { isVisible: false }
+  autoHideEnabled = false
+  hiddenByScroll = false
+  lastScrollTopForAutoHide = null
+  currentBottomDistance = 20
 }

@@ -364,6 +364,74 @@ if (pluginRect.width > 0 && pluginRect.left > 0) {
 
 ---
 
+## 血泪教训
+
+### 教训 1：别在 scroll 处理器里动缓存（P3 翻车）
+
+**文件**：`src/toolbarManager.ts`
+**提交**：`86041f8`（已回退 `6b19a42`）
+
+**犯的错**：把 scroll handler 显示分支中的 `querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden')` 替换成了 `getToolbarElementsForAutoHide()`，以为它们等价。
+
+**实际不等价**：
+
+```typescript
+// 原版 —— 只操作"当前已隐藏"的元素（带 toolbar-scroll-hidden 类）
+document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden')
+
+// 替换版 —— 返回所有工具栏元素（不管有没有 hidden class）
+getToolbarElementsForAutoHide()  // → [data-toolbar-customized]
+```
+
+在"下滑恢复"分支里，原版只对已隐藏的元素执行 `removeProperty('opacity')` + `transform` 恢复。替换后对所有元素执行，没隐藏的元素也被改了 transform → **滚动隐藏行为错乱**。
+
+**教训**：
+- 缓存函数的返回语义必须跟原始查询**完全等价**才能替换
+- `.toolbar-scroll-hidden`（按状态过滤）与 `[data-toolbar-customized]`（按属性过滤）是不同的筛选逻辑
+- scroll 处理器是高频路径，但**错了比慢了更严重**——没坏的别动
+
+### 教训 2：编辑器限定查找别管太宽（误伤 barPlugins）
+
+**文件**：`src/toolbarManager.ts`
+**提交**：`d989001`（收窄白名单 `6ff3516`）
+
+**犯的错**：在 `executeClickSequence` 里加了编辑器限定查找逻辑，但条件写太松，把 `barPlugins`、`text:思源手机端增强` 这些不在编辑器内的全局元素也拦住了。
+
+```typescript
+// 第一次（误伤）——条件太宽，barPlugins、text:xxx 也被框进来了
+if (clickedButton && !actualSelector.startsWith('text:') &&
+    !actualSelector.startsWith('#') && ...)
+
+// 最终（安全）——只有白名单才走新逻辑
+if (clickedButton && (actualSelector === 'more' || actualSelector === 'doc'))
+```
+
+**教训**：
+- "顺手扩大作用域"是大忌，新逻辑一定要用**白名单**收窄
+- 全局元素（顶栏按钮、弹窗菜单项）跟编辑器内的工具栏按钮不能混为一谈
+- 任何新加的条件分支都要问："会不会影响到其他已有的按钮？"
+
+### 教训 3：代码审查报告不能全信（sub-agent 误报）
+
+**犯的错**：让 AI sub-agent 做了代码审查，它报了 4 个问题就直接信了，没逐条核实就动手改。
+
+**实际误报**：
+- 说 `window.__toolbarManager` 没 delete → 实际上 L7603 有 delete，L7606 重设是 cleanup 重建流程的正常逻辑
+- 说迁移逻辑每次启动写盘 → 实际上 `removeData('featureConfig')` 自清理，`migrateLegacyPerm()` 幂等
+
+**教训**：
+- 自动化审查报告只能当线索，不能当结论
+- 动手改代码前必须**亲自读一遍目标代码**确认问题真实存在
+- 特别是性能优化——"可能有问题"不代表"真的有问题"
+
+### 总结：动代码前的自问清单
+
+1. **这个 bug 是我亲眼复现的吗？**（还是别人/机器报告的？）
+2. **这段代码的原始意图是什么？**（注释 / git blame / 附近上下文）
+3. **我的改动有没有白名单兜底？**（只影响目标，不影响其他）
+4. **如果改错了，能不能快速回退？**（小提交 + 清晰 commit msg）
+5. **这个"顺手优化"真的必要吗？**（没坏的别动）
+
 ## 手机端/桌面端底部胶囊滚动隐藏
 
 **文件**：`src/toolbarManager.ts`

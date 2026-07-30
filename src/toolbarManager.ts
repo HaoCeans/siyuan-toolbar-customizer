@@ -150,7 +150,8 @@ export interface ButtonConfig {
   floatPanelPosition?: 'top' | 'center' | 'bottom'; // 悬浮弹窗垂直位置：top=顶部, center=居中(默认), bottom=底部
 	  maxVisibleTabs?: number;   // 手机端标签页：最大可见标签数 (1~10)，超出后可滚动，默认 10
 	  collapseStyle?: 'preview' | 'minimal'; // 折叠面板样式：preview=收起显示预览小图标, minimal=收起仅显示展开手柄
-  showInContextMenu?: boolean; // 是否显示在文本右键菜单中（仅模板类型，默认false）
+	  bottomDistance?: number;   // 前一篇/后一篇导航栏距底部距离(px)，手机端默认80，桌面端默认20
+	  showInContextMenu?: boolean; // 是否显示在文本右键菜单中（仅模板类型，默认false）
   buttonsPerLayer?: number[];  // 桌面端扩展工具栏：每层按钮数量，如 [8, 5, 5, 5, 5]（仅 overflow-button-desktop 使用）
   overflowToolbarHeight?: number;  // 桌面端扩展工具栏高度(px)，默认 32（仅 overflow-button-desktop 使用）
   overflowToolbarWidth?: number;   // 桌面端扩展工具栏宽度(px)，默认 0 表示与主工具栏同宽，最大 1300
@@ -2198,17 +2199,18 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
     button.addEventListener('touchend', () => {
       setTimeout(() => { isTouchEvent = false }, 100)
     })
-  } else {
-    // 其他按钮：保持原有逻辑
-    // 在 mousedown 时保存选区和焦点元素（此时编辑器还未失去焦点）
-    button.addEventListener('mousedown', (e) => {
-      if (isTouchEvent) return // 如果是触摸事件，跳过 mousedown
-      const selection = window.getSelection()
-      if (selection && selection.rangeCount > 0) {
-        savedSelection = selection.getRangeAt(0).cloneRange()
-      }
-      lastActiveElement = document.activeElement as HTMLElement
-    })
+	  } else {
+	    // 其他按钮：保持原有逻辑
+	    // 在 mousedown 时保存选区和焦点元素（此时编辑器还未失去焦点）
+	    button.addEventListener('mousedown', (e) => {
+	      e.preventDefault()  // 阻止按钮获得焦点，保持编辑器焦点/输入法不关闭
+	      if (isTouchEvent) return // 如果是触摸事件，跳过选区保存（touchstart 已保存）
+	      const selection = window.getSelection()
+	      if (selection && selection.rangeCount > 0) {
+	        savedSelection = selection.getRangeAt(0).cloneRange()
+	      }
+	      lastActiveElement = document.activeElement as HTMLElement
+	    })
 
     // 移动端：touchstart 时保存状态
     button.addEventListener('touchstart', (e) => {
@@ -2660,15 +2662,16 @@ function showOverflowToolbar(config: ButtonConfig) {
       let lastActiveElement: HTMLElement | null = null
       let isTouchEvent = false
 
-      // 在 mousedown 时保存选区和焦点元素
-      layerBtn.addEventListener('mousedown', (e) => {
-        if (isTouchEvent) return
-        const selection = window.getSelection()
-        if (selection && selection.rangeCount > 0) {
-          savedSelection = selection.getRangeAt(0).cloneRange()
-        }
-        lastActiveElement = document.activeElement as HTMLElement
-      })
+	      // 在 mousedown 时保存选区和焦点元素
+	      layerBtn.addEventListener('mousedown', (e) => {
+	        e.preventDefault()  // 阻止按钮获得焦点
+	        if (isTouchEvent) return
+	        const selection = window.getSelection()
+	        if (selection && selection.rangeCount > 0) {
+	          savedSelection = selection.getRangeAt(0).cloneRange()
+	        }
+	        lastActiveElement = document.activeElement as HTMLElement
+	      })
 
       // 移动端：touchstart 时保存状态
       layerBtn.addEventListener('touchstart', (e) => {
@@ -5771,7 +5774,7 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
 	    return
 	  }
 
-		  // ⑧图片快捷导入日记
+		  // ⑧图片快捷导入
 	  if (subtype === 'image-upload') {
 	    await executeImageUpload(config, savedSelection, lastActiveElement)
 	    return
@@ -5938,7 +5941,7 @@ function minutesToHHMM(minutes: number): string {
 }
 
 /**
- * ⑧图片快捷导入日记
+ * ⑧图片快捷导入
  */
 /**
  * 追加图片 markdown 到日记底部（原有逻辑，工具栏无光标时使用）
@@ -6063,7 +6066,7 @@ async function executeImageUpload(config: ButtonConfig, preSavedRange: Range | n
 	        }
 	      }
 	    } catch (error) {
-	      console.warn('[图片快捷导入日记] 执行失败:', error)
+	      console.warn('[图片快捷导入] 执行失败:', error)
 	      Notify.showErrorCommandCannotExecute('图片导入失败')
 	    }
 	  }

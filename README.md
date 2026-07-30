@@ -112,7 +112,7 @@
 - ⑤ **叶归 LifeLog 适配**：深度适配叶归 LifeLog 插件
 - ⑥ **弹窗框模板选择**：弹窗内多模板快速选择，适配输入法避让
 - ⑦ **滚动文档顶部或底部**：一键跳转文档首尾
-- ⑧ **图片快捷导入日记**：一键选择图片导入笔记。开启块编辑模式可插入记事弹窗光标处
+- ⑧ **图片快捷导入**：一键选择图片导入笔记。开启块编辑模式可插入记事弹窗光标处
 - ⑨ **悬浮标签页Tab**：多文档快速切换，悬浮Tab栏自动管理
 - ⑩ **悬浮大纲**：左侧悬浮大纲面板，标题快速跳转
 - ⑪ **前一篇/后一篇文档**：底部悬浮导航栏，按文件树顺序浏览文档
@@ -333,6 +333,34 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 ---
 
 # 📌 Changelog
+
+### v3.7.8 — Navigation Enhancement + IME Friendly ✨
+
+> 💡 **If you use 「⑪ Previous/Next Document」or mobile shortcuts, recommended update.**
+
+#### ✨ New
+
+**1. ⑪ Previous/Next Document: Desktop scroll auto-hide 🎯**
+- Scroll up to hide the nav bar, scroll down to show, matching the mobile experience
+- Auto-restores visibility and resets scroll baseline when switching documents
+
+**2. ⑪ Previous/Next Document: Configurable bottom distance**
+- Both desktop and mobile can now independently adjust the nav bar's distance from the bottom (0~200px)
+- Live preview via slider in settings
+
+#### 🔧 Improvements
+
+**3. ⑫ Slide Comment: Removed manual download button**
+- The plugin is now on the marketplace; guide users to search "鲸鱼快速批注" in the marketplace
+- No more GitHub Release ZIP download links
+
+**4. Toolbar buttons no longer close the IME 📱**
+- Clicking any toolbar button no longer steals focus from the editor
+- Mobile keyboard stays open when tapping toolbar buttons, smoother input experience
+
+#### 🏷️ Misc
+
+- ⑧ "Quick Image Import to Diary" renamed to "Quick Image Import"
 
 ### v3.7.7 — 修了个误伤 🐛
 
@@ -846,7 +874,7 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 #### ✨ 新增功能
 
 - 🐋 **鲸鱼定制工具箱新增**
-  - 🖼️ **⑦图片快捷导入日记** - 支持快速导入图片到每日日记
+  - 🖼️ **⑦图片快捷导入** - 支持快速导入图片到每日日记
   - 📑 **⑧手机端标签页Tab** - 新增手机端悬浮标签栏，支持钉住功能
   - 📋 **⑨手机端悬浮大纲** - 新增手机端悬浮大纲面板，快速浏览文档结构
   - 📄 **⑪手机端前一篇/后一篇文档** - 新增文档导航栏，快速切换上下一篇文档
@@ -1001,7 +1029,7 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 
 1. **选择方案** - 选择适合你的套餐方案
 2. **扫码转账** - 使用微信或支付宝扫码付款，付款备注请提供用户名
-3. **提供信息** - 将付款截图和用户名发送至 17114555244@qq.com 邮箱，或加入 QQ 群联系群主
+3. **提供信息** - 将付款截图和用户名发送至 1711455244@qq.com 邮箱，或加入 QQ 群联系群主
 4. **获取激活码** - 群主核实后发放激活码，粘贴激活即可解锁全部功能
 
 进群咨询/获取：**QQ群 1018010924**

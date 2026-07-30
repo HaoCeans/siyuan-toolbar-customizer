@@ -390,10 +390,17 @@ export default class ToolbarCustomizer extends Plugin {
             btn.sort = idx
           })
         }
-      } else {
-        // 配置不存在或格式错误，使用默认配置（首次加载时不保存，等用户修改时再保存）
-        this.desktopButtonConfigs = DEFAULT_DESKTOP_BUTTONS.map(btn => ({...btn}))
-      }
+	      } else {
+	        // 配置不存在或格式错误，使用默认配置（首次加载时不保存，等用户修改时再保存）
+	        this.desktopButtonConfigs = DEFAULT_DESKTOP_BUTTONS.map(btn => ({...btn}))
+	      }
+	      // 调试：检查 doc-nav 按钮的 bottomDistance
+	      const docNavBtn = this.desktopButtonConfigs.find(b => b.type === 'author-tool' && (b as any).authorToolSubtype === 'doc-nav')
+	      if (docNavBtn) {
+	        console.log('[DesktopDocNav] 加载后 doc-nav button config:', JSON.stringify({ id: docNavBtn.id, bottomDistance: (docNavBtn as any).bottomDistance, name: docNavBtn.name }))
+	      } else {
+	        console.log('[DesktopDocNav] 未找到 doc-nav 按钮')
+	      }
 
       // 加载手机端按钮配置
       const savedMobileButtons = await this.loadData('mobileButtonConfigs')
@@ -737,16 +744,17 @@ export default class ToolbarCustomizer extends Plugin {
       initSmallWindowDetector()
 
 	      // 从按钮配置中查找各模块的透明度、滚动隐藏（与 toggleVisibility 一致，避免重载后仅恢复可见态却丢失开关）
-	      const findAuthorToolFloatOptions = (subtype: string): { floatOpacity?: number; autoHideOnScroll?: boolean; maxVisibleTabs?: number; floatPanelPosition?: string; collapseStyle?: 'preview' | 'minimal' } => {
-	        const btn = this.mobileButtonConfigs.find(b => b.type === 'author-tool' && b.authorToolSubtype === subtype)
-	        return {
-	          floatOpacity: btn?.floatOpacity,
-	          autoHideOnScroll: btn?.autoHideOnScroll,
-	          maxVisibleTabs: btn?.maxVisibleTabs,
-	          floatPanelPosition: btn?.floatPanelPosition,
-	          collapseStyle: btn?.collapseStyle
-	        }
-	      }
+      const findAuthorToolFloatOptions = (subtype: string): { floatOpacity?: number; autoHideOnScroll?: boolean; maxVisibleTabs?: number; floatPanelPosition?: string; collapseStyle?: 'preview' | 'minimal'; bottomDistance?: number } => {
+        const btn = this.mobileButtonConfigs.find(b => b.type === 'author-tool' && b.authorToolSubtype === subtype)
+        return {
+          floatOpacity: btn?.floatOpacity,
+          autoHideOnScroll: btn?.autoHideOnScroll,
+          maxVisibleTabs: btn?.maxVisibleTabs,
+          floatPanelPosition: btn?.floatPanelPosition,
+          collapseStyle: btn?.collapseStyle,
+          bottomDistance: btn?.bottomDistance
+        }
+      }
 
       const tabsOpts = findAuthorToolFloatOptions('mobile-tabs')
       const outlineOpts = findAuthorToolFloatOptions('mobile-outline')
@@ -781,7 +789,8 @@ export default class ToolbarCustomizer extends Plugin {
         loadData: (key) => this.loadData(key),
         eventBus: this.eventBus,
         floatOpacity: docNavOpts.floatOpacity,
-        autoHideOnScroll: docNavOpts.autoHideOnScroll
+        autoHideOnScroll: docNavOpts.autoHideOnScroll,
+        bottomDistance: docNavOpts.bottomDistance
       })
     }
 
@@ -802,10 +811,12 @@ export default class ToolbarCustomizer extends Plugin {
       })
 
       // 初始化桌面端文档导航模块
+      const desktopDocNavBtn = this.desktopButtonConfigs.find(b => b.type === 'author-tool' && b.authorToolSubtype === 'doc-nav')
       await initDesktopDocNav({
         saveData: (key, value) => this.saveData(key, value),
         loadData: (key) => this.loadData(key),
-        eventBus: this.eventBus
+        eventBus: this.eventBus,
+        bottomDistance: desktopDocNavBtn?.bottomDistance
       })
     }
 

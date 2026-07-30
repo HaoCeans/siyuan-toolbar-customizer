@@ -875,7 +875,7 @@ export function createMobileButtonItem(
         <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>⑤ 叶归LifeLog适配</option>
         <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
         <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
-        <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>⑧ 图片快捷导入日记</option>
+        <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>⑧ 图片快捷导入</option>
         <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>⑨ 悬浮标签页Tab</option>
         <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>⑩ 悬浮大纲</option>
         <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 前一篇/后一篇文档</option>
@@ -1358,7 +1358,7 @@ export function createMobileButtonItem(
       scrollDocConfigDiv.appendChild(radioContainer)
       authorToolContainer.appendChild(scrollDocConfigDiv)
 
-      // 图片快捷导入日记配置区
+      // 图片快捷导入配置区
       const imageUploadConfigDiv = document.createElement('div')
       imageUploadConfigDiv.id = 'image-upload-config-mobile'
       imageUploadConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
@@ -1495,6 +1495,50 @@ export function createMobileButtonItem(
       autoHideContainer.appendChild(autoHideRow)
       autoHideContainer.appendChild(autoHideHint)
       floatOpacityConfigDiv.appendChild(autoHideContainer)
+
+      // 底部距离配置（⑪前一篇/后一篇文档专用）
+      const bottomDistanceContainer = document.createElement('div')
+      bottomDistanceContainer.id = 'doc-nav-bottom-distance-config-mobile'
+      bottomDistanceContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px; margin-top: 4px;'
+
+      const bottomDistLabel = document.createElement('label')
+      bottomDistLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
+      bottomDistLabel.textContent = '距离底部高度'
+
+      const bottomDistRow = document.createElement('div')
+      bottomDistRow.style.cssText = 'display: flex; align-items: center; gap: 12px;'
+
+      const bottomDistSlider = document.createElement('input')
+      bottomDistSlider.type = 'range'
+      bottomDistSlider.min = '0'
+      bottomDistSlider.max = '200'
+      bottomDistSlider.step = '5'
+      bottomDistSlider.value = String(button.bottomDistance ?? 80)
+      bottomDistSlider.style.cssText = 'flex: 1; accent-color: var(--b3-theme-primary);'
+
+      const bottomDistValue = document.createElement('span')
+      bottomDistValue.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface-light); min-width: 40px; text-align: right;'
+      bottomDistValue.textContent = (button.bottomDistance ?? 80) + 'px'
+
+      bottomDistSlider.addEventListener('input', () => {
+        const val = parseInt(bottomDistSlider.value)
+        button.bottomDistance = val
+        bottomDistValue.textContent = val + 'px'
+        // 实时更新已显示的导航栏
+        const navBar = document.getElementById('mobile-doc-nav-bar')
+        if (navBar) navBar.style.bottom = val + 'px'
+      })
+
+      const bottomDistHint = document.createElement('div')
+      bottomDistHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
+      bottomDistHint.textContent = '💡 调整导航栏距离屏幕底部的距离（0~200px）'
+
+      bottomDistRow.appendChild(bottomDistSlider)
+      bottomDistRow.appendChild(bottomDistValue)
+      bottomDistanceContainer.appendChild(bottomDistLabel)
+      bottomDistanceContainer.appendChild(bottomDistRow)
+      bottomDistanceContainer.appendChild(bottomDistHint)
+      floatOpacityConfigDiv.appendChild(bottomDistanceContainer)
 
       // 弹窗位置选择（⑨⑩⑪ 共用）
       const positionContainer = document.createElement('div')

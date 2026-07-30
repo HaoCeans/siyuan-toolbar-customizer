@@ -1152,12 +1152,11 @@ export function createDesktopSettingLayout(
         rowTr('⑤', '叶归LifeLog适配', '与LifeLog插件深度整合，时间记录更智能，生活管理更高效'),
         rowTr('⑥', '弹窗框模板选择', '弹出式模板选择器，快速插入常用内容，写作效率倍增'),
         rowTr('⑦', '滚动文档顶部或底部', '一键直达文档首尾，长文档浏览更轻松'),
-        rowTr('⑧', '图片快捷导入日记', '一键选择图片导入笔记。若开启思源块编辑模式，可插入记事弹窗编辑器光标处'),
+        rowTr('⑧', '图片快捷导入', '一键选择图片导入笔记。若开启思源块编辑模式，可插入记事弹窗编辑器光标处'),
         rowTr('⑨', '悬浮标签页Tab', '多文档快速切换，悬浮Tab栏，自动管理'),
         rowTr('⑩', '悬浮大纲', '左侧悬浮大纲面板，标题快速跳转，阅读长文必备'),
         rowTr('⑪', '前一篇/后一篇文档', '底部悬浮导航栏，按文件树顺序浏览文档'),
-		        rowTr('⑫', '滑动快速批注<br><span style="color:#10b981;font-size:11px;">免费</span>', '完美联动「鲸鱼快速批注」插件，请先在电脑端下载该插件才能使用！' +
-		          '<br/><button onclick="alert(\'① 请到思源工作空间的 data/plugins/ 目录下，新建 siyuan-comment 文件夹\\n② 将下载的压缩包解压到 siyuan-comment 文件夹\\n③ 重载思源，在插件市场搜索「鲸鱼快速批注」打开插件\\n\\n如遇问题请进QQ群：1018010924\');location.href=\'https://github.com/HaoCeans/siyuan-comment/releases/download/v1.0.0/siyuan-comment.zip\'" style="margin-top:4px;padding:4px 12px;border-radius:6px;border:none;background:var(--b3-theme-primary);color:#fff;cursor:pointer;font-size:12px;outline:none;transition:opacity 0.2s;">⬇️ 下载最新版</button>'),
+		        rowTr('⑫', '滑动快速批注<br><span style="color:#10b981;font-size:11px;">免费</span>', '完美联动「鲸鱼快速批注」插件（独立插件），在插件市场搜索「鲸鱼快速批注」即可安装使用'),
         rowTr('⑬', '文档朗读', '使用浏览器语音合成朗读当前文档，支持语速调节、段落高亮'),
         rowTr('⑭', '一键清理空块', '自动扫描并删除文档中空块（无文本段落/标题/列表项），预览确认后批量删除'),
         rowTr('⑮', '沉浸阅读模式<br><span style="color:#10b981;font-size:11px;">免费</span>', '🔒一键锁定文档防误编辑 + 上滑自动隐藏工具栏，全屏沉浸阅读'),
@@ -1372,7 +1371,7 @@ export function createDesktopSettingLayout(
       const tip = document.createElement('div')
       tip.className = 'toolbar-customizer-pay-tip'
       tip.innerHTML = `
-        付款后请将用户名${currentUserName() ? '<strong>' + currentUserName() + '</strong>' : '（你的思源账号）'}和付款截图发至 17114555244@qq.com 邮箱或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入QQ群</a>联系群主。
+        付款后请将用户名${currentUserName() ? '<strong>' + currentUserName() + '</strong>' : '（你的思源账号）'}和付款截图发至 1711455244@qq.com 邮箱或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入QQ群</a>联系群主。
       `
 
       dialog.appendChild(closeBtn)
@@ -1624,7 +1623,7 @@ export function createDesktopSettingLayout(
 
         const accountTip = document.createElement('div')
         accountTip.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); margin-top: 6px; line-height: 1.5;'
-        accountTip.innerHTML = '无法在付款备注提供时，可将用户名和付款截图发送至 17114555244@qq.com，或 <a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主。'
+        accountTip.innerHTML = '无法在付款备注提供时，可将用户名和付款截图发送至 1711455244@qq.com，或 <a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主。'
         accountBox.appendChild(accountTip)
         content.appendChild(accountBox)
 
@@ -1642,7 +1641,7 @@ export function createDesktopSettingLayout(
         const steps = [
           { title: '选择方案', desc: '选择适合你的套餐方案，点击「扫码购买」' },
           { title: '扫码转账', desc: '使用微信或支付宝扫码付款，付款备注请提供用户名「<strong>' + (currentUserName() || (isActivated ? '已激活用户' : '你的思源账号用户名')) + '</strong>」' },
-          { title: '提供信息', desc: '将付款截图和用户名<strong>' + (currentUserName() || '（你的思源账号）') + '</strong>发送至 17114555244@qq.com 邮箱，或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主' },
+          { title: '提供信息', desc: '将付款截图和用户名<strong>' + (currentUserName() || '（你的思源账号）') + '</strong>发送至 1711455244@qq.com 邮箱，或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主' },
           { title: '获取激活码', desc: '群主核实后发放激活码，回到本页粘贴激活即可解锁全部功能' },
         ]
         steps.forEach((step, i) => {

@@ -394,13 +394,6 @@ export default class ToolbarCustomizer extends Plugin {
 	        // 配置不存在或格式错误，使用默认配置（首次加载时不保存，等用户修改时再保存）
 	        this.desktopButtonConfigs = DEFAULT_DESKTOP_BUTTONS.map(btn => ({...btn}))
 	      }
-	      // 调试：检查 doc-nav 按钮的 bottomDistance
-	      const docNavBtn = this.desktopButtonConfigs.find(b => b.type === 'author-tool' && (b as any).authorToolSubtype === 'doc-nav')
-	      if (docNavBtn) {
-	        console.log('[DesktopDocNav] 加载后 doc-nav button config:', JSON.stringify({ id: docNavBtn.id, bottomDistance: (docNavBtn as any).bottomDistance, name: docNavBtn.name }))
-	      } else {
-	        console.log('[DesktopDocNav] 未找到 doc-nav 按钮')
-	      }
 
       // 加载手机端按钮配置
       const savedMobileButtons = await this.loadData('mobileButtonConfigs')
@@ -816,7 +809,8 @@ export default class ToolbarCustomizer extends Plugin {
         saveData: (key, value) => this.saveData(key, value),
         loadData: (key) => this.loadData(key),
         eventBus: this.eventBus,
-        bottomDistance: desktopDocNavBtn?.bottomDistance
+        bottomDistance: desktopDocNavBtn?.bottomDistance,
+        autoHideOnScroll: desktopDocNavBtn?.autoHideOnScroll
       })
     }
 

@@ -751,7 +751,6 @@ export function toggleVisibility(config: ButtonConfig): void {
 
     createNavBar()
     applyOpacity(navBar, config.floatOpacity)
-    if (navBar) navBar.style.bottom = currentBottomDistance + 'px'
     ensureScrollListenerBound()
 
     // 重新注册事件监听

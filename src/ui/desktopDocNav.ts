@@ -18,6 +18,7 @@ interface DocNavContext {
   loadData: (key: string) => Promise<any>
   eventBus: any
   bottomDistance?: number
+  autoHideOnScroll?: boolean
 }
 
 interface DesktopDocNavState {
@@ -37,7 +38,7 @@ let state: DesktopDocNavState = {
 
 let navBar: HTMLElement | null = null
 let injectedStyle: HTMLElement | null = null
-let switchProtyleHandler: (() => void) | null = null
+let switchProtyleHandler: (() => void) & { cancel?: () => void } | null = null
 let dragCleanup: (() => void) | null = null
 let themeModeUnsubscribe: (() => void) | null = null
 
@@ -183,26 +184,37 @@ export async function navigateToAdjacentDoc(direction: 'prev' | 'next'): Promise
 
 // ===== Switch-protyle handler 工厂 =====
 /** 创建带防抖的文档切换处理器，每次调用返回新闭包，需先 off 旧引用再 on */
-function createSwitchProtyleHandler(): () => void {
+function createSwitchProtyleHandler(): (() => void) & { cancel?: () => void } {
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
-  return () => {
-    if (!state.isVisible) return
-    if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => {
+	  const handler = () => {
+	    if (!state.isVisible) return
+	    if (debounceTimer) clearTimeout(debounceTimer)
+	    debounceTimer = setTimeout(() => {
+	      debounceTimer = null
+	      // 重置滚动基准
+	      lastScrollTopForAutoHide = null
+	      lastAutoHideToggleAt = 0
+	      // 如果之前被滚动隐藏了，切文档时恢复可见
+	      if (hiddenByScroll && navBar) {
+	        hiddenByScroll = false
+	        navBar.style.transition = 'none'
+	        navBar.style.opacity = '1'
+	        navBar.style.pointerEvents = ''
+	      }
+	      // 切标签页后滚动容器变了，重绑 scroll 监听
+	      if (autoHideEnabled) {
+	        ensureScrollListenerBound()
+	      }
+	      fetchAdjacentDocs()
+	    }, 300)
+	  }
+  handler.cancel = () => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
       debounceTimer = null
-      // 重置滚动基准
-      lastScrollTopForAutoHide = null
-      lastAutoHideToggleAt = 0
-      // 如果之前被滚动隐藏了，切文档时恢复可见
-      if (hiddenByScroll && navBar) {
-        hiddenByScroll = false
-        navBar.style.transition = 'none'
-        navBar.style.opacity = '1'
-        navBar.style.pointerEvents = ''
-      }
-      fetchAdjacentDocs()
-    }, 300)
+    }
   }
+  return handler
 }
 
 // ===== DOM 构建 =====
@@ -502,9 +514,12 @@ export async function init(context: DocNavContext): Promise<void> {
 
   await loadState()
 
-  // 如果 loadState 没有恢复 bottomDistance（旧格式升级），尝试从 context 读取
+  // 从 context 恢复底部距离和滚动隐藏开关（按钮配置 > 持久化状态）
   if (context.bottomDistance !== undefined && currentBottomDistance === 20) {
     currentBottomDistance = context.bottomDistance
+  }
+  if (context.autoHideOnScroll !== undefined) {
+    autoHideEnabled = context.autoHideOnScroll
   }
 
   if (state.isVisible) {
@@ -515,8 +530,10 @@ export async function init(context: DocNavContext): Promise<void> {
   // 监听文档切换事件（300ms 防抖，避免快速切标签时大量 API）
   // 先移除旧的 handler（防止 init 重入泄漏），再创建新的
   if (switchProtyleHandler) {
+    switchProtyleHandler.cancel?.()
     context.eventBus.off('switch-protyle', switchProtyleHandler)
     context.eventBus.off('loaded-protyle-dynamic', switchProtyleHandler)
+    switchProtyleHandler = null
   }
   switchProtyleHandler = createSwitchProtyleHandler()
   context.eventBus.on('switch-protyle', switchProtyleHandler)
@@ -542,7 +559,6 @@ export function toggleVisibility(config: ButtonConfig): void {
 	  if (state.isVisible) {
 	    // 从配置读取滚动隐藏开关和底部距离（配置优先，其次持久化状态，最后默认值）
 	    autoHideEnabled = config.autoHideOnScroll ?? false
-	    console.log('[DocNav] config.bottomDistance =', config.bottomDistance, 'currentBottomDistance =', currentBottomDistance)
 	    currentBottomDistance = config.bottomDistance ?? currentBottomDistance
     hiddenByScroll = false
     lastScrollTopForAutoHide = null
@@ -553,8 +569,10 @@ export function toggleVisibility(config: ButtonConfig): void {
     // 注册 EventBus 监听（先 off 旧再 on 新，处理 init 时 handler 为空的情况）
     if (ctx) {
       if (switchProtyleHandler) {
+        switchProtyleHandler.cancel?.()
         ctx.eventBus.off('switch-protyle', switchProtyleHandler)
         ctx.eventBus.off('loaded-protyle-dynamic', switchProtyleHandler)
+        switchProtyleHandler = null
       }
       switchProtyleHandler = createSwitchProtyleHandler()
       ctx.eventBus.on('switch-protyle', switchProtyleHandler)
@@ -568,8 +586,10 @@ export function toggleVisibility(config: ButtonConfig): void {
     removeNavBar()
     // 隐藏时移除 EventBus 监听，避免后台无效触发
     if (ctx && switchProtyleHandler) {
+      switchProtyleHandler.cancel?.()
       ctx.eventBus.off('switch-protyle', switchProtyleHandler)
       ctx.eventBus.off('loaded-protyle-dynamic', switchProtyleHandler)
+      switchProtyleHandler = null
     }
 
     // 重置滚动隐藏状态
@@ -587,6 +607,7 @@ export function toggleVisibility(config: ButtonConfig): void {
 
 export function cleanup(): void {
   if (ctx && switchProtyleHandler) {
+    switchProtyleHandler.cancel?.()
     ctx.eventBus.off('switch-protyle', switchProtyleHandler)
     ctx.eventBus.off('loaded-protyle-dynamic', switchProtyleHandler)
     switchProtyleHandler = null

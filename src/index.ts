@@ -22,6 +22,7 @@ import {
   initMobileToolbarAdjuster,
   initCustomButtons,
   cleanup,
+  resetCleanupState,
   createButtonsForEditors,
   DEFAULT_BUTTONS_CONFIG,
   DEFAULT_DESKTOP_BUTTONS,
@@ -217,7 +218,7 @@ export default class ToolbarCustomizer extends Plugin {
 
   // 手机端小功能配置
   private mobileFeatureConfig = {
-    hideBreadcrumbIcon: true,   // 面包屑图标隐藏
+    hideBreadcrumbIcon: true,   // 面包屑按钮隐藏（默认隐藏，需用时在①开关关闭即可显示）
     hideReadonlyButton: true,   // 锁定编辑按钮隐藏
     hideDocMenuButton: true,    // 文档菜单按钮隐藏
     hideMoreButton: true,       // 更多按钮隐藏
@@ -671,6 +672,10 @@ export default class ToolbarCustomizer extends Plugin {
   private async initPluginFunctions() {
     // 清理旧的功能
     cleanup()
+    // 复位清理标志：cleanup() 会把 isCleanedUp 置 true，若不复位，
+    // initCustomButtons 的 rAF/timeout 回调全被跳过，启动/重载后工具栏按钮
+    // 无法创建，只有点文档触发事件才出现（时序 bug 根因）
+    resetCleanupState()
   
     // ===== 初始化移动端工具栏调整 =====
     // 手机端：如果禁用自定义按钮，跳过工具栏位置调整（恢复思源默认顶部）
@@ -1110,7 +1115,7 @@ export default class ToolbarCustomizer extends Plugin {
         // 如果扩展工具栏按钮启用，强制隐藏相关按钮
         const overflowBtn = this.mobileButtonConfigs.find(btn => btn.id === 'overflow-button-mobile')
         if (overflowBtn && overflowBtn.enabled !== false) {
-          this.mobileFeatureConfig.hideBreadcrumbIcon = true
+          // 注意：不再强制隐藏「面包屑」按钮（hideBreadcrumbIcon），它是手机端原生路径菜单入口
           this.mobileFeatureConfig.hideReadonlyButton = true
           this.mobileFeatureConfig.hideDocMenuButton = true
           this.mobileFeatureConfig.hideMoreButton = true

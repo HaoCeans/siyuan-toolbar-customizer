@@ -546,3 +546,58 @@ function refreshMobileCapsuleScrollBinding(): void {
 | `no targets to hide` | 元素还没就绪（`setupToolbarForElement` 未完成） |
 | `applied (bottom), opacity: N` | 已应用隐藏，N 应为 0（否则 CSS 覆盖问题） |
 | `SHOW` | 执行显示 |
+
+## 启动/重载时序：isCleanedUp 标志泄漏（工具栏按钮不加载）
+
+### 现象（v3.7.9 修复）
+
+- 每次启动思源或重载插件后，工具栏自定义按钮不加载；**点一下文档（触发事件）才出现**
+- 电脑端、手机端都出现
+
+### 根因
+
+模块级标志 `isCleanedUp`（`toolbarManager.ts`）在 `cleanup()` 尾部被置 `true`，**全代码没有任何地方复位**：
+
+```ts
+// cleanup() 尾部
+currentButtonConfigs = []
+isCleanedUp = true    // ← 置 true 后永不复位
+isSettingUpToolbar = false
+```
+
+而 `cleanup()` 不仅在 `onunload` 时调用，也在**每次重初始化**的 `initPluginFunctions()`（`index.ts`）第一行调用。重初始化后 `initCustomButtons` 里的两个创建入口全部被门闩拦截：
+
+```ts
+requestAnimationFrame(() => {
+  if (isCleanedUp) return    // ← 启动/重载后必跳过
+  setupEditorButtons(configs)
+})
+safeSetTimeout(() => {
+  if (isCleanedUp) return    // ← 同样跳过
+  setupEditorButtons(configs)
+}, 200)
+```
+
+- **电脑端**：`setupEditorButtons` 永远不会被调用 → 按钮永不创建。唯一能创建按钮的是事件总线路径（`loaded-protyle-dynamic` / `switch-protyle` → `createButtonsForEditors` **直接调用、无门闩**），只在点文档/切文档时触发 → "点文档才显示"完全吻合
+- **手机端**：`initMobileToolbarAdjuster` 的无门闩路径（100ms 定时器 / MutationObserver）能部分兜底，但 `setupEditorButtons` 内部 rAF 重试同样有 `if (isCleanedUp) return`，重试也被掐死 → 手机端同样被削弱
+
+### 思源加载时序背景（源码分析）
+
+| 路径 | 时序 |
+|------|------|
+| 启动 | `loadPlugins(init=true)` 对插件**并行加载不 await** → `onload()` 在布局恢复前就开始；`onLayoutReady()` 在布局恢复（含重开上次文档页签）之后调用，前提是 `onload()` 已 resolve |
+| 重载 | `onload()` 完成后**立刻**接 `onLayoutReady()`，不等布局 |
+
+**结论**：`onload()` 要快、不依赖布局/编辑器（await 编辑器/DOM 会让 `onLayoutReady` 无限期延后）；依赖文档/布局的初始化放 `onLayoutReady()` 或订阅事件（`loaded-protyle-dynamic` / `switch-protyle` / `loaded-protyle-static` / `ws-main`）。
+
+### 修复
+
+- 新增 `resetCleanupState()`：`isCleanedUp = false`
+- `initPluginFunctions()` 在 `cleanup()` 后立即调用（**重初始化边界复位**）
+- `onunload` 路径的 `isCleanedUp = true` 保护保留（卸载后异步回调不再操作 DOM）
+
+### 教训
+
+1. **模块级标志被 cleanup() 置位后，凡是"清理后还会重初始化"的场景都必须考虑复位**。cleanup() 的注释明明写了"重初始化时也会被调用"，但标志复位遗漏了。
+2. 排查"某功能只在用户交互后才出现"类 bug，优先怀疑：**初始化入口被门闩/状态卡住**，而不是事件本身。
+3. cleanup() 与初始化共用时，要逐一遍历模块级状态变量的生命周期（isCleanedUp / currentButtonConfigs / isSettingUpToolbar / 各 observer / 各 timer）。

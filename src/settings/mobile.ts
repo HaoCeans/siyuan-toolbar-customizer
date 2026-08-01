@@ -4014,7 +4014,7 @@ export function createMobileSettingLayout(
   createGroupTitle('5️⃣ ','小功能选择')
 
   // 说明文字
-  createNotice('⚙️调整手机端的图标隐藏设置，注意打开扩展工具栏，会强制隐藏，若想用面包屑等，请滚动到顶部，关闭扩展工具栏按钮')
+  createNotice('⚙️调整手机端的图标隐藏设置：①面包屑按钮默认隐藏，需要时关闭①即可显示并弹出路径菜单；打开扩展工具栏会强制隐藏②③④原生按钮')
 
   // 检查扩展工具栏按钮是否启用
   const isOverflowButtonEnabled = () => {
@@ -4024,19 +4024,15 @@ export function createMobileSettingLayout(
 
 
   setting.addItem({
-    title: '①面包屑图标隐藏',
-    description: '💡开启后隐藏面包屑左侧的图标',
+    title: '①面包屑按钮隐藏',
+    description: '💡开启后隐藏手机端「面包屑」按钮（关闭后可在工具栏显示，点击弹出思源原生路径菜单）',
     createActionElement: () => {
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
       toggle.className = 'b3-switch'
-      const overflowEnabled = isOverflowButtonEnabled()
-      toggle.checked = overflowEnabled ? true : context.mobileFeatureConfig.hideBreadcrumbIcon
+      // 面包屑按钮不再受扩展工具栏强制隐藏，开关真实生效
+      toggle.checked = context.mobileFeatureConfig.hideBreadcrumbIcon === true
       toggle.style.cssText = 'transform: scale(1.2);'
-      if (overflowEnabled) {
-        toggle.disabled = true
-        toggle.style.opacity = '0.5'
-      }
       toggle.onchange = async () => {
         context.mobileFeatureConfig.hideBreadcrumbIcon = toggle.checked
         await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)

@@ -334,6 +334,35 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 
 # 📌 Changelog
 
+### v3.7.9 — Toolbar loading fix + Breadcrumb toggle 📱
+
+> 💡 **Recommended update** if you've seen toolbar buttons missing right after starting/reloading SiYuan (they only appeared after clicking a document).
+
+#### 🔧 Fixes
+
+**1. Toolbar buttons now load right after startup/reload (timing bug)**
+- Root cause: the module-level `isCleanedUp` flag was set to `true` by `cleanup()` during re-initialization and never reset, so all scheduled button-creation callbacks were skipped until a document event (e.g., clicking a doc) triggered them
+- Fixed: reset the flag after the re-init cleanup (`resetCleanupState()`)
+- Applies to both desktop and mobile
+
+**2. Mobile "Breadcrumb" button is now configurable**
+- Previously it was hidden by CSS at multiple levels and the "①Hide breadcrumb" toggle had no real effect — there was no way to show it
+- Now the toggle actually controls it: hidden by default (same as before); turn ① off to show the button and access SiYuan's native full-screen path menu
+- No longer force-hidden when the overflow toolbar is enabled
+
+**3. Breadcrumb button no longer squeezed out when shown**
+- Its width is now reserved in the main bar budget (same mechanism as "⑥ Reserve width for other plugin buttons"), min 72px, auto-measured when wider
+- `flex-shrink: 0` prevents the chip from being compressed
+
+**4. Fixed console error from duplicate `loadURL` in the quick-note float window**
+- The float window called `loadURL` twice with the same URL, so the second navigation cancelled the first (Electron `ERR_ABORTED`) and left an unhandled promise rejection
+- Removed the duplicate call and added error handling
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ 查看历史版本
+  </summary>
+
 ### v3.7.8 — Navigation Enhancement + IME Friendly ✨
 
 > 💡 **If you use 「⑪ Previous/Next Document」or mobile shortcuts, recommended update.**
@@ -361,11 +390,6 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 #### 🏷️ Misc
 
 - ⑧ "Quick Image Import to Diary" renamed to "Quick Image Import"
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ 查看历史版本
-  </summary>
 
 ### v3.7.7 — 修了个误伤 🐛
 

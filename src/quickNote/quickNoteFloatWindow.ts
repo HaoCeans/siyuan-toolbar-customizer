@@ -389,9 +389,11 @@ function createFloatWindow(): void {
     }
 
     const html = getFloatWindowHtml()
-    floatWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
-
-    floatWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
+    floatWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`).catch((err) => {
+      // 忽略导航错误（如 ERR_ABORTED），避免产生未处理的 Promise rejection；
+      // 仅记录日志便于排查（重复 loadURL 曾导致 ERR_ABORTED -3 的误报）
+      console.warn('[QuickNoteFloat] 悬浮窗导航异常:', err)
+    })
 
     floatWindow.webContents.once('did-finish-load', async () => {
       applyFloatWindowBounds(floatWindow)

@@ -681,6 +681,35 @@ export function getButtonWidth(button: ButtonConfig): number {
 }
 
 /**
+ * 主栏「面包屑」按钮的最低预留宽度（px）。
+ * 与 ⑥「其他插件按钮预留宽度」机制一致：从主栏预算预留左侧原生按钮宽度。
+ * 中文「面包屑」约 44px、英文 "Breadcrumb" 约 74px，72px 覆盖常见语言；
+ * 实际宽度大于此值时按实测值扣减（见 getVisibleNativeButtonsWidth）。
+ */
+const MOBILE_BREADCRUMB_RESERVE_MIN = 72
+
+/**
+ * 测量主栏中「面包屑」按钮（mobile-menu chip）的当前实际宽度。
+ * 只测量该按钮本身（不统计 readonly/doc/more/context 等其他原生按钮），
+ * 确保「隐藏状态下的溢出计算与历史版本完全一致」（无感更新：老用户布局零变化）。
+ * 隐藏（①开关开启，scale(0)/display:none）时返回 0，不占任何预算；
+ * 显示时返回真实宽度，供主栏预算预留（与 ⑥「其他插件按钮预留宽度」同机制）。
+ */
+function getVisibleNativeButtonsWidth(): number {
+  const breadcrumb = document.querySelector(
+    '.protyle-breadcrumb[data-input-method], .protyle-breadcrumb__bar[data-input-method], .protyle-breadcrumb:not(.protyle-breadcrumb__bar), .protyle-breadcrumb__bar'
+  ) as HTMLElement | null
+  if (!breadcrumb) return 0
+  const chip = breadcrumb.querySelector(':scope > .protyle-breadcrumb__icon[data-type="mobile-menu"]') as HTMLElement | null
+  if (!chip) return 0
+  const style = window.getComputedStyle(chip)
+  if (style.display === 'none' || style.visibility === 'hidden') return 0
+  const rect = chip.getBoundingClientRect()
+  if (rect.width <= 0) return 0
+  return rect.width + (parseFloat(style.marginLeft) || 0) + (parseFloat(style.marginRight) || 0)
+}
+
+/**
  * 重新计算所有按钮的溢出层级
  * 根据底部工具栏宽度，将按钮分配到可见区域或扩展工具栏
  * @param buttons 所有按钮配置
@@ -713,6 +742,17 @@ export function calculateButtonOverflow(
   }
   const reserveWidth = Math.max(0, Number(externalButtonsReserveWidth) || 0)
   mainAvailableWidth -= reserveWidth
+  // 与 ⑥「其他插件按钮预留宽度」同机制：从主栏预算预留「面包屑」按钮宽度。
+  // ①开启（面包屑隐藏，默认状态）：不扣任何宽度，与历史版本计算完全一致（无感更新）。
+  // ①关闭（面包屑显示）：预留 max(MOBILE_BREADCRUMB_RESERVE_MIN, chip 实测宽度)，
+  //   兜底 72px 覆盖测量时机未就绪等场景，实测更宽时按实测扣减。
+  // 仅真实 DOM 场景扣除（预览场景已传入 availableWidth，跳过）；只扣主栏预算，不扣扩展面板预算。
+  if (availableWidth == null) {
+    const chipHidden = pluginInstance?.mobileFeatureConfig?.hideBreadcrumbIcon === true
+    if (!chipHidden) {
+      mainAvailableWidth -= Math.max(MOBILE_BREADCRUMB_RESERVE_MIN, getVisibleNativeButtonsWidth())
+    }
+  }
 
   // 扩展工具栏可用宽度 = 主工具栏可用宽度 - 扩展面板相对多出的尺寸
   // 底部固定模式：扩展面板 left:10px + right:10px + border:1px×2 = 22px
@@ -1336,12 +1376,16 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
             display: none !important;
           }
 
-          /* 隐藏原生「面包屑」文字按钮和退出聚焦按钮 */
-          .protyle-breadcrumb__bar[data-input-method] > .protyle-breadcrumb__icon[data-type="mobile-menu"],
+          /* 隐藏原生「退出聚焦」按钮（保留「面包屑」按钮，由①开关控制显示） */
           .protyle-breadcrumb__bar[data-input-method] > .protyle-breadcrumb__icon[data-type="exit-focus"],
-          .protyle-breadcrumb[data-input-method] > .protyle-breadcrumb__icon[data-type="mobile-menu"],
           .protyle-breadcrumb[data-input-method] > .protyle-breadcrumb__icon[data-type="exit-focus"] {
             display: none !important;
+          }
+
+          /* 面包屑按钮：禁止 flex 压缩（它是主栏里唯一可收缩的元素，被压扁后文字会溢出挤压） */
+          .protyle-breadcrumb__bar[data-input-method] > .protyle-breadcrumb__icon[data-type="mobile-menu"],
+          .protyle-breadcrumb[data-input-method] > .protyle-breadcrumb__icon[data-type="mobile-menu"] {
+            flex-shrink: 0 !important;
           }
 
           /* 最左侧自定义按钮去掉左边距 */
@@ -1585,10 +1629,14 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
             display: none !important;
           }
 
-          /* 隐藏原生按钮 */
-          body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="mobile-menu"],
+          /* 隐藏原生「退出聚焦」按钮（保留「面包屑」按钮） */
           body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="exit-focus"] {
             display: none !important;
+          }
+
+          /* 面包屑按钮：禁止 flex 压缩 */
+          body.siyuan-toolbar-top-mode .protyle-breadcrumb:not([data-toolbar-customized]) > .protyle-breadcrumb__icon[data-type="mobile-menu"] {
+            flex-shrink: 0 !important;
           }
 
           /* 最左边的按钮左边距为0 */
@@ -7478,6 +7526,16 @@ function showDatabasePopup(
       console.warn('[数据库弹窗] 打开块失败:', err)
     }
   })
+}
+
+/**
+ * 复位清理标志（重初始化 cleanup() 之后调用）。
+ * cleanup() 在 onunload 与重初始化时都会将 isCleanedUp 置 true；
+ * 若重初始化后不复位，initCustomButtons 的 rAF/timeout 回调全部被跳过，
+ * 工具栏按钮永远无法创建，只能等事件驱动（如点文档触发 loaded-protyle-dynamic）才出现。
+ */
+export function resetCleanupState(): void {
+  isCleanedUp = false
 }
 
 // ===== 清理函数 =====

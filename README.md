@@ -334,6 +334,28 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 
 # 📌 Changelog
 
+### v3.8.0 — Stabler toolbar + No more double popups
+
+> 💡 **Mobile toolbar sometimes blank after switching apps? ⌥⇧N pops two windows? Update.**
+
+**① Mobile toolbar is less likely to go missing**
+- On some phones SiYuan starts up slowly, and the toolbar-recovery code could silently fail halfway — so the toolbar never appeared
+- Now the recovery kicks in earlier and has a "fill in if missing" fallback; as long as SiYuan is running, it'll recover eventually
+- The old "check once after 8 seconds then give up" is now "check every second, stop when it's fine, up to 40 tries"
+
+**② No more empty capsule after app-kill restore**
+- On some phones, switching back after the system killed the app could leave stale markers but zero buttons — and the old check was fooled, leaving an empty capsule
+- Now it checks both the marker and actual buttons; missing either one rebuilds
+
+**③ ⌥⇧N block-format popup: won't spawn duplicates when other plugins' popups are open**
+- SiYuan's global hotkey fires in the main window AND every child popup, so each one raced to create the popup → two of them. Pressing again couldn't close it because multiple windows fought over the toggle
+- Fix: the hotkey now only registers in the main window
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ Older versions
+  </summary>
+
 ### v3.7.9 — Toolbar loading fix + Breadcrumb toggle 📱
 
 > 💡 **Recommended update** if you've seen toolbar buttons missing right after starting/reloading SiYuan (they only appeared after clicking a document).
@@ -357,11 +379,6 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 **4. Fixed console error from duplicate `loadURL` in the quick-note float window**
 - The float window called `loadURL` twice with the same URL, so the second navigation cancelled the first (Electron `ERR_ABORTED`) and left an unhandled promise rejection
 - Removed the duplicate call and added error handling
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ 查看历史版本
-  </summary>
 
 ### v3.7.8 — Navigation Enhancement + IME Friendly ✨
 

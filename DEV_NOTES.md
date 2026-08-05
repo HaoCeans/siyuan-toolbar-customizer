@@ -64,6 +64,30 @@ HIDE_CSS 常量：
 - 为何不 `win.destroy` 重建：销毁重建需起新渲染进程，打开慢（~1s）；替换内容毫秒级
 - 5 秒内再摁快捷键 → 取消定时器 → `w.show()` 恢复编辑
 
+**多窗口快捷键冲突：⌥⇧N 在所有 window.html 中重复触发**：
+
+- **症状**（v3.8.0 修复）：
+  1. 打开其他插件的独立窗口（如闲笔 Sketch Note，也是 `window.html`）后
+  2. 按 ⌥⇧N 唤起块格式一键记事 → **弹出两个相同弹窗**，再次按快捷键无法 toggle 隐藏
+
+- **根因**：
+  SiYuan 的 `addCommand({ globalCallback })` 注册的全局快捷键会在**所有**加载了该插件的窗口中触发 `globalCallback`。本插件 `onload()` 中无条件注册 ⌥⇧N/⌥⇧L 快捷键，不区分主窗口还是子窗口（`window.html`）。当闲笔等窗口打开时，主窗口 + 闲笔窗口同时收到回调 → 各建各的弹窗 → 两个。
+
+- **第二次按快捷键为什么无法隐藏**：
+  弹窗创建后获得焦点。再次按 ⌥⇧N 时：主窗口收到回调 → toggle 找到弹窗 → hide；弹窗自身也收到回调 → 但弹窗的 `qnWinId` 为 null → 找不到窗口 → `createOneWindow` → `destroyAllBlockWindows` **跳过自己**（`mainId` = 弹窗自己的 id）→ 新建第二个弹窗。结果：一个 hide、一个新建，视觉上"关不掉"。
+
+- **修复（v3.8.0）**：全局快捷键注册加 `!isInWindow` 守卫：
+  ```ts
+  // index.ts onload()
+  if (!this.isMobile && !this.isInWindow) {
+    this.addCommand({ ... })  // 只在主窗口注册，子窗口不注册
+  }
+  ```
+  这样只有主窗口处理快捷键，toggle 逻辑（找到 → show/hide，找不到 → 创建）始终正确运行，不会被多个窗口实例互相干扰。
+
+- **为什么不用 `document.hasFocus()`**：
+  `document.hasFocus()` 看似能过滤"非聚焦窗口不执行"，但它有副作用：弹窗获得焦点后，主窗口 `hasFocus() = false` → 主窗口不执行 toggle → 弹窗的 toggle-hide 路径被切断 → 弹窗关不掉。另外 `globalCallback` 设计初衷是思源在后台时也能响应快捷键，`hasFocus()` 会同时阻断后台使用场景。**从源头控制（不让子窗口注册快捷键）是正确解。**
+
 **弹窗与主窗口焦点冲突（hash 路由 + 僵尸窗口）**：
 
 - **症状**：一旦打开过记事弹窗，主窗口文档树点击日记文档完全无反应，只有重启思源才能恢复。
@@ -601,3 +625,65 @@ safeSetTimeout(() => {
 1. **模块级标志被 cleanup() 置位后，凡是"清理后还会重初始化"的场景都必须考虑复位**。cleanup() 的注释明明写了"重初始化时也会被调用"，但标志复位遗漏了。
 2. 排查"某功能只在用户交互后才出现"类 bug，优先怀疑：**初始化入口被门闩/状态卡住**，而不是事件本身。
 3. cleanup() 与初始化共用时，要逐一遍历模块级状态变量的生命周期（isCleanedUp / currentButtonConfigs / isSettingUpToolbar / 各 observer / 各 timer）。
+
+## 手机端悬浮标签页 Tab：面板行宽被外部 CSS 压缩
+
+**文件**：`src/ui/mobileTabs.ts`（`injectStyles()`）
+
+### 症状
+
+手机端悬浮标签页 Tab 展开后（200px 面板），每个 `.mobile-tab-item` 只占约一半宽度（实测 100px / 88px），标题被压得只剩省略号，行不满宽。`#mobile-tabs-list` 本身撑满 200px，但里面的行只有 ~50%。
+
+### 排查路径
+
+1. **先怀疑构建产物过期**：工作区 `mobileTabs.ts` 已有 `width: 100%` 修复，但 `dist/` 与 `package.zip` 是旧构建 → 重新构建后问题依旧（说明不止是旧包问题）。
+2. **用无头浏览器实测 4 种父容器 display 场景**（`display:block` / `flex-col` / `flex-row-wrap` / `grid` 两列）：
+   - 父容器正常（block）：item 默认就是 200px 满宽，**无需 `width:100%`**
+   - 父容器被覆盖为 grid 两列：item 被均分成 ~100px（正好一半）
+   - 父容器被覆盖为 flex：item 按内容宽（~337px 溢出）
+   → 结论：手机 App/主题里有规则把 `#mobile-tabs-list` 的 `display` 覆盖成了 grid 或 flex。
+3. **查思源内核 CSS**（安装包 `resources/stage/build/mobile/base.*.css` + 内置主题 daylight/midnight）：`mobile-tab-item` / `mobile-tabs-list` / `mobile-tabs-bar` / `data-tab-id` / `data-custom-button` **0 条命中**。能压窄 flex 子项的只有 `.protyle-wysiwyg [data-node-id]` 这类编辑器内部作用域规则，不影响挂载在 `document.body` 下的 `#mobile-tabs-bar`。
+   → 结论：不是思源内核 CSS 直接覆盖，而是手机 App 版本/第三方主题的规则（未拿到对应版本源码前无法定位具体规则）。
+
+### 修复（!important 锁死，不依赖外部规则内容）
+
+给面板三个层级全部 `!important` 锁死，任何外部规则（同权重下后注入 + `!important` 兜底）都覆盖不动：
+
+```css
+#mobile-tabs-bar {
+  display: flex !important;
+  flex-direction: column !important;
+}
+#mobile-tabs-bar.collapsed { width: 46px !important; }
+#mobile-tabs-bar.expanded  { width: 200px !important; }
+#mobile-tabs-list {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+}
+.mobile-tab-item {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 0 0 auto;      /* 防被当 flex/grid 子项压缩 */
+  box-sizing: border-box;
+}
+```
+
+### 实测验证
+
+无头 Edge 模拟"外部规则恶意把 `#mobile-tabs-list` 覆盖成 `display:grid !important; grid-template-columns:1fr 1fr`"：
+- 锁死后最终生效 `display:flex`，item 恢复 **200px 满宽** ✅
+
+### 教训
+
+1. **「宽度不满」类 bug 不要只盯着自己的 CSS**——先确认父容器 display 是否被外部规则改掉。块级 flex 子项默认 `width:auto` 就是 100%，真正需要 `width:100%` 的场景反而少。
+2. **排查外部覆盖的三板斧**：①重构建产物排除旧包嫌疑 ②无头浏览器枚举父容器 display 场景复现特征数值（100px=grid 均分、88px=固定宽） ③查思源内核 CSS + 内置主题是否命中选择器。
+3. 悬浮面板注入到 `document.body` 的 DOM，最容易被主题/App CSS 的**泛化规则**（`div` / `[data-*]` / `*`）或**同 ID 规则**波及；关键布局属性（display/width/flex-direction）用 `!important` 锁死是防御性写法，代价是牺牲可被外部主题定制的能力——对本插件可接受。
+4. 实测中发现：`truncateTitle` 截断（默认 8→12 字）只影响 JS 层面文本，**不影响 CSS 宽度**；标题带 `...` 不代表行窄，不能作为"宽度不足"的判断依据。
+
+### 补充：display 被覆盖导致图标/文字分两行
+
+- **症状**：数字徽章、标题、关闭按钮纵向堆叠（图标和文字不在同一行）。标题此时已按 7 字截断（说明新包已生效），问题在 item 自身布局。
+- **根因**：`.mobile-tab-item` 的 `display: flex` 未加 `!important`，外部规则把 item 覆盖成 block → 行内三元素各自占一行。
+- **修复**：`.mobile-tab-item { display: flex !important; align-items: center !important; }`，同时给 `.mobile-tab-title { flex: 1 1 auto !important; min-width: 0 !important }`、`.mobile-tab-close` / `.mobile-tab-number { flex: 0 0 auto !important }` 全部锁死。
+- **教训**：外部 CSS 覆盖插件 DOM 时，不只覆盖容器（bar/list）的宽度/display，**也可能覆盖到子元素自身的 display/flex**。凡插件注入到 `document.body` 的悬浮面板，建议 bar → list → item → item 内子元素（徽章/标题/按钮）**四层全部 `!important` 锁死**，一次到位，别等逐个症状出现再补。

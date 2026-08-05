@@ -45,7 +45,9 @@ import {
   refreshKmindZenCompat,
   refreshDesktopFloatingScrollOnSwitch,
   triggerDesktopLifelogGlobalCapture,
-  markDesktopBreadcrumbForFloating
+  markDesktopBreadcrumbForFloating,
+  safeSetInterval,
+  clearSafeInterval
 } from './toolbarManager'
 
 // TTS 设置持久化初始化
@@ -166,6 +168,11 @@ export default class ToolbarCustomizer extends Plugin {
   private eventBusContextMenuHandler: ((event: any) => void) | null = null
   private quickNoteTextareaContextMenuHandler: ((e: MouseEvent) => void) | null = null
   private _quickNoteTextareaDomLogged = false
+
+  // 手机端工具栏自愈：protyle 事件 handler（onload 即注册，早于任何 protyle 事件）
+  private eventBusReinitHandler: (() => void) | null = null
+  // ws-main 心跳 handler（onload 即注册，作为长期兜底）
+  private eventBusWsHeartbeatHandler: (() => void) | null = null
 
   // 待保存的欢迎标记（延迟到用户保存设置时写入）
 
@@ -317,6 +324,28 @@ export default class ToolbarCustomizer extends Plugin {
       this.isElectron = true
     } catch (err) {
       this.isElectron = false
+    }
+
+    // ===== 手机端工具栏自愈：事件监听提前到 onload =====
+    // 原先在 onLayoutReady→initPluginFunctions 才注册，鸿蒙杀后台恢复时 onLayoutReady
+    // 深埋异步链（getLocalStorage→langs→getCloudUser→onboarding→...），任一环失败它就不触发，
+    // 导致 handler 注册晚于 protyle 事件，工具栏永远建不上。
+    // 这里在 onload（远早于任何 protyle 事件）就绑定，确保事件不丢。
+    if (this.isMobile) {
+      this.eventBusReinitHandler = () => {
+        // 守卫：桌面端走 eventBusRefreshHandler 路径，不重复；禁用自定义按钮时跳过
+        if (!this.isMobile) return
+        if (this.mobileFeatureConfig.disableCustomButtons) return
+        this.reinitMobileToolbarIfMissing()
+      }
+      this.eventBus.on('loaded-protyle-dynamic', this.eventBusReinitHandler)
+      this.eventBus.on('loaded-protyle-static', this.eventBusReinitHandler)
+      this.eventBus.on('switch-protyle', this.eventBusReinitHandler)
+
+      // ws-main 心跳兜底：思源把每条 WebSocket 消息都转发给插件，是前端唯一确定持续到达的信号。
+      // 即使三个 protyle 事件全错过，只要内核活着 WS 在推，工具栏迟早补齐。
+      this.eventBusWsHeartbeatHandler = () => this.onWsHeartbeat()
+      this.eventBus.on('ws-main', this.eventBusWsHeartbeatHandler)
     }
 
     // ===== 加载配置 =====
@@ -596,25 +625,28 @@ export default class ToolbarCustomizer extends Plugin {
       }
     }
 
-    if (!this.isMobile) {
-	      this.addCommand({
-	        langKey: 'quickNoteGlobalCapture',
-	        langText: '一键记事（全局捕获）',
-	        hotkey: '⌥⇧N',
-	        globalCallback: () => {
-	          void triggerDesktopQuickNoteGlobalCapture()
-	        },
-	      })
-	      this.addCommand({
-	        langKey: 'lifelogGlobalCapture',
-	        langText: '叶归LifeLog（全局捕获）',
-	        hotkey: '⌥⇧L',
-	        globalCallback: () => {
-	          void triggerDesktopLifelogGlobalCapture()
-	        },
-	      })
-	    }
-	  }
+    // 只在主窗口注册全局快捷键，子窗口（window.html）不注册。
+    // 如果子窗口也注册，SiYuan 的 globalCallback 会在所有窗口中触发，
+    // 导致多窗口环境下弹出多份弹窗 / 快捷键无法正常 toggle。
+    if (!this.isMobile && !this.isInWindow) {
+		      this.addCommand({
+		        langKey: 'quickNoteGlobalCapture',
+		        langText: '一键记事（全局捕获）',
+		        hotkey: '⌥⇧N',
+		        globalCallback: () => {
+		          void triggerDesktopQuickNoteGlobalCapture()
+		        },
+		      })
+		      this.addCommand({
+		        langKey: 'lifelogGlobalCapture',
+		        langText: '叶归LifeLog（全局捕获）',
+		        hotkey: '⌥⇧L',
+		        globalCallback: () => {
+		          void triggerDesktopLifelogGlobalCapture()
+		        },
+		      })
+		    }
+		  }
 
   /** 插件启动时清理上次残留的草稿块（重启前未 cancelDraft 的情况） */
   private cleanupOrphanDraftBlocks(): void {
@@ -658,13 +690,12 @@ export default class ToolbarCustomizer extends Plugin {
         this.mobileFeatureConfig.disableCustomButtons
       )
 
-      // ===== 健康自检：冷启动慢机型上 .protyle-breadcrumb 可能晚于初始化窗口才渲染 =====
-      // 此时 setupToolbar/setupEditorButtons 都会失败，且无任何兜底恢复入口（eventBus
-      // 也可能已在监听器注册前触发完），导致胶囊永久消失。
-      // 8 秒后自检一次：若工具栏就绪信号未成立则重建（仅 1 次，靠 reinit 内部短路防重复）。
-      setTimeout(() => {
-        this.reinitMobileToolbarIfMissing()
-      }, 8000)
+      // ===== 周期自愈定时器（替代旧的 8 秒一次性 setTimeout）=====
+      // 旧逻辑：8 秒自检 1 次，若当时 breadcrumb 还没渲染（鸿蒙冷启动慢机型完全可能），
+      // reinitMobileToolbarIfMissing 直接 return 且永不重试 → 胶囊永久消失。
+      // 新逻辑：startSelfHealTimer 每 1 秒检查一次，成功即停，最多 40 次（约 40s），
+      // 之后交由 ws-main 心跳（onload 已注册）长期兜底。
+      this.startSelfHealTimer()
     }
   }
 
@@ -697,7 +728,9 @@ export default class ToolbarCustomizer extends Plugin {
     this.applyDesktopToolbarPosition()
 
     // ===== 使用思源 EventBus 监听编辑器加载事件（替代 MutationObserver，避免卡顿） =====
-    // 先移除旧的监听器（避免重复监听）
+    // 注意：手机端的 protyle 事件监听已提前到 onload 注册（eventBusReinitHandler），
+    // 这里只给【桌面端】注册 eventBusRefreshHandler，避免手机端重复监听同一事件。
+    // 手机端切文档时的 refreshToolbarAutoHide / refreshKmindZenCompat 已合并进 reinitMobileToolbarIfMissing。
     if (this.eventBusRefreshHandler) {
       this.eventBus.off('loaded-protyle-dynamic', this.eventBusRefreshHandler)
       this.eventBus.off('switch-protyle', this.eventBusRefreshHandler)
@@ -706,21 +739,17 @@ export default class ToolbarCustomizer extends Plugin {
     // 定义刷新按钮的回调函数（电脑端直接创建按钮，避免 initCustomButtons 的重复清理和延迟）
     this.eventBusRefreshHandler = () => {
       if (this.isMobile) {
-        // 手机端：如果禁用自定义按钮，直接返回不创建
-        if (this.mobileFeatureConfig.disableCustomButtons) {
-          return
-        }
-        // 手机端需要完整的初始化流程（包括溢出计算）
-        initCustomButtons(this.mobileButtonConfigs)
-      } else {
-        // 电脑端直接创建按钮，无需 1 秒延迟和重复清理
-        const editors = document.querySelectorAll('.protyle')
-        if (editors.length > 0) {
-          createButtonsForEditors(editors, this.desktopButtonConfigs)
-        }
-        // 给刚出现的面包屑打 data-input-method 属性，确保胶囊 CSS 即时生效
-        markDesktopBreadcrumbForFloating()
+        // 手机端分支：onload 已注册独立的 reinit handler，这里不应被触发（手机端未注册此 handler）。
+        // 保留分支以防被其他路径调用，安全 no-op。
+        return
       }
+      // 电脑端直接创建按钮，无需 1 秒延迟和重复清理
+      const editors = document.querySelectorAll('.protyle')
+      if (editors.length > 0) {
+        createButtonsForEditors(editors, this.desktopButtonConfigs)
+      }
+      // 给刚出现的面包屑打 data-input-method 属性，确保胶囊 CSS 即时生效
+      markDesktopBreadcrumbForFloating()
       // 刷新工具栏滚动隐藏状态（切文档时锁状态可能变了）
       refreshToolbarAutoHide()
       // 刷新电脑端胶囊滚动隐藏（切文档/标签页时重置滚动基准，避免 delta 错乱导致失效）
@@ -728,12 +757,12 @@ export default class ToolbarCustomizer extends Plugin {
       // 刷新 Kmind-Zen 兼容检测（切文档时文档树状态可能变了）
       refreshKmindZenCompat()
     }
-    // 监听编辑器动态加载完成事件（最快触发）
-    this.eventBus.on('loaded-protyle-dynamic', this.eventBusRefreshHandler)
-    // 监听编辑器切换事件（切换标签页时触发）
-    this.eventBus.on('switch-protyle', this.eventBusRefreshHandler)
-    // 监听编辑器静态加载完成事件（后备）
-    this.eventBus.on('loaded-protyle-static', this.eventBusRefreshHandler)
+    // 桌面端注册 protyle 事件（手机端在 onload 已注册，这里跳过）
+    if (!this.isMobile) {
+      this.eventBus.on('loaded-protyle-dynamic', this.eventBusRefreshHandler)
+      this.eventBus.on('switch-protyle', this.eventBusRefreshHandler)
+      this.eventBus.on('loaded-protyle-static', this.eventBusRefreshHandler)
+    }
     
     // ===== 初始化小窗模式检测器 =====
     // 在手机端检测小窗模式和前后台切换
@@ -918,15 +947,19 @@ export default class ToolbarCustomizer extends Plugin {
    * 工具栏自愈：检测当前激活模式的"就绪信号"是否丢失，丢失则重建。
    *
    * 触发场景：
-   *  - onLayoutReady 8 秒自检（补丁2）
-   *  - visibilitychange 切回前台（补丁3，windowDetector 调用）
+   *  - protyle 事件（loaded-protyle-dynamic/static、switch-protyle，handler 在 onload 注册）
+   *  - ws-main 心跳（onWsHeartbeat，500ms 节流）
+   *  - onLayoutReady 周期自检（startSelfHealTimer，1s 周期、最多 40 次）
+   *  - visibilitychange 切回前台（windowDetector 调用，保留为额外兜底）
    *
    * 就绪信号：
-   *  - 底部固定/胶囊模式：.protyle-breadcrumb[__bar][data-input-method] 存在
-   *  - 顶部模式：body.siyuan-toolbar-top-mode 生效（纯 CSS 驱动，breadcrumb 出现即生效，通常无需重建）
+   *  - 底部固定/胶囊模式：.protyle-breadcrumb[__bar][data-input-method] 存在 且 有真实按钮节点 [data-custom-button]
+   *  - 顶部模式：body.siyuan-toolbar-top-mode 生效 且 有真实按钮节点（纯 CSS 驱动，breadcrumb 出现即生效）
    *
-   * 防重复：initMobileToolbarAdjuster 内部对 data-toolbar-customized==='true' 短路；
-   *        initCustomButtons 内部做按钮差异判断。两者都允许安全重复调用。
+   * 幂等性：本函数可被事件/心跳/定时器任意重复调用。
+   *  - breadcrumb 还没渲染：本次 return（不重建），但不阻止后续重试（由周期定时器/心跳继续触发）。
+   *  - breadcrumb 已存在但就绪信号缺失：立即重建。
+   *  - 已就绪：return。
    */
   reinitMobileToolbarIfMissing(): void {
     if (!this.isMobile) return
@@ -937,30 +970,84 @@ export default class ToolbarCustomizer extends Plugin {
     const isTopMode = cfg.enableTopToolbar === true
     const isBottomOrFloating = cfg.enableBottomToolbar === true || cfg.enableFloatingToolbar === true
 
-    // 判断"工具栏是否已就绪"
+    // breadcrumb 容器是否存在（任意模式都依赖它）
+    const breadcrumb = document.querySelector(
+      '.protyle-breadcrumb:not(.protyle-breadcrumb__bar), .protyle-breadcrumb__bar'
+    )
+    // breadcrumb 还没出现：本次不重建，等下次事件/心跳/定时器再试（不在此终止整个自愈链）
+    if (!breadcrumb) {
+      return
+    }
+
+    // 判断"工具栏是否已就绪"——以"真实按钮节点"为最终判据，避免残留属性误判
+    const hasRealButtons = !!document.querySelector('[data-custom-button]')
     let toolbarReady = false
     if (isTopMode) {
-      // 顶部模式靠 body class + 纯 CSS 生效，breadcrumb 出现即认为就绪
-      toolbarReady = document.body.classList.contains('siyuan-toolbar-top-mode')
-        && !!document.querySelector('.protyle-breadcrumb, .protyle-breadcrumb__bar')
+      // 顶部模式靠 body class + 纯 CSS 生效；按钮节点存在才算真完成
+      toolbarReady = document.body.classList.contains('siyuan-toolbar-top-mode') && hasRealButtons
     } else if (isBottomOrFloating) {
-      // 底部/胶囊模式：breadcrumb 必须被打上 data-input-method 属性才算 setup 成功
-      toolbarReady = !!document.querySelector(
+      // 底部/胶囊模式：breadcrumb 须被打上 data-input-method 且有真实按钮
+      const hasInputMethod = !!document.querySelector(
         '.protyle-breadcrumb[data-input-method], .protyle-breadcrumb__bar[data-input-method]'
       )
+      toolbarReady = hasInputMethod && hasRealButtons
     }
 
     if (toolbarReady) return  // 一切正常，无需重建
 
-    // breadcrumb 还没出现：不重建（避免提前 setup 再次失败），交给退避重试/EventBus 兜底
-    const breadcrumbExists = !!document.querySelector(
-      '.protyle-breadcrumb:not(.protyle-breadcrumb__bar), .protyle-breadcrumb__bar'
-    )
-    if (!breadcrumbExists) return
-
-    // breadcrumb 已存在但 data-input-method 缺失：说明 setupToolbar 错过了窗口，立即重建
+    // breadcrumb 已存在但就绪信号缺失（外壳缺失、或残留属性但无按钮）：立即重建
     initMobileToolbarAdjuster(this.mobileConfig, this.mobileFeatureConfig.disableCustomButtons)
     initCustomButtons(this.mobileButtonConfigs)
+    // 重建后刷新工具栏滚动隐藏 / Kmind-Zen 兼容（原 eventBusRefreshHandler 手机端分支的职责，
+    // 现因手机端不再注册 eventBusRefreshHandler 而合并到此处）
+    refreshToolbarAutoHide()
+    refreshKmindZenCompat()
+  }
+
+  /** ws-main 心跳节流：避免每条 WS 消息都触发 reinitMobileToolbarIfMissing */
+  private _lastHeartbeatCheck = 0
+  private onWsHeartbeat(): void {
+    if (!this.isMobile) return
+    const now = Date.now()
+    if (now - this._lastHeartbeatCheck < 500) return
+    this._lastHeartbeatCheck = now
+    this.reinitMobileToolbarIfMissing()
+  }
+
+  /**
+   * 周期自愈定时器（替代旧的 8 秒一次性 setTimeout）。
+   * - 每 1 秒检查一次工具栏就绪信号；
+   * - 成功（isToolbarComplete）即停；
+   * - 最多 40 次（约 40s）后停止，之后交给 ws-main 心跳长期兜底。
+   */
+  private _selfHealTimer: ReturnType<typeof setInterval> | null = null
+  private startSelfHealTimer(): void {
+    if (!this.isMobile) return
+    if (this._selfHealTimer) return
+    let attempts = 0
+    this._selfHealTimer = safeSetInterval(() => {
+      attempts++
+      const cfg = this.mobileConfig
+      const isTopMode = cfg.enableTopToolbar === true
+      const isBottomOrFloating = cfg.enableBottomToolbar === true || cfg.enableFloatingToolbar === true
+      const hasBreadcrumb = !!document.querySelector(
+        '.protyle-breadcrumb:not(.protyle-breadcrumb__bar), .protyle-breadcrumb__bar'
+      )
+      const hasRealButtons = !!document.querySelector('[data-custom-button]')
+      const hasInputMethod = !!document.querySelector(
+        '.protyle-breadcrumb[data-input-method], .protyle-breadcrumb__bar[data-input-method]'
+      )
+      const complete = hasBreadcrumb && hasRealButtons
+        && (isTopMode ? document.body.classList.contains('siyuan-toolbar-top-mode') : (isBottomOrFloating ? hasInputMethod : true))
+      if (complete) {
+        if (this._selfHealTimer) { clearSafeInterval(this._selfHealTimer); this._selfHealTimer = null }
+        return
+      }
+      this.reinitMobileToolbarIfMissing()
+      if (attempts >= 40) {
+        if (this._selfHealTimer) { clearSafeInterval(this._selfHealTimer); this._selfHealTimer = null }
+      }
+    }, 1000)
   }
 
   /** 思源同步仅变更插件存储数据（dataChangePlugins）时调用，不会触发 onunload/onload */
@@ -990,6 +1077,7 @@ export default class ToolbarCustomizer extends Plugin {
     destroyDesktopQuickNoteBlockWindow()
     cleanupImagePicker()
     try { delete (window as any).__quickNoteFloatCommand } catch { /* ignore */ }
+    try { delete (window as any).__quicknoteButtonStyleHandler } catch { /* ignore */ }
 
     // 清理资源
     cleanup()
@@ -1040,6 +1128,24 @@ export default class ToolbarCustomizer extends Plugin {
       this.eventBus.off('switch-protyle', this.eventBusRefreshHandler)
       this.eventBus.off('loaded-protyle-static', this.eventBusRefreshHandler)
       this.eventBusRefreshHandler = null
+    }
+
+    // 清理手机端工具栏自愈监听器（onload 注册的 protyle 事件 + ws-main 心跳）
+    if (this.eventBusReinitHandler) {
+      this.eventBus.off('loaded-protyle-dynamic', this.eventBusReinitHandler)
+      this.eventBus.off('loaded-protyle-static', this.eventBusReinitHandler)
+      this.eventBus.off('switch-protyle', this.eventBusReinitHandler)
+      this.eventBusReinitHandler = null
+    }
+    if (this.eventBusWsHeartbeatHandler) {
+      this.eventBus.off('ws-main', this.eventBusWsHeartbeatHandler)
+      this.eventBusWsHeartbeatHandler = null
+    }
+
+    // 清理周期自愈定时器（双保险：safeSetInterval 已被 clearAllTimers 覆盖，这里显式清更稳妥）
+    if (this._selfHealTimer) {
+      clearSafeInterval(this._selfHealTimer)
+      this._selfHealTimer = null
     }
 
     // 清理右键菜单事件监听器

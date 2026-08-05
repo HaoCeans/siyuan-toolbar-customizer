@@ -827,8 +827,9 @@ function injectStyles(): void {
       transform: translateY(-50%);
       /* 与主工具栏同层级；仍低于扩展工具栏(1000+) */
       z-index: 5;
-      display: flex;
-      flex-direction: column;
+      /* 锁死为竖向 flex 容器：防止外部规则改 display 导致子项布局错乱 */
+      display: flex !important;
+      flex-direction: column !important;
       background: rgba(255,255,255,0.72);
       border-radius: 20px;
       box-shadow: 0 2px 20px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.04);
@@ -842,15 +843,23 @@ function injectStyles(): void {
       border: 0.5px solid rgba(0,0,0,0.08);
     }
     #mobile-tabs-bar.collapsed {
-      width: 46px;
+      width: 46px !important;
       padding: 6px 0;
     }
     #mobile-tabs-bar.expanded {
-      width: 200px;
+      /* !important 锁死展开宽度，防止外部规则（主题/App CSS）压缩面板 */
+      width: 200px !important;
       padding: 6px;
     }
     #mobile-tabs-list {
       flex: 1;
+      /* 显式撑满：不依赖 column flex 默认的 align-items:stretch，避免被其他样式影响后列表变内容宽 */
+      align-self: stretch;
+      width: 100% !important;
+      /* 锁死为竖向 flex 容器：防止外部规则（如主题/App CSS）把列表 display 覆盖成 grid/横向布局，
+         导致每个 tab 行被均分成半宽（实测 grid 两列时 item 只有 100px/200px） */
+      display: flex !important;
+      flex-direction: column !important;
       overflow-y: auto;
       overflow-x: hidden;
       scrollbar-width: none;
@@ -861,6 +870,13 @@ function injectStyles(): void {
     .mobile-tab-item {
       display: flex;
       align-items: center;
+      /* 显式让每行撑满列表宽度（配合 box-sizing 避免 padding 撑破）；
+         !important 防止外部规则直接给 item 设宽度（实测出现过 88px 固定宽） */
+      width: 100% !important;
+      max-width: 100% !important;
+      box-sizing: border-box;
+      /* 不随外部 flex/grid 布局压缩（width:100% 之外的双保险） */
+      flex: 0 0 auto;
       padding: 7px 8px;
       margin: 2px 0;
       border-radius: 12px;

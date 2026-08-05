@@ -601,6 +601,25 @@ function safeSetTimeout(callback: () => void, delay: number): ReturnType<typeof 
 }
 
 /**
+ * 安全的 setInterval，返回的定时器会被跟踪以便清理。
+ * 供 index.ts 的"工具栏自愈周期重试"使用，纳入 activeTimers 后会被 clearAllTimers 统一回收。
+ */
+export function safeSetInterval(callback: () => void, delay: number): ReturnType<typeof setInterval> {
+  const timerId = setInterval(callback, delay)
+  activeTimers.add(timerId)
+  return timerId
+}
+
+/**
+ * 清除由 safeSetInterval 返回的定时器，并从 activeTimers 移除。
+ * 不传参时会与 clearAllTimers 一起执行；这里提供"单独清某个 interval"的能力。
+ */
+export function clearSafeInterval(timerId: ReturnType<typeof setInterval>): void {
+  clearInterval(timerId)
+  activeTimers.delete(timerId)
+}
+
+/**
  * 清除所有活动的定时器
  */
 function clearAllTimers() {
@@ -611,6 +630,19 @@ function clearAllTimers() {
   activeTimers.clear()
   activeObservers.forEach(obs => obs.disconnect())
   activeObservers.clear()
+}
+
+/**
+ * 清理已注册的 focus/blur 监听器（focusEventHandlers）。
+ * - cleanup() 全量清理时调用；
+ * - setupToolbarForElement 因"残留属性但无真实按钮"重新执行前也调用，避免重复绑定累积。
+ */
+function detachFocusEventHandlers(): void {
+  focusEventHandlers.forEach(({ element, focusHandler, blurHandler }) => {
+    element.removeEventListener('focus', focusHandler)
+    element.removeEventListener('blur', blurHandler)
+  })
+  focusEventHandlers = []
 }
 
 /**
@@ -1053,6 +1085,7 @@ function cleanupDesktopFloatingToolbar(): void {
     desktopFloatingObserver.disconnect()
     desktopFloatingObserver = null
   }
+  lastDesktopFloatingConfig = null
 }
 
 /**
@@ -1401,11 +1434,20 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
       // 执行CSS更新（每次都要刷新，使配置变更实时生效）
       updateToolbarCSS()
 
-	    // 防止重复设置
-	    if ((toolbar as HTMLElement).dataset.toolbarCustomized === 'true') return
+	    // 防止重复设置：真实性以"既有属性又有真实按钮节点"为准。
+	    // 仅检查属性会在鸿蒙杀后台 DOM 快照恢复场景下误判（残留 data-toolbar-customized="true"
+	    // 但实际按钮节点已被思源重建清空），导致 setup 短路、data-input-method 不重打、
+	    // setupEditorButtons 的就绪信号永不成立 → 空白胶囊。
+	    const toolbarEl = toolbar as HTMLElement
+	    const hasRealButtons = !!toolbar.querySelector('[data-custom-button]')
+	    if (toolbarEl.dataset.toolbarCustomized === 'true' && hasRealButtons) return
 
-	    // 标记已设置
-	    (toolbar as HTMLElement).dataset.toolbarCustomized = 'true'
+	    // 标记已设置（首次进入，或残留属性但无按钮的重建场景）
+	    toolbarEl.dataset.toolbarCustomized = 'true'
+
+	    // 重建场景下，先清理上一轮残留的 focus/blur 监听器，避免反复 setup 时累积泄漏。
+	    // 首次进入时 focusEventHandlers 为空数组，调用是安全的 no-op。
+	    detachFocusEventHandlers()
 
 	    // 初始设置
 	    let baseHeight = window.innerHeight
@@ -1934,7 +1976,10 @@ function setupEditorButtons(configs: ButtonConfig[], waitFrameBudget = 60) {
   }
 
   // 启动溢出计算（完成后会创建按钮）
-  requestAnimationFrame(() => calculateOverflowWithDelay())
+  requestAnimationFrame(() => {
+    if (isCleanedUp) return
+    calculateOverflowWithDelay()
+  })
 }
 
 /**
@@ -4018,6 +4063,7 @@ function executeScrollDoc(config: ButtonConfig) {
 
   // 检测滚动是否生效，未生效则用 scrollIntoView 回退
   requestAnimationFrame(() => {
+    if (isCleanedUp) return
     if (scrollEl && scrollEl.scrollTop === scrollTopBefore) {
       const content = activeProtyle.querySelector('.protyle-content') as HTMLElement
       if (content) {
@@ -5244,6 +5290,8 @@ function unbindDesktopScrollForFloating(): void {
   desktopHiddenByScroll = false
   desktopLastScrollTop = null
   desktopAutoHideIgnoreUntil = 0
+  desktopAutoHideLastHide = 0
+  desktopAutoHideLastShow = 0
 }
 
 /**
@@ -6305,6 +6353,7 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
     // 自适应缩小字号：文字超宽时缩小而非省略（不低于 9px）
     catBtns.forEach((btn) => {
       requestAnimationFrame(() => {
+        if (isCleanedUp) return
         if (btn.scrollWidth > btn.clientWidth) {
           const scale = btn.clientWidth / btn.scrollWidth;
           const baseFontSize = catFontSize;
@@ -7572,11 +7621,7 @@ export function cleanup() {
   toolbarCheckTimers.clear()
 
   // 清理旧的 per-element 监听器
-  focusEventHandlers.forEach(({ element, focusHandler, blurHandler }) => {
-    element.removeEventListener('focus', focusHandler)
-    element.removeEventListener('blur', blurHandler)
-  })
-  focusEventHandlers = []
+  detachFocusEventHandlers()
 
   if (mutationObserver) {
     mutationObserver.disconnect()
@@ -7659,6 +7704,8 @@ export function cleanup() {
   toolbarAutoHideLastShow = 0
   toolbarAutoHideIgnoreUntil = 0
   toolbarAutoHideDocLocked = false
+  toolbarAutoHideForceActive = false
+  toolbarAutoHideCapsuleMode = false
   if (toolbarAutoHidePendingTimer) {
     clearTimeout(toolbarAutoHidePendingTimer)
     toolbarAutoHidePendingTimer = null
@@ -7714,6 +7761,12 @@ export function cleanup() {
   //   - pluginInstance?.isMobile 为 undefined（平台判断错误）
   //   - pluginInstance?.desktopButtonConfigs 为 []（扩展工具栏无按钮）
   // pluginInstance 只应在 onunload 时清除
+  // 清理 Lifelog 弹窗引用（插件卸载时弹窗若还开着，清理其闭包引用）
+  if (activeLifelogCleanup) {
+    activeLifelogCleanup()
+    activeLifelogCleanup = null
+  }
+  activeLifelogInput = null
 }
 
 // ===== 快捷键执行功能 =====

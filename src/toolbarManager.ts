@@ -3844,6 +3844,11 @@ async function executeClickSequence(config: ButtonConfig, clickedButton?: HTMLEl
           }
         }
 
+        // 等待元素动画静止（思源 v3.8 抽屉动画适配）
+        // 手机端 menuPlugin / sidebar-plugin-tab 等打开时带 上拉抽屉动画，
+        // 动画期间元素已挂载但位置未稳定，立即点击会失败
+        await waitForElementSettled(element)
+
         // 检查元素是否可见
         if (!isVisible(element)) {
           throw new Error(`元素不可见: ${actualSelector}`)
@@ -4334,6 +4339,40 @@ function waitForElement(selector: string, timeout: number = 5000): Promise<HTMLE
       resolve(null)
     }, timeout)
   })
+}
+
+/**
+ * 等待目标元素及其祖先链上的动画/过渡全部结束（思源 v3.8 抽屉动画适配）
+ *
+ * 背景：思源 v3.8 手机端点击 toolbarMore / menuPlugin / sidebar-plugin-tab 等会触发
+ * 上拉抽屉动画，菜单项/面板在动画期间已挂载但位置未稳定，点击序列下一步立即点击会失败。
+ * 通过 Web Animations API 检测目标元素及祖先链上所有 running 动画，静止后再继续。
+ *
+ * 不支持 getAnimations() 的旧 WebView 直接放行，退回原有的固定步间延迟。
+ * 有常驻动画（如无限循环 spinner）时由超时兜底，不无限等待。
+ */
+async function waitForElementSettled(element: HTMLElement, timeout = 2000): Promise<void> {
+  if (typeof element.getAnimations !== 'function') return
+  // 先等一帧以上再开始检测：CSS transition 的 Animation 对象在样式变化后的下一渲染帧才创建，
+  // 立即检测会漏掉刚触发的抽屉动画（思源 v3.8 面板/菜单统一 150ms translate 滑入）
+  await delay(50)
+  const start = Date.now()
+  while (Date.now() - start < timeout) {
+    let hasRunning = false
+    let node: HTMLElement | null = element
+    while (node && node !== document.documentElement) {
+      for (const anim of node.getAnimations()) {
+        if (anim.playState === 'running') {
+          hasRunning = true
+          break
+        }
+      }
+      if (hasRunning) break
+      node = node.parentElement
+    }
+    if (!hasRunning) return
+    await delay(50)
+  }
 }
 
 /**

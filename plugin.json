@@ -3,7 +3,7 @@
   "author": "whale🐋",
   "url": "https://github.com/HaoCeans/siyuan-toolbar-customizer",
   "version": "3.8.0",
-  "minAppVersion": "3.7.0",
+  "minAppVersion": "3.8.0",
   "backends": [
     "all"
   ],

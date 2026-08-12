@@ -83,6 +83,88 @@ export function isBlockInputFormat(format: string | undefined): boolean {
   return format === 'block'
 }
 
+/**
+ * 在块格式编辑器内插入纯文本（思源 v3.8 适配）。
+ *
+ * 背景：`document.execCommand('insertText')` 在编辑器内没有有效 selection 时会**静默返回 false**
+ * （不抛异常，try/catch 捕获不到）。弹窗刚打开、尚未手动点击编辑器建立光标时，`editEl.focus()`
+ * 只建立 DOM 焦点不建立光标，execCommand 无插入点而失败——表现为"点击模板按钮没反应"。
+ *
+ * 修复（借鉴思源官方 getEditorRange + focusByRange 的兜底模式）：
+ * ① 优先恢复思源 focusout 时克隆保存到 protyle.toolbar.range 的选区（若仍在编辑区内）；
+ * ② 否则手动构建 range 兜底到编辑区末尾（空草稿块即开头），removeAllRanges + addRange 建立光标。
+ *
+ * execCommand 成功后由浏览器原生 beforeinput/input 触发思源 input() 完成渲染与落库，无需干预；
+ * 仅当 execCommand 返回 false（浏览器禁用等极端情况）时手动插入文本节点并派发合成 input 事件
+ * 通知思源——注意只有此时才派发，避免重复 input() 产生重复事务。
+ *
+ * 注意：模板含换行时 execCommand 会走 insertLineBreak 分支拆成多块（思源官方同样行为），单行模板无影响。
+ */
+export function insertTextIntoBlockEditor(editEl: HTMLElement, text: string, savedRange?: Range | null): void {
+  let sel = window.getSelection()
+  let range: Range | null = null
+
+  // 现有选区有效则直接使用
+  if (sel && sel.rangeCount > 0) {
+    const r = sel.getRangeAt(0)
+    if (editEl.contains(r.startContainer) && editEl.contains(r.endContainer)) {
+      range = r
+    }
+  }
+
+  if (!range) {
+    // ① 恢复失焦前思源克隆保存的选区（wysiwyg focusout 写入 protyle.toolbar.range）
+    if (savedRange && editEl.contains(savedRange.startContainer) && editEl.contains(savedRange.endContainer)) {
+      range = savedRange
+    } else {
+      // ② 兜底：光标放到编辑区末尾（空内容即开头）
+      range = document.createRange()
+      range.selectNodeContents(editEl)
+      range.collapse(false)
+    }
+    sel = window.getSelection()
+    if (sel) {
+      sel.removeAllRanges()
+      sel.addRange(range)
+    }
+  }
+
+  let ok = false
+  try {
+    ok = document.execCommand('insertText', false, text)
+  } catch {
+    ok = false
+  }
+  if (ok) return
+
+  // 极端兜底：execCommand 不可用，手动插入文本并通知思源。
+  // 若插入点在编辑区边界（块外），先落到最后一个块末尾，避免产生裸文本节点。
+  let r: Range | null = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : range
+  if (r) {
+    const container = r.startContainer.nodeType === Node.TEXT_NODE ? r.startContainer.parentElement : r.startContainer
+    if (!(container instanceof HTMLElement) || !container.closest('[data-node-id]')) {
+      const blocks = Array.from(editEl.querySelectorAll(':scope > [data-node-id]'))
+      const last = blocks[blocks.length - 1] as HTMLElement | undefined
+      if (last) {
+        r = document.createRange()
+        r.selectNodeContents(last)
+        r.collapse(false)
+      }
+    }
+    if (r && editEl.contains(r.startContainer)) {
+      const s = window.getSelection()
+      if (s) {
+        s.removeAllRanges()
+        s.addRange(r)
+      }
+      r.deleteContents()
+      r.insertNode(document.createTextNode(text))
+      r.collapse(false)
+      editEl.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }))
+    }
+  }
+}
+
 function hasWysiwygText(editor: Protyle): boolean {
   const wysiwyg = editor.protyle.wysiwyg.element
   // 文本内容（排除零宽空格）
@@ -254,22 +336,14 @@ export async function createBlockInputHandle(
     },
     insertText: (text: string) => {
       const wysiwyg = editor.protyle.wysiwyg.element
-      if (!wysiwyg.querySelector('[contenteditable="true"]')) return
+      const editEl = wysiwyg.querySelector('[contenteditable="true"]') as HTMLElement | null
+      if (!editEl) return
       // focusBlockEditable 在手机端会用隐藏 input 唤起键盘再延迟 50ms 聚焦 editEl，
-      // 必须等聚焦完成后再 execCommand，否则 fakeInput 有焦点时插入文本会失败
+      // 必须等聚焦完成后再插入，否则 fakeInput 有焦点时插入文本会失败
       focusBlockEditable(wysiwyg, options.isMobile, () => {
-        try {
-          document.execCommand('insertText', false, text)
-        } catch {
-          // execCommand 不可用时，用 Selection API 降级
-          const sel = window.getSelection()
-          if (sel && sel.rangeCount > 0) {
-            const range = sel.getRangeAt(0)
-            range.deleteContents()
-            range.insertNode(document.createTextNode(text))
-            range.collapse(false)
-          }
-        }
+        // 思源 v3.8：execCommand 无有效选区时静默失败（弹窗刚打开无光标时点击模板按钮没反应），
+        // insertTextIntoBlockEditor 会先恢复/构建选区（见函数注释），再执行插入
+        insertTextIntoBlockEditor(editEl, text, editor.protyle.toolbar?.range)
       })
     },
     focus: () => {

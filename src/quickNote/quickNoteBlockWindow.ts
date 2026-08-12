@@ -10,6 +10,9 @@ const QUICKNOTE_TITLE = '⚡ 快捷记事'
 const BASE_HIDE = '.layout-tab-bar,.protyle-title,.protyle-background,.protyle-scroll,#status{display:none!important}'
 const BREADCRUMB_HIDE = '.protyle-breadcrumb{display:none!important}'
 const BREADCRUMB_SHOW = '.protyle-breadcrumb{margin-top:25px!important}'
+// 第三方「层级导航」插件（og-hierachy-navigate）的面包屑渲染在思源原生 .protyle-breadcrumb 之外，
+// 原生选择器覆盖不到：弹窗隐藏后再打开时该插件会重新渲染面包屑（弹窗中无存在意义，一律隐藏）
+const THIRD_PARTY_BREADCRUMB_HIDE = '[class*="og-hierachy-navigate"]{display:none!important}'
 const DRAG_CSS = '#qn-drag-handle{position:fixed;top:0;left:0;width:50%;height:36px;z-index:9999;-webkit-app-region:drag;cursor:grab}'
 const FLOATING_RESET = 'html body .protyle-breadcrumb[data-input-method]:not(.protyle-breadcrumb__bar){display:none!important}'
 const BLOCK_EMPTY_KEY = '__qn_block_empty'  // localStorage key：Protyle 是否为空
@@ -140,10 +143,10 @@ const HASH_FIX_JS = `(function(){
 	  }, 200);
 	})()`
 
-function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string; hideFloatingJS: string } {
+function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string; hideFloatingJS: string; hideBreadcrumbJS: string } {
   const toolbarOn = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteToolbarVisible !== false
   const hideFloating = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteHideFloatingToolbar !== false
-  let hideCSS = BASE_HIDE + (toolbarOn ? BREADCRUMB_SHOW : BREADCRUMB_HIDE) + DRAG_CSS
+  let hideCSS = BASE_HIDE + (toolbarOn ? BREADCRUMB_SHOW : BREADCRUMB_HIDE) + DRAG_CSS + THIRD_PARTY_BREADCRUMB_HIDE
   if (hideFloating) hideCSS += FLOATING_RESET
   return {
     hideJS: `(function(){
@@ -207,16 +210,35 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
       obs.observe(document.body,{childList:true,subtree:true});
       setTimeout(function(){try{obs.disconnect()}catch(e){}},5000);
     })()`,
+    // 第三方「层级导航」插件的面包屑渲染时机不定（弹窗 show 恢复、注入新草稿块后都可能重新渲染），
+    // 用持续 MutationObserver + 100ms 防抖兜底 CSS：observer 只建一个（__qnHideBreadcrumbObserver 复用），
+    // 窗口销毁时随渲染进程自然终止，无需显式清理。
+    hideBreadcrumbJS: `(function(){
+      function hide(){
+        var els=document.querySelectorAll('[class*="og-hierachy-navigate"]');
+        for(var i=0;i<els.length;i++){els[i].style.setProperty('display','none','important')}
+      }
+      hide();
+      if(window.__qnHideBreadcrumbObserver)return;
+      var t=null;
+      window.__qnHideBreadcrumbObserver=new MutationObserver(function(){
+        if(t)return;
+        t=setTimeout(function(){t=null;hide()},100);
+      });
+      window.__qnHideBreadcrumbObserver.observe(document.body,{childList:true,subtree:true});
+    })()`,
   }
 }
 
-function _injectScripts(win: any, scripts: { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string; hideFloatingJS: string }, show: boolean): void {
+function _injectScripts(win: any, scripts: { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string; hideFloatingJS: string; hideBreadcrumbJS: string }, show: boolean): void {
   win.webContents.executeJavaScript(scripts.hideJS).catch(()=>{})
   win.webContents.executeJavaScript(scripts.titleJS).catch(()=>{})
   win.webContents.executeJavaScript(scripts.closeHookJS).catch(()=>{})
   win.webContents.executeJavaScript(scripts.pollJS).catch(()=>{})
   // 注入隐藏胶囊的脚本
   win.webContents.executeJavaScript(scripts.hideFloatingJS).catch((e: any) => console.error('[QN-FLOAT] inject failed', e))
+  // 注入隐藏第三方「层级导航」插件面包屑的脚本
+  win.webContents.executeJavaScript(scripts.hideBreadcrumbJS).catch((e: any) => console.error('[QN-BREADCRUMB] inject failed', e))
   try { win.setTitle(QUICKNOTE_TITLE) } catch {}
   if (show) { win.show(); win.focus() }
 }
@@ -276,6 +298,8 @@ function createOneWindow(blockId: string): boolean {
     const scripts = _getInjectionScripts()
     win.webContents.on('dom-ready', () => {
       win.webContents.executeJavaScript(scripts.hideJS).catch(()=>{})
+      // 尽早注入隐藏第三方层级导航面包屑的脚本（dom-ready 时该插件可能尚未初始化，靠 observer 兜底）
+      win.webContents.executeJavaScript(scripts.hideBreadcrumbJS).catch(()=>{})
       // 尽早注入 hash 修复，赶在 SiYuan 内部路由设置 hash 之前
       win.webContents.executeJavaScript(HASH_FIX_JS).then(() => {
         console.log('[QN-HASH] dom-ready: HASH_FIX_JS 注入成功')
@@ -294,6 +318,8 @@ function createOneWindow(blockId: string): boolean {
 export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): Promise<boolean> {
   const BW = getBW(); if (!BW) return false
   const mainId = getMainId()
+  // 隐藏脚本组：show 恢复 / 注入新草稿块后需要补执行 hideBreadcrumbJS（第三方层级导航面包屑可能重新渲染）
+  const scripts = _getInjectionScripts()
   let found = false
   for (const w of (BW.getAllWindows?.() || [])) {
     try { if (!w || w.isDestroyed?.() || w.id === mainId) continue; if (w.id !== qnWinId) continue; found = true;
@@ -334,6 +360,8 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
                   }catch(e){}
                 })()
               `).catch(()=>{})
+              // 注入新块后第三方「层级导航」插件可能检测到文档变化重新渲染面包屑，补一次隐藏
+              w.webContents.executeJavaScript(scripts.hideBreadcrumbJS).catch(()=>{})
             }
           } catch {}
         }, delay)
@@ -341,7 +369,10 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
       }
       // 还没到 5 秒又摁了快捷键：取消清理，恢复编辑
       if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null }
-      w.show(); w.focus(); return true
+      w.show(); w.focus()
+      // show 恢复时第三方「层级导航」插件可能重新渲染面包屑，补一次隐藏（observer 复用，不会重复创建）
+      w.webContents.executeJavaScript(scripts.hideBreadcrumbJS).catch(()=>{})
+      return true
     } catch {}
   }
   // 找不到窗口：清理跟踪，创建新窗口

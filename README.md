@@ -351,6 +351,18 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 - SiYuan's global hotkey fires in the main window AND every child popup, so each one raced to create the popup → two of them. Pressing again couldn't close it because multiple windows fought over the toggle
 - Fix: the hotkey now only registers in the main window
 
+**④ Block-format quick-note popup: template buttons did nothing when clicked right after opening (SiYuan v3.8)**
+- Since v3.8, text insertion silently fails when the editor has no caret — clicking a ② template button right after the popup opened did nothing (clicking the editor first fixed it)
+- Fixed: the caret is restored/built automatically before inserting (restores the last known position, otherwise falls back to the end of the editor), so template buttons work at any time
+
+**⑤ Click automation: adapted to SiYuan v3.8 drawer animations**
+- In v3.8, the mobile "More menu" and "Sidebar plugin panel" open with a 150ms slide-up drawer animation — clicking the next step before it finished failed (e.g. the "Open plugin settings" button)
+- Fixed: automatically wait for the element's animations to settle before clicking (duration-adaptive, not hard-coded to 150ms)
+
+**⑥ Block-format quick-note popup: third-party "Hierarchy Navigate" plugin breadcrumb no longer leaks**
+- With the "Hierarchy Navigate" plugin installed, its breadcrumb reappeared after hiding and reopening the popup (it renders outside SiYuan's native breadcrumb, so native selectors couldn't hide it)
+- Fixed: dedicated hiding for that plugin's breadcrumb + a persistent observer fallback that catches it whenever it renders
+
 <details>
   <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
     ⬇️ Older versions
@@ -698,9 +710,9 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 ### v3.7.0 — 图片导入重构 + 附件管理 + 工具箱分类（版本大更新）
 
 > ⚠️ **环境要求（重要）**
-> 从 v3.7.0 起，本插件要求 **思源笔记 v3.7.0 及以上**版本才能正常使用。
-> 若思源版本低于 v3.7.0，将无法安装或在插件市场显示不兼容，请先升级思源笔记。
-> （原因：插件已适配思源 v3.7 的语言标识规范，旧版本无法正确匹配插件信息。）
+> 从 v3.8.0 起，本插件要求 **思源笔记 v3.8.0 及以上**版本才能正常使用。
+> 若思源版本低于 v3.8.0，将无法安装或在插件市场显示不兼容，请先升级思源笔记。
+> （原因：插件已适配思源 v3.8 的语言标识规范，旧版本无法正确匹配插件信息。）
 
 ## 新增
 

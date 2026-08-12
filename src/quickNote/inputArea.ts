@@ -1,6 +1,6 @@
 import { Constants, Protyle, ProtyleMethod } from 'siyuan'
 import { pluginInstance } from '../toolbarManager'
-import { createBlockInputHandle } from './blockInput'
+import { createBlockInputHandle, insertTextIntoBlockEditor } from './blockInput'
 import type { QuickNoteInputFormat } from './types'
 
 export type QuickNoteContent =
@@ -211,13 +211,10 @@ export function insertTextIntoQuickNoteDialog(text: string): boolean {
 
   const editEl = dialog.querySelector('.toolbar-customizer-qnote-protyle [contenteditable="true"]') as HTMLElement | null
   if (editEl) {
+    // 复用块编辑器的选区保障逻辑：无有效选区时 execCommand 会静默失败（思源 v3.8）
     editEl.focus()
-    try {
-      document.execCommand('insertText', false, text)
-      return true
-    } catch {
-      return false
-    }
+    insertTextIntoBlockEditor(editEl, text)
+    return true
   }
   return false
 }

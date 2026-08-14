@@ -759,3 +759,42 @@ safeSetTimeout(() => {
 1. **跨模块 dispatch 复用按钮处理器时，注意处理器内的「环境相关」副作用**——焦点恢复依赖 `lastActiveElement` 的语义（主工具栏=文档编辑器，弹窗=弹窗编辑器），复用前必须显式标记区分场景。
 2. **`void asyncFn()` 的并发竞态**：dispatch 是同步的、处理器内部 await 挂起、弹窗关闭侧 `void` 不等待——两侧并发，结果取决于执行时长。凡「先 A 后 B」的顺序依赖，要么 await 链完整，要么加保护标记，别依赖时序巧合。
 3. **按钮处理器保存的上下文（savedSelection/lastActiveElement）是「按下瞬间」的状态**，功能执行完再使用可能已失效（弹窗已关 / 编辑器已销毁）。弹窗场景用标记显式跳过，而不是期望「刚好来得及」。
+
+## 锁状态读取：全局 querySelector 串台 + 按钮投影不可靠（v3.8.2）
+
+### 现象
+
+切换文档后 toggle-lock（⑮沉浸阅读）按钮 🔒/🔓 图标显示不对：**时对时错、跟着切过的文档走**；手机端锁图标恒显示「解锁」。
+
+### 根因（三个叠加的事实）
+
+1. **思源多编辑器并存**：切文档时旧 `.protyle` 只是加 `fn__none` 隐藏、不销毁（`editor/util.ts` updatePanelByEditor 靠 fn__none 跳过隐藏编辑器）。DOM 里同时存在多个只读按钮。
+2. **全局 `querySelector('[data-type="readonly"]')` 返回 DOM 顺序第一个**——很可能是隐藏旧编辑器的按钮 → 读到上一个文档的锁状态。
+3. **移动端结构性缺失**：手机端 breadcrumb 只渲染 `data-type="mobile-menu"`，**没有只读按钮**（`breadcrumb/index.ts` isMobile 分支）→ 全局查找在移动端永远读不到。
+
+### 权威源（思源源码确认）
+
+- 锁状态的最终判定在 `onGet.ts` `setReadonlyByConfig`：`readOnly = protyle.wysiwyg.element.getAttribute('custom-sy-readonly')` —— **wysiwyg 元素属性是权威源**，按钮 `data-subtype` 只是它的 DOM 投影（`disabledProtyle`/`enableProtyle` 同步）
+- 每个 protyle 实例都有自己的 `wysiwyg.element` → **按实例查属性，零串台可能**
+- 补充：`config.editor.readOnly` 临时只读时 `custom-sy-readonly` 为 'false' 但 `protyle.disabled === true` → 完整状态 = `attr === 'true' || disabled`
+
+### 修复：getDocLockedState 统一函数
+
+`toolbarManager.ts` 新增 `getDocLockedState(target)`，判定顺序：
+① wysiwyg `custom-sy-readonly === 'true'` ② `protyle.disabled` ③ 范围内按钮 `data-subtype` 兜底
+
+入参支持 protyle 实例（`getActiveProtyle()`）或 `.protyle` DOM 元素（限定范围内查）。替换全部 5 处散落读取：
+
+| 位置 | 原实现 | 问题 |
+|------|--------|------|
+| createButtonsForEditors 图标刷新×2 | editor 内按钮 | 移动端无按钮 → 恒解锁 |
+| 手机扩展栏 2821 | **全局** querySelector | fn__none 残留串台 |
+| 桌面扩展栏 3144 | `breadcrumbBar.querySelector`（bar 内） | **按钮是 bar 的兄弟**（`.protyle-breadcrumb` 直接子级），bar 内永远查不到 → 恒解锁 |
+| executeToggleLock | 按钮 → API 兜底 | 按钮是投影，移动端走 API |
+| refreshToolbarAutoHide | **全局** querySelector | 串台 → 滚动隐藏状态错 |
+
+### 教训
+
+1. **思源 DOM 的「隐藏不销毁」是常态**（fn__none / fn__hidden），任何全局 `document.querySelector` 都可能命中隐藏的旧编辑器。多编辑器架构下**必须限定当前编辑器范围**查询（editor.querySelector / protyle 实例）。
+2. **读状态优先找「权威源」而不是「投影」**：思源把最终状态放在 wysiwyg 元素属性上（custom-sy-readonly），按钮 data-subtype 只是投影——投影可能不存在（移动端）、可能串台（多编辑器）、可能过时。查权威源 + 按实例查，天然免疫这些问题。
+3. **选择器要匹配真实 DOM 结构**：桌面扩展栏 bug 是「在 bar 内找 bar 的兄弟」——写选择器前先确认目标元素的真实挂载层级，别假设。

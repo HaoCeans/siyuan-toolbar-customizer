@@ -2037,8 +2037,8 @@ export function createButtonsForEditors(editors: NodeListOf<Element>, configs: B
         existingButtons.forEach(btn => {
           const btnConfig = configs.find(c => c.id === (btn as HTMLElement).dataset.customButton)
           if (btnConfig?.type === 'author-tool' && btnConfig.authorToolSubtype === 'toggle-lock') {
-            const isLocked = (readonlyBtn as HTMLElement)?.getAttribute('data-subtype') === 'lock'
-            updateToggleLockIcon(btn as HTMLElement, isLocked)
+            // 限定当前编辑器读取（wysiwyg custom-sy-readonly 权威源，移动端无只读按钮也不受影响）
+            updateToggleLockIcon(btn as HTMLElement, getDocLockedState(editor))
           }
         })
         return
@@ -2087,8 +2087,7 @@ export function createButtonsForEditors(editors: NodeListOf<Element>, configs: B
 	    toggleLockBtns.forEach(btn => {
 	      const btnConfig = configs.find(c => c.id === btn.dataset.customButton)
 	      if (btnConfig?.type === 'author-tool' && btnConfig.authorToolSubtype === 'toggle-lock') {
-	        const isLocked = (readonlyBtn as HTMLElement)?.getAttribute('data-subtype') === 'lock'
-	        updateToggleLockIcon(btn, isLocked)
+	        updateToggleLockIcon(btn, getDocLockedState(editor))
 	      }
 	    })
 	  })
@@ -2816,12 +2815,11 @@ function showOverflowToolbar(config: ButtonConfig) {
 
 	      toolbar.appendChild(layerBtn)
 
-	      // toggle-lock：根据当前文档锁状态更新图标
-	      if (btn.type === 'author-tool' && btn.authorToolSubtype === 'toggle-lock') {
-	        const readonlyBtn = document.querySelector('.protyle-breadcrumb__bar [data-type="readonly"], .protyle-breadcrumb [data-type="readonly"]') as HTMLElement
-	        const isLocked = readonlyBtn?.getAttribute('data-subtype') === 'lock'
-	        updateToggleLockIcon(layerBtn, isLocked)
-	      }
+      // toggle-lock：根据当前文档锁状态更新图标
+      if (btn.type === 'author-tool' && btn.authorToolSubtype === 'toggle-lock') {
+        // 限定当前活动编辑器读取，避免全局查询命中 fn__none 残留的旧编辑器（串台）
+        updateToggleLockIcon(layerBtn, getDocLockedState(getActiveProtyle()))
+      }
 	    })
 
     // 阻止触摸事件冒泡到 document，防止被其他 handler 意外关闭
@@ -3139,12 +3137,12 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
 
 	      toolbar.appendChild(layerBtn)
 
-	      // toggle-lock：根据当前文档锁状态更新图标
-	      if (btn.type === 'author-tool' && btn.authorToolSubtype === 'toggle-lock') {
-	        const readonlyBtn = breadcrumbBar.querySelector('[data-type="readonly"]') as HTMLElement
-	        const isLocked = readonlyBtn?.getAttribute('data-subtype') === 'lock'
-	        updateToggleLockIcon(layerBtn, isLocked)
-	      }
+      // toggle-lock：根据当前文档锁状态更新图标
+      // 注意：只读按钮是 .protyle-breadcrumb 的直接子级（bar 的兄弟），在 bar 内查不到；
+      // 且要用 .protyle 范围查询，避免命中其他编辑器的按钮
+      if (btn.type === 'author-tool' && btn.authorToolSubtype === 'toggle-lock') {
+        updateToggleLockIcon(layerBtn, getDocLockedState(breadcrumbBar.closest('.protyle')))
+      }
 	    })
 
     breadcrumbBar.appendChild(toolbar)
@@ -4818,6 +4816,41 @@ function executeTTS() {
 }
 
 /**
+ * 统一读取文档锁定状态（思源 v3.8 适配）
+ *
+ * 权威源是 wysiwyg 元素上的 custom-sy-readonly 属性（思源 setReadonlyByConfig 的最终判定值），
+ * 按钮 data-subtype 只是它的 DOM 投影；且移动端 breadcrumb 没有只读按钮（结构性缺失），
+ * 全局 querySelector('[data-type="readonly"]') 又会命中 fn__none 残留的旧编辑器（串台）。
+ * 因此统一在传入的 protyle 实例 / .protyle 元素范围内读取，杜绝全局查询。
+ *
+ * 判定顺序：
+ * ① wysiwyg 元素 custom-sy-readonly === 'true'
+ * ② protyle.disabled（config.editor.readOnly 临时只读时属性可能为 'false'）
+ * ③ 范围内只读按钮 data-subtype === 'lock'（兜底）
+ */
+function getDocLockedState(target?: any): boolean {
+  const p = target?.protyle ?? target
+  if (p?.wysiwyg?.element) {
+    // protyle 实例路径
+    const attr = (p.wysiwyg.element as HTMLElement).getAttribute('custom-sy-readonly')
+    if (attr !== null) return attr === 'true' || p.disabled === true
+    if (p.disabled === true) return true
+    const btn = (p.element as HTMLElement | undefined)?.querySelector('.protyle-breadcrumb [data-type="readonly"]')
+    if (btn) return btn.getAttribute('data-subtype') === 'lock'
+    return false
+  }
+  if (target instanceof HTMLElement) {
+    // .protyle DOM 元素路径
+    const wysiwyg = target.querySelector('.protyle-wysiwyg')
+    const attr = wysiwyg?.getAttribute('custom-sy-readonly')
+    if (attr !== null) return attr === 'true'
+    const btn = target.querySelector('.protyle-breadcrumb [data-type="readonly"]')
+    if (btn) return btn.getAttribute('data-subtype') === 'lock'
+  }
+  return false
+}
+
+/**
  * 更新思源原生只读按钮的 DOM 状态（图标 + data-subtype 属性）
  */
 function updateNativeReadonlyBtn(readonlyBtn: Element | null, locked: boolean): void {
@@ -4853,8 +4886,9 @@ async function executeToggleLock(config: ButtonConfig): Promise<void> {
   }
   const docId = protyle.block.rootID
 
-	  // 1. 读取当前锁状态 —— 优先从当前编辑器 DOM 读取（同步，无竞态）
-	  //    必须限定在 protyle.element 内，否则多标签页场景会读到其他编辑器的按钮
+	  // 1. 读取当前锁状态 —— 统一走 getDocLockedState（wysiwyg custom-sy-readonly 权威源）：
+	  //    按钮 data-subtype 只是投影（移动端甚至没有只读按钮），全局查询会串台
+	  //    readonlyBtn 查找保留，仅用于下面的乐观更新（updateNativeReadonlyBtn）
 	  const editorEl = protyle.element as HTMLElement | undefined
 	  let readonlyBtn: Element | null = null
 	  if (editorEl) {
@@ -4866,19 +4900,7 @@ async function executeToggleLock(config: ButtonConfig): Promise<void> {
 	    readonlyBtn = document.querySelector('.protyle-breadcrumb__bar [data-type="readonly"]')
 	  }
 
-	  let isLocked: boolean
-	  if (readonlyBtn) {
-	    isLocked = readonlyBtn.getAttribute('data-subtype') === 'lock'
-	  } else {
-	    // DOM 不可用时回退到 API 读取
-	    try {
-	      const getResp = await fetchSyncPost('/api/attr/getBlockAttrs', { id: docId })
-	      isLocked = getResp?.data?.['custom-sy-readonly'] === 'true'
-	    } catch {
-	      showMessage('读取文档锁状态失败', 2000, 'error')
-	      return
-	    }
-	  }
+	  const isLocked = getDocLockedState(protyle)
 
 	  const newLocked = !isLocked
 	  const newValue = newLocked ? 'true' : 'false'
@@ -5682,10 +5704,9 @@ export function refreshDesktopFloatingScrollOnSwitch(): void {
 		    return
 		  }
 		
-		  // 检查当前文档是否锁定
-		  const readonlyBtn = document.querySelector('[data-type="readonly"]') as HTMLElement | null
-		  const isLocked = readonlyBtn?.getAttribute('data-subtype') === 'lock'
-		  toolbarAutoHideDocLocked = isLocked  // 缓存供滚动处理器读取，省去每帧 querySelector
+	  // 检查当前文档是否锁定（限定当前活动编辑器，避免全局查询命中残留旧编辑器）
+	  const isLocked = getDocLockedState(getActiveProtyle())
+	  toolbarAutoHideDocLocked = isLocked  // 缓存供滚动处理器读取，省去每帧 querySelector
 		  // 锁定时始终隐藏原生顶栏（不跟滚动联动），解锁时恢复
 		  document.body.classList.toggle('toolbar-locked', isLocked)
 		

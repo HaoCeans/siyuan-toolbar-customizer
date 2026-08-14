@@ -334,9 +334,15 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 
 # 📌 Changelog
 
-### v3.8.2 — Version maintenance
+### v3.8.2 — Fixed wrong lock state after switching documents
 
-> 💡 **This release is a version-number maintenance update with no functional changes.**
+> 💡 **If the 🔒/🔓 icon shows the wrong state after switching documents (follows the previous document), or the mobile lock icon doesn't update, update.**
+
+**① Fixed lock-state reading after switching documents (SiYuan v3.8)**
+- Symptom: lock/unlock state wrong after switching documents — sometimes right, sometimes following the previously viewed document; the mobile lock icon was stuck on "unlocked"
+- Root cause: the plugin read the lock state via a global `querySelector` for the readonly button, but SiYuan only hides old editors (`fn__none`) instead of removing them — the global lookup could hit a hidden old editor's button and report the previous document's state; also, mobile breadcrumbs have no readonly button at all (structural absence), so mobile never read anything
+- Fix: read each editor's own `custom-sy-readonly` attribute (SiYuan's authoritative lock source; the button is only its DOM projection) scoped to the current editor — accurate on both desktop and mobile
+- Bonus fix: desktop overflow-toolbar lock buttons were stuck on "unlocked" (the readonly button is a sibling of the breadcrumb bar, so the old in-bar lookup never found it)
 
 <details>
   <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">

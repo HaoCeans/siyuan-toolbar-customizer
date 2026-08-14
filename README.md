@@ -344,6 +344,17 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 - Fix: read each editor's own `custom-sy-readonly` attribute (SiYuan's authoritative lock source; the button is only its DOM projection) scoped to the current editor — accurate on both desktop and mobile
 - Bonus fix: desktop overflow-toolbar lock buttons were stuck on "unlocked" (the readonly button is a sibling of the breadcrumb bar, so the old in-bar lookup never found it)
 
+**② Mobile lock icon didn't update after switching documents**
+- Symptom: on mobile the 🔒/🔓 icon didn't follow the new document after switching (desktop was fine)
+- Root cause: mobile document-switch refreshes go through a "rebuild only if missing" path — when buttons already existed it returned early, so the icon-refresh code never ran; the scroll-hide lock-state cache wasn't refreshed either
+- Fix: refresh the lock icons and the scroll-hide lock cache even when the toolbar is already ready
+
+**③ Lock/unlock icon flicker (especially on long documents)**
+- Symptom: clicking lock → shows 🔒 → immediately flickers back to 🔓 → then 🔒 again after a while (reverse for unlock)
+- Root cause: the optimistic update only changed the button icon, not the authoritative `custom-sy-readonly` attribute on the wysiwyg element — SiYuan re-renders before the API write completes (slow on long documents), reads the old value and overwrites the icon back
+- Fix: the optimistic update now also sets the authoritative attribute; the API response code is checked (a failed write never threw, so the rollback never ran); icons are re-synced after a successful write
+- Bonus fix: failed toggles no longer leave the icon stuck in the wrong optimistic state (response-code check + attribute rollback)
+
 <details>
   <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
     ⬇️ Older versions

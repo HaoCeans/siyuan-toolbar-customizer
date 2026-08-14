@@ -4851,6 +4851,22 @@ function getDocLockedState(target?: any): boolean {
 }
 
 /**
+ * 刷新所有 toggle-lock 按钮的图标（切换文档后锁状态变化时调用）
+ * 逐编辑器限定范围读取，多编辑器并存时各自正确
+ */
+export function refreshToggleLockIcons(): void {
+  document.querySelectorAll('.protyle').forEach(editor => {
+    const locked = getDocLockedState(editor)
+    editor.querySelectorAll<HTMLElement>('[data-custom-button]').forEach(btn => {
+      const cfg = currentButtonConfigs.find(c => c.id === btn.dataset.customButton)
+      if (cfg?.type === 'author-tool' && cfg.authorToolSubtype === 'toggle-lock') {
+        updateToggleLockIcon(btn, locked)
+      }
+    })
+  })
+}
+
+/**
  * 更新思源原生只读按钮的 DOM 状态（图标 + data-subtype 属性）
  */
 function updateNativeReadonlyBtn(readonlyBtn: Element | null, locked: boolean): void {
@@ -4914,6 +4930,12 @@ async function executeToggleLock(config: ButtonConfig): Promise<void> {
 	  if (customBtn) {
 	    updateToggleLockIcon(customBtn, newLocked)
 	  }
+	  //    同步乐观更新权威属性：思源在 API 写入完成前可能因 WS 推送重渲染 protyle，
+	  //    setReadonlyByConfig 读 wysiwyg 元素的 custom-sy-readonly 决定锁状态——
+	  //    不改它就会读到旧值，把图标覆盖回去（长文文档重渲染慢，闪变尤其明显）
+	  try {
+	    protyle.wysiwyg.element.setAttribute('custom-sy-readonly', newValue)
+	  } catch { /* ignore */ }
 
   // 3. 串行写入 API（排队确保顺序，消除竞态）
   const previous = toggleLockWriteQueue
@@ -4922,22 +4944,35 @@ async function executeToggleLock(config: ButtonConfig): Promise<void> {
 
   try {
     await previous // 等待之前所有未完成的写入
-    await fetchSyncPost('/api/attr/setBlockAttrs', {
+    const resp = await fetchSyncPost('/api/attr/setBlockAttrs', {
       id: docId,
       attrs: { 'custom-sy-readonly': newValue }
     })
-    // DOM 已在上面乐观更新，这里不再重复更新
+    if (resp?.code !== 0) {
+      // fetchSyncPost 失败不抛异常，必须显式检查返回码走回滚
+      throw new Error(resp?.msg || '写入失败')
+    }
+    // 终态修正：写入期间思源可能因 WS 推送重渲染 protyle 并用自己的旧状态覆盖过图标，
+    // 以确认后的状态再刷一次（含扩展工具栏里的全部 toggle-lock 按钮）
+    updateNativeReadonlyBtn(readonlyBtn, newLocked)
+    if (customBtn) {
+      updateToggleLockIcon(customBtn, newLocked)
+    }
+    refreshToggleLockIcons()
 
     if (config.showNotification !== false) {
       showMessage(newLocked ? '🔒 文档已锁定' : '🔓 文档已解锁', 1500, 'info')
     }
     refreshToolbarAutoHide()
   } catch (e) {
-    // 4. 写入失败 —— 回滚图标到实际状态
+    // 4. 写入失败 —— 回滚图标和属性到实际状态
     updateNativeReadonlyBtn(readonlyBtn, isLocked)
     if (customBtn) {
       updateToggleLockIcon(customBtn, isLocked)
     }
+    try {
+      protyle.wysiwyg.element.setAttribute('custom-sy-readonly', isLocked ? 'true' : 'false')
+    } catch { /* ignore */ }
     console.warn('[toggle-lock] 切换失败:', e)
     showMessage('切换锁状态失败', 2000, 'error')
   } finally {

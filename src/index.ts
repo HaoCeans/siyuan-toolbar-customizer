@@ -43,6 +43,7 @@ import {
   showTemplateContextMenu,
   refreshToolbarAutoHide,
   refreshKmindZenCompat,
+  refreshToggleLockIcons,
   refreshDesktopFloatingScrollOnSwitch,
   triggerDesktopLifelogGlobalCapture,
   markDesktopBreadcrumbForFloating,
@@ -993,7 +994,13 @@ export default class ToolbarCustomizer extends Plugin {
       toolbarReady = hasInputMethod && hasRealButtons
     }
 
-    if (toolbarReady) return  // 一切正常，无需重建
+    if (toolbarReady) {
+      // 切文档后锁状态可能已变化：按钮已存在（无需重建），但要刷新 toggle-lock 图标
+      // 与滚动隐藏的锁状态缓存（refreshToolbarAutoHide 原来只在重建分支刷新，会读到旧缓存）
+      refreshToggleLockIcons()
+      refreshToolbarAutoHide()
+      return
+    }
 
     // breadcrumb 已存在但就绪信号缺失（外壳缺失、或残留属性但无按钮）：立即重建
     initMobileToolbarAdjuster(this.mobileConfig, this.mobileFeatureConfig.disableCustomButtons)

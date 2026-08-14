@@ -798,3 +798,67 @@ safeSetTimeout(() => {
 1. **思源 DOM 的「隐藏不销毁」是常态**（fn__none / fn__hidden），任何全局 `document.querySelector` 都可能命中隐藏的旧编辑器。多编辑器架构下**必须限定当前编辑器范围**查询（editor.querySelector / protyle 实例）。
 2. **读状态优先找「权威源」而不是「投影」**：思源把最终状态放在 wysiwyg 元素属性上（custom-sy-readonly），按钮 data-subtype 只是投影——投影可能不存在（移动端）、可能串台（多编辑器）、可能过时。查权威源 + 按实例查，天然免疫这些问题。
 3. **选择器要匹配真实 DOM 结构**：桌面扩展栏 bug 是「在 bar 内找 bar 的兄弟」——写选择器前先确认目标元素的真实挂载层级，别假设。
+
+## 手机端切文档图标不刷新：reinitMobileToolbarIfMissing 的 return 陷阱（v3.8.2）
+
+### 现象
+
+手机端切换文档后 toggle-lock 图标不跟随新文档状态（电脑端正常）。
+
+### 根因
+
+手机端与电脑端的切文档刷新路径**不同**：
+
+| 平台 | 切文档路径 | 行为 |
+|------|-----------|------|
+| 电脑端 | `eventBusRefreshHandler` → `createButtonsForEditors` | existingButtons 分支**每次都刷新**图标 |
+| 手机端 | `eventBusReinitHandler` → `reinitMobileToolbarIfMissing` | **「缺失才重建」**：`toolbarReady` 时直接 `return`，图标刷新从未执行 |
+
+`reinitMobileToolbarIfMissing`（index.ts:964）的设计目标是「工具栏缺失时补建」，`if (toolbarReady) return` 的语义是「不缺就不动」——但 toggle-lock 图标的更新依赖「每次切文档都执行」，被 return 拦截了。同根源：`refreshToolbarAutoHide`（锁状态缓存）也只挂在重建分支，toolbarReady 时不刷新。
+
+### 修复
+
+toolbarReady 分支补执行：
+
+```ts
+if (toolbarReady) {
+  refreshToggleLockIcons()   // 遍历每个编辑器，getDocLockedState 读权威源刷图标
+  refreshToolbarAutoHide()   // 锁状态缓存同步刷新
+  return
+}
+```
+
+### 教训
+
+1. **「缺失才重建」的函数不适合做「状态刷新」**——职责不同：自愈逻辑管「存在性」，状态刷新管「值」。合在一起时，`return` 的短路条件会吞掉刷新逻辑。检查此类函数时，重点看 return 分支是否漏了「值更新」职责。
+2. **两端行为差异是定位线索**：同一功能桌面正常、手机异常，先对比两端的调用链差异（平台分支各自走什么函数），差异点就是嫌疑点。
+
+## toggle-lock 闪变：乐观更新必须同步权威属性（v3.8.2）
+
+### 现象
+
+长文文档上，点击锁定 → 先变 🔒 → **立刻闪回 🔓** → 等一会儿又变 🔒（解锁反向同理）。
+
+### 根因（时序链）
+
+```
+t=0     点击 → 乐观更新按钮图标 🔒（但 wysiwyg 属性 custom-sy-readonly 还是旧值 'false'）
+t≈0.5s  思源收到 WS 推送 → 重渲染 protyle → setReadonlyByConfig 读属性（旧值）
+        → enableProtyle 把图标覆盖回 🔓
+t≈几秒  API 写入完成 → 内核属性 'true' → 思源最终重渲染/插件刷新 → 🔒
+```
+
+- **乐观更新只改了投影（按钮 data-subtype），没改权威源（wysiwyg 属性）**——思源重渲染读权威源，读到旧值把图标覆盖回去
+- 长文文档重渲染慢 → 时间窗口拉大 → 闪变可见；短文档瞬间完成 → 看不出
+
+### 修复（executeToggleLock 三处）
+
+1. **乐观更新同步 setAttribute 权威属性**（`protyle.wysiwyg.element.setAttribute('custom-sy-readonly', newValue)`）——思源重渲染读到的就是新值，不再闪回（治本）
+2. **检查 fetchSyncPost 返回码**——`fetchSyncPost` 失败**不抛异常**，原来 `code !== 0` 时走不到 catch，回滚永不触发，失败时图标停在错误的乐观状态（顺带修掉的隐藏 bug）
+3. **写入成功后终态刷新**（`updateNativeReadonlyBtn` + `updateToggleLockIcon` + `refreshToggleLockIcons`）——写入期间即使被覆盖，确认后立即修正；失败时同步回滚属性 + 图标
+
+### 教训
+
+1. **乐观更新的范围要覆盖「读取该状态的所有来源」**：图标只是展示层，思源重渲染读的是权威属性——只改展示层，重渲染时必然闪回。乐观更新要改到「任何读取路径都看到新值」为止。
+2. **fetchSyncPost 不抛异常**（返回 `{code !== 0}`），所有调用都要显式检查 `resp?.code !== 0` 才能走失败分支——这是本插件多个历史 bug 的共同模式。
+3. **「先正确后闪变」往往是写入窗口期的竞态**：UI 立即更新 + 后端慢确认 + 中间有第三方（思源）重渲染 → 只要中间读取路径能看到旧值，就会闪。修复思路是让中间路径也看到新值（乐观更新权威源），而不是等终态。

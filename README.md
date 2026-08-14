@@ -334,6 +334,15 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 
 # 📌 Changelog
 
+### v3.8.2 — Version maintenance
+
+> 💡 **This release is a version-number maintenance update with no functional changes.**
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ Older versions
+  </summary>
+
 ### v3.8.1 — Quick-note popup buttons no longer pop up the keyboard
 
 > 💡 **If clicking ④ click-automation / ③ shortcut / ⑥ toolbox buttons inside the quick-note popup pops up the keyboard and the popup stays open, update.**
@@ -342,11 +351,6 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 - Symptom: clicking ④ click-automation / ③ shortcut / ⑥ toolbox buttons inside the popup popped up the keyboard and the popup didn't close
 - Root cause: after executing, the main-toolbar button handler restores the focus saved at press time ("clicking a toolbar button keeps the keyboard open" design) — in the popup scenario that element is the popup editor, so restoring focus popped up the keyboard; the popup also closes slowly, creating a race
 - Fix: skip the focus restore when triggered from inside the popup (marker + double-cleanup); the main-toolbar "keep keyboard open" behavior is unchanged
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ Older versions
-  </summary>
 
 ### v3.8.0 — Stabler toolbar + No more double popups
 

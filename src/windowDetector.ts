@@ -1947,7 +1947,15 @@ async function handleButtonClick(
 
     // 其他类型按钮：通过原始按钮触发
     if (originalBtn) {
-      originalBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      // 标记弹窗场景：主按钮处理器执行完的"恢复焦点"逻辑（toolbarManager）会把焦点还给
+      // mousedown 时保存的 lastActiveElement（即弹窗编辑器），导致输入法弹出；
+      // 处理器读到标记即跳过并清除（这里再兜底延迟清除，防异常路径残留）
+      originalBtn.dataset.qnotePopupTrigger = 'true'
+      try {
+        originalBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      } finally {
+        setTimeout(() => { delete originalBtn.dataset.qnotePopupTrigger }, 2000);
+      }
       if (buttonConfig.type === 'builtin') {
         if (dialogBuiltinCloseTimer) clearTimeout(dialogBuiltinCloseTimer);
         dialogBuiltinCloseTimer = setTimeout(() => { void closeNoteDialog(); dialogBuiltinCloseTimer = null; }, 100);

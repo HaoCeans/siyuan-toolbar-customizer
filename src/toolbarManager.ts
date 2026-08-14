@@ -2370,7 +2370,11 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
 
     // builtin 类型的按钮不恢复焦点，让输入法自然关闭
     // 其他类型恢复焦点（preventScroll 防止浏览器自动滚动到顶部）
-    if (config.type !== 'builtin') {
+    // 记事弹窗内克隆按钮触发（qnotePopupTrigger）时不恢复：lastActiveElement 是弹窗编辑器，
+    // focus 它会弹出输入法，且与弹窗关闭（teardown 慢）形成竞态——弹窗还开着键盘就弹出来了
+    const skipFocusRestore = button.dataset.qnotePopupTrigger === 'true'
+    delete button.dataset.qnotePopupTrigger
+    if (config.type !== 'builtin' && !skipFocusRestore) {
       if (lastActiveElement && lastActiveElement !== document.activeElement) {
         ;(lastActiveElement as HTMLElement).focus({ preventScroll: true })
       }

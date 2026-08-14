@@ -135,6 +135,42 @@ HIDE_CSS 常量：
   | `getTitle()` 匹配销毁旧窗口 | 思源覆盖了窗口标题，永远匹配不上 |
   | Dialog + Protyle（同窗口） | 需要独立 BrowserWindow（副屏、拖拽等） |
 
+### 手机端弹窗输入：focusBlockEditable + 选区保障（v3.8.1）
+
+**调用链**（点模板按钮 → 插入 + 弹输入法）：
+
+```
+windowDetector.handleButtonClick（template 分支）
+ → inputArea.insertTextIntoQuickNoteDialog
+ → blockInput.insertText
+ → focusBlockEditable(wysiwyg, isMobile, callback)   ← 弹输入法
+ → insertTextIntoBlockEditor(editEl, text, toolbar.range)  ← 插入
+```
+
+**弹输入法机制**（`blockInput.ts` `focusBlockEditable`）：
+
+- 手机端 WebView 里 `contenteditable` 直接 `focus()` **弹不出键盘**（键盘只响应真实触摸或 `<input>/<textarea>` 聚焦）
+- 技巧：创建隐藏 `<input>`（`position:fixed;left:-9999px`）→ `fakeInput.focus()` 唤起系统键盘 → 50ms 后 `editEl.focus()` 转移焦点 → 再执行 callback
+- 50ms 延迟原因：必须等 fakeInput 让出焦点，否则插入会落到 fakeInput 上
+- 焦点已在编辑区（`wysiwyg.contains(activeElement) && isContentEditable`）→ 直接 callback，不折腾键盘
+- 纯文本 textarea 不需要此技巧：`focus()` 原生弹键盘，且 `selectionStart/End` 始终有效
+
+**插入机制**（`insertTextIntoBlockEditor`，思源 v3.8 适配）：
+
+- **背景**：`execCommand('insertText')` 在编辑器内无有效 selection 时**静默返回 false**（不抛异常，try/catch 捕获不到）——`focus()` 只建焦点不建光标，弹窗刚打开无光标时点击模板按钮"没反应"
+- **三层选区保障**（借鉴思源官方 `getEditorRange` + `focusByRange` 模式）：
+  1. 现有选区在编辑区内 → 直接用
+  2. 恢复 `protyle.toolbar.range`（思源 wysiwyg focusout 时克隆保存的失焦前选区，需验证容器仍在 DOM）
+  3. 兜底：`selectNodeContents(editEl) + collapse(false)` 光标放编辑区末尾（空草稿块即开头），`removeAllRanges + addRange` 建立真实光标
+- **execCommand 成功后不做任何事**：浏览器原生 beforeinput/input 触发思源 `input()` 自动渲染+事务落库，手动再派发 input 会**重复走 input() 产生重复事务**
+- **极端兜底**（execCommand 返回 false）：手动 insertNode 文本 + 派发合成 `InputEvent('input', {inputType:'insertText', data})`——仅此时派发；插入点在块外时先落到最后一个块末尾，避免产生裸文本节点
+- **多行模板**：`\n` 会走 `insertLineBreak` 分支拆成多块（思源官方同款行为，块格式弹窗中即预期，勿改）
+
+**教训**：
+1. `execCommand` 的失败**不抛异常**，返回值必须显式检查——用 try/catch 做降级是无效的（曾经的 `inputArea.ts` fallback 就因此谎报成功）
+2. 手机端 WebView 的键盘唤起规则与桌面不同：contenteditable 不可直接 focus 弹键盘，隐藏 input 中转是通用解法
+3. 恢复克隆 range 前必须验证 `startContainer` 仍被编辑器包含（块重建后旧 range 已失效）
+
 ### 电脑端底部胶囊的隐藏：JS MutationObserver + inline style
 
 **问题**：一键记事弹窗中，电脑端底部胶囊（悬浮工具栏）需要隐藏。但通过注入 `<style>` 标签设置 `display:none` 无效。
@@ -687,3 +723,39 @@ safeSetTimeout(() => {
 - **根因**：`.mobile-tab-item` 的 `display: flex` 未加 `!important`，外部规则把 item 覆盖成 block → 行内三元素各自占一行。
 - **修复**：`.mobile-tab-item { display: flex !important; align-items: center !important; }`，同时给 `.mobile-tab-title { flex: 1 1 auto !important; min-width: 0 !important }`、`.mobile-tab-close` / `.mobile-tab-number { flex: 0 0 auto !important }` 全部锁死。
 - **教训**：外部 CSS 覆盖插件 DOM 时，不只覆盖容器（bar/list）的宽度/display，**也可能覆盖到子元素自身的 display/flex**。凡插件注入到 `document.body` 的悬浮面板，建议 bar → list → item → item 内子元素（徽章/标题/按钮）**四层全部 `!important` 锁死**，一次到位，别等逐个症状出现再补。
+
+## 记事弹窗内按钮点击：非 builtin 焦点恢复弹出输入法（v3.8.1）
+
+### 现象
+
+块格式记事弹窗内点击「模拟点击/快捷键/鲸鱼工具箱」按钮 → **输入法弹出、弹窗保持打开**。
+
+### 根因（调用链）
+
+1. 弹窗内克隆按钮点击 → `windowDetector.ts` `handleButtonClick` → `originalBtn.dispatchEvent(click)` 转发主工具栏按钮
+2. 主按钮处理器（`toolbarManager.ts` 2325）功能执行完后执行「非 builtin 恢复焦点」：
+   ```ts
+   if (config.type !== 'builtin') {
+     if (lastActiveElement && lastActiveElement !== document.activeElement) {
+       lastActiveElement.focus({ preventScroll: true })
+     }
+   }
+   ```
+3. `lastActiveElement` 是按下按钮瞬间（mousedown）保存的 `document.activeElement`——弹窗场景即**弹窗的块格式编辑器**
+4. `focus()` 弹窗编辑器 → 手机端弹出输入法；且 `closeNoteDialogImmediately()` 是 `void` 不等待，teardown 慢（`cancelDraft` 等事务队列 + 150ms + 删块网络请求），功能执行快 → **竞态**：focus 先于弹窗移除 → 弹窗保持打开 + 键盘弹出
+
+### 为什么主工具栏场景没问题
+
+主工具栏点击时 `lastActiveElement` 是**文档编辑器**，恢复焦点 = 输入法不关闭（v3.7.8「点击工具栏按钮不关输入法」特性），符合预期。缺陷只在弹窗场景（`lastActiveElement` 语义变成弹窗编辑器）。
+
+### 修复：qnotePopupTrigger 标记（双保险）
+
+- `windowDetector.ts`：dispatch 前 `originalBtn.dataset.qnotePopupTrigger = 'true'`，`finally` 里 2s 兜底清除（防处理器异常路径残留）
+- `toolbarManager.ts` 2373：读标记跳过焦点恢复、**随即删除**（即读即删，不污染后续主工具栏点击）
+- 主工具栏无标记 → 原行为不变
+
+### 教训
+
+1. **跨模块 dispatch 复用按钮处理器时，注意处理器内的「环境相关」副作用**——焦点恢复依赖 `lastActiveElement` 的语义（主工具栏=文档编辑器，弹窗=弹窗编辑器），复用前必须显式标记区分场景。
+2. **`void asyncFn()` 的并发竞态**：dispatch 是同步的、处理器内部 await 挂起、弹窗关闭侧 `void` 不等待——两侧并发，结果取决于执行时长。凡「先 A 后 B」的顺序依赖，要么 await 链完整，要么加保护标记，别依赖时序巧合。
+3. **按钮处理器保存的上下文（savedSelection/lastActiveElement）是「按下瞬间」的状态**，功能执行完再使用可能已失效（弹窗已关 / 编辑器已销毁）。弹窗场景用标记显式跳过，而不是期望「刚好来得及」。

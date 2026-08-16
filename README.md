@@ -229,9 +229,12 @@
 | `{{datetime}}` | 2026-01-21 14:30:45 |
 | `{{year}}` / `{{month}}` / `{{day}}` | 2026 / 01 / 21 |
 | `{{hour}}` / `{{minute}}` / `{{second}}` | 14 / 30 / 45 |
-| `{{week}}` | 星期二 |
+| `{{week}}` | Tuesday |
+| `{{timestamp}}` | 1786789000000 (Unix ms timestamp) |
+| `{{newline}}` | Line break (cleaner multi-line templates) |
 
-**示例**：插入 `{{year}}年{{month}}月{{day}}日 {{hour}}:{{minute}}` → `2026年01月21日 14:30`
+**Example**: `{{year}}年{{month}}月{{day}}日 {{hour}}:{{minute}}` → `2026年01月21日 14:30`
+**Example**: `first line{{newline}}second line` → inserts two lines (in block format, splits into two blocks)
 
 #### ③ 电脑端快捷键【简单】
 模拟键盘快捷键，如 `Alt+5`（打开日记）、`Ctrl+P`（全局搜索）
@@ -334,6 +337,39 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 
 # 📌 Changelog
 
+### v3.8.3 — Smarter template insertion + one-click factory reset
+
+> 💡 **Templates landing at the end of the first block in the block-format popup? Want a {{newline}} variable? Want to reset the plugin to its out-of-the-box state in one click? Update.**
+
+**① Templates insert wherever the cursor is**
+- Before, with the cursor on the 2nd line or later, tapping a template button dropped the content at the end of the first block — confusing
+- Now templates insert right where the cursor is; with no cursor it still does the old thing (insert at top)
+
+**② Template variables completed**
+- Before, `{{timestamp}}` did nothing in the popup, and `{{date}}`/`{{datetime}}` showed yesterday's date between 00:00–08:00
+- Now every variable works everywhere, and dates/times use your local timezone
+
+**③ New {{newline}} line-break variable**
+- Write `{{newline}}` in a template and it becomes a real line break — multi-line templates are finally easy
+- Example: `first line{{newline}}second line` → two blocks in block format, two lines in plain-text mode
+
+**④ One-click restore factory defaults**
+- Buttons, feature toggles, toolbar position, global config — one click puts everything back to the first-install defaults (your activation is kept)
+- You must export a backup of the current config before restoring, so an accidental tap can't wreck anything
+
+**⑤ Click-automation: set the step delay yourself**
+- Write a standalone line like `200ms` / `1s` / `800` between steps to change the wait for the following steps (default 200ms)
+- Slow animation or slow loading? Just wait a bit longer — no more gambling on the default interval
+
+**⑥ New buttons automatically join the quick-note popup**
+- Buttons you add now automatically appear in the quick-note popup — no need to manually check them in 4️⃣ → ⑨
+- Don't want a button there? Just uncheck it in ⑨
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ Older versions
+  </summary>
+
 ### v3.8.2 — Fixed wrong lock state after switching documents
 
 > 💡 **If the 🔒/🔓 icon shows the wrong state after switching documents (follows the previous document), or the mobile lock icon doesn't update, update.**
@@ -354,11 +390,6 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 - Root cause: the optimistic update only changed the button icon, not the authoritative `custom-sy-readonly` attribute on the wysiwyg element — SiYuan re-renders before the API write completes (slow on long documents), reads the old value and overwrites the icon back
 - Fix: the optimistic update now also sets the authoritative attribute; the API response code is checked (a failed write never threw, so the rollback never ran); icons are re-synced after a successful write
 - Bonus fix: failed toggles no longer leave the icon stuck in the wrong optimistic state (response-code check + attribute rollback)
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ Older versions
-  </summary>
 
 ### v3.8.1 — Quick-note popup buttons no longer pop up the keyboard
 

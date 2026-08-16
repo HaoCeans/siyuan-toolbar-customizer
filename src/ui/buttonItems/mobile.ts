@@ -712,6 +712,8 @@ export function createMobileButtonItem(
           <code>{{minute}}</code><span>分钟 (30)</span>
           <code>{{second}}</code><span>秒 (45)</span>
           <code>{{week}}</code><span>星期几</span>
+          <code>{{timestamp}}</code><span>Unix时间戳 (毫秒)</span>
+          <code>{{newline}}</code><span>换行符</span>
         </div>
       `
       templateContainer.appendChild(hint)
@@ -802,7 +804,7 @@ export function createMobileButtonItem(
 
       const hint = document.createElement('div')
       hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
-      hint.innerHTML = '<div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px;"><strong style="color: var(--b3-theme-primary);">🌟 社区可用代码分享（推荐）</strong><br><a href="https://ld246.com/article/1771266377449" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">https://ld246.com/article/1771266377449</a></div>💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">思源笔记常用功能 ID 速查表（GitHub）</a><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">模拟点击序列使用说明（GitHub）</a>'
+      hint.innerHTML = '<div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px;"><strong style="color: var(--b3-theme-primary);">🌟 社区可用代码分享（推荐）</strong><br><a href="https://ld246.com/article/1771266377449" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">https://ld246.com/article/1771266377449</a></div>💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong><br>• <strong>间隔时间（如 200ms / 1s，单独占一行，设置后续步骤的等待时间）</strong><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">思源笔记常用功能 ID 速查表（GitHub）</a><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">模拟点击序列使用说明（GitHub）</a>'
 
       clickSequenceContainer.appendChild(hint)
 
@@ -2166,6 +2168,12 @@ export function createMobileButtonItem(
 
     // 当展开编辑区域时，调用 refreshForm 刷新配置区状态
     if (isExpanded) {
+      // 滚动到该按钮，让展开的设置居中显示（与「添加按钮」后的自动展开行为一致）。
+      // 否则列表底部附近的按钮展开后，表单原地撑开落在「手机端自定义按钮」区底部
+      // （全局按钮配置上方），不在屏幕中间。
+      setTimeout(() => {
+        item.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 100)
       // 查找 subtypeSelect 元素（使用唯一ID）
       const subtypeSelect = editForm.querySelector(`#subtype-select-${button.id}`) as HTMLSelectElement
       if (subtypeSelect && (subtypeSelect as any).refreshForm) {

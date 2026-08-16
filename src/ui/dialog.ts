@@ -9,6 +9,13 @@ export interface ConfirmDialogOptions {
   hint?: string  // 底部提示文字（带颜色）
   confirmText?: string
   cancelText?: string
+  /** 额外的动作按钮（如"导出配置"），点击执行成功（不抛异常）后自动启用确认按钮 */
+  extraButton?: {
+    text: string
+    onClick: () => void | Promise<void>
+  }
+  /** 确认按钮初始禁用（配合 extraButton：先完成动作再放行确认，如"先导出再恢复"） */
+  confirmInitiallyDisabled?: boolean
 }
 
 /**
@@ -16,7 +23,7 @@ export interface ConfirmDialogOptions {
  * @returns Promise<boolean> - 用户选择结果
  */
 export function showConfirmDialog(options: ConfirmDialogOptions): Promise<boolean> {
-  const { title = '确认', message, hint, confirmText = '确定', cancelText = '取消' } = options
+  const { title = '确认', message, hint, confirmText = '确定', cancelText = '取消', extraButton, confirmInitiallyDisabled } = options
 
   return new Promise((resolve) => {
     const overlay = document.createElement('div')
@@ -95,6 +102,36 @@ export function showConfirmDialog(options: ConfirmDialogOptions): Promise<boolea
       border-top: 1px solid var(--b3-border-color);
     `
 
+    // 额外动作按钮（如"导出配置"）：执行成功后才放行确认按钮
+    if (extraButton) {
+      const extraBtn = document.createElement('button')
+      extraBtn.className = 'b3-button'
+      extraBtn.textContent = extraButton.text
+      extraBtn.style.cssText = `
+        flex: 1;
+        border: none;
+        border-radius: 0;
+        padding: 12px;
+        background: var(--b3-theme-background);
+        color: #f59e0b;
+        font-weight: 600;
+      `
+      extraBtn.onclick = async () => {
+        extraBtn.disabled = true
+        try {
+          await extraButton.onClick()
+          // 动作完成 → 放行确认
+          confirmButton.disabled = false
+          confirmButton.style.opacity = ''
+        } catch (e) {
+          console.warn('[dialog extraButton] 执行失败:', e)
+        } finally {
+          extraBtn.disabled = false
+        }
+      }
+      buttons.appendChild(extraBtn)
+    }
+
     const cancelButton = document.createElement('button')
     cancelButton.className = 'b3-button'
     cancelButton.textContent = cancelText
@@ -105,6 +142,7 @@ export function showConfirmDialog(options: ConfirmDialogOptions): Promise<boolea
       padding: 12px;
       background: var(--b3-theme-background);
       color: var(--b3-theme-on-background);
+      ${extraButton ? 'border-left: 1px solid var(--b3-border-color);' : ''}
     `
 
     const confirmButton = document.createElement('button')
@@ -119,6 +157,11 @@ export function showConfirmDialog(options: ConfirmDialogOptions): Promise<boolea
       background: var(--b3-theme-primary);
       color: var(--b3-theme-on-primary);
     `
+    // 初始禁用确认按钮（配合 extraButton 的"先导出再确认"流程）
+    if (confirmInitiallyDisabled) {
+      confirmButton.disabled = true
+      confirmButton.style.opacity = '0.5'
+    }
 
     cancelButton.onclick = () => {
       document.body.removeChild(overlay)

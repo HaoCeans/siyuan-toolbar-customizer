@@ -10,12 +10,13 @@ import { TRIAL_CODE, clearTrial } from '../utils/licenseManager'
 import type { Setting } from 'siyuan'
 import type { GlobalButtonConfig } from '../toolbarManager'
 import type { ButtonConfig } from '../toolbarManager'
-import { showMessage } from 'siyuan'
+import { showMessage, fetchSyncPost } from 'siyuan'
 import * as Notify from '../notification'
 import { createMobileButtonItem, type MobileButtonContext } from '../ui/buttonItems/mobile'
 import { createToolbarPreview } from '../ui/toolbarPreview'
 import { createMobileQuickNoteFormatField } from '../ui/quickNoteFormatField'
-import { calculateButtonOverflow, getToolbarAvailableWidth, getButtonWidth } from '../toolbarManager'
+import { calculateButtonOverflow, getToolbarAvailableWidth, getButtonWidth, resetAllConfigsToFactoryDefaults } from '../toolbarManager'
+import { showConfirmDialog } from '../ui/dialog'
 import { lucideToSvg } from '../utils/lucideHelper'
 
 /**
@@ -563,7 +564,9 @@ export interface MobileFeatureConfig {
 export interface MobileSettingsContext {
   buttonConfigs: ButtonConfig[]
   mobileButtonConfigs: ButtonConfig[]
+  desktopButtonConfigs: ButtonConfig[]
   mobileGlobalButtonConfig: GlobalButtonConfig
+  desktopGlobalButtonConfig: GlobalButtonConfig
   mobileFeatureConfig: MobileFeatureConfig
   mobileConfig: MobileToolbarConfig
   desktopFeatureConfig: MobileFeatureConfig
@@ -573,6 +576,7 @@ export interface MobileSettingsContext {
   showIconPicker: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void
   showButtonIdPicker: (currentValue: string, onSelect: (result: any) => void) => void
   saveData: (key: string, value: any) => Promise<void>
+  removeData: (key: string) => Promise<void>
   applyFeatures: () => void
   applyDesktopToolbarPosition: () => void
   applyMobileToolbarStyle: () => void
@@ -1436,6 +1440,13 @@ export function createMobileSettingLayout(
           overflowLevel: 0 // 初始为可见，稍后重新计算
         }
         context.buttonConfigs.push(newButton)
+
+        // 新按钮默认加入记事弹窗（白名单模式：quickNoteButtonIds 非空数组时追加；空数组=全显模式无需处理，
+        // 若在空数组里 push 会把"显示全部"误变成"只显示新按钮"）
+        const qnIds = context.mobileFeatureConfig.quickNoteButtonIds
+        if (Array.isArray(qnIds) && qnIds.length > 0) {
+          context.mobileFeatureConfig.quickNoteButtonIds = [...qnIds, newButton.id]
+        }
 
         // 获取扩展工具栏按钮的层数配置
         const overflowBtn = context.mobileButtonConfigs.find(btn => btn.id === 'overflow-button-mobile')
@@ -4216,6 +4227,100 @@ export function createMobileSettingLayout(
       descEl.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
       descEl.textContent = '💡 开启后：隐藏所有自定义按钮 + 取消所有工具栏样式修改，让思源恢复到未安装插件时的原始状态'
       container.appendChild(descEl)
+
+      return container
+    }
+  })
+
+  // ⚠️ 手机端恢复默认出厂配置（恢复为插件首次安装时的出厂默认，保留激活/授权）
+  setting.addItem({
+    title: '',
+    description: '',
+    createActionElement: () => {
+      const container = document.createElement('div')
+      container.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin: 0 -16px;
+        width: calc(100% + 32px);
+        padding: 16px;
+        background: linear-gradient(135deg, rgba(255, 152, 0, 0.12), rgba(255, 193, 7, 0.08));
+        border: 2px solid rgba(255, 152, 0, 0.4);
+        border-radius: 8px;
+        box-sizing: border-box;
+      `
+
+      const headerRow = document.createElement('div')
+      headerRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
+
+      const titleEl = document.createElement('label')
+      titleEl.style.cssText = 'font-size: 15px; font-weight: 700; color: #f59e0b;'
+      titleEl.textContent = '⚠️ 恢复默认出厂配置'
+
+      const resetBtn = document.createElement('button')
+      resetBtn.className = 'b3-button b3-button--outline'
+      resetBtn.textContent = '恢复'
+      resetBtn.style.cssText = 'flex-shrink: 0; padding: 6px 16px; border-color: #f59e0b; color: #f59e0b; cursor: pointer;'
+      resetBtn.onclick = async () => {
+        // 导出当前配置（电脑端+手机端全量），导出成功后才放行「确认恢复」
+        const exportConfig = async () => {
+          const payload = {
+            schema: 'siyuan-toolbar-customizer:full-config',
+            exportedAt: new Date().toISOString(),
+            pluginVersion: 'unknown',
+            data: {
+              mobileToolbarConfig: context.mobileConfig,
+              desktopButtonConfigs: context.desktopButtonConfigs,
+              mobileButtonConfigs: context.mobileButtonConfigs,
+              desktopFeatureConfig: context.desktopFeatureConfig,
+              mobileFeatureConfig: context.mobileFeatureConfig,
+              desktopGlobalButtonConfig: context.desktopGlobalButtonConfig,
+              mobileGlobalButtonConfig: context.mobileGlobalButtonConfig,
+            }
+          }
+          const text = JSON.stringify(payload, null, 2)
+          // 手机端 WebView 不支持 a[download]，用剪贴板导出
+          if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text)
+            showMessage('✅ 配置已复制到剪贴板，请粘贴到笔记/文件保存后，再确认恢复', 5000, 'info')
+          } else {
+            // 兜底：隐藏 textarea + execCommand 复制
+            const ta = document.createElement('textarea')
+            ta.value = text
+            ta.style.cssText = 'position: fixed; opacity: 0; left: -9999px;'
+            document.body.appendChild(ta)
+            ta.select()
+            document.execCommand('copy')
+            document.body.removeChild(ta)
+            showMessage('✅ 配置已复制到剪贴板，请粘贴到笔记/文件保存后，再确认恢复', 5000, 'info')
+          }
+        }
+
+        const ok = await showConfirmDialog({
+          title: '恢复默认出厂配置',
+          message: '将恢复为插件首次安装时的出厂默认配置（按钮、小功能、工具栏位置、全局配置等），当前所有自定义配置将被替换。\n建议先导出当前配置备份（电脑端+手机端），导出完成后再确认恢复。',
+          hint: '恢复后：出厂默认按钮（更多/打开菜单/锁住文档/…）+ 小功能开关 + 工具栏位置 + 全局按钮配置全部回到默认；激活码与授权信息保留',
+          confirmText: '确认恢复',
+          cancelText: '取消',
+          confirmInitiallyDisabled: true,
+          extraButton: { text: '📤 导出配置文件', onClick: exportConfig },
+        })
+        if (!ok) return
+        // 全量恢复出厂默认（仅保留激活/授权字段）
+        await resetAllConfigsToFactoryDefaults(context as any)
+        showMessage('✅ 已恢复默认出厂配置，正在刷新界面...', 3000, 'info')
+        await fetchSyncPost('/api/ui/reloadUI', {})
+      }
+
+      headerRow.appendChild(titleEl)
+      headerRow.appendChild(resetBtn)
+      container.appendChild(headerRow)
+
+      const resetDesc = document.createElement('div')
+      resetDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
+      resetDesc.textContent = '💡 将插件所有配置恢复为首次安装时的出厂默认（按钮/小功能/工具栏位置/全局配置），激活码与授权信息保留，当前自定义配置会被替换'
+      container.appendChild(resetDesc)
 
       return container
     }

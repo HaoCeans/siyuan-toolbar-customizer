@@ -209,11 +209,13 @@ export function insertTextIntoQuickNoteDialog(text: string): boolean {
     return true
   }
 
-  const editEl = dialog.querySelector('.toolbar-customizer-qnote-protyle [contenteditable="true"]') as HTMLElement | null
-  if (editEl) {
-    // 复用块编辑器的选区保障逻辑：无有效选区时 execCommand 会静默失败（思源 v3.8）
-    editEl.focus()
-    insertTextIntoBlockEditor(editEl, text)
+  const protyleEl = dialog.querySelector('.toolbar-customizer-qnote-protyle') as HTMLElement | null
+  const wysiwyg = protyleEl?.querySelector('.protyle-wysiwyg') as HTMLElement | null
+  if (wysiwyg) {
+    // 复用块编辑器的选区保障逻辑：无有效选区时 execCommand 会静默失败（思源 v3.8）。
+    // 校验容器必须传整个 wysiwyg，不能传第一个块的 contenteditable（见 blockInput 注释）
+    wysiwyg.querySelector('[contenteditable="true"]')?.focus()
+    void insertTextIntoBlockEditor(wysiwyg, text)
     return true
   }
   return false

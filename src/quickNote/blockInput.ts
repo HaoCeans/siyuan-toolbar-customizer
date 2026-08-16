@@ -3,7 +3,7 @@
  * 弹窗打开前在目标文档插入空块；Enter 可产生多个顶层块，保存时逐块 updateBlock 写回。
  */
 
-import { Protyle } from 'siyuan'
+import { Protyle, getFrontend } from 'siyuan'
 import type { QuickNoteInputAreaOptions, QuickNoteInputHandle } from './inputArea'
 import { destroyQuickNoteProtyle } from './protyleIsolate'
 import { createQuickNoteDraftBlock, deleteQuickNoteDraftBlock, blockExistsInKernel } from './kernelBlock'
@@ -19,6 +19,7 @@ import {
   type QuickNoteRootState,
 } from './popoverBlocks'
 import { waitForProtyleTransactionsIdle } from './protyleUtil'
+import { insertMultiLineText } from '../utils/protyleEnter'
 
 function buildBlockWrapperStyle(isDark: boolean, isMobile: boolean, isAppleStyle?: boolean): string {
   const layout = `
@@ -94,56 +95,71 @@ export function isBlockInputFormat(format: string | undefined): boolean {
  * ① 优先恢复思源 focusout 时克隆保存到 protyle.toolbar.range 的选区（若仍在编辑区内）；
  * ② 否则手动构建 range 兜底到编辑区末尾（空草稿块即开头），removeAllRanges + addRange 建立光标。
  *
+ * 注意：`container` 必须是**整个编辑器容器（wysiwyg）**，不能是第一个块的 contenteditable。
+ * Protyle 每个块都有独立的 [contenteditable="true"]，若只校验第一块，光标在第二块及以后会被
+ * 误判为"无有效选区"，模板被插到第一个块末尾（v3.8.0 回归，见 DEV_NOTES）。
+ *
+ * 多行文本（{{newline}} 等）：**不能把 `\n` 直接交给 execCommand('insertText')**——contenteditable
+ * 会把换行当普通字符插入文本节点、渲染成空格，不会产生新块。逐行插入 + 行间派发合成 Enter
+ * 的逻辑在 utils/protyleEnter.ts 的 insertMultiLineText（思源官方 enter() 换行链路，
+ * 列表感知、事务落库、focusByWbr 设光标），连续换行时空行先塞 ZWSP 避免"退出列表"语义。
+ *
  * execCommand 成功后由浏览器原生 beforeinput/input 触发思源 input() 完成渲染与落库，无需干预；
  * 仅当 execCommand 返回 false（浏览器禁用等极端情况）时手动插入文本节点并派发合成 input 事件
  * 通知思源——注意只有此时才派发，避免重复 input() 产生重复事务。
- *
- * 注意：模板含换行时 execCommand 会走 insertLineBreak 分支拆成多块（思源官方同样行为），单行模板无影响。
  */
-export function insertTextIntoBlockEditor(editEl: HTMLElement, text: string, savedRange?: Range | null): void {
+export async function insertTextIntoBlockEditor(container: HTMLElement, text: string, savedRange?: Range | null): Promise<void> {
   let sel = window.getSelection()
   let range: Range | null = null
 
-  // 现有选区有效则直接使用
+  // 现有选区在编辑容器内则直接使用
+  const containsRange = (r: Range): boolean =>
+    container.contains(r.startContainer) && container.contains(r.endContainer)
+
   if (sel && sel.rangeCount > 0) {
     const r = sel.getRangeAt(0)
-    if (editEl.contains(r.startContainer) && editEl.contains(r.endContainer)) {
+    if (containsRange(r)) {
       range = r
     }
   }
 
   if (!range) {
     // ① 恢复失焦前思源克隆保存的选区（wysiwyg focusout 写入 protyle.toolbar.range）
-    if (savedRange && editEl.contains(savedRange.startContainer) && editEl.contains(savedRange.endContainer)) {
+    if (savedRange && containsRange(savedRange)) {
       range = savedRange
     } else {
-      // ② 兜底：光标放到编辑区末尾（空内容即开头）
-      range = document.createRange()
-      range.selectNodeContents(editEl)
-      range.collapse(false)
+      // ② 兜底：光标放到第一个块末尾（空草稿块即开头）
+      const firstEditEl = container.querySelector('[contenteditable="true"]') as HTMLElement | null
+      if (firstEditEl) {
+        range = document.createRange()
+        range.selectNodeContents(firstEditEl)
+        range.collapse(false)
+      }
     }
-    sel = window.getSelection()
-    if (sel) {
-      sel.removeAllRanges()
-      sel.addRange(range)
+    if (range) {
+      sel = window.getSelection()
+      if (sel) {
+        sel.removeAllRanges()
+        sel.addRange(range)
+      }
     }
   }
 
-  let ok = false
-  try {
-    ok = document.execCommand('insertText', false, text)
-  } catch {
-    ok = false
-  }
+  if (!range) return  // 容器内没有任何 contenteditable，放弃插入
+
+  // 多行（含 {{newline}}）逐行插入 + 合成 Enter 走思源官方换行链路
+  const ok = await insertMultiLineText(container, text)
   if (ok) return
 
-  // 极端兜底：execCommand 不可用，手动插入文本并通知思源。
-  // 若插入点在编辑区边界（块外），先落到最后一个块末尾，避免产生裸文本节点。
-  let r: Range | null = sel && sel.rangeCount > 0 ? sel.getRangeAt(0) : range
+  // 极端兜底：execCommand 不可用，手动插入第一行文本并通知思源。
+  // 若插入点在编辑区边界（块外），先落到最后一个顶层块末尾，避免产生裸文本节点。
+  const firstLine = text.split('\n')[0]
+  const curSel = window.getSelection()
+  let r: Range | null = curSel && curSel.rangeCount > 0 ? curSel.getRangeAt(0) : range
   if (r) {
-    const container = r.startContainer.nodeType === Node.TEXT_NODE ? r.startContainer.parentElement : r.startContainer
-    if (!(container instanceof HTMLElement) || !container.closest('[data-node-id]')) {
-      const blocks = Array.from(editEl.querySelectorAll(':scope > [data-node-id]'))
+    const containerEl = r.startContainer.nodeType === Node.TEXT_NODE ? r.startContainer.parentElement : r.startContainer
+    if (!(containerEl instanceof HTMLElement) || !containerEl.closest('[data-node-id]')) {
+      const blocks = Array.from(container.querySelectorAll(':scope > [data-node-id]'))
       const last = blocks[blocks.length - 1] as HTMLElement | undefined
       if (last) {
         r = document.createRange()
@@ -151,16 +167,16 @@ export function insertTextIntoBlockEditor(editEl: HTMLElement, text: string, sav
         r.collapse(false)
       }
     }
-    if (r && editEl.contains(r.startContainer)) {
+    if (r && container.contains(r.startContainer)) {
       const s = window.getSelection()
       if (s) {
         s.removeAllRanges()
         s.addRange(r)
       }
       r.deleteContents()
-      r.insertNode(document.createTextNode(text))
+      r.insertNode(document.createTextNode(firstLine))
       r.collapse(false)
-      editEl.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text }))
+      container.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: firstLine }))
     }
   }
 }
@@ -336,14 +352,13 @@ export async function createBlockInputHandle(
     },
     insertText: (text: string) => {
       const wysiwyg = editor.protyle.wysiwyg.element
-      const editEl = wysiwyg.querySelector('[contenteditable="true"]') as HTMLElement | null
-      if (!editEl) return
-      // focusBlockEditable 在手机端会用隐藏 input 唤起键盘再延迟 50ms 聚焦 editEl，
+      if (!wysiwyg) return
+      // focusBlockEditable 在手机端会用隐藏 input 唤起键盘再延迟 50ms 聚焦编辑区，
       // 必须等聚焦完成后再插入，否则 fakeInput 有焦点时插入文本会失败
       focusBlockEditable(wysiwyg, options.isMobile, () => {
         // 思源 v3.8：execCommand 无有效选区时静默失败（弹窗刚打开无光标时点击模板按钮没反应），
         // insertTextIntoBlockEditor 会先恢复/构建选区（见函数注释），再执行插入
-        insertTextIntoBlockEditor(editEl, text, editor.protyle.toolbar?.range)
+        void insertTextIntoBlockEditor(wysiwyg, text, editor.protyle.toolbar?.range)
       })
     },
     focus: () => {
@@ -377,9 +392,15 @@ export function createBlockFormatSettingsPlaceholder(): HTMLElement {
   container.dataset.quickNoteBlockSettings = 'true'
   container.style.cssText =
     'padding: 10px 12px; background: rgba(139, 92, 246, 0.08); border: 1px dashed rgba(139, 92, 246, 0.45); border-radius: 6px; font-size: 12px; color: var(--b3-theme-on-surface-light); line-height: 1.5;'
+  // 400MB 独立窗口提示仅桌面端成立（电脑端块格式弹窗是独立 Electron 窗口）；
+  // 手机端块格式是弹窗内嵌编辑器，不另开窗口，无此占用。
+  const frontend = getFrontend()
+  const isMobile = frontend === 'mobile' || frontend === 'browser-mobile'
   container.innerHTML =
     '🧩 <strong style="color: #8b5cf6;">思源块格式</strong>：弹窗内直接编辑内核块，Enter 可多段落/列表，发送时逐块写入文档。' +
-    '<br>⚠️ <span style="color: #e67e22;">注意：块格式为了能够丝滑地打开和使用，会加载完整 Protyle 编辑器到独立窗口，预计额外占用约 400MB 运存。关窗后释放。</span>' +
-    '<br><span style="color: #999;">仅在打开窗口时产生运存占用，关闭窗口即销毁，不持续占用。</span>'
+    (isMobile
+      ? '<br><span style="color: #999;">手机端块格式为弹窗内嵌编辑器，不另开独立窗口，无 400MB 级别的大额运存占用。与电脑端完全独立，请放心使用！</span>'
+      : '<br>⚠️ <span style="color: #e67e22;">注意：块格式为了能够丝滑地打开和使用，会加载完整 Protyle 编辑器到独立窗口，预计额外占用约 400MB 运存。关窗后释放。</span>' +
+        '<br><span style="color: #999;">仅在打开窗口时产生运存占用，关闭窗口即销毁，不持续占用。</span>')
   return container
 }

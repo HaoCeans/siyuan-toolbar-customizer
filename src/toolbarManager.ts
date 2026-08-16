@@ -31,6 +31,7 @@ import { deleteBlock } from "./api";
 import { uploadImageFile, insertProtyleImageAtCaret } from "./quickNote/imageInsert";
 import { lucideToSvg } from "./utils/lucideHelper";
 import * as licenseManager from "./utils/licenseManager";
+import { insertMultiLineText } from "./utils/protyleEnter";
 
 // ===== 插件实例（用于需要 app 参数的 API 调用） =====
 export let pluginInstance: any = null;
@@ -499,6 +500,63 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     showNotification: true
   }
 ]
+
+/**
+ * 恢复所有配置为出厂默认（插件首次安装状态），仅保留激活/授权相关字段。
+ * 用于设置页「恢复默认出厂配置」功能（桌面端/手机端共用）。
+ * - 按钮、全局按钮配置、手机端工具栏配置：显式写入 DEFAULT_* 常量
+ * - 小功能配置（featureConfig）：移除存储键让 onload 回退内置默认，再把授权字段单独写回，
+ *   避免清掉用户已购买的激活码/授权信息（授权字段就存在 featureConfig 里）
+ */
+export async function resetAllConfigsToFactoryDefaults(ctx: {
+  desktopButtonConfigs: ButtonConfig[]
+  mobileButtonConfigs: ButtonConfig[]
+  desktopGlobalButtonConfig: GlobalButtonConfig
+  mobileGlobalButtonConfig: GlobalButtonConfig
+  desktopFeatureConfig: Record<string, unknown>
+  mobileFeatureConfig: Record<string, unknown>
+  mobileConfig: MobileToolbarConfig
+  saveData: (key: string, value: unknown) => Promise<void>
+  removeData: (key: string) => Promise<void>
+}): Promise<void> {
+  // 按钮 → 出厂默认（深拷贝，避免共享引用）
+  ctx.desktopButtonConfigs.splice(0, ctx.desktopButtonConfigs.length, ...DEFAULT_DESKTOP_BUTTONS.map(b => ({ ...b })))
+  ctx.mobileButtonConfigs.splice(0, ctx.mobileButtonConfigs.length, ...DEFAULT_MOBILE_BUTTONS.map(b => ({ ...b })))
+
+  // 全局按钮配置 → 出厂默认
+  Object.assign(ctx.desktopGlobalButtonConfig, { ...DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG })
+  Object.assign(ctx.mobileGlobalButtonConfig, { ...DEFAULT_MOBILE_GLOBAL_BUTTON_CONFIG })
+
+  // 手机端工具栏配置 → 出厂默认
+  Object.assign(ctx.mobileConfig, { ...DEFAULT_MOBILE_CONFIG })
+
+  // 小功能配置 → 出厂默认（保留授权字段 + 桌面端升级提示标记）
+  const preserveKeys = [
+    'authorActivated', 'authorCode', 'authorAccount',
+    'licensePlan', 'licenseExpiry', 'licenseGraceEnd',
+    'hasSeenDesktopFloatingNotice',
+  ]
+  const collectPreserved = (cfg: Record<string, unknown>): Record<string, unknown> => {
+    const out: Record<string, unknown> = {}
+    for (const k of preserveKeys) {
+      if (cfg[k] !== undefined) out[k] = cfg[k]
+    }
+    return out
+  }
+  const dFeature = ctx.desktopFeatureConfig
+  const mFeature = ctx.mobileFeatureConfig
+  await ctx.removeData('desktopFeatureConfig')
+  await ctx.removeData('mobileFeatureConfig')
+  await ctx.saveData('desktopFeatureConfig', collectPreserved(dFeature))
+  await ctx.saveData('mobileFeatureConfig', collectPreserved(mFeature))
+
+  // 保存其余出厂默认
+  await ctx.saveData('desktopButtonConfigs', ctx.desktopButtonConfigs)
+  await ctx.saveData('mobileButtonConfigs', ctx.mobileButtonConfigs)
+  await ctx.saveData('desktopGlobalButtonConfig', ctx.desktopGlobalButtonConfig)
+  await ctx.saveData('mobileGlobalButtonConfig', ctx.mobileGlobalButtonConfig)
+  await ctx.saveData('mobileToolbarConfig', ctx.mobileConfig)
+}
 
 // ===== 扩展工具栏辅助常量 =====
 export const OVERFLOW_BUTTON_ID_MOBILE = 'overflow-button-mobile'
@@ -3653,11 +3711,22 @@ export function insertTemplate(config: ButtonConfig, savedSelection: Range | nul
     const inputEvent = new Event('input', { bubbles: true })
     
     try {
-      // 尝试使用execCommand插入文本
-      document.execCommand('insertText', false, processedTemplate)
-      
-      // 触发输入事件
-      contentEditable.dispatchEvent(inputEvent)
+      if (processedTemplate.includes('\n')) {
+        // 多行模板（{{newline}}）：逐行插入 + 合成 Enter 走思源官方换行链路。
+        // 不能直接 execCommand 插 \n（只当普通字符进文本节点、渲染成空格，不产生新块）
+        const wysiwyg = activeEditor.querySelector('.protyle-wysiwyg')
+        if (wysiwyg) {
+          void insertMultiLineText(wysiwyg as HTMLElement, processedTemplate)
+        } else {
+          // 找不到 wysiwyg 时退回原逻辑
+          document.execCommand('insertText', false, processedTemplate)
+          contentEditable.dispatchEvent(inputEvent)
+        }
+      } else {
+        // 单行模板：原逻辑
+        document.execCommand('insertText', false, processedTemplate)
+        contentEditable.dispatchEvent(inputEvent)
+      }
     } catch (error) {
       Notify.showErrorInsertTemplateFailed()
     }
@@ -3678,6 +3747,7 @@ export function insertTemplate(config: ButtonConfig, savedSelection: Range | nul
  * - {{second}} - 秒 ss
  * - {{week}} - 星期几（中文）
  * - {{timestamp}} - Unix时间戳（毫秒）
+ * - {{newline}} - 换行符（\n）
  */
 export function processTemplateVariables(template: string): string {
   const now = new Date()
@@ -3708,6 +3778,7 @@ export function processTemplateVariables(template: string): string {
     .replace(/\{\{second\}\}/g, second)
     .replace(/\{\{week\}\}/g, week)
     .replace(/\{\{timestamp\}\}/g, String(now.getTime()))
+    .replace(/\{\{newline\}\}/g, '\n')
 }
 
 /**
@@ -3810,9 +3881,28 @@ async function executeClickSequence(config: ButtonConfig, clickedButton?: HTMLEl
     return
   }
 
+  // 步骤间隔：默认 200ms；序列中可写独立延迟行覆盖（如 "200ms" / "1s" / "800"，无单位=毫秒）
+  let stepDelay = 200
+  let isFirstStep = true
   for (let i = 0; i < config.clickSequence.length; i++) {
-    const selector = config.clickSequence[i].trim()
-    if (!selector) continue // 跳过空选择器
+    const line = config.clickSequence[i].trim()
+    if (!line) continue // 跳过空行
+
+    // 延迟行：设置后续步骤的等待时间（可多次出现，取最近一次）
+    const delayMatch = /^(\d+(?:\.\d+)?)\s*(ms|s)?$/i.exec(line)
+    if (delayMatch) {
+      const num = parseFloat(delayMatch[1])
+      stepDelay = (delayMatch[2] ?? 'ms').toLowerCase() === 's' ? num * 1000 : num
+      continue
+    }
+
+    // 第一步立即执行；后续步骤先等待 stepDelay（可被延迟行覆盖）
+    if (!isFirstStep) {
+      await delay(stepDelay)
+    }
+    isFirstStep = false
+
+    const selector = line
 
     // 判断是否为悬浮操作（* 前缀）
     const isHover = selector.startsWith('*')
@@ -3915,9 +4005,6 @@ async function executeClickSequence(config: ButtonConfig, clickedButton?: HTMLEl
     if (!success) {
       return // 如果步骤失败，停止整个序列
     }
-
-    // 步骤之间稍微延迟，让界面有时间响应
-    await delay(200)
   }
 }
 
@@ -8926,8 +9013,19 @@ async function executePopupSelect(config: ButtonConfig, savedSelection: Range | 
       if (contentEditable) {
         const inputEvent = new Event('input', { bubbles: true })
         try {
-          document.execCommand('insertText', false, processedContent)
-          contentEditable.dispatchEvent(inputEvent)
+          if (processedContent.includes('\n')) {
+            // 多行模板（{{newline}}）：逐行插入 + 合成 Enter 走思源官方换行链路
+            const wysiwyg = activeEditor.querySelector('.protyle-wysiwyg')
+            if (wysiwyg) {
+              void insertMultiLineText(wysiwyg as HTMLElement, processedContent)
+            } else {
+              document.execCommand('insertText', false, processedContent)
+              contentEditable.dispatchEvent(inputEvent)
+            }
+          } else {
+            document.execCommand('insertText', false, processedContent)
+            contentEditable.dispatchEvent(inputEvent)
+          }
         } catch (error) {
           Notify.showErrorInsertTemplateFailed()
         }

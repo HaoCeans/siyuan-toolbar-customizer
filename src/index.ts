@@ -1336,6 +1336,7 @@ export default class ToolbarCustomizer extends Plugin {
         showConfirmDialog: (msg) => this.showConfirmDialog(msg),
         showIconPicker: (current, onSelect) => this.showIconPicker(current, onSelect),
         saveData: (key, value) => this.saveData(key, value),
+        removeData: (key) => this.removeData(key),
         applyFeatures: () => this.applyFeatures(),
         applyDesktopToolbarPosition: () => this.applyDesktopToolbarPosition(),
         refreshButtons: () => {
@@ -1366,7 +1367,9 @@ export default class ToolbarCustomizer extends Plugin {
     const context: MobileSettingsContext = {
       buttonConfigs: this.buttonConfigs,
       mobileButtonConfigs: this.mobileButtonConfigs,
+      desktopButtonConfigs: this.desktopButtonConfigs,
       mobileGlobalButtonConfig: this.mobileGlobalButtonConfig,
+      desktopGlobalButtonConfig: this.desktopGlobalButtonConfig,
       mobileFeatureConfig: this.mobileFeatureConfig,
       mobileConfig: this.mobileConfig,
       desktopFeatureConfig: this.desktopFeatureConfig,
@@ -1376,6 +1379,7 @@ export default class ToolbarCustomizer extends Plugin {
       showIconPicker: (currentValue, onSelect) => this.showIconPicker(currentValue, onSelect),
       showButtonIdPicker: (currentValue, onSelect) => this.showButtonIdPicker(currentValue, onSelect),
       saveData: (key, value) => this.saveData(key, value),
+      removeData: (key) => this.removeData(key),
       applyFeatures: () => this.applyFeatures(),
       applyDesktopToolbarPosition: () => this.applyDesktopToolbarPosition(),
       applyMobileToolbarStyle: () => this.applyMobileToolbarStyle(),

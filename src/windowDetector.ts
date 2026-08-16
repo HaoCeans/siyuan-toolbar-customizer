@@ -1866,20 +1866,10 @@ async function handleButtonClick(
     if (buttonConfig.type === 'template') {
       const noteDialog = document.getElementById('quick-note-dialog') || document.getElementById('quick-note-dialog-desktop');
       if (noteDialog && buttonConfig.template) {
-        let templateContent = buttonConfig.template;
-        const now = new Date();
-        templateContent = templateContent
-          .replace(/{{date}}/g, now.toISOString().split('T')[0])
-          .replace(/{{time}}/g, now.toTimeString().split(' ')[0])
-          .replace(/{{datetime}}/g, `${now.toISOString().split('T')[0]} ${now.toTimeString().split(' ')[0]}`)
-          .replace(/{{year}}/g, now.getFullYear().toString())
-          .replace(/{{month}}/g, String(now.getMonth() + 1).padStart(2, '0'))
-          .replace(/{{day}}/g, String(now.getDate()).padStart(2, '0'))
-          .replace(/{{hour}}/g, String(now.getHours()).padStart(2, '0'))
-          .replace(/{{minute}}/g, String(now.getMinutes()).padStart(2, '0'))
-          .replace(/{{second}}/g, String(now.getSeconds()).padStart(2, '0'))
-          .replace(/{{week}}/g, ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'][now.getDay()]);
-
+        // 统一走 processTemplateVariables：与主编辑器/右键菜单/popup-select 同一套变量实现，
+        // 支持 {{timestamp}}/{{newline}}，且日期时间用本地时区
+        // （原先内联 toISOString 是 UTC，中国时区凌晨 0-8 点 {{date}} 会差一天）
+        const templateContent = processTemplateVariables(buttonConfig.template);
         insertTextIntoQuickNoteDialog(templateContent);
         Notify.showInfoTemplateInserted(buttonConfig.showNotification !== false);
       }

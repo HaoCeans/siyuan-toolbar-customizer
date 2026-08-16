@@ -164,12 +164,70 @@ windowDetector.handleButtonClick（template 分支）
   3. 兜底：`selectNodeContents(editEl) + collapse(false)` 光标放编辑区末尾（空草稿块即开头），`removeAllRanges + addRange` 建立真实光标
 - **execCommand 成功后不做任何事**：浏览器原生 beforeinput/input 触发思源 `input()` 自动渲染+事务落库，手动再派发 input 会**重复走 input() 产生重复事务**
 - **极端兜底**（execCommand 返回 false）：手动 insertNode 文本 + 派发合成 `InputEvent('input', {inputType:'insertText', data})`——仅此时派发；插入点在块外时先落到最后一个块末尾，避免产生裸文本节点
-- **多行模板**：`\n` 会走 `insertLineBreak` 分支拆成多块（思源官方同款行为，块格式弹窗中即预期，勿改）
+- **多行模板（{{newline}}）**：见下方专节「多行模板换行（{{newline}}）：合成 Enter 走思源官方链路（v3.8.3）」
 
 **教训**：
 1. `execCommand` 的失败**不抛异常**，返回值必须显式检查——用 try/catch 做降级是无效的（曾经的 `inputArea.ts` fallback 就因此谎报成功）
 2. 手机端 WebView 的键盘唤起规则与桌面不同：contenteditable 不可直接 focus 弹键盘，隐藏 input 中转是通用解法
 3. 恢复克隆 range 前必须验证 `startContainer` 仍被编辑器包含（块重建后旧 range 已失效）
+
+### 多行模板换行（{{newline}}）：合成 Enter 走思源官方链路（v3.8.3）
+
+**问题**：模板里的 `{{newline}}` 变量替换成 `\n` 后，在块编辑器里"不生效"（渲染成空格，不换行）。
+
+**根因（踩坑记录）**：
+- 原假设"`\n` 会走 insertLineBreak 分支拆成多块"是**错的**
+- 实际 `document.execCommand('insertText', false, 'a\nb')` 在 contenteditable 里只会把 `\n` **当普通字符插入文本节点**——HTML 空白折叠渲染成空格，**不会产生新块**
+- 记事弹窗和主编辑器（`insertTemplate` / popup-select）踩的是同一个坑
+
+**思源换行链路（读源码确认）**：
+- 入口：`keydown.ts:1374-1381`——`matchHotKey("↩", event)` 匹配 Enter → `enter()`；监听器挂在 `wysiwyg.element` 上，range 从**当前 selection** 取（keydown.ts:270）
+- 核心：`enter.ts:434` `listEnter`——空项退出列表 / 段首前插 / 段末后插 / 子列表首项前插 / 文字中间拆分，全部经 `genListItemElement` + `insertAdjacentElement` + `updateTransaction` 事务落库 + `focusByWbr` 设光标
+- 移动端 IME 回车也走同一条链路（v3.8 的 Android `Unidentified` 机制）
+
+**实现（合成 Enter，官方同款模式）**：
+
+```typescript
+const keydownEvent = new KeyboardEvent("keydown", {
+  key: "Enter", code: "Enter",
+  keyCode: 13,            // ← 必须显式 13！合成事件默认 0，思源 KEYCODELIST 修饰键判断会走错分支
+  bubbles: true, cancelable: true,
+});
+wysiwyg.element.dispatchEvent(keydownEvent);   // 派发到 wysiwyg 即可（监听器在其上）
+```
+
+- 官方先例：思源 Android 兼容补丁 d3e6ece43 自己就合成 `Backspace` keydown 派发到 `this.element`
+- 合成事件不触发浏览器默认行为，思源 `enter()` 全权处理 + `preventDefault` → **不会双换行**
+
+**前提条件**：
+1. **selection 必须落在目标块内**——keydown 监听读的是当前 selection，无选区时 `getEditorRange` 兜底到文档首块（换行会发生在错误位置）
+2. keyCode 必须显式 13
+
+**边界情况**：空列表项按 Enter 的语义是"退出列表"（listOutdent）而非新建下一项 → 连续换行（空行）时**先塞 ZWSP**（`\u200b`）让块非空再 Enter；ZWSP 不可见，保存时 `hasWysiwygText` 会剥离
+
+**行间时序**：Enter 派发后 `await setTimeout(0)` 等一帧，确保 `focusByWbr` 已把光标放进新块（防 `updateTransaction` 异步扰动）
+
+**共享实现**：`src/utils/protyleEnter.ts`（`insertMultiLineText` / `dispatchSyntheticEnter` / `isCurrentBlockEmpty`），覆盖全部模板插入入口：
+
+| 入口 | 位置 |
+|---|---|
+| 记事弹窗块格式 | `blockInput.ts` `insertTextIntoBlockEditor` |
+| 主编辑器工具栏按钮 + 右键菜单 | `insertTemplate`（toolbarManager.ts:3714） |
+| popup-select 主编辑器 | `executePopupSelect`（toolbarManager.ts:9000） |
+
+**验证记录（v3.8.3 实测）**：派发后 `defaultPrevented=true`（思源 handler 接住）、block id 变化（enter() 真实执行）；纯 `\n` 空块模板 block 数恒 1 是空块重建的正确语义。调试日志已清除。
+
+**教训**：
+1. contenteditable 的 `execCommand('insertText')` **不把 `\n` 当换行**——它只是文本字符。块编辑器里的"换行"是应用层语义，必须走应用自己的输入处理链路
+2. "模拟用户按键"时，合成事件要带全 `key/code/keyCode/which`，且先确认监听器的挂载点与取值方式（读 selection 还是读 event）
+3. 多入口重复的逻辑（本处三处）务必抽共享模块，否则修复只覆盖一个入口、另一个入口继续踩坑
+
+**回归修复（v3.8.1）——有光标时模板插到第一个块末尾**：
+
+- **症状**：手机端一键记事弹窗（块格式），光标在第二块及以后时点模板按钮，模板插到**第一个块末尾**，而不是光标处。
+- **根因**：`insertTextIntoBlockEditor` 的选区校验容器是 `wysiwyg.querySelector('[contenteditable="true"]')`——Protyle **每个块都有独立的 contenteditable**，这个查询永远返回第一个块。光标在非首块时 `editEl.contains(range)` 为 false → 有效光标被丢弃 → 落入兜底 `selectNodeContents(第一个块).collapse(false)`。`protyle.toolbar.range` 的校验同样只认第一块。
+- **修复**：函数改为接收**整个 wysiwyg 作为校验容器**（`container.contains` 校验选区），兜底时才查第一个块；极端兜底的顶层块查询同步改为 `container.querySelectorAll(':scope > [data-node-id]')`（原 `editEl` 是第一块、无子块，永远查不到）。调用点：`blockInput.insertText` 与 `inputArea.insertTextIntoQuickNoteDialog` 兜底分支都传 wysiwyg。
+- **教训**：校验「选区是否在编辑器内」时，容器必须是**整个编辑器**而不是某个代表性元素。Protyle 的多 contenteditable 结构下，`querySelector` 只取第一个，最容易漏掉非首块场景。
 
 ### 电脑端底部胶囊的隐藏：JS MutationObserver + inline style
 

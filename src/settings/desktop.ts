@@ -9,13 +9,14 @@ import { TRIAL_CODE, clearTrial } from '../utils/licenseManager'
 
 import type { Setting } from 'siyuan'
 import type { GlobalButtonConfig, ButtonConfig } from '../toolbarManager'
-import { calculateButtonOverflow } from '../toolbarManager'
+import { calculateButtonOverflow, resetAllConfigsToFactoryDefaults } from '../toolbarManager'
 import { createDesktopButtonItem, type DesktopButtonContext } from '../ui/buttonItems/desktop'
 import { createMobileButtonItem, type MobileButtonContext } from '../ui/buttonItems/mobile'
 import { createToolbarPreview } from '../ui/toolbarPreview'
 import { fetchSyncPost, showMessage } from 'siyuan'
 import * as Notify from '../notification'
 import { showButtonSelector } from '../ui/buttonSelector'
+import { showConfirmDialog } from '../ui/dialog'
 import { createDesktopQuickNoteSettingsSection } from '../ui/desktopQuickNoteSettings'
 
 /**
@@ -400,6 +401,7 @@ export interface DesktopSettingsContext {
   showConfirmDialog: (message: string) => Promise<boolean>
   showIconPicker: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void
   saveData: (key: string, value: any) => Promise<void>
+  removeData: (key: string) => Promise<void>
   applyFeatures: () => void
   applyDesktopToolbarPosition: () => void
   refreshButtons: () => void
@@ -2589,6 +2591,89 @@ export function createDesktopSettingLayout(
 
       container.appendChild(dangerItem)
 
+      // ⚠️ 恢复默认出厂配置（恢复为插件首次安装时的出厂默认，保留激活/授权）
+      const resetItem = document.createElement('div')
+      resetItem.style.cssText = `
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        padding: 16px !important;
+        margin-top: 12px !important;
+        background: linear-gradient(135deg, rgba(255, 152, 0, 0.12), rgba(255, 193, 7, 0.08)) !important;
+        border: 2px solid rgba(255, 152, 0, 0.4) !important;
+        border-radius: 8px !important;
+      `
+
+      const resetHeader = document.createElement('div')
+      resetHeader.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
+
+      const resetLabel = document.createElement('label')
+      resetLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #f59e0b; min-width: 180px;'
+      resetLabel.textContent = '⚠️ 恢复默认出厂配置'
+
+      const resetBtn = document.createElement('button')
+      resetBtn.className = 'b3-button b3-button--outline'
+      resetBtn.textContent = '恢复'
+      resetBtn.style.cssText = 'flex-shrink: 0; padding: 6px 16px; border-color: #f59e0b; color: #f59e0b; cursor: pointer;'
+      resetBtn.onclick = async () => {
+        // 导出当前配置（电脑端+手机端全量），导出成功后才放行「确认恢复」
+        const exportConfig = () => {
+          const payload = {
+            schema: 'siyuan-toolbar-customizer:full-config',
+            exportedAt: new Date().toISOString(),
+            pluginVersion: context.version || 'unknown',
+            data: {
+              mobileToolbarConfig: context.mobileConfig,
+              desktopButtonConfigs: context.desktopButtonConfigs,
+              mobileButtonConfigs: context.mobileButtonConfigs,
+              desktopFeatureConfig: context.desktopFeatureConfig,
+              mobileFeatureConfig: context.mobileFeatureConfig,
+              desktopGlobalButtonConfig: context.desktopGlobalButtonConfig,
+              mobileGlobalButtonConfig: context.mobileGlobalButtonConfig,
+            }
+          }
+          const text = JSON.stringify(payload, null, 2)
+          const blob = new Blob([text], { type: 'application/json;charset=utf-8' })
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          const safeVer = String(context.version || 'unknown').replace(/[^\w.-]+/g, '_')
+          a.href = url
+          a.download = `siyuan-toolbar-customizer-config_${safeVer}.json`
+          document.body.appendChild(a)
+          a.click()
+          a.remove()
+          URL.revokeObjectURL(url)
+          showMessage('✅ 已导出配置文件，确认无误后再恢复', 3000, 'info')
+        }
+
+        const ok = await showConfirmDialog({
+          title: '恢复默认出厂配置',
+          message: '将恢复为插件首次安装时的出厂默认配置（按钮、小功能、工具栏位置、全局配置等），当前所有自定义配置将被替换。\n建议先导出当前配置备份（电脑端+手机端），导出完成后再确认恢复。',
+          hint: '恢复后：出厂默认按钮（更多/打开菜单/锁住文档/…）+ 小功能开关 + 工具栏位置 + 全局按钮配置全部回到默认；激活码与授权信息保留',
+          confirmText: '确认恢复',
+          cancelText: '取消',
+          confirmInitiallyDisabled: true,
+          extraButton: { text: '📤 导出配置文件', onClick: exportConfig },
+        })
+        if (!ok) return
+        // 全量恢复出厂默认（仅保留激活/授权字段）
+        await resetAllConfigsToFactoryDefaults(context as any)
+        showMessage('✅ 已恢复默认出厂配置，正在刷新界面...', 3000, 'info')
+        await fetchSyncPost('/api/ui/reloadUI', {})
+      }
+
+      resetHeader.appendChild(resetLabel)
+      resetHeader.appendChild(resetBtn)
+
+      const resetDesc = document.createElement('div')
+      resetDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
+      resetDesc.textContent = '💡 将插件所有配置恢复为首次安装时的出厂默认（按钮/小功能/工具栏位置/全局配置），激活码与授权信息保留，当前自定义配置会被替换'
+
+      resetItem.appendChild(resetHeader)
+      resetItem.appendChild(resetDesc)
+
+      container.appendChild(resetItem)
+
       return container
     }
   })
@@ -2685,6 +2770,13 @@ export function createDesktopSettingLayout(
           enabled: true
         }
         context.mobileButtonConfigs.push(newButton)
+
+        // 新按钮默认加入记事弹窗（白名单模式：quickNoteButtonIds 非空数组时追加；空数组=全显模式无需处理，
+        // 若在空数组里 push 会把"显示全部"误变成"只显示新按钮"）
+        const mobileFeature = context.mobileFeatureConfig as { quickNoteButtonIds?: string[] }
+        if (Array.isArray(mobileFeature.quickNoteButtonIds) && mobileFeature.quickNoteButtonIds.length > 0) {
+          mobileFeature.quickNoteButtonIds = [...mobileFeature.quickNoteButtonIds, newButton.id]
+        }
         lastAddedButtonId = newButton.id
         renderList()
       }

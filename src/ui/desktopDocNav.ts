@@ -107,27 +107,30 @@ async function fetchAdjacentDocs(): Promise<void> {
       prevDoc = null
       nextDoc = null
     } else {
+      // sort=15（SortModeFileTree）：实测返回顺序与文件树视觉顺序一致（顶部→底部）
+      // 不要透传 config.fileTree.sort：那是前端枚举，6=SortModeCustom 自定义排序，无 sort 值的文档会被排到最前
+      const sortMode = 15
       const response: any = await fetchSyncPost('/api/filetree/listDocsByPath', {
         notebook: docInfo.notebookId,
         path: docInfo.parentPath,
-        sort: (window as any).siyuan?.config?.fileTree?.sort ?? 4
+        sort: sortMode
       })
 
 	      if (response?.code === 0 && response?.data) {
 	        const files: FiletreeDoc[] = response.data.files || []
 	        const idx = files.findIndex(f => f.id === docId)
 
-	        // API 返回的数组顺序与文件树 UI 视觉顺序相反：
-	        // files[0] 在文件树底部，files[last] 在文件树顶部
-	        // 因此 files[idx+1] 是视觉"上一篇"（上面），files[idx-1] 是视觉"下一篇"（下面）
-	        if (idx >= 0 && idx < files.length - 1) {
-	          prevDoc = { id: files[idx + 1].id, title: files[idx + 1].name || '未命名' }
+	        // API 返回的数组顺序与文件树 UI 视觉顺序一致：
+	        // files[0] 在文件树顶部，files[last] 在文件树底部（v3.8.4 实测确认，原「相反」假设已过时）
+	        // 因此 files[idx-1] 是视觉"上一篇"（上面），files[idx+1] 是视觉"下一篇"（下面）
+	        if (idx > 0) {
+	          prevDoc = { id: files[idx - 1].id, title: files[idx - 1].name || '未命名' }
 	        } else {
 	          prevDoc = null
 	        }
 
-	        if (idx > 0) {
-	          nextDoc = { id: files[idx - 1].id, title: files[idx - 1].name || '未命名' }
+	        if (idx >= 0 && idx < files.length - 1) {
+	          nextDoc = { id: files[idx + 1].id, title: files[idx + 1].name || '未命名' }
 	        } else {
 	          nextDoc = null
 	        }

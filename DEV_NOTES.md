@@ -920,3 +920,68 @@ t≈几秒  API 写入完成 → 内核属性 'true' → 思源最终重渲染/�
 1. **乐观更新的范围要覆盖「读取该状态的所有来源」**：图标只是展示层，思源重渲染读的是权威属性——只改展示层，重渲染时必然闪回。乐观更新要改到「任何读取路径都看到新值」为止。
 2. **fetchSyncPost 不抛异常**（返回 `{code !== 0}`），所有调用都要显式检查 `resp?.code !== 0` 才能走失败分支——这是本插件多个历史 bug 的共同模式。
 3. **「先正确后闪变」往往是写入窗口期的竞态**：UI 立即更新 + 后端慢确认 + 中间有第三方（思源）重渲染 → 只要中间读取路径能看到旧值，就会闪。修复思路是让中间路径也看到新值（乐观更新权威源），而不是等终态。
+
+## 手机端设置：透明度滑杆拖动时「设置界面跑走」（v3.8.4）
+
+**文件**：`src/ui/buttonItems/mobile.ts`（`scheduleFloatOpacityPersist`）
+
+**症状**：手机端设置 → 鲸鱼定制工具箱 → 前一篇/后一篇文档 → 拖「悬浮弹窗透明度」滑杆，每调一下设置界面立刻跳走（跑到别处）。
+
+**根因**：滑杆 input 防抖 250ms 后调用 `context.updateMobileToolbar()`——它每次都会**全量重初始化整个手机端工具栏**（`initMobileToolbarAdjuster`：重注入 CSS、breadcrumb 变 `position:fixed`、重绑 resize、新建 MutationObserver；`initCustomButtons`：rAF 重建全部按钮；`applyMobileToolbarStyle`）。移动端上这些操作反复抖动底层布局 → 视觉上设置界面"跑走"。
+
+**为什么不需要它**：`floatOpacity` 是**按钮点击时实时读取**的（`toggleMobileDocNav(config)` 整个 config 传过去，`applyOpacity(navBar, context.floatOpacity)` 读的是当时的 config）；且滑杆 input 里已直接 `el.style.background = rgba(...)` 实时更新预览面板。所以只需 `saveData` 持久化，下次点击自然生效。
+
+**修复**：删除 `updateMobileToolbar()`，只保留 `saveData('mobileButtonConfigs', ...)`；函数改名 `scheduleFloatOpacityPersist`。
+
+**教训**：滑杆/高频输入路径里的"防抖后刷新"要问一句——这个刷新真的有必要吗？全量重初始化（重建工具栏/重注入 CSS）在移动端是布局抖动的重灾区，能持久化解决的别重初始化。
+
+## 前一篇/后一篇文档：listDocsByPath 返回顺序假设过时（v3.8.4）
+
+**文件**：`src/ui/mobileDocNav.ts`（`fetchAdjacentDocsByFiletree`）、`src/ui/desktopDocNav.ts`（`fetchAdjacentDocs`）
+
+**症状**：文档树按名称升序时，文档 20260816 的导航显示「前一篇=20260818、后一篇=20260816」——方向正好反了（日期靠后的出现在"前一篇"）。手机端、电脑端同时出现。
+
+**排查过程（重要教训）**：
+
+1. 首先怀疑自身改动（v3.8.4 透明度滑杆修复）——`git diff` 证明 `mobileDocNav.ts` 零改动，排除。
+2. git 历史显示方向性假设来自 v3.7.1（`fb70e32`），那次正是「修复按钮方向反了」的提交：把 prev/next 取索引对调，并加了注释「API 返回的数组顺序与文件树 UI 视觉顺序相反：files[0] 在文件树底部」；同时把 `sort` 从硬编码 15 改为跟随用户配置 `siyuan.config.fileTree.sort ?? 4`。
+3. 加 `[DocNav-debug]` 日志实测（两端），拿到关键数据：
+   - `sort= 6`：用户设「按名称升序」，但 API 语义里名称升序是 0（`0=名称升序 1=更新时间降序 2=创建时间降序 3=自定义`）。插件透传的 `config.fileTree.sort` 是**设置面板内部枚举**，与 API 枚举不是同一套编码——传 6 碰巧被 API 兜底为升序，排序本身没错。
+   - `files` 顺序严格升序（0:08-01 … 16:08-17）→ **API 现在返回的就是文件树视觉顺序**（files[0]=顶部最早）。v3.7.1 时代的「相反」假设已过时。
+
+**根因**：思源升级后 `listDocsByPath` 返回顺序从「与视觉相反」变成「与视觉一致」，旧假设失效 → `prev=files[idx+1]`、`next=files[idx-1]` 取反。
+
+**修复**：两端对调取索引：
+```ts
+// API 返回顺序与文件树视觉顺序一致：files[0]=顶部
+const prevFile = idx > 0 ? files[idx - 1] : null   // 上一篇=更靠上（idx 前）
+const nextFile = idx < files.length - 1 ? files[idx + 1] : null  // 下一篇=更靠下（idx 后）
+```
+
+**教训**：
+1. **对思源内部 API 返回顺序的假设会随版本过时**。凡是依赖"数组顺序方向"的逻辑，遇到"以前对、升级后反了"的现象，优先怀疑 API 行为变化，而不是自己的改动。
+2. **`config.fileTree.sort`（设置面板枚举）≠ API 的 sort 参数枚举**。透传用户配置前要确认两侧编码一致；本次依赖「未知值兜底升序」是碰巧可用，不稳定。
+3. **「以前修过方向反了」是重要历史线索**：v3.7.1 那次对调就是按当时的 API 行为校准的，之后 API 又变了——遇到方向类 bug 先查 git 历史里有没有类似的「方向修正」提交，它标记了假设的校准时点。
+
+## 块格式记事弹窗：任务模板（- [ ]）取消后残留孤儿块 → 重建索引（v3.8.4）
+
+**文件**：`src/quickNote/blockInput.ts`、`src/quickNote/kernelBlock.ts`
+
+**症状**：手机端块格式记事弹窗里插入 `- [ ] 任务` 模板 → 删除模板内容 → 直接取消 → 很容易出现**两个一模一样的任务块**、其中一个删不掉 → 只能重建索引。
+
+**根因（三个竞态叠加）**：
+
+1. **markdown 快捷语法触发思源异步块转换**：`- [ ]` 等通过 `execCommand('insertText')` 插入后，思源 `input()` 检测到快捷语法 → 异步执行块转换（**删旧文本块、新建 list/task 块，块 ID 变化**）。但插件的 `state.rootBlockId` 仍是插入前的草稿块 ID → 后续取消/恢复按旧 ID 删除时，转换产生的新块残留成孤儿块。
+2. **删除内容触发 `recoverIfEmpty` 自动新建草稿块**：用户删光内容后 wysiwyg 顶层块数归零 → MutationObserver / `handleEmptyContent` 触发 `recoverIfEmpty` → `resetDraftBlock` **再创建一个新草稿块**（与转换遗留的任务块叠加 = "两个一样的任务块"）。
+3. **取消时事务未落库就删块**：`waitForProtyleTransactionsIdle(800, 40)` 超时或事务未进 `siyuan.transactions` → `deleteBlock` 到达内核时块尚未落库 → 报"块不存在"失败 → 残留。
+
+**修复（三个点）**：
+
+1. **插入后对齐根块 ID**（`syncRootBlockIdAfterInsert`）：模板插入完成后等事务队列清空，从 wysiwyg 读取**实际顶层块 ID** 覆盖 `state.rootBlockId`/`docRootId`——无论思源转换是否换 ID，后续删/写都对准真实块。
+2. **删除前 flush 事务 + 失败重试**（`deleteQuickNoteDraftBlock`）：先调 `/api/sqlite/flushTransaction` 强制落库再删；删除失败再 flush+重试一次，仍失败才走 `deleteBlock`。
+3. **恢复流程让位取消流程**（`resetDraftBlock`）：开头检查 `state.isDestroying` 直接中止；`createQuickNoteDraftBlock` await 期间用户点了取消，则补删刚创建的新块——堵住"取消时又新建一个草稿块"的竞态。
+
+**教训**：
+1. **模板内容是「文本」还是「markdown 快捷语法」行为完全不同**：`- [ ]`/`- `/`1. ` 会触发思源块转换（新建块、ID 变化），普通文本不会。凡是插入后还要做"按 ID 删/改"的流程，插入 markdown 快捷语法后必须**重新读取 DOM 实际块 ID**，不能依赖插入前的 ID。
+2. **异步转换 + 用户快速取消 = 竞态高发**：思源 `input()` 的 markdown 转换是异步事务，用户"插入→删除→取消"三步连做时，每一步都可能撞上尚未落库的转换。删除前显式 flush（`/api/sqlite/flushTransaction`）比"等事务队列"更可靠——`window.siyuan.transactions` 只反映前端队列，不是内核落库状态。
+3. **恢复机制要区分"内容为空"和"正在取消"**：`recoverIfEmpty` 的本意是加载失败/内容意外丢失时自动重建，但用户主动删光内容也会触发它——恢复逻辑必须与取消（isDestroying）互斥，否则"删除"和"新建"互相打架。

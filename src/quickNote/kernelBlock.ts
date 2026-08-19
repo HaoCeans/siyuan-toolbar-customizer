@@ -174,8 +174,31 @@ export async function deleteQuickNoteDraftBlock(blockId: string | null | undefin
   // 直接尝试 API 删除，不先查 blockExistsInKernel：
   // 刚创建的块可能还未被 SQL 索引，导致 blockExistsInKernel 返回 false 而跳过删除，
   // 进而在 recoverIfEmpty 循环中不断创建新块却不删旧块，造成空块累积。
+  // 但插入后的 markdown 快捷转换（- [ ] 等）是异步事务，删除前需先 flush，
+  // 否则删除请求到达内核时块尚未落库，deleteBlock 报"块不存在"而失败 → 残留孤儿块。
+  try {
+    await fetch('/api/sqlite/flushTransaction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    })
+  } catch {
+    // flush 失败不阻塞删除（兜底重试）
+  }
   const ok = await deleteBlockSilent(blockId)
   if (ok) return
+  // 删除失败可能是事务仍在上传：flush 后再重试一次，仍失败则走 deleteBlock（可能弹错，接受）
+  try {
+    await fetch('/api/sqlite/flushTransaction', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    })
+  } catch {
+    // ignore
+  }
+  const ok2 = await deleteBlockSilent(blockId)
+  if (ok2) return
   try {
     await deleteBlock(blockId)
   } catch {

@@ -1355,13 +1355,16 @@ export function createMobileSettingLayout(
 
       let lastAddedButtonId: string | null = null
 
-	      const renderList = () => {
-	        flushSliderDrags()
-	        // 保存 dialog 滚动位置，防止全量重建后跳到顶部
-	        const dialogContent = listContainer.closest('.b3-dialog__content') as HTMLElement | null
-	        const savedScrollTop = dialogContent?.scrollTop ?? 0
+		      const renderList = () => {
+		        flushSliderDrags()
+		        // 记住当前展开的按钮，重建后恢复展开（避免启用开关/层数输入等触发 renderList 时，编辑中的表单被收起）
+		        const prevExpandedEl = listContainer.querySelector('[data-expanded="1"]') as HTMLElement | null
+		        const prevExpandedId = prevExpandedEl?.dataset.buttonId ?? null
+		        // 保存 dialog 滚动位置，防止全量重建后跳到顶部
+		        const dialogContent = listContainer.closest('.b3-dialog__content') as HTMLElement | null
+		        const savedScrollTop = dialogContent?.scrollTop ?? 0
 
-	        listContainer.innerHTML = ''
+		        listContainer.innerHTML = ''
 	        const sortedButtons = [...context.buttonConfigs].sort((a, b) => a.sort - b.sort)
 
         sortedButtons.forEach((button, index) => {
@@ -1411,8 +1414,16 @@ export function createMobileSettingLayout(
               lastAddedButtonId = null
             }, 100)
           }
-	        })
-	        // 恢复 dialog 滚动位置（防止新增按钮时的 scrollIntoView 干扰，用 RAF 确保在所有布局变化后执行）
+		        })
+		        // 重建后恢复此前展开的按钮（排除「刚添加按钮」的自动展开流程，避免两个表单同时打开）
+		        if (prevExpandedId && prevExpandedId !== lastAddedButtonId) {
+		          const item = listContainer.querySelector(`[data-button-id="${prevExpandedId}"]`) as HTMLElement | null
+		          const header = item?.querySelector('[style*="cursor: pointer"]') as HTMLElement | null
+		          if (item && header) {
+		            header.click()  // 复用表头 toggle：展开 + 滚动到表单 + refreshForm
+		          }
+		        }
+		        // 恢复 dialog 滚动位置（防止新增按钮时的 scrollIntoView 干扰，用 RAF 确保在所有布局变化后执行）
 	        if (dialogContent && savedScrollTop > 0) {
 	          requestAnimationFrame(() => {
 	            dialogContent.scrollTop = savedScrollTop

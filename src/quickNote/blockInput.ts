@@ -191,15 +191,46 @@ function hasWysiwygText(editor: Protyle): boolean {
   return false
 }
 
+/**
+ * 模板插入后对齐根块 ID（markdown 快捷语法专用）。
+ *
+ * 背景：`- [ ] ` / `- ` / `1. ` 等 markdown 快捷语法插入后，思源会异步执行块转换
+ * （删除原文本块、新建列表/任务块），块 ID 与插入前的草稿块 ID 不同。若 state.rootBlockId
+ * 仍指向旧 ID，后续 cancelDraft / resetDraftBlock 按旧 ID 删除时会残留转换产生的新块
+ * → 文档中出现删不掉的孤儿块 → 思源重建索引。
+ *
+ * 做法：等事务队列清空后，从 wysiwyg 读取实际顶层块 ID 覆盖 state.rootBlockId /
+ * docRootId。顶层块为空（转换尚未完成）则跳过，交给后续操作兜底。
+ */
+async function syncRootBlockIdAfterInsert(editor: Protyle, state: QuickNoteRootState): Promise<void> {
+  if (state.isDestroying) return
+  await waitForProtyleTransactionsIdle(800, 40)
+  const tops = getLiveWysiwygTopBlocks(editor.protyle.wysiwyg.element)
+  if (tops.length === 0) return
+  const realId = tops[0].getAttribute('data-node-id')
+  if (realId) {
+    state.rootBlockId = realId
+    state.docRootId = realId
+  }
+}
+
 async function resetDraftBlock(
   editor: Protyle,
   state: QuickNoteRootState,
   options: QuickNoteInputAreaOptions,
 ): Promise<boolean> {
   if (!options.saveTarget) return false
+  // 取消流程已开始（cancelDraft 已置 isDestroying）：立即中止恢复，
+  // 避免与 cancelDraft 的删块竞态——取消时又创建一个新草稿块，导致残留孤儿块。
+  if (state.isDestroying) return false
   // 记住旧块 ID，创建新块后删除旧块，避免留下空白块
   const oldBlockId = state.rootBlockId
   const newId = await createQuickNoteDraftBlock(options.saveTarget)
+  // await 期间用户可能已点取消：新块已创建，若取消的删除集合不含它，需在此补删
+  if (state.isDestroying) {
+    await deleteQuickNoteDraftBlock(newId)
+    return false
+  }
   if (!newId) return false
   if (oldBlockId && oldBlockId !== newId) {
     await deleteQuickNoteDraftBlock(oldBlockId)
@@ -358,7 +389,12 @@ export async function createBlockInputHandle(
       focusBlockEditable(wysiwyg, options.isMobile, () => {
         // 思源 v3.8：execCommand 无有效选区时静默失败（弹窗刚打开无光标时点击模板按钮没反应），
         // insertTextIntoBlockEditor 会先恢复/构建选区（见函数注释），再执行插入
-        void insertTextIntoBlockEditor(wysiwyg, text, editor.protyle.toolbar?.range)
+        void insertTextIntoBlockEditor(wysiwyg, text, editor.protyle.toolbar?.range).then(() => {
+          // markdown 快捷语法（- [ ] 等）触发思源异步块转换（删旧块建新块），
+          // 等待转换事务落库后，把 state.rootBlockId 对齐到 DOM 实际顶层块，
+          // 否则取消/保存时删/写的是已不存在的旧块 ID，残留孤儿块 → 重建索引
+          syncRootBlockIdAfterInsert(editor, state)
+        })
       })
     },
     focus: () => {

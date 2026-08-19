@@ -62,6 +62,7 @@ export function createMobileButtonItem(
 ): HTMLElement {
   const isOverflowButton = button.id === 'overflow-button-mobile'
   const item = document.createElement('div')
+  item.dataset.buttonId = button.id  // 供 renderList 重建后定位并恢复展开状态
   // 扩展工具栏按钮使用特殊样式凸显
   if (isOverflowButton) {
     item.style.cssText = `
@@ -1420,17 +1421,20 @@ export function createMobileButtonItem(
       opacitySlider.style.cssText = 'flex: 1; accent-color: var(--b3-theme-primary);'
 
       let floatOpacityPersistTimer: ReturnType<typeof setTimeout> | null = null
-      const scheduleFloatOpacityPersistAndRefresh = () => {
+      const scheduleFloatOpacityPersist = () => {
         if (floatOpacityPersistTimer) clearTimeout(floatOpacityPersistTimer)
         floatOpacityPersistTimer = setTimeout(() => {
-          // 写入持久化配置，确保下一次点击/重建按钮时 floatOpacity 生效
-          // 以及通过刷新工具栏，确保按钮点击闭包使用最新配置对象。
+          // 只持久化，不重初始化工具栏：
+          // floatOpacity 在按钮点击时实时读取（toggleVisibility(config)），下次点击自然生效；
+          // 且滑杆 input 已实时更新预览面板背景。
+          // 以前这里还调 updateMobileToolbar()，每次拖动都全量重建工具栏
+          // （CSS 注入 / breadcrumb 变 fixed / 重建按钮），手机端设置界面布局反复抖动
+          // → "每调一下立刻跑走"（见 DEV_NOTES）。
           void (async () => {
             try {
               await context.saveData('mobileButtonConfigs', context.buttonConfigs)
-              context.updateMobileToolbar?.()
             } catch (e) {
-              console.warn('[floatOpacity] persist/refresh failed:', e)
+              console.warn('[floatOpacity] persist failed:', e)
             }
           })()
         }, 250)
@@ -1448,8 +1452,8 @@ export function createMobileButtonItem(
         })
 
         // 防止 slider 拖动过程中触发过多次初始化/保存；
-        // 由于工具栏按钮点击时使用了当时构建的配置对象，需刷新一次以确保闭包拿到最新 floatOpacity。
-        scheduleFloatOpacityPersistAndRefresh()
+        // 持久化 floatOpacity，下次点击面板时生效（不再重初始化工具栏，避免设置界面抖动）
+        scheduleFloatOpacityPersist()
       })
 
       const opacityValue = document.createElement('span')
@@ -2165,14 +2169,18 @@ export function createMobileButtonItem(
     isExpanded = !isExpanded
     editForm.style.display = isExpanded ? 'flex' : 'none'
     expandIcon.style.transform = isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'
+    // 记录展开状态，供 renderList 重建后恢复（避免编辑中的表单被收起）
+    if (isExpanded) item.dataset.expanded = '1'
+    else delete item.dataset.expanded
 
     // 当展开编辑区域时，调用 refreshForm 刷新配置区状态
     if (isExpanded) {
-      // 滚动到该按钮，让展开的设置居中显示（与「添加按钮」后的自动展开行为一致）。
-      // 否则列表底部附近的按钮展开后，表单原地撑开落在「手机端自定义按钮」区底部
-      // （全局按钮配置上方），不在屏幕中间。
+      // 滚动到该按钮，让展开的设置从头部看起（方案A：表单顶部对齐滚动容器顶部）。
+      // 不能用 block:'center' 居中整个 item——表单高于视口时，浏览器会把 item 中心
+      // 对齐视口中心，表头被滚出屏外，看起来"跑到其他地方"（已确认思源侧无滚动干扰）。
+      editForm.style.scrollMarginTop = '16px' // 顶部留一点呼吸间距（思源弹窗标题栏在内容区外，不遮挡）
       setTimeout(() => {
-        item.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        editForm.scrollIntoView({ behavior: 'smooth', block: 'start' })
       }, 100)
       // 查找 subtypeSelect 元素（使用唯一ID）
       const subtypeSelect = editForm.querySelector(`#subtype-select-${button.id}`) as HTMLSelectElement

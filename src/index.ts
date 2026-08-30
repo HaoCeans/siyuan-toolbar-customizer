@@ -159,11 +159,6 @@ export default class ToolbarCustomizer extends Plugin {
   private desktopGlobalButtonConfig: GlobalButtonConfig = { ...DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG }
   private mobileGlobalButtonConfig: GlobalButtonConfig = { ...DEFAULT_MOBILE_GLOBAL_BUTTON_CONFIG }
 
-  // 全局事件处理器引用（用于清理）
-  private touchStartHandler: any = null
-  private touchMoveHandler: any = null
-  private touchEndHandler: any = null
-
   // EventBus 事件回调引用（用于清理）
   private eventBusRefreshHandler: (() => void) | null = null
   private eventBusContextMenuHandler: ((event: any) => void) | null = null
@@ -232,11 +227,9 @@ export default class ToolbarCustomizer extends Plugin {
     hideMoreButton: true,       // 更多按钮隐藏
     toolbarStyle: 'divider' as 'default' | 'divider',  // 工具栏样式：默认或带分割线（手机端默认分割线）
     disableCustomButtons: false,// 禁用所有自定义按钮
-    disableMobileSwipe: true,   // 手机端禁止左右滑动弹出
     showMobileLineBreakButton: false, // 顶部工具栏云同步左侧显示 H 换行按钮
     hideStatusBar: true,         // 手机端隐藏底部状态条 #status
-    disableFileTree: true,      // 禁止右滑弹出文档树
-    disableSettingMenu: true,   // 禁止左滑弹出设置菜单
+    keepTopBarVisible: false,    // 不隐藏顶栏标题（滚动沉浸时标题栏保持显示，默认关）
     showAllNotifications: true, // 一键开启所有按钮右上角提示
     authorActivated: false,     // 鲸鱼定制工具箱是否已激活（兼容字段，新逻辑读 licensePlan）
     authorCode: '',             // 鲸鱼定制工具箱激活码（原始码，含签名）
@@ -548,7 +541,7 @@ export default class ToolbarCustomizer extends Plugin {
       if (savedLegacyFeatureConfig) {
         // 只迁移新配置中存在的属性
         const desktopProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'toolbarHeight', 'disableCustomButtons', 'showAllNotifications']
-        const mobileProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'disableMobileSwipe', 'disableFileTree', 'disableSettingMenu', 'showAllNotifications']
+        const mobileProps = ['hideBreadcrumbIcon', 'hideReadonlyButton', 'hideDocMenuButton', 'hideMoreButton', 'showAllNotifications']
 
         // 迁移到电脑端配置（只迁移电脑端支持的属性）
         desktopProps.forEach(prop => {
@@ -626,27 +619,34 @@ export default class ToolbarCustomizer extends Plugin {
       }
     }
 
-    // 只在主窗口注册全局快捷键，子窗口（window.html）不注册。
-    // 如果子窗口也注册，SiYuan 的 globalCallback 会在所有窗口中触发，
-    // 导致多窗口环境下弹出多份弹窗 / 快捷键无法正常 toggle。
-    if (!this.isMobile && !this.isInWindow) {
-		      this.addCommand({
-		        langKey: 'quickNoteGlobalCapture',
-		        langText: '一键记事（全局捕获）',
-		        hotkey: '⌥⇧N',
-		        globalCallback: () => {
-		          void triggerDesktopQuickNoteGlobalCapture()
-		        },
-		      })
-		      this.addCommand({
-		        langKey: 'lifelogGlobalCapture',
-		        langText: '叶归LifeLog（全局捕获）',
-		        hotkey: '⌥⇧L',
-		        globalCallback: () => {
-		          void triggerDesktopLifelogGlobalCapture()
-		        },
-		      })
-		    }
+	    // 一键记事全局快捷键：只在主窗口注册。其回调（triggerDesktopQuickNoteCapture）
+	    // 没有 document.hasFocus() 保护，若子窗口也注册，按下快捷键后思源向所有窗口
+	    // 广播 siyuan-hotkey，每个窗口都会执行 → 多窗口重复弹窗。
+	    if (!this.isMobile && !this.isInWindow) {
+	      this.addCommand({
+	        langKey: 'quickNoteGlobalCapture',
+	        langText: '一键记事（全局捕获）',
+	        hotkey: '⌥⇧N',
+	        globalCallback: () => {
+	          void triggerDesktopQuickNoteGlobalCapture()
+	        },
+	      })
+	    }
+	    // 叶归LifeLog全局快捷键：主窗口 + 独立窗口（window.html）都注册。
+	    // 回调（triggerDesktopLifelogGlobalCapture）开头有 document.hasFocus() 保护——
+	    // 思源主进程向所有窗口广播 siyuan-hotkey，各窗口在 onGetConfig 遍历自身 commands
+	    // 找到 globalCallback 才执行，但只有聚焦窗口通过 hasFocus 检查 → 不会多窗口重复弹窗。
+	    // （v3.8.4 起放开 isInWindow：否则文档移到独立窗口后 ⌥⇧L 两边都不响应）
+	    if (!this.isMobile) {
+	      this.addCommand({
+	        langKey: 'lifelogGlobalCapture',
+	        langText: '叶归LifeLog（全局捕获）',
+	        hotkey: '⌥⇧L',
+	        globalCallback: () => {
+	          void triggerDesktopLifelogGlobalCapture()
+	        },
+	      })
+	    }
 		  }
 
   /** 插件启动时清理上次残留的草稿块（重启前未 cancelDraft 的情况） */
@@ -1167,19 +1167,6 @@ export default class ToolbarCustomizer extends Plugin {
       this.quickNoteTextareaContextMenuHandler = null
     }
 
-    // 清理全局 touch 事件监听器
-    if (this.touchStartHandler) {
-      document.removeEventListener('touchstart', this.touchStartHandler, true)
-      this.touchStartHandler = null
-    }
-    if (this.touchMoveHandler) {
-      document.removeEventListener('touchmove', this.touchMoveHandler, false)
-      this.touchMoveHandler = null
-    }
-    if (this.touchEndHandler) {
-      document.removeEventListener('touchend', this.touchEndHandler, false)
-      this.touchEndHandler = null
-    }
   }
 
   async uninstall() {
@@ -1633,37 +1620,16 @@ export default class ToolbarCustomizer extends Plugin {
       `
     }
 
-    // 手机端禁止左右滑动弹出
-    if (this.isMobile && this.mobileFeatureConfig.disableMobileSwipe) {
-      const { disableFileTree, disableSettingMenu } = this.mobileFeatureConfig
-      
-      if (disableFileTree && disableSettingMenu) {
-        // 同时禁用文档树和设置菜单
-        styleContent += `
-          #sidebar.moving, #menu.moving, .side-mask.moving {
-            display: none !important;
-          }
-        `
-      } else if (disableFileTree) {
-        // 仅禁用文档树（右滑）
-        styleContent += `
-          #sidebar.moving, .side-mask.moving.move-right {
-            display: none !important;
-          }
-        `
-      } else if (disableSettingMenu) {
-        // 仅禁用设置菜单（左滑）
-        styleContent += `
-          #menu.moving, .side-mask.moving.move-left {
-            display: none !important;
-          }
-        `
-      }
-      
-      // 添加触摸事件监听
-      this.setupMobileSwipeDisable()
+    // 不隐藏顶栏标题：顶栏始终固定原位（不随滚动位移/隐藏，避免阈值处跳变闪烁）
+    if (this.mobileFeatureConfig.keepTopBarVisible === true) {
+      styleContent += `
+        .mobile-topbar {
+          visibility: visible !important;
+          transform: translate3d(0, 0, 0) !important;
+        }
+      `
     }
-    
+
     if (styleContent) {
       style.textContent = styleContent
       document.head.appendChild(style)
@@ -1718,99 +1684,6 @@ export default class ToolbarCustomizer extends Plugin {
       },
       cfg.disableCustomButtons === true
     )
-  }
-
-  // 手机端滑动禁用的状态变量
-  private swipeStartX = 0
-  private swipeIsFirstMove = true
-  private swipeMask: HTMLElement | null = null
-
-  // 设置手机端滑动禁用
-  private setupMobileSwipeDisable() {
-    if (!this.isMobile || !this.mobileFeatureConfig.disableMobileSwipe) return
-    if (!document.getElementById('sidebar')) return
-
-    // 移除旧监听器（如果存在）
-    if (this.touchStartHandler) {
-      document.removeEventListener('touchstart', this.touchStartHandler, true)
-    }
-    if (this.touchMoveHandler) {
-      document.removeEventListener('touchmove', this.touchMoveHandler, false)
-    }
-    if (this.touchEndHandler) {
-      document.removeEventListener('touchend', this.touchEndHandler, false)
-    }
-
-    this.touchStartHandler = (e: TouchEvent) => {
-      const target = e.target as HTMLElement
-      if (target.closest('#menu, #sidebar')) return
-
-      this.swipeIsFirstMove = true
-      const touch = e.touches[0]
-      this.swipeStartX = touch.clientX
-    }
-
-    this.touchMoveHandler = (e: TouchEvent) => {
-      const target = e.target as HTMLElement
-      if (target.closest('#menu, #sidebar')) return
-
-      if (this.swipeIsFirstMove) {
-        this.swipeIsFirstMove = false
-        document.getElementById('menu')?.classList.add('moving')
-        document.getElementById('sidebar')?.classList.add('moving')
-        this.swipeMask = document.querySelector('.side-mask')
-        this.swipeMask?.classList.add('moving')
-      }
-
-      const touch = e.touches[0]
-      const currentX = touch?.clientX || 0
-      const diffX = currentX - this.swipeStartX
-
-      if (Math.abs(diffX) > 0 && this.swipeMask) {
-        if (diffX < 0) {
-          // 左滑 设置菜单
-          if (this.swipeMask.classList.contains('move-right')) this.swipeMask.classList.remove('move-right')
-          if (!this.swipeMask.classList.contains('move-left')) this.swipeMask.classList.add('move-left')
-        } else {
-          // 右滑 文档树
-          if (this.swipeMask.classList.contains('move-left')) this.swipeMask.classList.remove('move-left')
-          if (!this.swipeMask.classList.contains('move-right')) this.swipeMask.classList.add('move-right')
-        }
-        this.swipeStartX = currentX
-      }
-    }
-
-    this.touchEndHandler = (e: TouchEvent) => {
-      const target = e.target as HTMLElement
-      if (target.closest('#menu, #sidebar')) return
-
-      if (!this.swipeIsFirstMove) {
-        this.closeMobilePanel()
-      }
-      this.swipeIsFirstMove = true
-      document.getElementById('menu')?.classList.remove('moving')
-      document.getElementById('sidebar')?.classList.remove('moving')
-      document.querySelector('.side-mask')?.classList.remove('moving')
-    }
-
-    // 添加新监听器
-    document.addEventListener('touchstart', this.touchStartHandler, true)
-    document.addEventListener('touchmove', this.touchMoveHandler, false)
-    document.addEventListener('touchend', this.touchEndHandler, false)
-  }
-  
-  // 关闭手机端侧边栏
-  private closeMobilePanel() {
-    const menu = document.getElementById('menu')
-    const sidebar = document.getElementById('sidebar')
-    const maskElement = document.querySelector('.side-mask') as HTMLElement
-    
-    if (menu) menu.style.transform = ''
-    if (sidebar) sidebar.style.transform = ''
-    if (maskElement) {
-      maskElement.classList.add('fn__none')
-      maskElement.style.opacity = ''
-    }
   }
 
   // 应用手机端工具栏样式（仅用于动态更新样式，不处理背景颜色）

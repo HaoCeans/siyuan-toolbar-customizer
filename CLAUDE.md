@@ -797,3 +797,101 @@ handleToolbarAutoHideScroll()      ← 滚动事件处理器
 | 4 | `desktop.ts` / `mobile.ts` | `updateVisibility` 加分支；创建专属配置 div（初始 `display:none`），追加到 `authorToolField`/`authorToolContainer` |
 | 5 | `toolbarManager.ts` L4820 | 路由分支 `if (subtype === 'new-feature')` → 调用执行函数 |
 | 6 | `settings/desktop.ts` / `mobile.ts` | 功能列表表格追加一行（序号+名称+说明） |
+
+---
+
+### 26. 思源 v3.8 移动端 breadcrumb 的滚动上移机制（`--mobile-bar-translate-y`）
+
+**相关文件**: `src/toolbarManager.ts`（各模式注入 CSS、`applyToolbarAutoHideState`）
+
+**背景**: 思源 `#editor > .protyle-breadcrumb` 自带 `transform: translate3d(0, var(--mobile-bar-translate-y, 0), 0)`，滚动沉浸时思源 JS 把变量设为负值（最多 -48px），面包屑随滚动上移。**插件所有模式的工具栏都复用这个 breadcrumb 元素**。
+
+**历史 bug**: 恢复工具栏时清空 inline transform 后，思源规则重新生效，工具栏随滚动上移最多 48px（表现为"工具栏往上跑 + 底部空白条"）。
+
+**规则**:
+- 各模式 CSS 必须用 `!important` 覆盖 transform：底部固定/顶部/侧边用 `translateZ(0) !important`，底部胶囊用 `translateX(-50%) translateY(0) !important`（居中）
+- `applyToolbarAutoHideState` 隐藏/恢复时都要写 inline transform（优先级最高），侧边胶囊用 `translateZ(0)`（不要用 `translateX(-50%)`，会破坏侧边定位）
+
+---
+
+### 27. 思源导航栏隐藏时 toolbarMore 不可点：必须绕过按钮直接开面板
+
+**相关文件**: `src/toolbarManager.ts`（`clickElement()`、`openMobileMoreMenu()`、clickSequence 的 `isVisible` 检查）
+
+**背景**: `.mobile-chrome--hidden` 时思源导航栏 `pointer-events: none; visibility: hidden` 且带 `inert` 属性，`toolbarMore` 无法点击（程序化 click 也不可靠）。
+
+**历史 bug**: 先解除 inert 再 `click()` 的方案在真机上失败；且 clickSequence 路径在点击前有 `isVisible()` 检查，隐藏元素直接抛"元素不可见"。
+
+**规则**:
+- `clickElement()` 中 `element.id === 'toolbarMore'` 时**不要点击按钮**，直接调 `openMobileMoreMenu()`：`#menu` 的 `style.zIndex = ++window.siyuan.zIndex` + `style.transform = 'translateX(0px)'`（复刻思源 `popMenu()` 核心，顺带 blur 收起键盘、清侧栏 transform）
+- clickSequence 步骤的 `isVisible` 检查必须跳过 toolbarMore（`element.id !== 'toolbarMore'` 才抛错）
+- 键盘打开时 `mobile-chrome--hidden` 不会移除（思源 `mobileBarsState` 的 `topbarVisible` 只看 `readingBarsOffset`，与 editing 无关）——判断导航栏隐藏统一用 `isNativeMobileBarsHidden()`（含 `mobile-keyboard--open` 例外）
+
+---
+
+### 28. 初始化时序：`initMobileToolbarAdjuster` 先于 `initCustomButtons`
+
+**相关文件**: `src/toolbarManager.ts`（`updateToolbarCSS`、`showOverflowToolbar`）
+
+**背景**: 初始化链路是 `initMobileToolbarAdjuster`（注入工具栏 CSS）→ `initCustomButtons`（更新 `currentButtonConfigs`）。**CSS 注入时按钮配置尚未就绪**。
+
+**历史 bug**: 在注入 CSS 时读取 overflow 按钮的 `layers` 计算导航栏位置，首次加载读到旧/空值，按 1 层定位，多层级时导航栏被顶层扩展栏遮挡。
+
+**规则**: 依赖"打开时才能确定的值"（如扩展栏层数）不要注入时算死——用 CSS 变量占位（`var(--tc-nav-bottom, 146px)`），在 `showOverflowToolbar` 打开时用当时的真实值（`layers`/`toolbarHeight`/`bottomOffset`）动态 `setProperty`。
+
+---
+
+### 29. 底部胶囊模式：默认隐藏思源导航栏，扩展栏打开时显示在扩展栏上方
+
+**相关文件**: `src/toolbarManager.ts`（胶囊 CSS 分支、`bindOverflowPanelSync`、`syncOverflowOpenClass`）
+
+**规则**:
+- 用 `body.siyuan-toolbar-floating` class 标记底部胶囊模式（区别于底部固定，避免影响底部固定的"导航栏对齐工具栏上沿"规则）
+- 默认隐藏：`body.siyuan-toolbar-floating .mobile-bottom-bar { visibility/opacity: 0; pointer-events: none }`
+- 扩展栏打开时显示：`body.siyuan-toolbar-floating.tc-overflow-open .mobile-bottom-bar`，bottom = `--tc-nav-bottom`（= 胶囊底距 + 胶囊高 + 间距 + (层数-1)×(层高+层距) + 层高 + 间距，与 `showOverflowToolbar` 层堆叠公式一致），并 `transform: translate3d(0,0,0)` 抵消思源滚动位移
+- `tc-overflow-open` 用 MutationObserver（`bindOverflowPanelSync`）监听 body 子级变化检测 `.overflow-toolbar-layer` 存在性（扩展栏挂载在 body 直接子级）；显示时移除导航栏 `inert`/`aria-hidden` 保证可点击
+- 扩展栏是插件面板，思源 `panelObserver` 不感知它——需要自己同步
+
+---
+
+### 30. 侧边胶囊模式要点
+
+**相关文件**: `src/toolbarManager.ts`（`isSideFloatingMode`、侧边 CSS 分支、`showOverflowToolbar` 侧边分支、`bindSidePanelsSync`）、`src/settings/mobile.ts`
+
+**规则**:
+- 模式互斥：`enableSideFloatingToolbar` 与 `enableTopToolbar`/`enableBottomToolbar`/`enableFloatingToolbar` 四选一（radio 互斥赋值）
+- 配置字段独立：`sideFloatingRadius`/`sideFloatingHeight`/`sideFloatingStyle` 等**不要复用** `floatingToolbar*`（用户明确要求两套独立，避免模式间串扰）
+- 收起态 = 单个竖排省略号按钮（`lucide:EllipsisVertical`），CSS 竖胶囊：`width: 32px; height: 配置高度; flex-direction: column`，且要清零按钮自带 `margin-right`（否则 ⋮ 不居中）
+- 展开面板：`showOverflowToolbar` 的 `isSideMode` 分支——单层显示全部按钮（不按 overflowLevel 过滤）、`position: fixed` 对齐胶囊（同侧同底）、竖排纯图标、`max-height` + `overflow-y: auto` 滚动、横向分割线（竖排面板不能用竖线分割线）
+- 侧栏/更多面板打开（100vw 全屏覆盖）和键盘弹出时隐藏胶囊：`applySideCapsuleVisibility()`（MutationObserver 监听 `#sidebar/#sidebarRight/#menu/#model` 的 style + body class）
+- 胶囊元素加 `data-prevent-swipe` 属性，否则横向滑动会触发思源侧栏滑出手势
+
+---
+
+### 31. 思源移动端导航栏接管：panelOpen 占位方案（根治 inert/滚动隐藏对抗）
+
+**相关文件**: `src/toolbarManager.ts`（`forceMenuPanelOpen`、`bindMenuPanelForce`、`isNavTakeoverMode`）
+
+**背景**: 底部胶囊 / 底部固定⑦ 模式下，导航栏由扩展工具栏接管（默认隐藏、扩展栏打开时显示在扩展栏上方）。思源滚动渲染会持续给 `#mobileBottomBar` 设置 `inert` 属性和隐藏样式，任何"JS 解除 inert"的方案都会与思源每帧对抗，导致真机卡死。
+
+**正解（读思源源码得出）**: 思源 `isPanelOpen()` 检查 `#sidebar/#sidebarRight/#menu/#model` 任一元素的 **inline `style.transform` 非空**；非空 → `panelOpen=true` → `isMobileBarsScrollPaused` → `readingBarsOffset` 不增长 → `bottomBarVisible` 恒 true → **思源根本不设置 inert、不隐藏导航栏**。
+
+**规则**:
+- 接管模式下给 `#menu` 设置 inline `transform: translateX(100vw)`（与思源 CSS 默认值相同，视觉零变化）——只设置一次，零对抗
+- 用 MutationObserver 监听 `#menu` 的 style，仅当思源 `closePanel` 清空 transform 时恢复占位（低频）
+- 卸载/接管关闭时：若占位 transform 还在则清空，交还思源
+- **副作用**: `panelOpen=true` 同时使顶栏不隐藏（`topbarVisible` 恒 true，标题常驻）；插件「随思源导航栏自动隐藏」在接管模式下失效（工具栏常驻）——均为接管模式的合理行为
+- 不要用 attributes observer 监听 `#mobileBottomBar` 的 inert 做"解除对抗"——每帧 DOM 写操作 + 全文档查询会卡死页面
+
+---
+
+### 32. 扩展栏外部关闭监听的 touchend 与合成 click 时序（鼠标正常、触摸点不到）
+
+**相关文件**: `src/toolbarManager.ts`（`showOverflowToolbar` 的 `closeOnOutside`）
+
+**背景**: 扩展栏打开时 document 挂 `click` + `touchend` 两个外部关闭监听。触摸路径中 **`touchend` 先于浏览器合成 click 触发**——触摸导航栏按钮（扩展栏外）时立即关闭扩展栏、隐藏导航栏，合成 click 异常，按钮点不到；鼠标路径是 click 阶段（按钮 click 先执行、功能已触发），所以"鼠标能点、手点不行"。
+
+**规则**:
+- `closeOnOutside` 必须区分事件类型：**`touchend` 阶段排除思源导航栏区域**（`target.closest('.mobile-bottom-bar')` 时不关闭），保证合成 click 正常到达按钮
+- `click` 阶段照常关闭（此时按钮功能已执行）
+- 排查"鼠标正常、触摸异常"的交互问题时，优先检查 touchend/click 双监听的时序差异

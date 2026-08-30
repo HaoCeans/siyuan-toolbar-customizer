@@ -516,6 +516,21 @@ export interface MobileToolbarConfig {
   floatingToolbarBorderRadius?: string; // 胶囊圆角
   floatingToolbarHeight?: string;   // 胶囊自身高度
   floatingToolbarScrollHide?: boolean; // 胶囊滚动隐藏
+
+  // 侧边胶囊工具栏配置（与底部胶囊并存，互斥于其他模式）
+  enableSideFloatingToolbar?: boolean;  // 是否启用侧边胶囊工具栏
+  // 微缩小胶囊（收起态 ⋮ 按钮）配置
+  sideMiniSide?: 'left' | 'right';  // 微缩小胶囊吸附侧，默认 'right'
+  sideMiniBottom?: string;   // 微缩小胶囊距底部距离（如 "100px"）
+  // 展开胶囊（展开面板）配置
+  sideFloatingSide?: 'left' | 'right';  // 展开胶囊吸附侧，默认 'right'
+  sideFloatingMargin?: string;   // 展开胶囊距侧边距离（如 "12px"）
+  sideFloatingBottom?: string;   // 展开胶囊距底部距离（如 "100px"）
+  sideFloatingRadius?: string;   // 展开胶囊圆角（如 "24px"）
+
+  // 通用行为配置
+  followNativeBarsAutoHide?: boolean;  // 随思源导航栏自动隐藏工具栏（顶部固定/底部固定/底部胶囊均生效，默认 true）
+  showNavOnOverflow?: boolean;  // 底部固定模式：扩展栏打开时显示思源导航栏（默认 false；底部胶囊模式始终生效）
 }
 
 /**
@@ -529,7 +544,8 @@ export interface MobileFeatureConfig {
   /** 顶部工具栏云同步位置左侧显示 H，点击硬换行 */
   showMobileLineBreakButton?: boolean
   disableCustomButtons: boolean
-  disableMobileSwipe?: boolean
+  hideStatusBar?: boolean  // 手机端隐藏底部状态条 #status
+  keepTopBarVisible?: boolean  // 不隐藏顶栏标题（滚动沉浸时标题栏保持显示，默认关）
   authorCode?: string
   authorActivated?: boolean
   authorAccount?: string  // 绑定的思源账号（与电脑端一致，重启后用于校验激活态是否仍属于当前账号）
@@ -2082,18 +2098,20 @@ export function createMobileSettingLayout(
         width: calc(100% + 32px);
       `
       const container = document.createElement('div')
-      container.style.cssText = 'display: flex; gap: 24px; align-items: center; justify-content: center;'
+      container.style.cssText = 'display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: center;'
 
       const options = [
         { value: 'top', label: '顶部固定' },
         { value: 'bottom', label: '底部固定' },
-        { value: 'floating', label: '底部胶囊' }
+        { value: 'floating', label: '底部胶囊' },
+        { value: 'side-floating', label: '侧边胶囊' }
       ]
 
       // 确定当前选中的值
       const getCurrentValue = () => {
         if (context.mobileConfig.enableTopToolbar) return 'top'
         if (context.mobileConfig.enableBottomToolbar) return 'bottom'
+        if (context.mobileConfig.enableSideFloatingToolbar) return 'side-floating'
         return 'floating'  // 默认底部胶囊
       }
 
@@ -2113,6 +2131,7 @@ export function createMobileSettingLayout(
           context.mobileConfig.enableTopToolbar = option.value === 'top'
           context.mobileConfig.enableBottomToolbar = option.value === 'bottom'
           context.mobileConfig.enableFloatingToolbar = option.value === 'floating'
+          context.mobileConfig.enableSideFloatingToolbar = option.value === 'side-floating'
 
           await context.saveData('mobileToolbarConfig', context.mobileConfig)
 
@@ -2120,6 +2139,7 @@ export function createMobileSettingLayout(
           const isBottom = option.value === 'bottom'
           const isTop = option.value === 'top'
           const isFloating = option.value === 'floating'
+          const isSideFloating = option.value === 'side-floating'
 
           document.querySelectorAll('.bottom-toolbar-setting').forEach(el => {
             (el as HTMLInputElement).disabled = !isBottom
@@ -2134,6 +2154,11 @@ export function createMobileSettingLayout(
           document.querySelectorAll('.floating-toolbar-setting').forEach(el => {
             (el as HTMLInputElement).disabled = !isFloating
             ;(el as HTMLInputElement).style.opacity = isFloating ? '' : '0.5'
+          })
+
+          document.querySelectorAll('.side-floating-toolbar-setting').forEach(el => {
+            (el as HTMLInputElement).disabled = !isSideFloating
+            ;(el as HTMLInputElement).style.opacity = isSideFloating ? '' : '0.5'
           })
 
           // 动态显示/隐藏整个配置分区
@@ -2158,6 +2183,13 @@ export function createMobileSettingLayout(
             }
           })
 
+          document.querySelectorAll('.side-floating-toolbar-section').forEach(el => {
+            const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
+            if (parent) {
+              parent.style.display = isSideFloating ? '' : 'none'
+            }
+          })
+
           // 同时显示/隐藏分区下的所有配置项
           const updateSectionVisibility = (className: string, show: boolean) => {
             document.querySelectorAll(className).forEach(el => {
@@ -2172,6 +2204,7 @@ export function createMobileSettingLayout(
           updateSectionVisibility('.top-toolbar-setting', isTop)
           updateSectionVisibility('.bottom-toolbar-setting', isBottom)
           updateSectionVisibility('.floating-toolbar-setting', isFloating)
+          updateSectionVisibility('.side-floating-toolbar-setting', isSideFloating)
 
           // 重新初始化工具栏
           context.updateMobileToolbar()
@@ -2191,6 +2224,7 @@ export function createMobileSettingLayout(
         const isTop = context.mobileConfig.enableTopToolbar
         const isBottom = context.mobileConfig.enableBottomToolbar
         const isFloating = !!context.mobileConfig.enableFloatingToolbar
+        const isSideFloating = !!context.mobileConfig.enableSideFloatingToolbar
 
         document.querySelectorAll('.top-toolbar-section').forEach(el => {
           const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
@@ -2213,6 +2247,13 @@ export function createMobileSettingLayout(
           }
         })
 
+        document.querySelectorAll('.side-floating-toolbar-section').forEach(el => {
+          const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
+          if (parent) {
+            parent.style.display = isSideFloating ? '' : 'none'
+          }
+        })
+
         const updateSectionVisibility = (className: string, show: boolean) => {
           document.querySelectorAll(className).forEach(el => {
             const input = el as HTMLInputElement
@@ -2226,10 +2267,28 @@ export function createMobileSettingLayout(
         updateSectionVisibility('.top-toolbar-setting', isTop)
         updateSectionVisibility('.bottom-toolbar-setting', isBottom)
         updateSectionVisibility('.floating-toolbar-setting', isFloating)
+        updateSectionVisibility('.side-floating-toolbar-setting', isSideFloating)
       }, 100)
 
       wrapper.appendChild(container)
       return wrapper
+    }
+  })
+
+  // === 随思源导航栏自动隐藏工具栏开关（对顶部固定/底部固定/底部胶囊均生效） ===
+  setting.addItem({
+    title: '✅随思源导航栏自动隐藏工具栏',
+    createActionElement: () => {
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'b3-switch'
+      toggle.checked = context.mobileConfig.followNativeBarsAutoHide !== false  // 默认开启
+      toggle.onchange = async () => {
+        context.mobileConfig.followNativeBarsAutoHide = toggle.checked
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
+        context.updateMobileToolbar()
+      }
+      return toggle
     }
   })
 
@@ -2251,8 +2310,8 @@ export function createMobileSettingLayout(
     description: '💡顶部工具栏距离屏幕顶部的距离（仅在顶部固定时有效）',
     createActionElement: () => {
       // 解析当前值，提取数字部分
-      const currentValueStr = context.mobileConfig.topToolbarOffset ?? '50px';
-      const currentValue = parseLengthSliderInt(currentValueStr, 50);
+      const currentValueStr = context.mobileConfig.topToolbarOffset ?? '45px';
+      const currentValue = parseLengthSliderInt(currentValueStr, 45);
       
       const slider = createCustomSliderWithoutLabel(
         currentValue,
@@ -2592,6 +2651,29 @@ export function createMobileSettingLayout(
     }
   })
 
+  setting.addItem({
+    title: '⑦扩展栏打开时显示思源导航栏',
+    description: '💡开启后默认隐藏思源导航栏，点击扩展按钮展开扩展栏时显示在扩展栏上方（底部胶囊模式始终生效）',
+    createActionElement: () => {
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'b3-switch'
+      toggle.classList.add('bottom-toolbar-setting')
+      toggle.checked = context.mobileConfig.showNavOnOverflow === true  // 默认关闭
+      toggle.onchange = async () => {
+        context.mobileConfig.showNavOnOverflow = toggle.checked
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
+        context.updateMobileToolbar()
+      }
+      // 根据底部工具栏启用状态设置禁用状态
+      if (!context.mobileConfig.enableBottomToolbar) {
+        toggle.style.opacity = '0.5';
+        toggle.style.pointerEvents = 'none';
+      }
+      return toggle
+    }
+  })
+
   // === 底部胶囊配置 ===
   setting.addItem({
     title: '',
@@ -2802,6 +2884,220 @@ export function createMobileSettingLayout(
         wrapper.style.pointerEvents = 'none';
       }
       return wrapper;
+    }
+  })
+
+  // === 侧边胶囊配置 ===
+  setting.addItem({
+    title: '',
+    description: '',
+    createActionElement: () => {
+      const div = document.createElement('div')
+      div.className = 'side-floating-toolbar-section'
+      div.innerHTML = '<span style="font-size: 14px; font-weight: 600; color: #a855f7; display: flex; align-items: center; gap: 6px;"><span>💊</span><span>侧边胶囊配置</span></span>'
+      return div
+    }
+  })
+
+  // ① 微缩小胶囊吸附侧
+  setting.addItem({
+    title: '①微缩小胶囊吸附侧',
+    description: '💡收起状态的 ⋮ 按钮吸附在屏幕的左侧还是右侧',
+    createActionElement: () => {
+      const wrapper = document.createElement('div')
+      wrapper.style.cssText = 'display: flex; gap: 12px; align-items: center;'
+      wrapper.classList.add('side-floating-toolbar-setting')
+
+      const sides = [
+        { value: 'left', label: '左侧' },
+        { value: 'right', label: '右侧' },
+      ]
+
+      sides.forEach(s => {
+        const btn = document.createElement('button')
+        btn.textContent = s.label
+        btn.dataset.value = s.value
+        const refreshBtn = () => {
+          const active = (context.mobileConfig.sideMiniSide ?? 'right') === s.value
+          btn.style.cssText = `
+            padding: 6px 16px; border-radius: 8px; cursor: pointer;
+            font-size: 14px; font-weight: 500;
+            border: 1px solid var(--b3-border-color);
+            background: ${active ? 'var(--b3-theme-primary)' : 'var(--b3-theme-surface)'};
+            color: ${active ? '#fff' : 'var(--b3-theme-on-surface)'};
+            transition: all 0.15s ease;
+          `
+        }
+        refreshBtn()
+        btn.onclick = async () => {
+          context.mobileConfig.sideMiniSide = s.value as 'left' | 'right'
+          await context.saveData('mobileToolbarConfig', context.mobileConfig)
+          wrapper.querySelectorAll('button').forEach(b => {
+            const isActive = b.dataset.value === context.mobileConfig.sideMiniSide
+            b.style.background = isActive ? 'var(--b3-theme-primary)' : 'var(--b3-theme-surface)'
+            b.style.color = isActive ? '#fff' : 'var(--b3-theme-on-surface)'
+          })
+          context.updateMobileToolbar()
+        }
+        wrapper.appendChild(btn)
+      })
+
+      if (!context.mobileConfig.enableSideFloatingToolbar) {
+        wrapper.style.opacity = '0.5';
+        wrapper.style.pointerEvents = 'none';
+      }
+      return wrapper;
+    }
+  })
+
+  // ② 微缩小胶囊距离底部高度
+  setting.addItem({
+    title: '②微缩小胶囊距离底部高度',
+    description: '💡收起状态的 ⋮ 按钮距离屏幕底部的间距',
+    createActionElement: () => {
+      const currentValueStr = context.mobileConfig.sideMiniBottom ?? '40px';
+      const currentValue = parseLengthSliderInt(currentValueStr, 40);
+      const slider = createCustomSliderWithoutLabel(
+        currentValue,
+        0, 300, 'px',
+        async (value) => {
+          context.mobileConfig.sideMiniBottom = value + 'px';
+          await context.saveData('mobileToolbarConfig', context.mobileConfig);
+          context.updateMobileToolbar();
+        }
+      );
+      slider.classList.add('side-floating-toolbar-setting');
+      if (!context.mobileConfig.enableSideFloatingToolbar) {
+        slider.style.opacity = '0.5';
+        slider.style.pointerEvents = 'none';
+      }
+      return slider;
+    }
+  })
+
+  // ③ 展开胶囊吸附侧
+  setting.addItem({
+    title: '③展开胶囊吸附侧',
+    description: '💡点击 ⋮ 展开的面板吸附在屏幕的左侧还是右侧',
+    createActionElement: () => {
+      const wrapper = document.createElement('div')
+      wrapper.style.cssText = 'display: flex; gap: 12px; align-items: center;'
+      wrapper.classList.add('side-floating-toolbar-setting')
+
+      const sides = [
+        { value: 'left', label: '左侧' },
+        { value: 'right', label: '右侧' },
+      ]
+
+      sides.forEach(s => {
+        const btn = document.createElement('button')
+        btn.textContent = s.label
+        btn.dataset.value = s.value
+        const refreshBtn = () => {
+          const active = (context.mobileConfig.sideFloatingSide ?? 'right') === s.value
+          btn.style.cssText = `
+            padding: 6px 16px; border-radius: 8px; cursor: pointer;
+            font-size: 14px; font-weight: 500;
+            border: 1px solid var(--b3-border-color);
+            background: ${active ? 'var(--b3-theme-primary)' : 'var(--b3-theme-surface)'};
+            color: ${active ? '#fff' : 'var(--b3-theme-on-surface)'};
+            transition: all 0.15s ease;
+          `
+        }
+        refreshBtn()
+        btn.onclick = async () => {
+          context.mobileConfig.sideFloatingSide = s.value as 'left' | 'right'
+          await context.saveData('mobileToolbarConfig', context.mobileConfig)
+          wrapper.querySelectorAll('button').forEach(b => {
+            const isActive = b.dataset.value === context.mobileConfig.sideFloatingSide
+            b.style.background = isActive ? 'var(--b3-theme-primary)' : 'var(--b3-theme-surface)'
+            b.style.color = isActive ? '#fff' : 'var(--b3-theme-on-surface)'
+          })
+          context.updateMobileToolbar()
+        }
+        wrapper.appendChild(btn)
+      })
+
+      if (!context.mobileConfig.enableSideFloatingToolbar) {
+        wrapper.style.opacity = '0.5';
+        wrapper.style.pointerEvents = 'none';
+      }
+      return wrapper;
+    }
+  })
+
+  // ④ 展开胶囊距离底部高度
+  setting.addItem({
+    title: '④展开胶囊距离底部高度',
+    description: '💡展开面板距离屏幕底部的间距（避开思源底部导航栏）',
+    createActionElement: () => {
+      const currentValueStr = context.mobileConfig.sideFloatingBottom ?? '100px';
+      const currentValue = parseLengthSliderInt(currentValueStr, 100);
+      const slider = createCustomSliderWithoutLabel(
+        currentValue,
+        0, 300, 'px',
+        async (value) => {
+          context.mobileConfig.sideFloatingBottom = value + 'px';
+          await context.saveData('mobileToolbarConfig', context.mobileConfig);
+          context.updateMobileToolbar();
+        }
+      );
+      slider.classList.add('side-floating-toolbar-setting');
+      if (!context.mobileConfig.enableSideFloatingToolbar) {
+        slider.style.opacity = '0.5';
+        slider.style.pointerEvents = 'none';
+      }
+      return slider;
+    }
+  })
+
+  // ⑤ 展开胶囊边距
+  setting.addItem({
+    title: '⑤展开胶囊边距',
+    description: '💡展开面板距离屏幕侧边的间距',
+    createActionElement: () => {
+      const currentValueStr = context.mobileConfig.sideFloatingMargin ?? '12px';
+      const currentValue = parseLengthSliderInt(currentValueStr, 12);
+      const slider = createCustomSliderWithoutLabel(
+        currentValue,
+        0, 40, 'px',
+        async (value) => {
+          context.mobileConfig.sideFloatingMargin = value + 'px';
+          await context.saveData('mobileToolbarConfig', context.mobileConfig);
+          context.updateMobileToolbar();
+        }
+      );
+      slider.classList.add('side-floating-toolbar-setting');
+      if (!context.mobileConfig.enableSideFloatingToolbar) {
+        slider.style.opacity = '0.5';
+        slider.style.pointerEvents = 'none';
+      }
+      return slider;
+    }
+  })
+
+  // ⑥ 展开胶囊圆角大小
+  setting.addItem({
+    title: '⑥展开胶囊圆角大小',
+    description: '💡展开面板的圆角弧度，值越大越圆',
+    createActionElement: () => {
+      const currentValueStr = context.mobileConfig.sideFloatingRadius ?? '24px';
+      const currentValue = parseLengthSliderInt(currentValueStr, 24);
+      const slider = createCustomSliderWithoutLabel(
+        currentValue,
+        0, 40, 'px',
+        async (value) => {
+          context.mobileConfig.sideFloatingRadius = value + 'px';
+          await context.saveData('mobileToolbarConfig', context.mobileConfig);
+          context.updateMobileToolbar();
+        }
+      );
+      slider.classList.add('side-floating-toolbar-setting');
+      if (!context.mobileConfig.enableSideFloatingToolbar) {
+        slider.style.opacity = '0.5';
+        slider.style.pointerEvents = 'none';
+      }
+      return slider;
     }
   })
 
@@ -4133,27 +4429,8 @@ export function createMobileSettingLayout(
     }
   })
 
-  // 手机端禁止左右滑动弹出
   setting.addItem({
-    title: '⑤禁止左右滑动弹出',
-    description: '💡开启后禁止左右滑动弹出文档树和设置菜单',
-    createActionElement: () => {
-      const toggle = document.createElement('input')
-      toggle.type = 'checkbox'
-      toggle.className = 'b3-switch'
-      toggle.checked = context.mobileFeatureConfig.disableMobileSwipe ?? false
-      toggle.style.cssText = 'transform: scale(1.2);'
-      toggle.onchange = async () => {
-        context.mobileFeatureConfig.disableMobileSwipe = toggle.checked
-        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
-        context.applyFeatures()
-      }
-      return toggle
-    }
-  })
-
-  setting.addItem({
-    title: '⑥换行按钮',
+    title: '⑤换行按钮',
     description: '💡在顶部工具栏原云同步位置左侧显示 H，并隐藏云同步图标；点击 H 在正文中分段换行（与编辑区内按 Enter 相同）',
     createActionElement: () => {
       const toggle = document.createElement('input')
@@ -4171,7 +4448,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '⑦手机端状态条隐藏',
+    title: '⑥手机端状态条隐藏',
     description: '💡隐藏手机端底部的状态条（含同步状态、字数统计等）。默认开启。',
     createActionElement: () => {
       const toggle = document.createElement('input')
@@ -4181,6 +4458,24 @@ export function createMobileSettingLayout(
       toggle.style.cssText = 'transform: scale(1.2);'
       toggle.onchange = async () => {
         context.mobileFeatureConfig.hideStatusBar = toggle.checked
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+        context.applyFeatures()
+      }
+      return toggle
+    }
+  })
+
+  setting.addItem({
+    title: '⑦不隐藏顶栏标题',
+    description: '💡开启后，滚动沉浸时顶部标题栏保持显示（不随导航栏一起隐藏），可点击编辑标题。默认关闭。',
+    createActionElement: () => {
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'b3-switch'
+      toggle.checked = context.mobileFeatureConfig.keepTopBarVisible === true
+      toggle.style.cssText = 'transform: scale(1.2);'
+      toggle.onchange = async () => {
+        context.mobileFeatureConfig.keepTopBarVisible = toggle.checked
         await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
         context.applyFeatures()
       }
@@ -4610,7 +4905,7 @@ export function createMobileSettingLayout(
 		        rowTr('⑫', '滑动快速批注<br><span style="color:#10b981;font-size:11px;">免费</span>', '完美联动「鲸鱼快速批注」插件（独立插件），请先在电脑端插件市场搜索「鲸鱼快速批注」进行下载，安装后同步到手机端'),
         rowTr('⑬', '文档朗读', '使用浏览器语音合成朗读当前文档，支持语速调节、段落高亮'),
         rowTr('⑭', '一键清理空块', '自动扫描并删除文档中空块（无文本段落/标题/列表项），预览确认后批量删除'),
-        rowTr('⑮', '沉浸阅读模式<br><span style="color:#10b981;font-size:11px;">免费</span>', '🔒一键锁定文档防误编辑 + 📱上滑自动隐藏工具栏，全屏沉浸阅读'),
+        rowTr('⑮', '沉浸阅读模式<br><span style="color:#10b981;font-size:11px;">免费</span>', '🔒一键锁定文档防误编辑，锁定/解锁图标可自定义'),
         rowTr('⑯', '快速添加附件', '📎选择任意文件上传，可自定义名称，图片支持压缩；有光标插光标处，无光标追加日记（记事弹窗中不生效）'),
       ]
 

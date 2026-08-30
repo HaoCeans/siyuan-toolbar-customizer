@@ -1741,9 +1741,9 @@ export function createDesktopButtonItem(
 		      collapseStyleConfigDiv.style.display = (subtype === 'mobile-tabs' || subtype === 'mobile-outline') ? 'flex' : 'none'
 		      // 前一篇/后一篇：显示底部距离 + 滚动隐藏配置
 		      docNavConfigDiv.style.display = subtype === 'doc-nav' ? 'flex' : 'none'
-		      // 沉浸阅读模式：显示/隐藏锁定图标+滚动隐藏开关
-		      const toggleExtras = editForm.querySelector('.toggle-lock-extras') as HTMLElement | null
-		      if (toggleExtras) toggleExtras.style.display = (subtype === 'toggle-lock') ? '' : 'none'
+	      // 沉浸阅读模式：显示/隐藏锁定图标自定义
+	      const toggleExtras = editForm.querySelector('.toggle-lock-extras') as HTMLElement | null
+	      if (toggleExtras) toggleExtras.style.display = (subtype === 'toggle-lock') ? '' : 'none'
 	      } else {
         docConfigDiv.style.display = 'flex'
         dbConfigDiv.style.display = 'none'
@@ -1769,28 +1769,11 @@ export function createDesktopButtonItem(
 	    toggleLockExtras.appendChild(descTitle)
 	    const descBox = document.createElement('div')
 	    descBox.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); background: var(--b3-theme-primary-lightest); border: 1px solid var(--b3-theme-primary-light); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; line-height: 1.6;'
-	    descBox.innerHTML = '🔒 <b>锁定文档</b>：防止误编辑，按钮显示锁定图标<br>📱 <b>滚动隐藏</b>：锁定后上滑自动隐藏工具栏，全屏沉浸阅读<br>🔓 <b>再次点击</b>：解锁文档，恢复工具栏'
+	    descBox.innerHTML = '🔒 <b>锁定文档</b>：防止误编辑，按钮显示锁定图标<br>🔓 <b>再次点击</b>：解锁文档，恢复编辑'
 	    toggleLockExtras.appendChild(descBox)
 	    toggleLockExtras.appendChild(createDesktopIconField('🔒锁定图标', button.lockIcon || '🔒', (v) => {
 	      button.lockIcon = v
 	    }, context.showIconPicker, button.iconSize))
-	    const autoHideItem = document.createElement('div')
-	    autoHideItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0;'
-	    const autoHideLabel = document.createElement('label')
-	    autoHideLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
-	    autoHideLabel.textContent = '🔽 锁定时工具栏滚动隐藏'
-	    const autoHideSwitch = document.createElement('input')
-	    autoHideSwitch.type = 'checkbox'
-	    autoHideSwitch.className = 'b3-switch'
-	    autoHideSwitch.checked = button.toolbarAutoHide ?? false
-	    autoHideSwitch.onchange = () => { button.toolbarAutoHide = autoHideSwitch.checked }
-	    autoHideItem.appendChild(autoHideLabel)
-	    autoHideItem.appendChild(autoHideSwitch)
-	    toggleLockExtras.appendChild(autoHideItem)
-	    const autoHideHint = document.createElement('div')
-	    autoHideHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); opacity: 0.7; margin-bottom: 4px;'
-	    autoHideHint.textContent = '仅移动端生效。文档锁定时，上滑隐藏工具栏、下滑显示'
-	    toggleLockExtras.appendChild(autoHideHint)
 	    authorToolField.appendChild(toggleLockExtras)
 	    // 更新 updateVisibility 使 toggle-lock 状态生效
 	    ;(subtypeSelect as any).refreshForm?.()
@@ -3381,7 +3364,7 @@ export function populateDesktopEditForm(
 	        collapseStyleConfigDiv2.style.display = (subtype === 'mobile-tabs' || subtype === 'mobile-outline') ? 'flex' : 'none'
 	        // 前一篇/后一篇：显示底部距离 + 滚动隐藏配置
 	        docNavConfigDiv2.style.display = subtype === 'doc-nav' ? 'flex' : 'none'
-	        // 沉浸阅读模式：显示/隐藏锁定图标+滚动隐藏开关
+	        // 沉浸阅读模式：显示/隐藏锁定图标自定义
 	        const toggleExtras2 = form.querySelector('.toggle-lock-extras') as HTMLElement | null
 	        if (toggleExtras2) toggleExtras2.style.display = (subtype === 'toggle-lock') ? '' : 'none'
 	      } else {
@@ -3409,28 +3392,11 @@ export function populateDesktopEditForm(
 	    toggleLockExtras2.appendChild(descTitle2)
 	    const descBox2 = document.createElement('div')
 	    descBox2.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); background: var(--b3-theme-primary-lightest); border: 1px solid var(--b3-theme-primary-light); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; line-height: 1.6;'
-	    descBox2.innerHTML = '🔒 <b>锁定文档</b>：防止误编辑，按钮显示锁定图标<br>📱 <b>滚动隐藏</b>：锁定后上滑自动隐藏工具栏，全屏沉浸阅读<br>🔓 <b>再次点击</b>：解锁文档，恢复工具栏'
+	    descBox2.innerHTML = '🔒 <b>锁定文档</b>：防止误编辑，按钮显示锁定图标<br>🔓 <b>再次点击</b>：解锁文档，恢复编辑'
 	    toggleLockExtras2.appendChild(descBox2)
 	    toggleLockExtras2.appendChild(createDesktopIconField('🔒锁定图标', button.lockIcon || '🔒', (v) => {
 	      button.lockIcon = v
 	    }, context.showIconPicker, button.iconSize))
-	    const autoHideItem2 = document.createElement('div')
-	    autoHideItem2.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0;'
-	    const autoHideLabel2 = document.createElement('label')
-	    autoHideLabel2.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
-	    autoHideLabel2.textContent = '🔽 锁定时工具栏滚动隐藏'
-	    const autoHideSwitch2 = document.createElement('input')
-	    autoHideSwitch2.type = 'checkbox'
-	    autoHideSwitch2.className = 'b3-switch'
-	    autoHideSwitch2.checked = button.toolbarAutoHide ?? false
-	    autoHideSwitch2.onchange = () => { button.toolbarAutoHide = autoHideSwitch2.checked }
-	    autoHideItem2.appendChild(autoHideLabel2)
-	    autoHideItem2.appendChild(autoHideSwitch2)
-	    toggleLockExtras2.appendChild(autoHideItem2)
-	    const autoHideHint2 = document.createElement('div')
-	    autoHideHint2.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); opacity: 0.7; margin-bottom: 4px;'
-	    autoHideHint2.textContent = '仅移动端生效。文档锁定时，上滑隐藏工具栏、下滑显示'
-	    toggleLockExtras2.appendChild(autoHideHint2)
 	    authorToolField.appendChild(toggleLockExtras2)
 	    ;(subtypeSelect as any).refreshForm?.()
 	  }

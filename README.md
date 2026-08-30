@@ -337,6 +337,39 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 
 # 📌 Changelog
 
+### v3.8.5 — Mobile upgrade: toolbars hide with SiYuan's nav bars + new side capsule
+
+> 💡 **Toolbar not hiding together with SiYuan's nav bars when you scroll? Bottom capsule overlapping the nav bar? Want a small button on the screen edge that opens all your tools? Update.**
+
+**① Toolbars follow SiYuan's nav bars (mobile)**
+- When you scroll, SiYuan hides its top title and bottom nav bar together — now the plugin toolbar (top / bottom / capsule) hides and shows with them, no more hiding out of sync
+- Don't want this? Turn off "Hide toolbar with SiYuan nav bars" in settings
+
+**② New "side capsule" toolbar mode**
+- The toolbar becomes a small button (⋮) on the screen edge — tap it to expand all buttons in a vertical panel
+- The position of the button and the panel (left/right, distance from bottom) can be set separately
+
+**③ Bottom capsule no longer overlaps SiYuan's nav bar**
+- The nav bar is now hidden by default in bottom-capsule mode; when you open the extension bar, the nav bar appears above it
+- Bottom-fixed mode got the same toggle (item #7: show the nav bar when the extension bar opens)
+
+**④ Simplified the "Immersive Reading Mode" button**
+- Removed "hide toolbar when locked" — toolbar hiding is now handled by SiYuan itself
+- The button now only locks/unlocks the document and lets you customize the lock/unlock icons
+
+**⑤ Mobile tweaks**
+- New toggle (item #7): "Keep top title visible" — the title stays on screen while scrolling
+- Removed the "disable swipe panels" option — SiYuan's native swipe behavior is restored
+- Default top toolbar offset changed to 45px
+
+**⑥ Smoother**
+- Fixed several things that could make the mobile UI stutter (repeated style refreshes, high-frequency listeners, etc.)
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ Older versions
+  </summary>
+
 ### v3.8.4 — Mobile button settings stop jumping around + Previous/Next direction fixed
 
 > 💡 **Expanded button forms in the mobile settings keep collapsing or drifting? Dragging the opacity slider makes the settings view jump? The Previous/Next navigation points the wrong way? Canceling a task template (`- [ ]`) in the block-format quick-note popup leaves an undeletable orphan block and forces a database rebuild? Update.**
@@ -362,11 +395,6 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 - Before, inserting a `- [ ] task` (markdown shortcut) template in the block-format popup, then deleting the content and canceling, could easily leave two identical task blocks where one couldn't be deleted — ending in a forced database rebuild
 - Cause: `- [ ]` triggers SiYuan's async block conversion (deletes the old block, creates a new task block), so the block ID changes — but the plugin still deleted by the old ID → the converted block was left behind as an orphan
 - Now: ① after insertion the draft-block ID is re-aligned to the real converted block; ② before cancel-delete the transaction queue is flushed and deletion retried on failure; ③ the auto-recovery no longer creates a new draft block while canceling — all three races are closed
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ Older versions
-  </summary>
 
 ### v3.8.3 — Smarter template insertion + one-click factory reset
 
@@ -797,8 +825,8 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 ### v3.7.0 — 图片导入重构 + 附件管理 + 工具箱分类（版本大更新）
 
 > ⚠️ **环境要求（重要）**
-> 从 v3.8.0 起，本插件要求 **思源笔记 v3.8.0 及以上**版本才能正常使用。
-> 若思源版本低于 v3.8.0，将无法安装或在插件市场显示不兼容，请先升级思源笔记。
+> 从 v3.8.5 起，本插件要求 **思源笔记 v3.8.2 及以上**版本才能正常使用。
+> 若思源版本低于 v3.8.2，将无法安装或在插件市场显示不兼容，请先升级思源笔记。
 > （原因：插件已适配思源 v3.8 的语言标识规范，旧版本无法正确匹配插件信息。）
 
 ## 新增

@@ -1937,7 +1937,7 @@ export function createMobileButtonItem(
 	          scrollDocConfigDiv.style.display = 'none'
 	          imageUploadConfigDiv.style.display = 'none'
 		          floatOpacityConfigDiv.style.display = 'none'
-		          // 沉浸阅读模式：显示/隐藏锁定图标+滚动隐藏开关
+		          // 沉浸阅读模式：显示/隐藏锁定图标自定义
 		          const toggleExtras = editForm.querySelector('.toggle-lock-extras') as HTMLElement | null
 		          if (toggleExtras) toggleExtras.style.display = (subtype === 'toggle-lock') ? '' : 'none'
 		        } else if (subtype === 'mobile-tabs' || subtype === 'mobile-outline' || subtype === 'doc-nav' || subtype === 'slide-comment' || subtype === 'tts') {
@@ -1982,28 +1982,11 @@ export function createMobileButtonItem(
       toggleLockExtras.appendChild(descTitle)
       const descBox = document.createElement('div')
       descBox.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); background: var(--b3-theme-primary-lightest); border: 1px solid var(--b3-theme-primary-light); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; line-height: 1.6;'
-      descBox.innerHTML = '🔒 <b>锁定文档</b>：防止误编辑，按钮显示锁定图标<br>📱 <b>滚动隐藏</b>：锁定后上滑自动隐藏工具栏，全屏沉浸阅读<br>🔓 <b>再次点击</b>：解锁文档，恢复工具栏'
+      descBox.innerHTML = '🔒 <b>锁定文档</b>：防止误编辑，按钮显示锁定图标<br>🔓 <b>再次点击</b>：解锁文档，恢复编辑'
       toggleLockExtras.appendChild(descBox)
       toggleLockExtras.appendChild(createIconField('🔒锁定图标', button.lockIcon || '🔒', (v) => {
         button.lockIcon = v
       }, context.showIconPicker, button.iconSize))
-      const toggleAutoHideItem = document.createElement('div')
-      toggleAutoHideItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 0;'
-      const toggleAutoHideLabel = document.createElement('label')
-      toggleAutoHideLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
-      toggleAutoHideLabel.textContent = '🔽 锁定时工具栏滚动隐藏'
-      const toggleAutoHideSwitch = document.createElement('input')
-      toggleAutoHideSwitch.type = 'checkbox'
-      toggleAutoHideSwitch.className = 'b3-switch'
-      toggleAutoHideSwitch.checked = button.toolbarAutoHide ?? false
-      toggleAutoHideSwitch.onchange = () => { button.toolbarAutoHide = toggleAutoHideSwitch.checked }
-      toggleAutoHideItem.appendChild(toggleAutoHideLabel)
-      toggleAutoHideItem.appendChild(toggleAutoHideSwitch)
-      toggleLockExtras.appendChild(toggleAutoHideItem)
-      const toggleAutoHideHint = document.createElement('div')
-      toggleAutoHideHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); opacity: 0.7; margin-bottom: 4px;'
-      toggleAutoHideHint.textContent = '文档锁定时，上滑隐藏工具栏、下滑显示'
-      toggleLockExtras.appendChild(toggleAutoHideHint)
       authorToolContainer.appendChild(toggleLockExtras)
       ;(subtypeSelect as any).refreshForm?.()
 

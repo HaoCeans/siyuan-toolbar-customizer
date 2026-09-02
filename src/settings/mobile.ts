@@ -502,6 +502,7 @@ export interface MobileToolbarConfig {
   useThemeColor?: boolean
   toolbarOpacity?: number
   toolbarZIndex?: number
+  overflowFollowMainStyle?: boolean  // 扩展工具栏样式跟随主工具栏（去掉高亮线框，背景/毛玻璃跟随主栏）
 
   // 顶部工具栏配置
   enableTopToolbar?: boolean
@@ -518,19 +519,19 @@ export interface MobileToolbarConfig {
   floatingToolbarScrollHide?: boolean; // 胶囊滚动隐藏
 
   // 侧边胶囊工具栏配置（与底部胶囊并存，互斥于其他模式）
-  enableSideFloatingToolbar?: boolean;  // 是否启用侧边胶囊工具栏
+  enableSideFloatingToolbar?: boolean;  // 是否启用侧边胶囊工具栏（默认 true：手机端默认位置）
   // 微缩小胶囊（收起态 ⋮ 按钮）配置
-  sideMiniSide?: 'left' | 'right';  // 微缩小胶囊吸附侧，默认 'right'
+  sideMiniSide?: 'left' | 'right';  // 微缩小胶囊吸附侧，默认 'left'
   sideMiniBottom?: string;   // 微缩小胶囊距底部距离（如 "100px"）
   // 展开胶囊（展开面板）配置
-  sideFloatingSide?: 'left' | 'right';  // 展开胶囊吸附侧，默认 'right'
+  sideFloatingSide?: 'left' | 'right';  // 展开面板吸附侧，默认 'left'
   sideFloatingMargin?: string;   // 展开胶囊距侧边距离（如 "12px"）
   sideFloatingBottom?: string;   // 展开胶囊距底部距离（如 "100px"）
   sideFloatingRadius?: string;   // 展开胶囊圆角（如 "24px"）
 
   // 通用行为配置
   followNativeBarsAutoHide?: boolean;  // 随思源导航栏自动隐藏工具栏（顶部固定/底部固定/底部胶囊均生效，默认 true）
-  showNavOnOverflow?: boolean;  // 底部固定模式：扩展栏打开时显示思源导航栏（默认 false；底部胶囊模式始终生效）
+  showNavOnOverflow?: boolean;  // 底部固定模式：扩展栏打开时显示思源导航栏（默认 true；底部胶囊模式始终生效）
 }
 
 /**
@@ -570,7 +571,8 @@ export interface MobileFeatureConfig {
   quickNoteAutoFocusFirstPopup?: boolean // 自动触发首次弹出时弹出输入法
   quickNoteAutoFocusRestore?: boolean   // 切后台前有输入法则切回后恢复
   // 工具栏样式配置
-  toolbarStyle?: 'default' | 'divider'  // 工具栏样式：默认或带分割线
+  toolbarStyle?: 'default' | 'divider'  // 工具栏样式：默认或带分割线（与毛玻璃独立，可叠加）
+  glassEffect?: boolean  // 毛玻璃背景（半透明 + 背景模糊，独立开关，可与分割线同时使用）
 }
 
 /**
@@ -858,6 +860,8 @@ export function createMobileSettingLayout(
   setting: Setting,
   context: MobileSettingsContext
 ): void {
+  // 预览元素引用（提升到函数作用域：位置模式切换后需要刷新预览形态，如侧边胶囊竖排）
+  let mobilePreviewEl: any = null
 	  // === v3.7 适配：手机端设置面板 ===
 	  // 默认所有设置项改为纵向堆叠（标题上、内容下铺满居中），解决手机端整体偏左。
 	  // 两项例外保持横向一行：① 裸开关（input.b3-switch）② 标记了 whale-row-layout 的项。
@@ -1506,8 +1510,11 @@ export function createMobileSettingLayout(
           getButtons: () => context.buttonConfigs,
           isMobile: true,
           isTopMode: context.mobileConfig?.enableTopToolbar,
+          // 动态判断侧边胶囊模式：每次渲染时读取，切换位置后 refresh 即切换预览形态
+          isSideMode: () => context.mobileConfig?.enableSideFloatingToolbar === true,
           onChanged: renderList,
         })
+        mobilePreviewEl = previewEl
       } catch (e) {
         console.error('[MobilePreview] 创建预览失败:', e)
         const errEl = document.createElement('div')
@@ -1796,98 +1803,86 @@ export function createMobileSettingLayout(
     }
   })
 
-  // 工具栏样式选择
+  // 工具栏样式选择（分割线 × 毛玻璃 四宫格组合；底层仍存 toolbarStyle + glassEffect 两字段）
   setting.addItem({
     title: '②工具栏样式选择',
-    description: '💡选择工具栏的显示样式',
+    description: '💡毛玻璃=半透明背景+背景模糊；分割线=按钮之间的间隔线；两者可任意组合（仅顶部/底部固定模式生效）',
     createActionElement: () => {
-      const container = document.createElement('div')
-      container.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
-
       const config = context.mobileFeatureConfig as any
       const currentStyle = config.toolbarStyle || 'divider'
+      const currentGlass = config.glassEffect === true
 
-      // 默认样式选项
-      const defaultOption = document.createElement('div')
-      defaultOption.style.cssText = `
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 12px;
-        border: 1px solid ${currentStyle === 'default' ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'};
-        border-radius: 6px;
-        cursor: pointer;
-        background: ${currentStyle === 'default' ? 'rgba(66, 133, 244, 0.08)' : 'transparent'};
-      `
+      // 组合项：style/glass 为写入的两个底层字段，key 用于选中态判断
+      const combos = [
+        { key: 'plain', label: '默认样式', desc: '实色背景', style: 'default', glass: false },
+        { key: 'glass', label: '毛玻璃样式', desc: '半透明磨砂', style: 'default', glass: true },
+        { key: 'divider', label: '默认+分割线', desc: '实色+间隔线', style: 'divider', glass: false },
+        { key: 'gdiv', label: '毛玻璃+分割线', desc: '磨砂+间隔线', style: 'divider', glass: true },
+      ]
 
-      const defaultRadio = document.createElement('input')
-      defaultRadio.type = 'radio'
-      defaultRadio.name = 'toolbar-style'
-      defaultRadio.checked = currentStyle === 'default'
-      defaultRadio.style.cssText = 'cursor: pointer;'
+      const container = document.createElement('div')
+      container.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 8px;'
 
-      const defaultLabel = document.createElement('span')
-      defaultLabel.textContent = '默认样式'
-      defaultLabel.style.cssText = 'font-size: 13px; flex: 1;'
+      const isActive = (c: { style: string; glass: boolean }) => c.style === currentStyle && c.glass === currentGlass
 
-      defaultOption.appendChild(defaultRadio)
-      defaultOption.appendChild(defaultLabel)
+      combos.forEach(c => {
+        const opt = document.createElement('div')
+        opt.dataset.combo = c.key
+        opt.style.cssText = `
+          display: flex; flex-direction: column; align-items: center; gap: 3px;
+          padding: 8px 6px; border-radius: 8px; cursor: pointer; text-align: center;
+          border: 1px solid ${isActive(c) ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'};
+          background: ${isActive(c) ? 'rgba(66, 133, 244, 0.08)' : 'transparent'};
+        `
 
-      // 分割线样式选项
-      const dividerOption = document.createElement('div')
-      dividerOption.style.cssText = `
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 12px;
-        border: 1px solid ${currentStyle === 'divider' ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'};
-        border-radius: 6px;
-        cursor: pointer;
-        background: ${currentStyle === 'divider' ? 'rgba(66, 133, 244, 0.08)' : 'transparent'};
-      `
+        // 预览小样：圆点模拟按钮，竖线模拟分割线，底色差异模拟毛玻璃
+        const preview = document.createElement('div')
+        preview.style.cssText = `
+          display: flex; align-items: center; justify-content: center; gap: 4px;
+          width: calc(100% - 4px); padding: 4px 0; border-radius: 5px; margin: 2px 0;
+          ${c.glass
+            ? 'background: rgba(128, 128, 128, 0.22); border: 1px solid rgba(128, 128, 128, 0.18); backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);'
+            : 'background: var(--b3-theme-surface); border: 1px solid var(--b3-border-color);'}
+        `
+        for (let i = 0; i < 3; i++) {
+          if (i > 0 && c.style === 'divider') {
+            const line = document.createElement('span')
+            line.style.cssText = 'width: 1px; height: 10px; background: var(--b3-border-color); flex-shrink: 0;'
+            preview.appendChild(line)
+          }
+          const dot = document.createElement('span')
+          dot.style.cssText = 'width: 8px; height: 8px; border-radius: 2px; background: var(--b3-theme-primary); flex-shrink: 0;'
+          preview.appendChild(dot)
+        }
+        opt.appendChild(preview)
 
-      const dividerRadio = document.createElement('input')
-      dividerRadio.type = 'radio'
-      dividerRadio.name = 'toolbar-style'
-      dividerRadio.checked = currentStyle === 'divider'
-      dividerRadio.style.cssText = 'cursor: pointer;'
+        const label = document.createElement('span')
+        label.textContent = c.label
+        label.style.cssText = 'font-size: 13px; font-weight: 500;'
+        opt.appendChild(label)
 
-      const dividerLabel = document.createElement('span')
-      dividerLabel.textContent = '加分割线'
-      dividerLabel.style.cssText = 'font-size: 13px; flex: 1;'
+        const desc = document.createElement('span')
+        desc.textContent = c.desc
+        desc.style.cssText = 'font-size: 11px; opacity: 0.7;'
+        opt.appendChild(desc)
 
-      dividerOption.appendChild(dividerRadio)
-      dividerOption.appendChild(dividerLabel)
+        opt.onclick = async () => {
+          config.toolbarStyle = c.style
+          config.glassEffect = c.glass
+          // 刷新选中高亮
+          container.querySelectorAll<HTMLElement>('div[data-combo]').forEach(el => {
+            const active = el.dataset.combo === c.key
+            el.style.borderColor = active ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
+            el.style.background = active ? 'rgba(66, 133, 244, 0.08)' : 'transparent'
+          })
+          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+          // 分割线变化 → 重建按钮（toolbar-style-changed 事件）；毛玻璃变化 → 刷新背景
+          window.dispatchEvent(new CustomEvent('toolbar-style-changed', { detail: c.style }))
+          context.applyMobileToolbarStyle()
+        }
 
-      // 更新选中样式
-      const updateSelection = () => {
-        defaultOption.style.borderColor = defaultRadio.checked ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
-        defaultOption.style.background = defaultRadio.checked ? 'rgba(66, 133, 244, 0.08)' : 'transparent'
-        dividerOption.style.borderColor = dividerRadio.checked ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
-        dividerOption.style.background = dividerRadio.checked ? 'rgba(66, 133, 244, 0.08)' : 'transparent'
-      }
-
-      // 点击事件
-      defaultOption.onclick = async () => {
-        defaultRadio.checked = true
-        config.toolbarStyle = 'default'
-        updateSelection()
-        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
-        // 触发自定义事件通知工具栏更新样式
-        window.dispatchEvent(new CustomEvent('toolbar-style-changed', { detail: 'default' }))
-      }
-
-      dividerOption.onclick = async () => {
-        dividerRadio.checked = true
-        config.toolbarStyle = 'divider'
-        updateSelection()
-        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
-        // 触发自定义事件通知工具栏更新样式
-        window.dispatchEvent(new CustomEvent('toolbar-style-changed', { detail: 'divider' }))
-      }
-
-      container.appendChild(defaultOption)
-      container.appendChild(dividerOption)
+        container.appendChild(opt)
+      })
 
       return container
     }
@@ -2030,9 +2025,33 @@ export function createMobileSettingLayout(
       themeRow.appendChild(themeCheckbox)
       themeRow.appendChild(themeLabel)
 
+      // 扩展工具栏样式跟随主工具栏开关
+      const followRow = document.createElement('div')
+      followRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-top: 4px;'
+
+      const followCheckbox = document.createElement('input')
+      followCheckbox.type = 'checkbox'
+      followCheckbox.className = 'b3-switch'
+      followCheckbox.checked = context.mobileConfig.overflowFollowMainStyle === true
+      followCheckbox.style.cssText = 'transform: scale(0.8);'
+
+      const followLabel = document.createElement('span')
+      followLabel.textContent = '⋯ 扩展工具栏样式跟随主工具栏'
+      followLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background);'
+
+      followCheckbox.onchange = async () => {
+        context.mobileConfig.overflowFollowMainStyle = followCheckbox.checked
+        await context.saveData('mobileToolbarConfig', context.mobileConfig)
+        context.applyMobileToolbarStyle()
+      }
+
+      followRow.appendChild(followCheckbox)
+      followRow.appendChild(followLabel)
+
       container.appendChild(lightRow)
       container.appendChild(darkRow)
       container.appendChild(themeRow)
+      container.appendChild(followRow)
 
       return container
     }
@@ -2111,8 +2130,8 @@ export function createMobileSettingLayout(
       const getCurrentValue = () => {
         if (context.mobileConfig.enableTopToolbar) return 'top'
         if (context.mobileConfig.enableBottomToolbar) return 'bottom'
-        if (context.mobileConfig.enableSideFloatingToolbar) return 'side-floating'
-        return 'floating'  // 默认底部胶囊
+        if (context.mobileConfig.enableFloatingToolbar) return 'floating'
+        return 'side-floating'  // 兜底与默认一致：侧边胶囊
       }
 
       options.forEach(option => {
@@ -2208,6 +2227,8 @@ export function createMobileSettingLayout(
 
           // 重新初始化工具栏
           context.updateMobileToolbar()
+          // 刷新顶部预览（侧边胶囊 ⇄ 其它模式切换时预览形态不同）
+          mobilePreviewEl?.refresh()
         }
 
 	        const text = document.createElement('span')
@@ -2659,7 +2680,7 @@ export function createMobileSettingLayout(
       toggle.type = 'checkbox'
       toggle.className = 'b3-switch'
       toggle.classList.add('bottom-toolbar-setting')
-      toggle.checked = context.mobileConfig.showNavOnOverflow === true  // 默认关闭
+      toggle.checked = context.mobileConfig.showNavOnOverflow !== false  // 默认开启
       toggle.onchange = async () => {
         context.mobileConfig.showNavOnOverflow = toggle.checked
         await context.saveData('mobileToolbarConfig', context.mobileConfig)
@@ -2918,7 +2939,7 @@ export function createMobileSettingLayout(
         btn.textContent = s.label
         btn.dataset.value = s.value
         const refreshBtn = () => {
-          const active = (context.mobileConfig.sideMiniSide ?? 'right') === s.value
+          const active = (context.mobileConfig.sideMiniSide ?? 'left') === s.value
           btn.style.cssText = `
             padding: 6px 16px; border-radius: 8px; cursor: pointer;
             font-size: 14px; font-weight: 500;
@@ -2978,7 +2999,7 @@ export function createMobileSettingLayout(
   // ③ 展开胶囊吸附侧
   setting.addItem({
     title: '③展开胶囊吸附侧',
-    description: '💡点击 ⋮ 展开的面板吸附在屏幕的左侧还是右侧',
+    description: '💡新版本展开工具栏已跟随微缩胶囊吸附侧（由①控制），本项不再生效',
     createActionElement: () => {
       const wrapper = document.createElement('div')
       wrapper.style.cssText = 'display: flex; gap: 12px; align-items: center;'
@@ -2994,7 +3015,7 @@ export function createMobileSettingLayout(
         btn.textContent = s.label
         btn.dataset.value = s.value
         const refreshBtn = () => {
-          const active = (context.mobileConfig.sideFloatingSide ?? 'right') === s.value
+          const active = (context.mobileConfig.sideFloatingSide ?? 'left') === s.value
           btn.style.cssText = `
             padding: 6px 16px; border-radius: 8px; cursor: pointer;
             font-size: 14px; font-weight: 500;
@@ -3029,7 +3050,7 @@ export function createMobileSettingLayout(
   // ④ 展开胶囊距离底部高度
   setting.addItem({
     title: '④展开胶囊距离底部高度',
-    description: '💡展开面板距离屏幕底部的间距（避开思源底部导航栏）',
+    description: '💡新版本展开工具栏已固定贴于微缩胶囊上方（由②推导），本项不再生效',
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.sideFloatingBottom ?? '100px';
       const currentValue = parseLengthSliderInt(currentValueStr, 100);
@@ -3054,7 +3075,7 @@ export function createMobileSettingLayout(
   // ⑤ 展开胶囊边距
   setting.addItem({
     title: '⑤展开胶囊边距',
-    description: '💡展开面板距离屏幕侧边的间距',
+    description: '💡新版本展开工具栏已固定与微缩胶囊同距屏幕侧边，本项不再生效',
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.sideFloatingMargin ?? '12px';
       const currentValue = parseLengthSliderInt(currentValueStr, 12);
@@ -4523,6 +4544,11 @@ export function createMobileSettingLayout(
         context.mobileFeatureConfig.disableCustomButtons = toggle.checked
         await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
         context.applyFeatures()
+        // 关闭"完全恢复"：重建被拆掉的工具栏 machinery（observer/胶囊/自定义按钮），
+        // 否则工具栏会停留在思源原始状态直到重启
+        if (!toggle.checked) {
+          context.updateMobileToolbar()
+        }
       }
 
       headerRow.appendChild(titleEl)
@@ -4574,7 +4600,7 @@ export function createMobileSettingLayout(
           const payload = {
             schema: 'siyuan-toolbar-customizer:full-config',
             exportedAt: new Date().toISOString(),
-            pluginVersion: 'unknown',
+            pluginVersion: (window as any).__pluginInstance?.version || 'unknown',
             data: {
               mobileToolbarConfig: context.mobileConfig,
               desktopButtonConfigs: context.desktopButtonConfigs,

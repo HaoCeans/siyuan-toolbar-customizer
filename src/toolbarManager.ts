@@ -63,8 +63,9 @@ export interface MobileToolbarConfig {
   toolbarHeight: string;      // 工具栏高度
   toolbarZIndex: number;      // 工具栏层级
   useThemeColor: boolean;     // 是否使用主题颜色
+  overflowFollowMainStyle?: boolean;  // 扩展工具栏样式跟随主工具栏（去高亮线框，背景/毛玻璃跟随主栏；默认 false）
   followNativeBarsAutoHide?: boolean;  // 随思源导航栏自动隐藏工具栏（默认 true）
-  showNavOnOverflow?: boolean;  // 底部固定模式下：默认隐藏思源导航栏，扩展栏打开时显示在扩展栏上方（默认 false；底部胶囊模式始终生效）
+  showNavOnOverflow?: boolean;  // 底部固定模式下：默认隐藏思源导航栏，扩展栏打开时显示在扩展栏上方（默认 true；底部胶囊模式始终生效）
 
   // 顶部工具栏专用配置
   enableTopToolbar: boolean;  // 是否启用顶部工具栏（固定定位模式）
@@ -75,7 +76,7 @@ export interface MobileToolbarConfig {
   topToolbarRetryDelay?: number;        // 顶部工具栏重试延迟（毫秒，0=无重试）
 
   // 底部胶囊工具栏配置
-  enableFloatingToolbar?: boolean;  // 是否启用底部胶囊工具栏
+  enableFloatingToolbar?: boolean;  // 是否启用底部胶囊工具栏（默认 false：默认位置已改为侧边胶囊）
   floatingToolbarMargin?: string;   // 胶囊距底部距离
   floatingToolbarBorderRadius?: string; // 胶囊圆角
   floatingToolbarHeight?: string;   // 胶囊自身高度
@@ -85,12 +86,12 @@ export interface MobileToolbarConfig {
       floatingToolbarScrollHide?: boolean; // 胶囊滚动隐藏
 
   // 侧边胶囊工具栏配置（与底部胶囊并存，互斥于其他模式）
-  enableSideFloatingToolbar?: boolean;  // 是否启用侧边胶囊工具栏
+  enableSideFloatingToolbar?: boolean;  // 是否启用侧边胶囊工具栏（默认 true：手机端默认位置）
   // 微缩小胶囊（收起态 ⋮ 按钮）配置
-  sideMiniSide?: 'left' | 'right';  // 微缩小胶囊吸附侧，默认 'right'
+  sideMiniSide?: 'left' | 'right';  // 微缩小胶囊吸附侧，默认 'left'
   sideMiniBottom?: string;   // 微缩小胶囊距底部距离（如 "100px"）
   // 展开胶囊（展开面板）配置
-  sideFloatingSide?: 'left' | 'right';  // 展开胶囊吸附侧，默认 'right'
+  sideFloatingSide?: 'left' | 'right';  // 展开面板吸附侧，默认 'left'（与微缩胶囊同侧）
   sideFloatingMargin?: string;   // 展开胶囊距侧边距离（如 "12px"）
   sideFloatingBottom?: string;   // 展开胶囊距底部距离（如 "100px"）
   sideFloatingRadius?: string;   // 展开胶囊圆角（如 "24px"）
@@ -169,6 +170,7 @@ export interface ButtonConfig {
   buttonsPerLayer?: number[];  // 桌面端扩展工具栏：每层按钮数量，如 [8, 5, 5, 5, 5]（仅 overflow-button-desktop 使用）
   overflowToolbarHeight?: number;  // 桌面端扩展工具栏高度(px)，默认 32（仅 overflow-button-desktop 使用）
   overflowToolbarWidth?: number;   // 桌面端扩展工具栏宽度(px)，默认 0 表示与主工具栏同宽，最大 1300
+  overflowAnimation?: boolean;  // 扩展工具栏打开动画（默认 true；false=直接弹出无动画，仅扩展工具栏按钮使用）
 }
 
 // 全局按钮配置（用于批量设置所有按钮的默认值）
@@ -219,16 +221,17 @@ export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
   toolbarHeight: '40px',      // 工具栏高度
   toolbarZIndex: 5,
   useThemeColor: true,        // 颜色跟随主题
+  overflowFollowMainStyle: false,  // 扩展工具栏样式跟随主工具栏（去高亮线框，背景/毛玻璃跟随主栏；默认关）
   followNativeBarsAutoHide: true,  // 随思源导航栏自动隐藏工具栏（顶部固定/底部固定/底部胶囊均生效）
-  showNavOnOverflow: false,   // 底部固定模式：扩展栏打开时显示思源导航栏（默认关；底部胶囊模式始终生效）
+  showNavOnOverflow: true,    // 底部固定模式：扩展栏打开时显示思源导航栏（默认开；底部胶囊模式始终生效）
 
   // 顶部工具栏配置
   enableTopToolbar: false,    // 默认不启用（与底部工具栏互斥）
   topToolbarOffset: '45px',   // 距离顶部 45px
   topToolbarPaddingLeft: '0px', // 顶部工具栏左边距（居中显示）
 
-	  // 底部胶囊工具栏配置（默认启用）
-	  enableFloatingToolbar: true,
+	  // 底部胶囊工具栏配置（默认禁用，由侧边胶囊替代为默认位置）
+	  enableFloatingToolbar: false,
 	  floatingToolbarMargin: '50px',
 	  floatingToolbarBorderRadius: '24px',
 	  floatingToolbarHeight: '40px',
@@ -237,11 +240,11 @@ export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
       floatingToolbarStyle: 'normal',
       floatingToolbarScrollHide: true,
 
-  // 侧边胶囊工具栏配置（默认不启用，与底部胶囊并存）
-  enableSideFloatingToolbar: false,
-  sideMiniSide: 'right',
+  // 侧边胶囊工具栏配置（默认启用：手机端默认位置为侧边胶囊）
+  enableSideFloatingToolbar: true,
+  sideMiniSide: 'left',     // 微缩小胶囊吸附侧（默认左侧）
   sideMiniBottom: '40px',
-  sideFloatingSide: 'right',
+  sideFloatingSide: 'left',  // 展开面板吸附侧（默认与微缩胶囊同侧）
   sideFloatingMargin: '12px',
   sideFloatingBottom: '100px',
   sideFloatingRadius: '24px',
@@ -580,6 +583,11 @@ export async function resetAllConfigsToFactoryDefaults(ctx: {
   await ctx.saveData('desktopGlobalButtonConfig', ctx.desktopGlobalButtonConfig)
   await ctx.saveData('mobileGlobalButtonConfig', ctx.mobileGlobalButtonConfig)
   await ctx.saveData('mobileToolbarConfig', ctx.mobileConfig)
+
+  // 其余独立配置也一并恢复出厂（TTS 引擎/语速设置、SF 语音 API 配置）
+  // key 与 src/tts/httpTtsEngine.ts 中的常量保持一致
+  await ctx.removeData('siyuan-tc-tts-settings')
+  await ctx.removeData('siyuan-tc-sf-api')
 }
 
 // ===== 扩展工具栏辅助常量 =====
@@ -638,6 +646,15 @@ let toolbarHiddenByScroll = false  // 当前插件工具栏是否处于隐藏状
 let toolbarScrollBindRetryTimer: ReturnType<typeof setInterval> | null = null  // 保留：unbindToolbarAutoHideScroll 清理用
 	let toolbarAutoHideCapsuleMode = false  // 当前工具栏是否为胶囊布局（与滚动隐藏开关解耦）
 let toolbarAutoHidePendingTimer: ReturnType<typeof setTimeout> | null = null  // 跟踪隐藏/显示的延时定时器
+// 接管模式（底部胶囊/底部固定⑦）自身滚动隐藏专用状态：思源原生栏被接管后
+// mobile-chrome--hidden 永不出现，由插件滚动监听自己驱动（独立变量，不与 nativeBars 状态互踩）
+let mobileScrollAutoHideBoundEl: HTMLElement | null = null  // 当前已绑定 scroll 监听的滚动容器
+let mobileScrollAutoHideHandler: ((e: Event) => void) | null = null  // scroll handler 引用（解绑用）
+let mobileScrollAutoHideRetryTimer: ReturnType<typeof setInterval> | null = null  // bind 重试 interval
+let mobileScrollAutoHideLastScrollTop: number | null = null  // 滚动基准（切文档 scrollTop 重置时防 delta 错乱）
+let mobileScrollAutoHideIgnoreUntil = 0  // hide/show 后的静默期，期间只跟踪位置不动作
+let mobileScrollAutoHideLastHide = 0  // 上次隐藏时间（冷却）
+let mobileScrollAutoHideLastShow = 0  // 上次显示时间（冷却）
 // 滚动方向阈值与冷却常量（桌面端胶囊滚动隐藏复用）
 const TOOLBAR_AUTOHIDE_THRESHOLD = 15
 const TOOLBAR_AUTOHIDE_COOLDOWN_HIDE = 200  // 隐藏冷却，防止反馈滚动触发反复切换
@@ -727,6 +744,17 @@ function detachFocusEventHandlers(): void {
     element.removeEventListener('blur', blurHandler)
   })
   focusEventHandlers = []
+}
+
+/**
+ * 判断"完全恢复思源原始状态"是否处于开启状态。
+ * 实时读取 pluginInstance 配置——initMobileToolbarAdjuster 的 disableCustomButtons 参数
+ * 是调用瞬间捕获的闭包值，运行时切换开关后必须读实时配置，否则 observer/重试回调
+ * 会用旧的 false 值把清理掉的样式重新注入。
+ */
+function isRestoreOriginalStateActive(captured: boolean): boolean {
+  if (captured) return true
+  return pluginInstance?.mobileFeatureConfig?.disableCustomButtons === true
 }
 
 /**
@@ -1113,6 +1141,34 @@ export function applyToolbarBackgroundColor(config: MobileToolbarConfig, disable
       }
     `
   }
+
+  // 毛玻璃背景效果（glassEffect 独立开关）：半透明背景 + 背景模糊，覆盖上方实色背景规则。
+  // 与②工具栏样式（分割线）正交可叠加；排除胶囊模式——胶囊有独立的 floatingToolbarStyle glass/solid 选项。
+  // 与 useThemeColor / 自定义色 / 透明度并存：透明度滑杆仍作用于整个元素（含模糊区）。
+  if (pluginInstance?.mobileFeatureConfig?.glassEffect === true) {
+    backgroundColorStyle.textContent += `
+      /* 毛玻璃样式 - 明亮模式 */
+      html:not([data-theme-mode="dark"]) body:not(.siyuan-toolbar-floating) .protyle-breadcrumb,
+      html:not([data-theme-mode="dark"]) body:not(.siyuan-toolbar-floating) .protyle-breadcrumb__bar,
+      html:not([data-theme-mode="dark"]) body:not(.siyuan-toolbar-floating).siyuan-toolbar-top-mode .protyle-breadcrumb,
+      html:not([data-theme-mode="dark"]) body:not(.siyuan-toolbar-floating).siyuan-toolbar-top-mode .protyle-breadcrumb__bar {
+        background: rgba(255, 255, 255, 0.25) !important;
+        border-color: rgba(0, 0, 0, 0.06) !important;
+        backdrop-filter: blur(20px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+      }
+      /* 毛玻璃样式 - 黑暗模式 */
+      html[data-theme-mode="dark"] body:not(.siyuan-toolbar-floating) .protyle-breadcrumb,
+      html[data-theme-mode="dark"] body:not(.siyuan-toolbar-floating) .protyle-breadcrumb__bar,
+      html[data-theme-mode="dark"] body:not(.siyuan-toolbar-floating).siyuan-toolbar-top-mode .protyle-breadcrumb,
+      html[data-theme-mode="dark"] body:not(.siyuan-toolbar-floating).siyuan-toolbar-top-mode .protyle-breadcrumb__bar {
+        background: rgba(30, 30, 30, 0.3) !important;
+        border-color: rgba(255, 255, 255, 0.06) !important;
+        backdrop-filter: blur(20px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+      }
+    `
+  }
 }
 
 // ===== 桌面端悬浮胶囊工具栏 =====
@@ -1315,6 +1371,14 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
   // 仅在移动端初始化
   if (!isMobileDevice()) return
 
+  // 完全恢复思源原始状态：拆除一切工具栏 machinery 并返回。
+  // 注意必须实时读配置——运行时切换开关时，调用方（如设置面板 updateMobileToolbar）
+  // 传入的 disableCustomButtons 可能与最新配置不一致，靠捕获值判断会漏。
+  if (isRestoreOriginalStateActive(disableCustomButtons)) {
+    restoreMobileToolbarOriginal()
+    return
+  }
+
   // 保存配置到全局变量，供扩展工具栏使用
   (window as any).__mobileToolbarConfig = config
 
@@ -1349,6 +1413,13 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
       // 防止递归调用
       if (isSettingUpToolbar) return false
 
+      // 运行时开启"完全恢复"后，本函数仍会被存活的 observer 触发（捕获的 disableCustomButtons
+      // 是旧值 false）：实时判断命中即拆除 machinery，避免样式/属性被重新注入。
+      if (isRestoreOriginalStateActive(disableCustomButtons)) {
+        restoreMobileToolbarOriginal()
+        return false
+      }
+
       // 优先查找 .protyle-breadcrumb（移动端使用）
       let breadcrumb = document.querySelector('.protyle-breadcrumb:not(.protyle-breadcrumb__bar)')
 
@@ -1381,14 +1452,15 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
           style.id = styleId
           document.head.appendChild(style)
         }
-        if (disableCustomButtons) {
+        // 恢复原始状态时清空 CSS；实时判断兜底（setupToolbar 守卫之外的任何直达调用路径）
+        if (isRestoreOriginalStateActive(disableCustomButtons)) {
           cssText = ''
 	        } else {
 	          const floatMargin = config.floatingToolbarMargin || '20px'
 	          const floatRadius = config.floatingToolbarBorderRadius || '24px'
 	          if (isSideFloating) {
 	            // === 侧边胶囊模式：吸附屏幕侧边的微缩 ⋮ 按钮，点击展开全部按钮面板 ===
-	            const miniSide = config.sideMiniSide === 'left' ? 'left' : 'right'
+	            const miniSide = config.sideMiniSide === 'right' ? 'right' : 'left'  // 默认左侧
 	            const miniBottom = config.sideMiniBottom || '40px'
 	            const floatRadius = config.sideFloatingRadius || '24px'
 	            cssText = `
@@ -1935,9 +2007,9 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
     const retryDelay = config.topToolbarRetryDelay ?? 0;  // 默认 0ms（无重试）
     if (retryDelay > 0) {
       safeSetTimeout(() => {
-        // 重新检查并设置顶部工具栏
+        // 重新检查并设置顶部工具栏（用实时配置判断，开关切换后不再注入背景样式）
         if (config.enableTopToolbar) {
-          applyToolbarBackgroundColor(config, disableCustomButtons)
+          applyToolbarBackgroundColor(config, isRestoreOriginalStateActive(disableCustomButtons))
         }
       }, retryDelay)
     }
@@ -2583,6 +2655,122 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
 
 
 /**
+ * 收集面包屑工具栏中"其他插件添加的按钮"（排除：本插件自定义按钮、思源原生按钮、
+ * 空白占位/路径条/分割线等非交互元素）。
+ * 侧边胶囊模式的微缩胶囊会把这些按钮 CSS 隐藏，这里把它们找出来镜像进展开面板。
+ */
+function findExternalToolbarButtons(): HTMLElement[] {
+  const found: HTMLElement[] = []
+  const seen = new Set<HTMLElement>()
+  const isExcluded = (el: HTMLElement): boolean => {
+    if (el.hasAttribute('data-custom-button')) return true    // 本插件按钮
+    if (el.hasAttribute('data-toolbar-divider')) return true  // 本插件分割线
+    if (el.hasAttribute('data-type')) return true             // 思源原生按钮（readonly/doc/more/mobile-menu/exit-focus）
+    if (el.classList.contains('protyle-breadcrumb__space')) return true  // 空白占位
+    if (el.classList.contains('protyle-breadcrumb__bar')) return true    // 路径条容器
+    if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') return true
+    return false
+  }
+  const collect = (host: HTMLElement) => {
+    Array.from(host.children).forEach(child => {
+      const el = child as HTMLElement
+      if (isExcluded(el)) return
+      // 只收集"像按钮"的元素：button/a、或含图标（svg/img）、或有文字/可访问名——
+      // 排除纯装饰元素（如其他插件的竖向分隔条：无内容、无图标、非 button/a）
+      const looksInteractive = el.tagName === 'BUTTON' || el.tagName === 'A'
+        || !!el.querySelector('svg, img')
+        || (el.textContent || '').trim() !== ''
+        || !!el.getAttribute('aria-label')
+        || !!el.getAttribute('title')
+      if (!looksInteractive) return
+      if (seen.has(el)) return
+      seen.add(el)
+      found.push(el)
+    })
+  }
+  document.querySelectorAll(
+    '.protyle-breadcrumb[data-input-method], .protyle-breadcrumb__bar[data-input-method]'
+  ).forEach(host => {
+    collect(host as HTMLElement)
+    // 路径条容器内部若存在其他插件按钮也收集（思源原生按钮已在排除项内）
+    const bar = (host as HTMLElement).classList.contains('protyle-breadcrumb__bar')
+      ? null
+      : (host as HTMLElement).querySelector(':scope > .protyle-breadcrumb__bar')
+    if (bar) collect(bar as HTMLElement)
+  })
+  return found
+}
+
+/**
+ * 侧边胶囊展开面板：把其他插件加到工具栏的按钮镜像进面板底部。
+ * 不 clone 原按钮（监听会丢），而是复制外观 + 点击时对原按钮 dispatch click——
+ * 事件从原按钮冒泡，与真实点击路径一致（元素级/容器级/document 级监听都能触发）。
+ */
+function appendExternalPluginButtons(toolbar: HTMLElement): void {
+  const externalBtns = findExternalToolbarButtons()
+  if (externalBtns.length === 0) return
+
+  const sep = document.createElement('div')
+  sep.style.cssText = 'width: 100%; height: 1px; background: var(--b3-border-color); margin: 4px 0; flex-shrink: 0;'
+  toolbar.appendChild(sep)
+
+  externalBtns.forEach(orig => {
+    const mirror = document.createElement('button')
+    mirror.className = 'fn__flex-center ariaLabel'
+    mirror.style.cssText = `
+      display: flex; align-items: center; justify-content: center;
+      height: 32px; margin-bottom: 2px;
+      border: none; border-radius: 6px; background: transparent;
+      color: var(--b3-theme-on-surface); cursor: pointer; flex-shrink: 0;
+    `
+    mirror.title = orig.getAttribute('aria-label') || orig.title || ''
+    // 复制外观（图标/文字），并把内嵌 svg/img 尺寸归一
+    mirror.innerHTML = orig.innerHTML
+    mirror.querySelectorAll('svg').forEach(s => {
+      s.setAttribute('width', '20')
+      s.setAttribute('height', '20')
+      s.style.cssText = 'flex-shrink: 0; display: block;'
+    })
+    mirror.querySelectorAll('img').forEach(im => {
+      im.style.cssText = 'width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; display: block;'
+    })
+    // 去掉复制内容中的装饰竖线（inline 宽 <=2px 且较高的元素，如插件工具栏分隔条）
+    mirror.querySelectorAll('div, span').forEach(el => {
+      const htmlEl = el as HTMLElement
+      const w = parseInt(htmlEl.style.width || '', 10)
+      const h = parseInt(htmlEl.style.height || '', 10)
+      if (!Number.isNaN(w) && w <= 2 && !Number.isNaN(h) && h >= 8) {
+        htmlEl.remove()
+      }
+    })
+    // 图标用 background-image 画的按钮（innerHTML 为空）：提取背景图到镜像
+    if (!mirror.innerHTML.trim()) {
+      const cs = window.getComputedStyle(orig)
+      const bg = cs.backgroundImage
+      if (bg && bg !== 'none' && !bg.includes('gradient')) {
+        mirror.style.backgroundImage = bg
+        mirror.style.backgroundSize = '20px 20px'
+        mirror.style.backgroundRepeat = 'no-repeat'
+        mirror.style.backgroundPosition = 'center'
+      }
+    }
+    mirror.addEventListener('mouseenter', () => {
+      mirror.style.background = 'color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent)'
+    })
+    mirror.addEventListener('mouseleave', () => { mirror.style.background = 'transparent' })
+    mirror.addEventListener('click', (e) => {
+      e.stopPropagation()
+      e.preventDefault()
+      // 关闭展开面板（与层内自定义按钮行为一致）
+      document.querySelectorAll('.overflow-toolbar-layer').forEach(el => el.remove())
+      // 原位触发原按钮：事件在其上触发并冒泡，插件监听路径与真实点击一致
+      orig.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }))
+    })
+    toolbar.appendChild(mirror)
+  })
+}
+
+/**
  * 显示/隐藏扩展工具栏弹窗
  * @param config 扩展工具栏按钮配置
  */
@@ -2627,6 +2815,11 @@ function showOverflowToolbar(config: ButtonConfig) {
 
   // 获取移动端工具栏配置
   const mobileConfig = (window as any).__mobileToolbarConfig as MobileToolbarConfig
+
+  // 扩展面板样式是否跟随主工具栏（去高亮线框；背景/毛玻璃跟随主栏）
+  const panelFollowMain = mobileConfig?.overflowFollowMainStyle === true
+  // 主栏毛玻璃是否开启（跟随模式下面板用同款半透明+模糊）
+  const panelGlass = panelFollowMain && pluginInstance?.mobileFeatureConfig?.glassEffect === true
 
   // 工具栏高度和间距（根据顶部/底部模式从不同配置读取，默认值 40px 和 4px）
   const toolbarHeight = isBottomToolbar
@@ -2688,69 +2881,53 @@ function showOverflowToolbar(config: ButtonConfig) {
   // 根据工具栏位置选择动画方向
   const animationName = isBottomToolbar ? 'slideUp' : 'slideDown'
 
-  // 添加动画样式和按钮状态样式
+  // 添加动画样式和按钮状态样式（overflowAnimation 关闭时不加 animation 规则，仅保留 focus 样式）
+  const animRule = config.overflowAnimation === false
+    ? ''
+    : `.overflow-toolbar-layer {
+        animation: ${animationName} 0.2s ease-out;
+      }`
   let animationStyle = document.getElementById('overflow-toolbar-animation')
   if (!animationStyle) {
     animationStyle = document.createElement('style')
     animationStyle.id = 'overflow-toolbar-animation'
-    animationStyle.textContent = `
-      @keyframes slideUp {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      @keyframes slideDown {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      .overflow-toolbar-layer {
-        animation: ${animationName} 0.2s ease-out;
-      }
-      /* 移除自定义按钮的 focus 状态样式（保留 active 状态以显示点击效果） */
-      [data-custom-button]:focus {
-        background-color: transparent !important;
-        box-shadow: none !important;
-        outline: none !important;
-        transform: none !important;
-      }
-      /* 移除扩展工具栏按钮的 focus 状态样式 */
-      .overflow-toolbar-layer button:focus {
-        background-color: transparent !important;
-        box-shadow: none !important;
-        outline: none !important;
-        transform: none !important;
-      }
-    `
     document.head.appendChild(animationStyle)
-  } else {
-    // 更新动画方向
-    animationStyle.textContent = `
-      @keyframes slideUp {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      @keyframes slideDown {
-        from { opacity: 0; transform: translateY(-10px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      .overflow-toolbar-layer {
-        animation: ${animationName} 0.2s ease-out;
-      }
-      /* 移除自定义按钮的 focus 状态样式（保留 active 状态以显示点击效果） */
-      [data-custom-button]:focus {
-        background-color: transparent !important;
-        box-shadow: none !important;
-        outline: none !important;
-        transform: none !important;
-      }
-      /* 移除扩展工具栏按钮的 focus 状态样式 */
-      .overflow-toolbar-layer button:focus {
-        background-color: transparent !important;
-        box-shadow: none !important;
-        outline: none !important;
-        transform: none !important;
-      }
-    `
   }
+  animationStyle.textContent = `
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    ${animRule}
+    /* 移除自定义按钮的 focus 状态样式（保留 active 状态以显示点击效果） */
+    [data-custom-button]:focus {
+      background-color: transparent !important;
+      box-shadow: none !important;
+      outline: none !important;
+      transform: none !important;
+    }
+    /* 移除扩展工具栏按钮的 focus 状态样式 */
+    .overflow-toolbar-layer button:focus {
+      background-color: transparent !important;
+      box-shadow: none !important;
+      outline: none !important;
+      transform: none !important;
+    }
+    /* 扩展工具栏层隐藏滚动条（窄面板滚动条难看且占位；触摸惯性滚动不受影响） */
+    .overflow-toolbar-layer {
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .overflow-toolbar-layer::-webkit-scrollbar {
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
+    }
+  `
 
   // 侧边胶囊模式：单层显示全部按钮（不按 overflowLevel 过滤）
   const isSideMode = isSideFloatingMode()
@@ -2779,7 +2956,7 @@ function showOverflowToolbar(config: ButtonConfig) {
     if (isSideMode) {
       // 展开胶囊：按 sideFloating* 独立定位（与微缩小胶囊位置无关），从该位置向上展开
       const mobileCfg = (window as any).__mobileToolbarConfig as MobileToolbarConfig | undefined
-      const side = mobileCfg?.sideFloatingSide === 'left' ? 'left' : 'right'
+      const side = mobileCfg?.sideFloatingSide === 'right' ? 'right' : 'left'  // 默认左侧
       const sideMargin = mobileCfg?.sideFloatingMargin || '12px'
       const sideBottom = parseInt(String(mobileCfg?.sideFloatingBottom ?? '100'), 10) || 100
       positionCss = `
@@ -2834,7 +3011,7 @@ function showOverflowToolbar(config: ButtonConfig) {
 	        max-height: calc(100vh - ${sideBottomNum + 90}px);
 	        overflow-y: auto;
 	        background: var(--b3-theme-surface);
-	        border: 1px solid var(--b3-theme-primary);
+	        ${panelFollowMain ? 'border: none;' : 'border: 1px solid var(--b3-theme-primary);'}
 	        border-radius: ${sideRadius}px;
 	        z-index: ${1000 + i};
 	        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -2845,7 +3022,7 @@ function showOverflowToolbar(config: ButtonConfig) {
 	      ${horizontalCss}
 	      height: ${toolbarHeight}px;
 	      background: var(--b3-theme-surface);
-	      border: 1px solid var(--b3-theme-primary);
+	      ${panelFollowMain ? 'border: none;' : 'border: 1px solid var(--b3-theme-primary);'}
 	      border-radius: 8px;
 	      display: flex;
 	      align-items: center;
@@ -2858,7 +3035,14 @@ function showOverflowToolbar(config: ButtonConfig) {
 
     // 应用工具栏背景颜色和透明度配置
     if (mobileConfig) {
-      if (mobileConfig.useThemeColor) {
+      if (panelGlass) {
+        // 跟随模式 + 主栏毛玻璃：与主栏同款半透明背景 + 背景模糊（透明度与主栏一致）
+        const isDark = document.documentElement.getAttribute('data-theme-mode') === 'dark'
+        toolbar.style.background = isDark ? 'rgba(30, 30, 30, 0.3)' : 'rgba(255, 255, 255, 0.25)'
+        toolbar.style.backdropFilter = 'blur(20px) saturate(180%)'
+        toolbar.style.webkitBackdropFilter = 'blur(20px) saturate(180%)'
+        toolbar.style.opacity = mobileConfig.toolbarOpacity.toString()
+      } else if (mobileConfig.useThemeColor) {
         // 使用主题颜色时，只需要调整透明度
         toolbar.style.backgroundColor = `var(--b3-theme-surface)`
         toolbar.style.opacity = mobileConfig.toolbarOpacity.toString()
@@ -3078,6 +3262,11 @@ function showOverflowToolbar(config: ButtonConfig) {
       }
 	    })
 
+    // 侧边胶囊模式：把其他插件加到工具栏的按钮镜像进面板底部（分隔线隔开）
+    if (isSideMode) {
+      appendExternalPluginButtons(toolbar)
+    }
+
     // 阻止触摸事件冒泡到 document，防止被其他 handler 意外关闭
     toolbar.addEventListener('touchstart', (e) => {
       e.stopPropagation()
@@ -3251,27 +3440,31 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
     btn.id !== OVERFLOW_BUTTON_ID_DESKTOP
   )
 
-  // 添加动画样式
+  // 添加动画样式（overflowAnimation 关闭时不加 animation 规则，仅保留 focus 样式；
+  // 每次打开都重写，保证开关切换后旧 animation 规则被移除）
+  const animRule = config.overflowAnimation === false
+    ? ''
+    : `.desktop-overflow-toolbar-layer {
+        animation: desktopOverflowSlideDown 0.2s ease-out;
+      }`
   let animationStyle = document.getElementById('desktop-overflow-toolbar-animation')
   if (!animationStyle) {
     animationStyle = document.createElement('style')
     animationStyle.id = 'desktop-overflow-toolbar-animation'
-    animationStyle.textContent = `
-      @keyframes desktopOverflowSlideDown {
-        from { opacity: 0; transform: translateY(-6px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      .desktop-overflow-toolbar-layer {
-        animation: desktopOverflowSlideDown 0.2s ease-out;
-      }
-      .desktop-overflow-toolbar-layer button:focus {
-        background-color: transparent !important;
-        box-shadow: none !important;
-        outline: none !important;
-      }
-    `
     document.head.appendChild(animationStyle)
   }
+  animationStyle.textContent = `
+    @keyframes desktopOverflowSlideDown {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    ${animRule}
+    .desktop-overflow-toolbar-layer button:focus {
+      background-color: transparent !important;
+      box-shadow: none !important;
+      outline: none !important;
+    }
+  `
 
   // 按层创建工具栏
   for (let i = 0; i < layers; i++) {
@@ -4826,6 +5019,22 @@ function hoverElement(element: HTMLElement): void {
 }
 
 /**
+ * 等待块/文档索引就绪。
+ * createDailyNote 等创建类 API 返回后文档可能仍在异步索引队列，此时 getBlockInfo
+ * 返回 code 3；移动端 mobile.tabs.open 内部对非 code 0 静默返回 invalid（restore 回退、
+ * 无日志）——打开前先轮询，避免"日记创建成功却打不开"。
+ */
+async function waitForBlockIndexReady(blockId: string, maxAttempts = 16, intervalMs = 300): Promise<void> {
+  for (let i = 0; i < maxAttempts; i++) {
+    try {
+      const resp = await fetchSyncPost('/api/block/getBlockInfo', { id: blockId })
+      if (resp?.code === 0) return
+    } catch { /* 网络抖动，继续重试 */ }
+    await new Promise(resolve => setTimeout(resolve, intervalMs))
+  }
+}
+
+/**
  * 执行日记功能
  * 根据 diaryPosition 参数决定打开日记后滚动到顶部还是底部
  * 如果配置了 notebookId，直接调用API创建/打开日记
@@ -4836,10 +5045,11 @@ async function executeDiary(config: ButtonConfig) {
     const windowObj = window as any
     const position = config.diaryPosition || 'bottom' // 默认为底部
 
-    // 检测是否为手机端
-    const isMobile = /mobile|android|iphone|ipad/i.test(navigator.userAgent) ||
-                     windowObj.siyuan?.config?.fronted === 'mobile' ||
-                     document.body.classList.contains('mobile')
+    // 检测是否为手机端（用插件环境判定，不要靠 UA 字符串猜——
+    // openMobileFileById 是移动端专用 API，桌面端 window.siyuan.mobile 不存在，
+    // UA 误判会调错打开函数导致静默失败）
+    const isMobile = pluginInstance?.isMobile === true
+      || windowObj.siyuan?.config?.fronted?.includes?.('mobile') === true
 
     // ==================== 滚动到底部函数（仅在 position === 'bottom' 时使用） ====================
     let scrollAttempts = 0
@@ -4974,7 +5184,11 @@ async function executeDiary(config: ButtonConfig) {
           // 打开创建的日记文档（createDailyNote不会自动跳转，需要手动打开）
           try {
             if (isMobile) {
-              // 移动端使用 openMobileFileById
+              // 移动端使用 openMobileFileById——但它走 mobile.tabs.open，
+              // 内部 resolveRoot 调 getBlockInfo：刚创建的文档还在异步索引队列时
+              // 会返回 code 3 → tabs.open 静默返回 invalid（restore 回退、无日志）。
+              // 因此先轮询等待文档索引就绪（最多约 5 秒）再打开。
+              await waitForBlockIndexReady(docId)
               await openMobileFileById(pluginInstance.app, docId)
             } else {
               // 桌面端使用 openTab
@@ -5022,7 +5236,6 @@ async function executeDiary(config: ButtonConfig) {
       const keymapItem = windowObj.siyuan.config.keymap.general.dailyNote
       hotkeyToTrigger = keymapItem.custom || keymapItem.default
     }
-
     // ==================== 电脑端流程 ====================
     if (!isMobile) {
       // 1. 触发快捷键
@@ -5715,6 +5928,76 @@ function unbindOverflowPanelSync(): void {
   document.body.classList.remove('tc-overflow-open')
 }
 
+/**
+ * 完全恢复思源原始状态（手机端「完全恢复思源原始状态」开关打开时调用）：
+ * 解绑全部 observer、复位隐藏状态、清除面包屑上的 inline 样式 / 属性 / 残留 body class / CSS 变量。
+ * 与 cleanup() 的区别：不删除自定义按钮 DOM、不清定时器，关闭开关后功能可恢复。
+ */
+export function restoreMobileToolbarOriginal(): void {
+  // 解绑所有 observer（含 #menu 占位 transform 还原、tc-overflow-open 移除）
+  unbindToolbarAutoHideScroll()
+  unbindMobileScrollAutoHide()
+  unbindNativeBarsSync()
+  unbindSidePanelsSync()
+  unbindOverflowPanelSync()
+
+  // 断开 initMobileToolbarAdjuster 注册的常驻面包屑 MutationObserver。
+  // 关键：只移除 style 元素不够——observer 仍存活，applyFeatures 清理产生的 DOM 变更会在
+  // 100ms 防抖后触发 setupToolbar → setupToolbarForElement，把胶囊 CSS / data-input-method
+  // 重新注入（面包屑被隐藏、按钮居中的直接原因）。
+  if (mutationObserver) {
+    mutationObserver.disconnect()
+    mutationObserver = null
+  }
+  // 移除 resize 与输入框 focus/blur 监听（同样是 initMobileToolbarAdjuster 注册的）
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler)
+    resizeHandler = null
+  }
+  detachFocusEventHandlers()
+  // 清理已弃用的 per-element 检测定时器（保留兼容）
+  toolbarCheckTimers.forEach(timer => clearTimeout(timer))
+  toolbarCheckTimers.clear()
+
+  // 复位状态（防残留：下次重新绑定时读到旧缓存）
+  toolbarHiddenByScroll = false
+  toolbarAutoHideCapsuleMode = false
+
+  // 清除面包屑上的 inline 样式 / class / 属性残留
+  // （inline opacity/transform 不会随 style 元素移除而消失，是"面包屑仍被隐藏/按钮仍偏位"的根因）
+  document.querySelectorAll('.protyle-breadcrumb, .protyle-breadcrumb__bar').forEach(el => {
+    const htmlEl = el as HTMLElement
+    htmlEl.classList.remove('toolbar-scroll-hidden')
+    htmlEl.style.removeProperty('opacity')
+    htmlEl.style.removeProperty('transform')
+    htmlEl.style.removeProperty('display')
+    htmlEl.style.removeProperty('position')
+    htmlEl.style.removeProperty('bottom')
+    htmlEl.style.removeProperty('top')
+    htmlEl.style.removeProperty('left')
+    htmlEl.style.removeProperty('right')
+    htmlEl.style.removeProperty('z-index')
+    htmlEl.style.removeProperty('background-color')
+    htmlEl.style.removeProperty('padding-bottom')
+    htmlEl.removeAttribute('data-input-method')
+    htmlEl.removeAttribute('data-toolbar-customized')
+    htmlEl.removeAttribute('data-prevent-swipe')
+  })
+
+  // 清除残留 body class（不除干净 isNavTakeoverMode 会持续为真，接管逻辑反复介入）
+  document.body.classList.remove(
+    'siyuan-toolbar-floating',
+    'siyuan-toolbar-nav-overflow',
+    'siyuan-toolbar-customizer-enabled',
+    'siyuan-toolbar-top-mode'
+  )
+
+  // 清除导航栏接管定位用的 CSS 变量
+  document.documentElement.style.removeProperty('--tc-nav-bottom')
+  document.documentElement.style.removeProperty('--tc-nav-bottom-fixed')
+  document.documentElement.style.removeProperty('--mobile-toolbar-offset')
+}
+
 // ===== 电脑端悬浮胶囊滚动隐藏（独立实现，不复用移动端逻辑） =====
 // 设计要点：
 // 1. CSS 隐藏逻辑（ensureToolbarAutoHideStyle / toolbar-scroll-hidden class）完全设备无关，直接复用
@@ -5985,6 +6268,9 @@ export function refreshDesktopFloatingScrollOnSwitch(): void {
 	/** 检测 Kmind-Zen 文档树是否激活，切换 body class 驱动 CSS 隐藏（仅移动端） */
 	export function refreshKmindZenCompat(): void {
 	  if (!isMobileDevice()) return
+	  // 完全恢复思源原始状态：不重注入 kmind-zen-compat-style（该 style 含隐藏面包屑规则，
+	  // applyFeatures 恢复分支会移除它，这里再注入会让"恢复"失效）
+	  if (pluginInstance?.mobileFeatureConfig?.disableCustomButtons === true) return
 	  if (!document.getElementById('kmind-zen-compat-style')) {
 	    const kmindStyle = document.createElement('style')
 	    kmindStyle.id = 'kmind-zen-compat-style'
@@ -6028,31 +6314,163 @@ export function refreshDesktopFloatingScrollOnSwitch(): void {
   }
 }
 
+// ===== 接管模式：插件自身滚动监听驱动工具栏隐藏/显示（仅移动端） =====
+// 背景：底部胶囊 / 底部固定⑦ 模式下导航栏由插件接管（forceMenuPanelOpen 让思源认为面板
+// 常开 → 暂停原生滚动隐藏），body.mobile-chrome--hidden 永不出现，"随思源导航栏自动隐藏"
+// 没有信号可跟。这里在接管模式下由插件自己监听编辑器滚动，还原"上滑隐藏、下滑显示"。
+
+/** 获取移动端编辑器滚动容器（手机端所有面板均以 protyle.contentElement 为滚动容器） */
+function getMobileScrollElementForAutoHide(): HTMLElement | null {
+  const protyle = (window as any).siyuan?.mobile?.editor?.protyle
+  return protyle?.contentElement || document.querySelector('.protyle-content')
+}
+
+/** 接管模式滚动监听：上滑隐藏、下滑显示（阈值/冷却与桌面端胶囊一致） */
+function handleMobileScrollAutoHide(): void {
+  const el = mobileScrollAutoHideBoundEl
+  if (!el) return
+
+  // 键盘打开时不隐藏（思源置 editing 状态，工具栏需保持可用）；若此前已隐藏则恢复
+  if (document.body.classList.contains('mobile-keyboard--open')) {
+    if (toolbarHiddenByScroll) applyToolbarAutoHideState(false)
+    return
+  }
+
+  const now = Date.now()
+  // 静默期内只跟踪位置，不执行动作（防止隐藏/显示后的反馈滚动触发反复切换）
+  if (now < mobileScrollAutoHideIgnoreUntil) {
+    mobileScrollAutoHideLastScrollTop = el.scrollTop
+    return
+  }
+
+  const st = el.scrollTop
+  if (st == null) return
+  if (mobileScrollAutoHideLastScrollTop == null) {
+    mobileScrollAutoHideLastScrollTop = st
+    return
+  }
+  const delta = st - mobileScrollAutoHideLastScrollTop
+  mobileScrollAutoHideLastScrollTop = st
+
+  // 同容器切文档时 scrollTop 可能被思源重置：单次事件 delta 超上限视为基准重置，只更新基准不动作
+  if (Math.abs(delta) > 800) return
+
+  // 冷却检查（隐藏 200ms / 显示 80ms，与桌面端胶囊一致）
+  if (!toolbarHiddenByScroll && delta > TOOLBAR_AUTOHIDE_THRESHOLD && now - mobileScrollAutoHideLastShow < TOOLBAR_AUTOHIDE_COOLDOWN_HIDE) return
+  if (toolbarHiddenByScroll && delta < -TOOLBAR_AUTOHIDE_THRESHOLD && now - mobileScrollAutoHideLastHide < TOOLBAR_AUTOHIDE_COOLDOWN_SHOW) return
+
+  if (!toolbarHiddenByScroll && delta > TOOLBAR_AUTOHIDE_THRESHOLD) {
+    // 上滑 → 隐藏
+    mobileScrollAutoHideLastHide = now
+    mobileScrollAutoHideIgnoreUntil = now + 250
+    mobileScrollAutoHideLastScrollTop = st
+    applyToolbarAutoHideState(true)
+  } else if (toolbarHiddenByScroll && delta < -TOOLBAR_AUTOHIDE_THRESHOLD) {
+    // 下滑 → 显示
+    mobileScrollAutoHideLastShow = now
+    mobileScrollAutoHideIgnoreUntil = now + 250
+    mobileScrollAutoHideLastScrollTop = st
+    applyToolbarAutoHideState(false)
+  }
+}
+
+function bindMobileScrollAutoHide(): void {
+  if (mobileScrollAutoHideBoundEl) return
+  const el = getMobileScrollElementForAutoHide()
+  if (!el) return
+  mobileScrollAutoHideBoundEl = el
+  mobileScrollAutoHideLastScrollTop = el.scrollTop
+  mobileScrollAutoHideHandler = handleMobileScrollAutoHide
+  el.addEventListener('scroll', mobileScrollAutoHideHandler, { passive: true })
+}
+
+/** 滚动容器晚于工具栏出现（冷启动）时的绑定重试 */
+function startMobileScrollAutoHideRetry(): void {
+  if (mobileScrollAutoHideBoundEl) return
+  if (mobileScrollAutoHideRetryTimer) return
+  let retryCount = 0
+  mobileScrollAutoHideRetryTimer = setInterval(() => {
+    retryCount++
+    bindMobileScrollAutoHide()
+    if (mobileScrollAutoHideBoundEl || retryCount >= 30) {
+      if (mobileScrollAutoHideRetryTimer) clearInterval(mobileScrollAutoHideRetryTimer)
+      mobileScrollAutoHideRetryTimer = null
+    }
+  }, 200)
+}
+
+function unbindMobileScrollAutoHide(): void {
+  if (mobileScrollAutoHideHandler && mobileScrollAutoHideBoundEl) {
+    mobileScrollAutoHideBoundEl.removeEventListener('scroll', mobileScrollAutoHideHandler)
+  }
+  mobileScrollAutoHideHandler = null
+  mobileScrollAutoHideBoundEl = null
+  if (mobileScrollAutoHideRetryTimer) {
+    clearInterval(mobileScrollAutoHideRetryTimer)
+    mobileScrollAutoHideRetryTimer = null
+  }
+  mobileScrollAutoHideLastScrollTop = null
+  mobileScrollAutoHideIgnoreUntil = 0
+}
+
 /**
  * 刷新工具栏自动隐藏状态（切换文档/锁定文档/初始化时调用）（仅移动端）
  *
- * 移动端插件工具栏的显示/隐藏统一跟随思源原生移动栏（body.mobile-chrome--hidden），
- * 由 bindNativeBarsSync 监听 body class 驱动，不再由插件自身的滚动监听或文档锁定状态驱动。
+ * 信号源分两种：
+ * - 非接管模式：跟随思源原生移动栏（body.mobile-chrome--hidden），由 bindNativeBarsSync 驱动；
+ * - 接管模式（底部胶囊/底部固定⑦）：思源原生滚动隐藏被 forceMenuPanelOpen 暂停，
+ *   mobile-chrome--hidden 永不出现，改由插件自身滚动监听驱动（bindMobileScrollAutoHide）。
  * 桌面端胶囊滚动隐藏有独立的 refreshDesktopFloatingScrollOnSwitch，不经过此函数。
  */
 export function refreshToolbarAutoHide(): void {
   // 仅移动端生效
   if (!isMobileDevice()) return
 
+  // 完全恢复思源原始状态：插件不再干预任何显隐。
+  // 否则心跳/设置变更仍会重注入 toolbar-autohide-style 并 bindNativeBarsSync，
+  // 恢复模式下滚动时面包屑仍被插件隐藏（"面包屑还是被藏"的残留源）
+  if (pluginInstance?.mobileFeatureConfig?.disableCustomButtons === true) {
+    unbindNativeBarsSync()
+    unbindMobileScrollAutoHide()
+    unbindToolbarAutoHideScroll()
+    if (toolbarHiddenByScroll) applyToolbarAutoHideState(false)
+    return
+  }
+
   // 侧栏/更多面板打开时隐藏侧边胶囊（与跟随隐藏开关无关，始终绑定）
   bindSidePanelsSync()
   // 扩展栏打开时显示思源导航栏（底部胶囊模式）
   bindOverflowPanelSync()
 
-  // 开关关闭时：不跟随思源原生栏，并恢复工具栏显示
+  // 开关关闭时：不跟随隐藏，解绑两种信号源并恢复工具栏显示
   const mobileCfg = (window as any).__mobileToolbarConfig as { followNativeBarsAutoHide?: boolean } | undefined
   if (mobileCfg?.followNativeBarsAutoHide === false) {
     unbindNativeBarsSync()
+    unbindMobileScrollAutoHide()
     if (toolbarHiddenByScroll) applyToolbarAutoHideState(false)
     return
   }
 
   ensureToolbarAutoHideStyle()
+
+  // 接管模式：由插件自身滚动监听驱动
+  if (isNavTakeoverMode()) {
+    unbindNativeBarsSync()
+    const activeEl = getMobileScrollElementForAutoHide()
+    if (activeEl && activeEl !== mobileScrollAutoHideBoundEl) {
+      // 滚动容器变化（切文档/重建）：先恢复显示再重绑，避免新文档看不到工具栏
+      if (toolbarHiddenByScroll) applyToolbarAutoHideState(false)
+      unbindMobileScrollAutoHide()
+      bindMobileScrollAutoHide()
+    } else if (!mobileScrollAutoHideBoundEl) {
+      bindMobileScrollAutoHide()
+    }
+    if (!mobileScrollAutoHideBoundEl) startMobileScrollAutoHideRetry()
+    return
+  }
+
+  // 非接管模式：跟随思源原生移动栏状态
+  unbindMobileScrollAutoHide()
   bindNativeBarsSync()
 
   // 立即同步一次当前原生栏状态（工具栏重建/文档切换后可能与缓存状态不同）
@@ -6916,10 +7334,60 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
 let activeLifelogCleanup: (() => void) | null = null
 let activeLifelogInput: HTMLTextAreaElement | null = null
 
+/**
+ * 桌面端 LifeLog 全局捕获（v3.8.2+ 适配版）。
+ *
+ * 思源 v3.8.2（commit 519b0e82e 插件生命周期重构）起：
+ * 1. 主进程把全局快捷键从"广播所有窗口"改为定向发给 workspace 主窗口——window.html
+ *    独立窗口（一键记事块格式弹窗/文档独立窗口）不在 workspaces 列表，永远收不到；
+ * 2. 渲染端接收 handler 加了 if (!isWindow()) guard，window 窗口收到也丢弃。
+ * 两处叠加导致独立窗口内 ⌥⇧L 完全失效；且 globalShortcut 在 OS 层拦截按键，
+ * 窗口内本地 keydown 也收不到（Electron 行为）。
+ *
+ * 适配：全局快捷键仍由主窗口触发；若 OS 焦点在本插件的独立窗口（window.html），
+ * 通过 @electron/remote 把动作转发到该窗口内执行（窗口内实例配置同源共享，
+ * LifeLog 弹窗直接渲染在聚焦窗口）；焦点在主窗口时走原路径。
+ */
+export async function triggerDesktopLifelogGlobalCaptureSmart(): Promise<void> {
+  try {
+    const remote = (window as any).require?.('@electron/remote')
+    const focused = remote?.BrowserWindow?.getFocusedWindow?.()
+    const url = focused?.webContents?.getURL?.() || ''
+    if (focused && url.includes('window.html')) {
+      // 窗口内包 try-catch，把执行结果/异常栈回传主窗口日志（executeJavaScript 原始报错看不到窗口内细节）
+      const inject = `
+        (function () {
+          try {
+            if (typeof window.__tcLifelogTrigger !== 'function') {
+              return 'hook-missing';
+            }
+            var r = window.__tcLifelogTrigger();
+            if (r && typeof r.then === 'function') {
+              return r.then(function () { return 'hook-ok'; })
+                .catch(function (e) { return 'hook-async-error: ' + (e && e.stack ? e.stack : String(e)); });
+            }
+            return 'hook-ok';
+          } catch (e) {
+            return 'hook-error: ' + (e && e.stack ? e.stack : String(e));
+          }
+        })()
+      `
+      focused.webContents.executeJavaScript(inject).then((res: any) => {
+      }).catch((err: any) => {
+      })
+      return
+    }
+  } catch (err) {
+  }
+  await triggerDesktopLifelogGlobalCapture()
+}
+
 export async function triggerDesktopLifelogGlobalCapture(): Promise<void> {
   if (isMobileDevice()) return
   // 多窗口环境下只有聚焦的窗口响应全局快捷键，避免所有窗口同时弹出
-  if (!document.hasFocus()) return
+  if (!document.hasFocus()) {
+    return
+  }
 
   // 已有打开的弹窗 → 关闭
   if (activeLifelogCleanup) {
@@ -8094,6 +8562,7 @@ export function cleanup() {
 
   // 清理工具栏滚动隐藏监听和 class
   unbindToolbarAutoHideScroll()
+  unbindMobileScrollAutoHide()
   // 清理思源原生移动栏状态同步
   unbindNativeBarsSync()
   // 清理侧栏/更多面板状态同步

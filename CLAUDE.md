@@ -895,3 +895,35 @@ handleToolbarAutoHideScroll()      ← 滚动事件处理器
 - `closeOnOutside` 必须区分事件类型：**`touchend` 阶段排除思源导航栏区域**（`target.closest('.mobile-bottom-bar')` 时不关闭），保证合成 click 正常到达按钮
 - `click` 阶段照常关闭（此时按钮功能已执行）
 - 排查"鼠标正常、触摸异常"的交互问题时，优先检查 touchend/click 双监听的时序差异
+
+---
+
+### 33. 思源 v3.8.2+ 全局快捷键不再覆盖 window.html 独立窗口（remote 转发方案）
+
+**相关文件**: `src/index.ts`（⌥⇧L 注册 + isInWindow 钩子）、`src/toolbarManager.ts`（`triggerDesktopLifelogGlobalCaptureSmart`）
+
+**背景**: 思源 v3.8.2（commit `519b0e82e` 插件生命周期重构）起，window.html 独立窗口（一键记事块格式弹窗、文档独立窗口）内插件 `globalCallback` 快捷键全部失效：
+- 主进程 `main.js`：全局快捷键从 `getAllWindows().forEach(send)` 广播改为 `getGlobalShortcutWorkspace` **定向发给 workspace 主窗口**——window 窗口不在 workspaces 列表，永远收不到
+- 渲染端 `boot/onGetConfig.ts` 接收 handler 加 `if (!isWindow())` guard——window 窗口收到也丢弃
+- 且 `globalShortcut` 在 OS 层拦截按键，**窗口内本地 keydown 监听也收不到**（Electron 行为，别走 keydown 方案）
+
+**规则**:
+- ⌥⇧L 仍注册 `globalCallback`（主窗口注册 → OS 层保持"全局捕获"语义），回调改走 `triggerDesktopLifelogGlobalCaptureSmart()`
+- Smart 转发：`@electron/remote` 的 `getFocusedWindow()` → URL 含 `window.html` → `executeJavaScript` 调用窗口内钩子 `window.__tcLifelogTrigger`（窗口内直接执行 LifeLog 流程：配置同源共享、弹窗渲染在聚焦窗口）；焦点在主窗口/外部 → 走原路径
+- 窗口内钩子在 onload（`isInWindow`）挂载、onunload 删除；钩子内必须调用**本窗口模块内函数**（同 bundle），不要引用未 import 的名字
+- **教训**: vite/esbuild 转译不做类型检查——import 列表删了某个函数，调用处编译不报错，运行时才 `ReferenceError: xxx is not defined`。钩子/回调引用的函数改 import 时务必核对
+- 调试跨窗口调用：`executeJavaScript` 注入 IIFE 包 try-catch，把 `'hook-ok' / 'hook-error: <stack>' / 'hook-missing'` 作为返回值取回调用窗口，比 Electron 原始报错（看不到窗口内细节）好用
+
+### 34. 打开文档类功能：分平台选 API + 创建后等索引就绪
+
+**相关文件**: `src/toolbarManager.ts`（`executeDiary`、`waitForBlockIndexReady`）
+
+**背景**: 手机端"④日记顶部或底部"填笔记本 ID 后打不开今日日记（但滚动照常执行——滚的是当前文档）。排查结论（读 v3.8.2 思源源码）：
+- `openMobileFileById`（siyuan SDK 导出自 `mobile/editor.ts`）是**移动端专用**：开头访问 `window.siyuan.mobile.tabs`，桌面端 `window.siyuan.mobile` 不存在 → 同步 TypeError，且常被异步链吞掉（无日志）
+- 移动端 `mobile.tabs.open` 内部 `resolveRoot` 先调 `/api/block/getBlockInfo`：**创建类 API（createDailyNote 等）返回后文档仍在异步索引队列 → code 3 → tabs.open 静默返回 invalid 并 restore**——零日志、零提示
+- 判定平台不要靠 UA 字符串猜（`/mobile|android/i.test(navigator.userAgent)` 会误判），用 `pluginInstance.isMobile`（getFrontend 判定）或 `config.fronted?.includes('mobile')`
+
+**规则**:
+- 打开文档：桌面端用 `siyuanOpenTab`，移动端用 `openMobileFileById`，平台判定走插件环境而非 UA
+- 创建类 API（createDailyNote / 新建文档）拿到 id 后**先轮询 `waitForBlockIndexReady(id)`**（getBlockInfo code===0，300ms×16≈5s）再打开，消除索引竞态
+- 思源移动端 `tabs.open` 失败是静默的（`void + then` 吞掉、只 restore）——排查"无日志但功能失效"时优先怀疑这类静默 API

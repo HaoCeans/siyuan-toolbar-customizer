@@ -985,3 +985,59 @@ const nextFile = idx < files.length - 1 ? files[idx + 1] : null  // 下一篇=�
 1. **模板内容是「文本」还是「markdown 快捷语法」行为完全不同**：`- [ ]`/`- `/`1. ` 会触发思源块转换（新建块、ID 变化），普通文本不会。凡是插入后还要做"按 ID 删/改"的流程，插入 markdown 快捷语法后必须**重新读取 DOM 实际块 ID**，不能依赖插入前的 ID。
 2. **异步转换 + 用户快速取消 = 竞态高发**：思源 `input()` 的 markdown 转换是异步事务，用户"插入→删除→取消"三步连做时，每一步都可能撞上尚未落库的转换。删除前显式 flush（`/api/sqlite/flushTransaction`）比"等事务队列"更可靠——`window.siyuan.transactions` 只反映前端队列，不是内核落库状态。
 3. **恢复机制要区分"内容为空"和"正在取消"**：`recoverIfEmpty` 的本意是加载失败/内容意外丢失时自动重建，但用户主动删光内容也会触发它——恢复逻辑必须与取消（isDestroying）互斥，否则"删除"和"新建"互相打架。
+
+## 思源 v3.8.2 回归：window 独立窗口全局快捷键失效（remote 转发修复）
+
+### 现象
+v3.8.2 之前：一键记事块格式弹窗（window.html）内按 ⌥⇧L（叶归LifeLog全局捕获）正常。
+v3.8.2 之后：主窗口正常，块格式弹窗内快捷键完全无反应。
+
+### 根因（读 v3.8.2 源码 + git diff v3.8.1 确认，同一 commit 引入两处断链）
+`519b0e82e :art: Improve plugin lifecycle sequencing...`（issue 18979，v3.8.2 插件生命周期重构）：
+
+1. **主进程分发改向**（app/electron/main.js）：
+   - v3.8.1：`globalShortcut.register(shortcut, () => { BrowserWindow.getAllWindows().forEach(itemB => itemB.webContents.send("siyuan-hotkey", ...)) })`——全窗口广播
+   - v3.8.2：改为 `getGlobalShortcutWorkspace(ownerWorkspace)` 定向——只发给 `workspaces` 数组里的 workspace 主窗口
+   - **关键事实**：window.html 独立窗口（`siyuan-open-window` 新建）不在 workspaces 数组（只收 workspaceDir/port/tray 的主窗口）→ 独立窗口聚焦时触发快捷键 → 找不到聚焦 workspace → fallback 主窗口 → **独立窗口永远收不到**
+
+2. **渲染端接收加拦截**（app/src/boot/onGetConfig.ts:209）：
+   - v3.8.1 handler：直接遍历 app.plugins 匹配 globalCallback && customHotkey → 执行
+   - v3.8.2：包 `if (!isWindow()) { dispatchPluginGlobalShortcut(...) }`；`isWindow()` = `!document.getElementById("toolbar")`——window.html 无 toolbar → 恒 true → **window 窗口收到也丢弃**
+
+3. **Electron 附加陷阱**：⌥⇧L 已被主窗口注册为 `globalShortcut` → OS 层拦截按键 → **独立窗口内 keydown 监听也收不到**（第一次修复尝试"窗口内 keydown"因此无效）
+
+另外：window 模式（window/index.ts）本就**不调用** `sendGlobalShortcut`（上报只在主窗口 onGetConfig / commonHotkey / keymapUi 触发）；`loadPlugins` 在 window 模式仍无条件执行（插件实例存在，只缺快捷键分发）。
+
+### 修复（remote 转发）
+1. 主窗口 globalCallback 改调 `triggerDesktopLifelogGlobalCaptureSmart()`：
+   - `@electron/remote` → `BrowserWindow.getFocusedWindow()` → `webContents.getURL()` 含 `window.html`（块格式弹窗/文档独立窗口/浮窗）→ `executeJavaScript('window.__tcLifelogTrigger()')` 把动作送进聚焦窗口执行
+   - 否则走原 `triggerDesktopLifelogGlobalCapture()`（hasFocus 保护不变）
+2. 独立窗口（isInWindow）onload 挂 `window.__tcLifelogTrigger = () => triggerDesktopLifelogGlobalCapture()`，onunload 删除
+
+### 调试经验
+- `executeJavaScript` 原始报错只有 "Script failed to execute"，看不到窗口内细节。注入 IIFE 包 try-catch 把结果字符串（hook-ok / hook-error: <stack> / hook-missing）作为**返回值**取回调用窗口打日志，一次按键定位全部环节
+- **esbuild 转译不做类型检查**：从 import 列表删除某函数后，调用处编译通过、运行时 ReferenceError。本次实际踩坑：Smart 转发替换 import 时把原 `triggerDesktopLifelogGlobalCapture` 删了，窗口内钩子调用它 → `is not defined`。钩子/跨窗口回调引用的函数，import 变动后必须全局核对调用点
+
+## 手机端日记按钮打不开（填笔记本 ID 时）：分平台 API + 索引竞态
+
+### 现象
+手机端"④日记顶部或底部"按钮：不填笔记本 ID（Alt+5 快捷键路）正常；填了 ID（API 路）打不开今日日记，但"能滚动到底部"（滚动其实作用在当前文档上）。
+
+### 排查过程（读 v3.8.2 思源源码）
+1. 快捷键路正常 → API 路的问题。无任何日志（API 失败/打开失败的 console.warn 都没打）→ createDailyNote 成功（code 0 + data.id），断在打开环节。
+2. SDK 导出链：插件 `require("siyuan")` 由 loader 拦截返回思源前端 `plugin/API.ts` 对象，`API.ts:412` 原样导出 `mobile/editor.ts` 的 `openMobileFileById`——没有换实现。
+3. `openMobileFileById`（v3.8.2 mobile/editor.ts）：
+   - 开头 `if (window.siyuan.mobile.tabs)` 分支 → 异步 `tabs.open(id, options)`，结果 `void + then` 吞掉；`"invalid"/"failed"` 时只 `tabs.restore()`——**全程零输出**
+   - **桌面端没有 `window.siyuan.mobile`**（mobile 字段只在移动端入口 mobile/index.ts 初始化）→ 桌面端调用直接同步 TypeError，且常被外层 try/catch 或异步链吞掉
+4. `tabs.open` 内部 `resolveRoot` 调 `/api/block/getBlockInfo`：**新创建的文档还在异步索引队列时返回 code 3** → `InvalidMobileTabTargetError` → "invalid" 静默回退——createDailyNote 后立即打开存在这个竞态窗口。
+5. 平台判定陷阱：插件原来用 UA 正则猜 isMobile（`/mobile|android|iphone|ipad/i`），桌面浏览器/WebView 场景可能误判 → 调了移动端专用 API。
+
+### 修复
+- isMobile 改用 `pluginInstance.isMobile === true || config.fronted?.includes('mobile')`（getFrontend 判定，不靠 UA）
+- 移动端打开前新增 `waitForBlockIndexReady(docId)`：轮询 `/api/block/getBlockInfo` 直到 code 0（300ms × 16 ≈ 5s）再调 `openMobileFileById`
+- 桌面端保持 `siyuanOpenTab`
+
+### 教训
+- 打开文档类功能必须按平台选 API：桌面 `openTab`、移动 `openMobileFileById`——后者桌面端不可用（无 `window.siyuan.mobile`）
+- 创建类 API 返回后立即用该 id 打开文档 = 索引竞态（移动 tabs.open 静默失败）；通用做法：先 `getBlockInfo` 轮询就绪
+- 思源移动端多处异步是"void + then 吞错误 + 静默回退"风格——排查"无日志但功能失效"时，先怀疑这类静默 API，别急着加日志

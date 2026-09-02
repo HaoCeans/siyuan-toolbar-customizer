@@ -339,6 +339,24 @@ export function createDesktopButtonItem(
     }, 'number')
     overflowContainer.appendChild(widthField)
 
+    // 打开动态动画开关
+    const animRow = document.createElement('div')
+    animRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
+    const animLabel = document.createElement('span')
+    animLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
+    animLabel.textContent = '打开动态动画'
+    const animToggle = document.createElement('input')
+    animToggle.type = 'checkbox'
+    animToggle.className = 'b3-switch'
+    animToggle.checked = button.overflowAnimation !== false  // 默认开启
+    animToggle.onchange = async () => {
+      button.overflowAnimation = animToggle.checked
+      await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
+    }
+    animRow.appendChild(animLabel)
+    animRow.appendChild(animToggle)
+    overflowContainer.appendChild(animRow)
+
     // 说明文字
     const descDiv = document.createElement('div')
     descDiv.style.cssText = `

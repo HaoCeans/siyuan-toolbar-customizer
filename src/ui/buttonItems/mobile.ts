@@ -552,6 +552,24 @@ export function createMobileButtonItem(
     layersField.querySelector('input')!.max = '5'
     layersContainer.appendChild(layersField)
 
+    // 打开动态动画开关
+    const animRow = document.createElement('div')
+    animRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px;'
+    const animLabel = document.createElement('span')
+    animLabel.textContent = '打开动态动画'
+    animLabel.style.cssText = 'font-size: 13px; font-weight: 600;'
+    const animToggle = document.createElement('input')
+    animToggle.type = 'checkbox'
+    animToggle.className = 'b3-switch'
+    animToggle.checked = button.overflowAnimation !== false  // 默认开启
+    animToggle.onchange = async () => {
+      button.overflowAnimation = animToggle.checked
+      await context.saveData('mobileButtonConfigs', context.buttonConfigs)
+    }
+    animRow.appendChild(animLabel)
+    animRow.appendChild(animToggle)
+    layersContainer.appendChild(animRow)
+
     // 说明文字
     const descDiv = document.createElement('div')
     descDiv.style.cssText = `

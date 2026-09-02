@@ -337,6 +337,44 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 
 # 📌 Changelog
 
+### v3.8.6 — Side capsule is now the default + frosted-glass styles + a batch of fixes
+
+> 💡 Want more buttons in the side capsule? Frosted-glass toolbar? ⌥⇧L not working on SiYuan v3.8.2+? Update.
+
+**① Mobile default toolbar position is now the "side capsule"**
+- New users / users who never set a position get the side capsule by default (a small ⋮ pinned to the left edge; tap to expand a vertical panel)
+- Existing saved positions are untouched
+- The mini capsule now sticks to the **left** side by default (was right); the expanded panel follows the same side
+
+**② Toolbar styles: frosted glass + 2×2 picker**
+- "Toolbar style" is now a 2×2 picker with live previews: Default / Glass / Default+Divider / Glass+Divider
+- Default is now **Glass+Divider** (translucent frosted background with button dividers; content blurs through as you scroll)
+- New "⋯ Extend panel follows main toolbar": removes the highlight border of the overflow panel and makes its background/glass follow the main toolbar settings
+
+**③ Side capsule panel now shows buttons added by other plugins**
+- Buttons other plugins add to the toolbar automatically appear at the bottom of the expanded panel (below a divider) and are clickable
+- Fixed mis-collecting decorative separators and empty icon buttons
+
+**④ "Auto-hide with nav bar" now works for the bottom capsule**
+- In takeover modes (bottom capsule / bottom-fixed ⑦) the toolbar previously never auto-hid — now the plugin listens to scrolling itself: scroll up hides, scroll down shows, keyboard open keeps it visible
+- Bottom-fixed "⑦ show nav bar when overflow opens" now defaults to ON
+
+**⑤ Adapted to SiYuan v3.8.2 global shortcut changes (desktop)**
+- Since v3.8.2 SiYuan only delivers global shortcuts to the main window, so ⌥⇧L stopped working in standalone windows (quick-note block window etc.) — now it is forwarded into the focused standalone window automatically
+- Fixed mobile "Diary top/bottom" not opening today's note when a notebook ID is set (platform-correct open API + waits for the document index to be ready)
+
+**⑥ Polish**
+- "Restore SiYuan original state" now really cleans up (removes lingering style injections/listeners; status bar etc. no longer left hidden), and the toolbar rebuilds correctly after turning it off
+- New "open animation" toggle for the overflow toolbar (default on; can be turned off for instant popups)
+- Hidden scrollbars on overflow/side panels (touch scrolling unaffected)
+- Toolbar preview adapted to side-capsule mode: shows the ⋮ mini capsule + vertical panel, drag-to-sort still works
+- Misc default-value/behavior fixes (mobile toolbar style picker, restore-factory settings, etc.)
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ Older versions
+  </summary>
+
 ### v3.8.5 — Mobile upgrade: toolbars hide with SiYuan's nav bars + new side capsule
 
 > 💡 **Toolbar not hiding together with SiYuan's nav bars when you scroll? Bottom capsule overlapping the nav bar? Want a small button on the screen edge that opens all your tools? Update.**
@@ -364,11 +402,6 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 
 **⑥ Smoother**
 - Fixed several things that could make the mobile UI stutter (repeated style refreshes, high-frequency listeners, etc.)
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ Older versions
-  </summary>
 
 ### v3.8.4 — Mobile button settings stop jumping around + Previous/Next direction fixed
 

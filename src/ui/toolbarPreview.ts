@@ -20,6 +20,8 @@ export interface ToolbarPreviewOptions {
   isMobile: boolean
   /** true=手机端顶部工具栏模式（主条在上扩展层在下），false=底部模式（扩展层在上主条在下） */
   isTopMode?: boolean
+  /** 动态判断是否为侧边胶囊模式（每次渲染时读取，模式切换后 refresh 即可切换形态） */
+  isSideMode?: () => boolean
   /** 拖动排序完成后的回调（用于触发下方卡片列表 renderList 同步） */
   onChanged: () => void
 }
@@ -98,6 +100,12 @@ export function createToolbarPreview(opts: ToolbarPreviewOptions): HTMLElement &
 
     const buttons = getButtons()
 
+    // 侧边胶囊模式：渲染"微缩 ⋮ 胶囊 + 竖排展开面板"（与真实工具栏形态一致）
+    if (opts.isSideMode?.() === true) {
+      renderSideMode(buttons)
+      return
+    }
+
     // 找扩展工具栏按钮配置
     const overflowBtn = buttons.find((b) => isOverflowButton(b.id))
     const overflowEnabled = overflowBtn ? overflowBtn.enabled !== false : false
@@ -144,6 +152,77 @@ export function createToolbarPreview(opts: ToolbarPreviewOptions): HTMLElement &
         }
       }
     }
+  }
+
+  /** 侧边胶囊模式渲染：顶部微缩胶囊（点击展开/收起）+ 竖排面板（单层容纳全部启用按钮） */
+  function renderSideMode(buttons: ButtonConfig[]): void {
+    const overflowBtn = buttons.find((b) => isOverflowButton(b.id))
+    const overflowEnabled = overflowBtn ? overflowBtn.enabled !== false : false
+
+    // 真实侧边面板单层全放：所有启用的普通按钮竖排（不含 ⋮ 自身）
+    const visibleButtons = buttons.filter(
+      (b) => !isOverflowButton(b.id) && b.enabled !== false,
+    ).sort((a, b) => b.sort - a.sort)
+
+    // 说明文字
+    const hint = document.createElement('div')
+    hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-bottom: 6px;'
+    hint.textContent = '💊 侧边胶囊模式：点击右侧微缩胶囊展开竖排面板'
+    stage.appendChild(hint)
+
+    // 微缩胶囊（吸附侧由 ① 配置决定，预览固定画在右侧）
+    const capsuleRow = document.createElement('div')
+    capsuleRow.style.cssText = 'display: flex; justify-content: flex-end; margin-bottom: 8px;'
+    const capsule = document.createElement('div')
+    capsule.title = '点击展开/收起'
+    capsule.style.cssText = `
+      display: flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px; border-radius: 12px; cursor: pointer;
+      background: color-mix(in srgb, var(--b3-theme-background) 60%, transparent);
+      border: 1px dashed var(--b3-theme-primary);
+      color: var(--b3-theme-on-surface);
+    `
+    const dotsSvg = lucideToSvg('EllipsisVertical', 18)
+    capsule.innerHTML = dotsSvg || '⋮'
+    capsule.addEventListener('click', (e) => {
+      e.stopPropagation()
+      overflowExpanded = !overflowExpanded
+      render()
+    })
+    capsuleRow.appendChild(capsule)
+    stage.appendChild(capsuleRow)
+
+    if (!overflowEnabled || !overflowExpanded) return
+
+    // 竖排展开面板
+    const panel = document.createElement('div')
+    panel.style.cssText = `
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+      padding: 10px 8px; border-radius: 14px; min-width: 52px; align-self: center;
+      background: color-mix(in srgb, var(--b3-theme-primary) 6%, transparent);
+      border: 1px dashed var(--b3-theme-primary);
+    `
+    const panelRow = document.createElement('div')
+    panelRow.style.cssText = 'display: flex; justify-content: center;'
+
+    if (visibleButtons.length === 0) {
+      const empty = document.createElement('span')
+      empty.textContent = '（空）'
+      empty.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light); opacity: 0.6;'
+      panel.appendChild(empty)
+    } else {
+      visibleButtons.forEach((button) => {
+        const el = createPreviewButton(button, {
+          draggable: true,
+          scaleFactor,
+          vertical: true,
+        })
+        panel.appendChild(el)
+      })
+    }
+
+    panelRow.appendChild(panel)
+    stage.appendChild(panelRow)
   }
 
   /**
@@ -232,9 +311,11 @@ export function createToolbarPreview(opts: ToolbarPreviewOptions): HTMLElement &
       isOverflowToggle?: boolean
       overflowExpanded?: boolean
       onToggle?: () => void
+      vertical?: boolean
     },
   ): HTMLElement {
     const sf = bOpts.scaleFactor ?? 1
+    const vertical = bOpts.vertical === true
     const scaledMW = Math.max(16, Math.round(button.minWidth * sf))
     const scaledIS = Math.max(10, Math.round(button.iconSize * sf))
     // 预览里按钮间距压到最低（2px），让更多空间给按钮本身
@@ -254,7 +335,9 @@ export function createToolbarPreview(opts: ToolbarPreviewOptions): HTMLElement &
     el.style.cssText = `
       display: flex; align-items: center; justify-content: center;
       min-width: ${scaledMW}px; height: ${scaledMW}px;
-      margin-right: ${scaledMR}px; padding: 0 ${scaledPad}px;
+      margin-right: ${vertical ? 0 : scaledMR}px;
+      margin-bottom: ${vertical ? Math.max(0, Math.round(2 * sf)) : 0}px;
+      padding: 0 ${scaledPad}px;
       border: none; border-radius: 4px; background-color: rgba(0,0,0,0);
       color: var(--b3-theme-on-surface); cursor: ${bOpts.draggable ? 'grab' : 'pointer'};
       user-select: none; flex-shrink: 0; gap: ${Math.round(4 * sf)}px;
@@ -301,11 +384,14 @@ export function createToolbarPreview(opts: ToolbarPreviewOptions): HTMLElement &
       e.preventDefault()
       e.dataTransfer!.dropEffect = 'move'
       const rect = el.getBoundingClientRect()
-      const isAfter = e.clientX > rect.left + rect.width / 2
+      // 竖排面板按 Y 轴判断插入位置，横排按 X 轴
+      const isAfter = vertical
+        ? e.clientY > rect.top + rect.height / 2
+        : e.clientX > rect.left + rect.width / 2
       clearAllDragHints()
-      el.style.boxShadow = isAfter
-        ? 'inset -3px 0 0 var(--b3-theme-primary)'
-        : 'inset 3px 0 0 var(--b3-theme-primary)'
+      el.style.boxShadow = vertical
+        ? (isAfter ? 'inset 0 -3px 0 var(--b3-theme-primary)' : 'inset 0 3px 0 var(--b3-theme-primary)')
+        : (isAfter ? 'inset -3px 0 0 var(--b3-theme-primary)' : 'inset 3px 0 0 var(--b3-theme-primary)')
     })
     el.addEventListener('dragleave', () => { el.style.boxShadow = '' })
     el.addEventListener('drop', (e) => {

@@ -46,9 +46,11 @@ import {
   refreshToggleLockIcons,
   refreshDesktopFloatingScrollOnSwitch,
   triggerDesktopLifelogGlobalCapture,
+  triggerDesktopLifelogGlobalCaptureSmart,
   markDesktopBreadcrumbForFloating,
   safeSetInterval,
-  clearSafeInterval
+  clearSafeInterval,
+  restoreMobileToolbarOriginal
 } from './toolbarManager'
 
 // TTS 设置持久化初始化
@@ -139,6 +141,7 @@ try {
 }
 const { version } = PluginInfo
 
+
 export default class ToolbarCustomizer extends Plugin {
   // 环境检测属性
   public isMobile: boolean
@@ -226,6 +229,7 @@ export default class ToolbarCustomizer extends Plugin {
     hideDocMenuButton: true,    // 文档菜单按钮隐藏
     hideMoreButton: true,       // 更多按钮隐藏
     toolbarStyle: 'divider' as 'default' | 'divider',  // 工具栏样式：默认或带分割线（手机端默认分割线）
+    glassEffect: true,  // 毛玻璃背景（半透明+背景模糊，独立于分割线样式，可叠加；默认开）
     disableCustomButtons: false,// 禁用所有自定义按钮
     showMobileLineBreakButton: false, // 顶部工具栏云同步左侧显示 H 换行按钮
     hideStatusBar: true,         // 手机端隐藏底部状态条 #status
@@ -354,6 +358,17 @@ export default class ToolbarCustomizer extends Plugin {
         // 此时不应默认启用底部胶囊，以免覆盖用户原有的底部/顶部工具栏设置
         if (savedMobileConfig.enableFloatingToolbar === undefined) {
           this.mobileConfig.enableFloatingToolbar = false
+        }
+        // v3.8.6 兼容：默认位置由底部胶囊改为侧边胶囊。
+        // 新默认只对"从未保存过任何位置字段"的用户生效（全新用户 saved 为空，整段跳过直接取 DEFAULT）。
+        // 老用户只要保存过任意位置字段（top/bottom/floating，含旧版底部固定/顶部模式用户），
+        // 就视为显式配置过位置：未开过侧边胶囊的一律保持关闭，
+        // 避免 DEFAULT 的 enableSideFloatingToolbar: true 被 merge 进来与原有位置双开打架
+        const hasAnyPositionSaved = savedMobileConfig.enableTopToolbar !== undefined
+          || savedMobileConfig.enableBottomToolbar !== undefined
+          || savedMobileConfig.enableFloatingToolbar !== undefined
+        if (hasAnyPositionSaved && savedMobileConfig.enableSideFloatingToolbar === undefined) {
+          this.mobileConfig.enableSideFloatingToolbar = false
         }
       }
       // 历史：长度类字段若存成无单位纯数字串（如 "45"），写入 CSS 会无效；统一补 px
@@ -632,20 +647,29 @@ export default class ToolbarCustomizer extends Plugin {
 	        },
 	      })
 	    }
-	    // 叶归LifeLog全局快捷键：主窗口 + 独立窗口（window.html）都注册。
-	    // 回调（triggerDesktopLifelogGlobalCapture）开头有 document.hasFocus() 保护——
-	    // 思源主进程向所有窗口广播 siyuan-hotkey，各窗口在 onGetConfig 遍历自身 commands
-	    // 找到 globalCallback 才执行，但只有聚焦窗口通过 hasFocus 检查 → 不会多窗口重复弹窗。
-	    // （v3.8.4 起放开 isInWindow：否则文档移到独立窗口后 ⌥⇧L 两边都不响应）
+	    // 叶归LifeLog全局快捷键。
+	    // 思源 v3.8.2+（commit 519b0e82e）起全局快捷键只分发给 workspace 主窗口，
+	    // window.html 独立窗口收不到广播（详见 toolbarManager triggerDesktopLifelogGlobalCaptureSmart）。
+	    // 这里仍只注册 globalCallback（主窗口注册 → OS 层 globalShortcut 保持"全局"语义），
+	    // 回调内 Smart 转发：焦点在独立窗口时经 remote 把动作送进该窗口执行。
 	    if (!this.isMobile) {
 	      this.addCommand({
 	        langKey: 'lifelogGlobalCapture',
 	        langText: '叶归LifeLog（全局捕获）',
 	        hotkey: '⌥⇧L',
 	        globalCallback: () => {
-	          void triggerDesktopLifelogGlobalCapture()
+	          void triggerDesktopLifelogGlobalCaptureSmart()
 	        },
 	      })
+	    }
+
+	    // 独立窗口（window.html，一键记事块格式弹窗/文档独立窗口）内挂 LifeLog 执行钩子：
+	    // 供主窗口 Smart 转发（executeJavaScript）调用。注意不能用窗口内 keydown 监听——
+	    // ⌥⇧L 已被主窗口注册为 globalShortcut，OS 层拦截按键，keydown 到不了任何窗口。
+	    if (!this.isMobile && this.isInWindow) {
+	      ;(window as any).__tcLifelogTrigger = () => {
+	        void triggerDesktopLifelogGlobalCapture()
+	      }
 	    }
 		  }
 
@@ -1083,6 +1107,8 @@ export default class ToolbarCustomizer extends Plugin {
     destroyQuickNoteFloatWindow()
     destroyDesktopQuickNoteBlockWindow()
     cleanupImagePicker()
+    // 清理独立窗口内 LifeLog 钩子
+    try { delete (window as any).__tcLifelogTrigger } catch { /* ignore */ }
     try { delete (window as any).__quickNoteFloatCommand } catch { /* ignore */ }
     try { delete (window as any).__quicknoteButtonStyleHandler } catch { /* ignore */ }
 
@@ -1549,8 +1575,8 @@ export default class ToolbarCustomizer extends Plugin {
       `
     }
 
-    // ⑦手机端状态条隐藏
-    if (this.isMobile && this.mobileFeatureConfig.hideStatusBar !== false) {
+    // ⑦手机端状态条隐藏（恢复原始状态时跳过，让状态条显示回来）
+    if (this.isMobile && this.mobileFeatureConfig.hideStatusBar !== false && !disableCustomButtons) {
       styleContent += `
         #status {
           display: none !important;
@@ -1598,10 +1624,14 @@ export default class ToolbarCustomizer extends Plugin {
 	        el.removeAttribute('data-toolbar-customized')
 	      })
 
-	      // 滚动隐藏残留
-	      document.querySelectorAll('.toolbar-scroll-hidden').forEach(el => el.classList.remove('toolbar-scroll-hidden'))
+      // 滚动隐藏残留
+      document.querySelectorAll('.toolbar-scroll-hidden').forEach(el => el.classList.remove('toolbar-scroll-hidden'))
 
-	      // 隐藏自定义按钮的 CSS
+      // 彻底恢复：解绑 observer、清除面包屑 inline 样式/属性/残留 class 与 CSS 变量
+      // （仅移除 style 元素不够——observer 会把样式重新注入，inline opacity/transform 也不会随 style 移除而消失）
+      restoreMobileToolbarOriginal()
+
+      // 隐藏自定义按钮的 CSS
 	      styleContent += `
         /* 隐藏所有自定义按钮 */
         .protyle-breadcrumb__bar button[data-custom-button],
@@ -1621,7 +1651,8 @@ export default class ToolbarCustomizer extends Plugin {
     }
 
     // 不隐藏顶栏标题：顶栏始终固定原位（不随滚动位移/隐藏，避免阈值处跳变闪烁）
-    if (this.mobileFeatureConfig.keepTopBarVisible === true) {
+    // 恢复原始状态时跳过，避免残留 CSS 干预顶栏原生表现
+    if (this.mobileFeatureConfig.keepTopBarVisible === true && !disableCustomButtons) {
       styleContent += `
         .mobile-topbar {
           visibility: visible !important;

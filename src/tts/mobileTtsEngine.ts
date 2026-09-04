@@ -8,8 +8,10 @@
  * 长文本按标点自动分段（每段 ≤180 字），逐段合成播放。
  */
 
+import { logger } from '@/utils/logger'
 import { TTSEngine, TTSOptions, ParagraphInfo } from './ttsEngine'
 import { forwardProxy } from '../api'
+import { t } from '../i18n/runtime'
 
 export type MobileTTSState = 'idle' | 'loading' | 'playing' | 'paused'
 
@@ -249,7 +251,7 @@ export class MobileTTSEngine {
           return
         }
         if (blob.size < 100) {
-          this.onError?.('音频数据为空')
+          this.onError?.(t('tts.emptyAudioData', undefined, '音频数据为空'))
           this.stop()
           return
         }
@@ -267,7 +269,7 @@ export class MobileTTSEngine {
         return
       }
     } catch (proxyErr) {
-      console.warn('[MobileTTS] kernel proxy failed:', proxyErr instanceof Error ? proxyErr.message : String(proxyErr))
+      logger.warn('[MobileTTS] kernel proxy failed:', proxyErr instanceof Error ? proxyErr.message : String(proxyErr))
       if (this.stopped) return
     }
 
@@ -300,7 +302,7 @@ export class MobileTTSEngine {
     }
 
     audio.onerror = () => {
-      this.onError?.(`第 ${this.currentIndex + 1} 段播放失败`)
+      this.onError?.(t('tts.paragraphPlaybackFailed', { index: this.currentIndex + 1 }, `第 ${this.currentIndex + 1} 段播放失败`))
       this.stop()
     }
 
@@ -309,7 +311,7 @@ export class MobileTTSEngine {
 
   /** 通过思源内核 forwardProxy 获取音频，绕过 WebView CSP */
   private async fetchViaKernelProxy(ttsUrl: string): Promise<Blob | null> {
-    console.log('[MobileTTS] trying kernel proxy for:', ttsUrl.substring(0, 80))
+    logger.log('[MobileTTS] trying kernel proxy for:', ttsUrl.substring(0, 80))
 
     const result = await forwardProxy(
       ttsUrl,
@@ -322,14 +324,14 @@ export class MobileTTSEngine {
     )
 
     if (!result || result.status !== 200 || !result.body) {
-      console.warn('[MobileTTS] kernel proxy returned no data, status:', result?.status)
+      logger.warn('[MobileTTS] kernel proxy returned no data, status:', result?.status)
       return null
     }
 
     // 校验内核是否真正使用了 base64 编码
     // （老版本内核可能不支持 responseEncoding 参数，会以 text 返回损坏数据）
     if (result.bodyEncoding && result.bodyEncoding !== 'base64') {
-      console.warn('[MobileTTS] kernel returned unexpected encoding:', result.bodyEncoding)
+      logger.warn('[MobileTTS] kernel returned unexpected encoding:', result.bodyEncoding)
       return null
     }
 
@@ -342,12 +344,12 @@ export class MobileTTSEngine {
     }
 
     if (bytes.length < 100) {
-      console.warn('[MobileTTS] decoded audio too small:', bytes.length, 'bytes')
+      logger.warn('[MobileTTS] decoded audio too small:', bytes.length, 'bytes')
       return null
     }
 
     const contentType = result.contentType || 'audio/mpeg'
-    console.log('[MobileTTS] kernel proxy success, audio size:', bytes.length, 'bytes, type:', contentType)
+    logger.log('[MobileTTS] kernel proxy success, audio size:', bytes.length, 'bytes, type:', contentType)
     return new Blob([bytes], { type: contentType })
   }
 
@@ -360,7 +362,7 @@ export class MobileTTSEngine {
 
     const timeout = setTimeout(() => {
       if (!this.stopped) {
-        this.onError?.('音频加载超时，请检查网络连接或切换到「本地 TTS」选项卡')
+        this.onError?.(t('tts.audioLoadTimeout', undefined, '音频加载超时，请检查网络连接或切换到「本地 TTS」选项卡'))
         this.stop()
       }
     }, 8000)
@@ -372,7 +374,7 @@ export class MobileTTSEngine {
       this.notify()
       audio.play().catch(() => {
         if (!this.stopped) {
-          this.onError?.('音频播放被阻止')
+          this.onError?.(t('tts.audioPlaybackBlocked', undefined, '音频播放被阻止'))
           this.stop()
         }
       })
@@ -381,7 +383,7 @@ export class MobileTTSEngine {
     audio.onerror = () => {
       clearTimeout(timeout)
       if (this.stopped) return
-      this.onError?.('有道 TTS 加载失败，请尝试：\n1. 切换到「本地 TTS」选项卡（需部署本地服务）\n2. 检查网络连接')
+      this.onError?.(t('tts.youdaoLoadFailed', undefined, '有道 TTS 加载失败，请尝试：\n1. 切换到「本地 TTS」选项卡（需部署本地服务）\n2. 检查网络连接'))
       this.stop()
     }
 

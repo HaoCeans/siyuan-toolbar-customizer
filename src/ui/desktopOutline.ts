@@ -3,6 +3,8 @@
  * 功能：在桌面端显示悬浮大纲面板，支持标题快速跳转和拖拽
  */
 
+import { logger } from '@/utils/logger'
+import { t } from '../i18n/runtime'
 import { fetchSyncPost, showMessage, openTab as siyuanOpenTab } from "siyuan"
 import { pluginInstance, getActiveProtyle } from "../toolbarManager"
 import type { ButtonConfig } from "../toolbarManager"
@@ -65,7 +67,7 @@ async function fetchOutline(docId: string): Promise<OutlineItem[] | null> {
       return parseOutlineData(response.data)
     }
   } catch (err) {
-    console.warn('[DesktopOutline] 获取大纲失败:', err)
+    logger.warn('[DesktopOutline] 获取大纲失败:', err)
   }
   return null
 }
@@ -75,7 +77,7 @@ function extractName(item: any): string {
   if (item.content) {
     return item.content.replace(/^#{1,6}\s*/, '').trim()
   }
-  return '未命名'
+  return t('navigation.common.untitled', undefined, '未命名')
 }
 
 function parseOutlineData(data: any[]): OutlineItem[] {
@@ -127,7 +129,7 @@ async function scrollToHeading(blockId: string): Promise<void> {
       }
     }, 100)
   } catch (err) {
-    console.error('[DesktopOutline] 滚动到标题失败:', err)
+    logger.error('[DesktopOutline] 滚动到标题失败:', err)
   }
 }
 
@@ -297,7 +299,7 @@ async function renderOutlinePanel(): Promise<void> {
   const docId = getCurrentDocId()
   if (!docId) {
     const listEl = outlinePanel?.querySelector('#desktop-outline-list')
-    if (listEl) listEl.innerHTML = '<div style="padding:12px;text-align:center;color:#8e8e93;font-size:12px;">未打开文档</div>'
+    if (listEl) listEl.innerHTML = `<div style="padding:12px;text-align:center;color:#8e8e93;font-size:12px;">${t('navigation.outline.noOpenDocument', undefined, '未打开文档')}</div>`
     return
   }
 
@@ -306,7 +308,7 @@ async function renderOutlinePanel(): Promise<void> {
   if (!listEl) return
 
   if (!outline || outline.length === 0) {
-    listEl.innerHTML = '<div style="padding:12px;text-align:center;color:#8e8e93;font-size:12px;">无大纲内容</div>'
+    listEl.innerHTML = `<div style="padding:12px;text-align:center;color:#8e8e93;font-size:12px;">${t('navigation.outline.empty', undefined, '暂无大纲内容')}</div>`
     return
   }
 
@@ -358,7 +360,7 @@ function createPanel(): void {
   // 收缩按钮
   const collapseBtn = document.createElement('button')
   collapseBtn.className = 'desktop-outline-collapse'
-  collapseBtn.textContent = '收起'
+  collapseBtn.textContent = t('navigation.common.collapse', undefined, '收起')
   collapseBtn.addEventListener('click', () => {
     state.isExpanded = !state.isExpanded
     outlinePanel.className = (state.isExpanded ? 'expanded' : 'collapsed')
@@ -444,7 +446,7 @@ async function loadState(): Promise<void> {
       }
     }
   } catch (err) {
-    console.warn('[DesktopOutline] 加载状态失败:', err)
+    logger.warn('[DesktopOutline] 加载状态失败:', err)
   }
 }
 
@@ -479,7 +481,7 @@ export function toggleVisibility(config: ButtonConfig): void {
   // 只在桌面端运行
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
   if (isMobile) {
-    showMessage('此功能仅支持桌面端', 1500, 'error')
+    showMessage(t('navigation.common.desktopOnly', undefined, '此功能仅支持桌面端'), 1500, 'error')
     return
   }
 
@@ -490,13 +492,13 @@ export function toggleVisibility(config: ButtonConfig): void {
     applyFloatPanelBackground(outlinePanel, config.floatOpacity, 0.85)
 
     if (config.showNotification !== false) {
-      showMessage('大纲已显示', 1500, 'info')
+      showMessage(t('navigation.outline.shown', undefined, '大纲已显示'), 1500, 'info')
     }
   } else {
     removePanel()
 
     if (config.showNotification !== false) {
-      showMessage('大纲已隐藏', 1500, 'info')
+      showMessage(t('navigation.outline.hidden', undefined, '大纲已隐藏'), 1500, 'info')
     }
   }
 

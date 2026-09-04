@@ -3,6 +3,8 @@
  * 功能：在桌面端显示悬浮导航栏，支持文档快速切换和拖拽
  */
 
+import { logger } from '@/utils/logger'
+import { t } from '../i18n/runtime'
 import { fetchSyncPost, showMessage, openTab as siyuanOpenTab } from "siyuan"
 import { pluginInstance, getActiveProtyle } from "../toolbarManager"
 import type { ButtonConfig } from "../toolbarManager"
@@ -83,7 +85,7 @@ async function fetchDocInfo(docId: string): Promise<{ notebookId: string; parent
       return { notebookId: box, parentPath }
     }
   } catch (err) {
-    console.warn('[DesktopDocNav] 获取文档信息失败:', err)
+    logger.warn('[DesktopDocNav] 获取文档信息失败:', err)
   }
   return null
 }
@@ -124,20 +126,20 @@ async function fetchAdjacentDocs(): Promise<void> {
 	        // files[0] 在文件树顶部，files[last] 在文件树底部（v3.8.4 实测确认，原「相反」假设已过时）
 	        // 因此 files[idx-1] 是视觉"上一篇"（上面），files[idx+1] 是视觉"下一篇"（下面）
 	        if (idx > 0) {
-	          prevDoc = { id: files[idx - 1].id, title: files[idx - 1].name || '未命名' }
+	          prevDoc = { id: files[idx - 1].id, title: files[idx - 1].name || t('navigation.common.untitled', undefined, '未命名') }
 	        } else {
 	          prevDoc = null
 	        }
 
 	        if (idx >= 0 && idx < files.length - 1) {
-	          nextDoc = { id: files[idx + 1].id, title: files[idx + 1].name || '未命名' }
+	          nextDoc = { id: files[idx + 1].id, title: files[idx + 1].name || t('navigation.common.untitled', undefined, '未命名') }
 	        } else {
 	          nextDoc = null
 	        }
 	      }
     }
   } catch (err) {
-    console.warn('[DesktopDocNav] 获取相邻文档失败:', err)
+    logger.warn('[DesktopDocNav] 获取相邻文档失败:', err)
     prevDoc = null
     nextDoc = null
   } finally {
@@ -167,8 +169,8 @@ async function navigateTo(direction: 'prev' | 'next'): Promise<boolean> {
     setTimeout(() => fetchAdjacentDocs(), 200)
     return true
   } catch (err) {
-    console.error('[DesktopDocNav] 打开文档失败:', err)
-    showMessage('打开文档失败', 3000, 'error')
+    logger.error('[DesktopDocNav] 打开文档失败:', err)
+    showMessage(t('navigation.common.openDocumentFailed', undefined, '打开文档失败'), 3000, 'error')
     // 恢复 prev/next 状态
     fetchAdjacentDocs()
     return false
@@ -297,17 +299,17 @@ function updateNavButtons(): void {
 
   if (prevBtn) {
     prevBtn.disabled = !prevDoc
-    prevBtn.innerHTML = `<span class="desktop-doc-nav-icon">←</span><span>${prevDoc?.title ? truncateTitle(prevDoc.title, 20) : '上一篇'}</span>`
+    prevBtn.innerHTML = `<span class="desktop-doc-nav-icon">←</span><span>${prevDoc?.title ? truncateTitle(prevDoc.title, 20) : t('navigation.docNav.previous', undefined, '上一篇')}</span>`
   }
 
   if (nextBtn) {
     nextBtn.disabled = !nextDoc
-    nextBtn.innerHTML = `<span>${nextDoc?.title ? truncateTitle(nextDoc.title, 20) : '下一篇'}</span><span class="desktop-doc-nav-icon">→</span>`
+    nextBtn.innerHTML = `<span>${nextDoc?.title ? truncateTitle(nextDoc.title, 20) : t('navigation.docNav.next', undefined, '下一篇')}</span><span class="desktop-doc-nav-icon">→</span>`
   }
 }
 
 function truncateTitle(title: string, maxLen = 20): string {
-  if (!title) return '未命名'
+  if (!title) return t('navigation.common.untitled', undefined, '未命名')
   return title.length > maxLen ? title.substring(0, maxLen) + '...' : title
 }
 
@@ -418,13 +420,13 @@ function createNavBar(bottomDistance?: number): void {
   const prevBtn = document.createElement('button')
   prevBtn.className = 'desktop-doc-nav-btn desktop-doc-nav-prev'
   prevBtn.disabled = true
-  prevBtn.innerHTML = '<span class="desktop-doc-nav-icon">←</span><span>上一篇</span>'
+  prevBtn.innerHTML = `<span class="desktop-doc-nav-icon">←</span><span>${t('navigation.docNav.previous', undefined, '上一篇')}</span>`
   prevBtn.addEventListener('click', () => navigateTo('prev'))
 
   const nextBtn = document.createElement('button')
   nextBtn.className = 'desktop-doc-nav-btn desktop-doc-nav-next'
   nextBtn.disabled = true
-  nextBtn.innerHTML = '<span>下一篇</span><span class="desktop-doc-nav-icon">→</span>'
+  nextBtn.innerHTML = `<span>${t('navigation.docNav.next', undefined, '下一篇')}</span><span class="desktop-doc-nav-icon">→</span>`
   nextBtn.addEventListener('click', () => navigateTo('next'))
 
   navBar.appendChild(prevBtn)
@@ -498,7 +500,7 @@ async function loadState(): Promise<void> {
       }
     }
   } catch (err) {
-    console.warn('[DesktopDocNav] 加载状态失败:', err)
+    logger.warn('[DesktopDocNav] 加载状态失败:', err)
   }
 }
 
@@ -546,14 +548,14 @@ export async function init(context: DocNavContext): Promise<void> {
 export function toggleVisibility(config: ButtonConfig): void {
   // 悬浮弹窗 / 独立窗口中不显示
   if (location.href.includes('window.html') || location.href.startsWith('data:text/html')) {
-    showMessage('此功能仅支持主窗口', 1500, 'info')
+    showMessage(t('navigation.common.mainWindowOnly', undefined, '此功能仅支持主窗口'), 1500, 'info')
     return
   }
 
   // 只在桌面端运行
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
   if (isMobile) {
-    showMessage('此功能仅支持桌面端', 1500, 'error')
+    showMessage(t('navigation.common.desktopOnly', undefined, '此功能仅支持桌面端'), 1500, 'error')
     return
   }
 
@@ -583,7 +585,7 @@ export function toggleVisibility(config: ButtonConfig): void {
     }
 
     if (config.showNotification !== false) {
-      showMessage('文档导航已显示', 1500, 'info')
+      showMessage(t('navigation.docNav.shown', undefined, '文档导航已显示'), 1500, 'info')
     }
   } else {
     removeNavBar()
@@ -601,7 +603,7 @@ export function toggleVisibility(config: ButtonConfig): void {
     lastScrollTopForAutoHide = null
 
     if (config.showNotification !== false) {
-      showMessage('文档导航已隐藏', 1500, 'info')
+      showMessage(t('navigation.docNav.hidden', undefined, '文档导航已隐藏'), 1500, 'info')
     }
   }
 

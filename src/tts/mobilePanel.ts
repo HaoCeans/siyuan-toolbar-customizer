@@ -5,6 +5,8 @@
  * 纯 HTTP API + <audio> + Blob URL 播放，任何 WebView 都能用
  */
 
+import { logger } from '@/utils/logger'
+import { t } from '../i18n/runtime'
 import { applyFloatPanelBackground, observeSiYuanThemeMode } from '../ui/floatPanelBackground'
 import * as Notify from '../notification'
 import { showMessage } from 'siyuan'
@@ -33,13 +35,13 @@ let autoReadAction: 'stop' | 'next' | 'prev' = 'stop'
 // ─── 导出 ──
 
 export async function showTTSOptionsMobile(): Promise<void> {
-  console.log('[TTS] showTTSOptionsMobile 被调用')
+  logger.log('[TTS] showTTSOptionsMobile 被调用')
   ensureHighlightStyle()
 
   const engine = getHttpTTSEngine()
   const total = await engine.extractParagraphsAsync()
-  console.log(`[TTS] 提取段落: ${total} 段`)
-  if (total === 0) { Notify.showErrorCommandCannotExecute('当前页面没有可朗读的内容'); return }
+  logger.log(`[TTS] 提取段落: ${total} 段`)
+  if (total === 0) { Notify.showErrorCommandCannotExecute(t('tts.noReadableContent', undefined, '当前页面没有可朗读的内容')); return }
 
   if (!engine.isIdle) { engine.stop(); removeBar() }
   showTTSPanel(total)
@@ -82,7 +84,7 @@ function showTTSPanel(total: number): void {
     letter-spacing:-0.02em;
     display:flex;align-items:center;gap:8px;
   `
-  header.innerHTML = `<span style="display:inline-flex;align-items:center;color:var(--b3-theme-primary)">${lucideSvg('volume-2', 20)}</span> 朗读设置`
+  header.innerHTML = `<span style="display:inline-flex;align-items:center;color:var(--b3-theme-primary)">${lucideSvg('volume-2', 20)}</span> ${t('tts.settings', undefined, '朗读设置')}`
   card.appendChild(header)
 
   // ── 模式切换（Apple 分段控件）──
@@ -99,7 +101,7 @@ function showTTSPanel(total: number): void {
   `
 
   const modeFree = document.createElement('div')
-  modeFree.textContent = '免费（不稳定）'
+  modeFree.textContent = t('tts.mode.freeUnstable', undefined, '免费（不稳定）')
   modeFree.style.cssText = `
     flex:1;padding:8px 0;border-radius:8px;text-align:center;
     font-size:13px;font-weight:500;letter-spacing:-0.01em;
@@ -110,7 +112,7 @@ function showTTSPanel(total: number): void {
   `
 
   const modeApi = document.createElement('div')
-  modeApi.textContent = '硅基流动'
+  modeApi.textContent = t('tts.mode.siliconFlow', undefined, '硅基流动')
   modeApi.style.cssText = `
     flex:1;padding:8px 0;border-radius:8px;text-align:center;
     font-size:13px;font-weight:500;letter-spacing:-0.01em;
@@ -132,7 +134,7 @@ function showTTSPanel(total: number): void {
   const autoReadRow = document.createElement('div')
   autoReadRow.style.cssText = 'margin-top: 6px; margin-bottom: 8px;'
   const autoLabel = document.createElement('div')
-  autoLabel.textContent = '朗读完成后'
+  autoLabel.textContent = t('tts.afterReading', undefined, '朗读完成后')
   autoLabel.style.cssText = 'font-size:13px;margin-bottom:6px;opacity:0.6;font-weight:500;letter-spacing:-0.01em;'
   autoReadRow.appendChild(autoLabel)
   const autoSel = document.createElement('select')
@@ -145,9 +147,9 @@ function showTTSPanel(total: number): void {
     -webkit-appearance:none;appearance:none;
   `
   const autoOpts: Array<{ v: string; t: string }> = [
-    { v: 'stop', t: '停止' },
-    { v: 'next', t: '自动继续朗读下一篇' },
-    { v: 'prev', t: '自动继续朗读上一篇' },
+    { v: 'stop', t: t('tts.stop', undefined, '停止') },
+    { v: 'next', t: t('tts.autoNext', undefined, '自动继续朗读下一篇') },
+    { v: 'prev', t: t('tts.autoPrevious', undefined, '自动继续朗读上一篇') },
   ]
   for (const o of autoOpts) { const opt = document.createElement('option'); opt.value = o.v; opt.textContent = o.t; autoSel.appendChild(opt) }
   // 从已保存的设置恢复
@@ -196,11 +198,11 @@ function renderFreeContent(container: HTMLElement, total: number, autoSel?: HTML
 
   const hint = document.createElement('div')
   hint.style.cssText = 'font-size:11px;opacity:0.5;margin-bottom:14px;letter-spacing:-0.01em;'
-  hint.textContent = '使用百度翻译接口，免费但可能随时失效。音色需切换到「百度API」模式'
+  hint.textContent = t('tts.baiduFreeMobileHint', undefined, '使用百度翻译接口，免费但可能随时失效。音色需切换到「百度API」模式')
   container.appendChild(hint)
 
   // 语速
-  const rateRow = makeRow('语速')
+  const rateRow = makeRow(t('tts.rate', undefined, '语速'))
   const rateBox = document.createElement('div')
   rateBox.style.cssText = 'display:flex;align-items:center;gap:8px'
   const rateSlider = document.createElement('input')
@@ -215,7 +217,7 @@ function renderFreeContent(container: HTMLElement, total: number, autoSel?: HTML
   container.appendChild(rateRow)
 
   // 范围
-  const rangeRow = makeRow('范围')
+  const rangeRow = makeRow(t('tts.range', undefined, '范围'))
   const rangeSel = makeSelect(buildRangeOptions(total))
   rangeRow.appendChild(rangeSel)
   container.appendChild(rangeRow)
@@ -224,7 +226,7 @@ function renderFreeContent(container: HTMLElement, total: number, autoSel?: HTML
   const btns = makeBtnRow()
   bindTap(btns.cancel, () => removeOverlay())
   bindTap(btns.confirm, async () => {
-    autoReadAction = autoSel?.value || 'stop'
+    autoReadAction = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev'
     saveTTSSettings({ autoReadAction })
     const speed = parseInt(rateSlider.value)
     saveTTSSettings({ speed, lastMode: 'free' })
@@ -243,13 +245,13 @@ function renderFreeContent(container: HTMLElement, total: number, autoSel?: HTML
     engine.onFinish = async () => {
       if (autoReadAction === 'stop') {
         const s = bar?.querySelector('#tm-s') as HTMLElement
-        if (s) s.textContent = '朗读完成'
+        if (s) s.textContent = t('tts.readingComplete', undefined, '朗读完成')
         engine.onStateChange = () => {}
-        await engine.speakOnce('本文档已经朗读完成', () => removeBar())
+        await engine.speakOnce(t('tts.documentReadingCompleteSpeech', undefined, '本文档已经朗读完成'), () => removeBar())
         return
       }
       const success = await navigateToAdjacentDoc(autoReadAction)
-      if (!success) { removeBar(); showMessage('已无更多文档', 2000, 'info'); return }
+      if (!success) { removeBar(); showMessage(t('tts.noMoreDocuments', undefined, '已无更多文档'), 2000, 'info'); return }
       await waitForDocLoaded()
       await engine.extractParagraphsAsync()
       engine.speak(0, undefined)
@@ -271,12 +273,12 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: HTMLS
   hintRow.style.cssText = 'margin-bottom:14px'
   const hint = document.createElement('div')
   hint.style.cssText = 'font-size:11px;opacity:0.5;margin-bottom:8px;letter-spacing:-0.01em;'
-  hint.textContent = '硅基流动 CosyVoice2 语音合成，中文质量高，约 ¥50/百万字符'
+  hint.textContent = t('tts.siliconFlowHint', undefined, '硅基流动 CosyVoice2 语音合成，中文质量高，约 ¥50/百万字符')
   hintRow.appendChild(hint)
   const link = document.createElement('a')
   link.href = 'https://cloud.siliconflow.cn/account/ak'
   link.target = '_blank'
-  link.textContent = '前往获取 API Key →'
+  link.textContent = t('tts.getApiKey', undefined, '前往获取 API Key →')
   link.style.cssText = `
     display:inline-block;font-size:13px;
     color:var(--b3-theme-primary);
@@ -293,7 +295,7 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: HTMLS
   const keyInput = document.createElement('input')
   keyInput.type = 'text'
   keyInput.value = cfg.apiKey
-  keyInput.placeholder = '粘贴硅基流动 API Key（sk-xxx）'
+  keyInput.placeholder = t('tts.apiKeyPlaceholder', undefined, '粘贴硅基流动 API Key（sk-xxx）')
   keyInput.style.cssText = `
     width:100%;padding:10px 14px;border-radius:10px;
     border:none;
@@ -305,14 +307,14 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: HTMLS
   container.appendChild(keyRow)
 
   // 音色
-  const speakerRow = makeRow('音色')
+  const speakerRow = makeRow(t('tts.timbre', undefined, '音色'))
   const speakerSel = makeSelect(SF_VOICES)
   speakerSel.value = settings.speaker
   speakerRow.appendChild(speakerSel)
   container.appendChild(speakerRow)
 
   // 语速
-  const rateRow = makeRow('语速')
+  const rateRow = makeRow(t('tts.rate', undefined, '语速'))
   const rateBox = document.createElement('div')
   rateBox.style.cssText = 'display:flex;align-items:center;gap:8px'
   const rateSlider = document.createElement('input')
@@ -327,7 +329,7 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: HTMLS
   container.appendChild(rateRow)
 
   // 范围
-  const rangeRow = makeRow('范围')
+  const rangeRow = makeRow(t('tts.range', undefined, '范围'))
   const rangeSel = makeSelect(buildRangeOptions(total))
   rangeRow.appendChild(rangeSel)
   container.appendChild(rangeRow)
@@ -336,10 +338,10 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: HTMLS
   const btns = makeBtnRow()
   bindTap(btns.cancel, () => removeOverlay())
   bindTap(btns.confirm, async () => {
-    autoReadAction = autoSel?.value || 'stop'
+    autoReadAction = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev'
     saveTTSSettings({ autoReadAction })
     const apiKey = keyInput.value.trim()
-    if (!apiKey) { Notify.showErrorCommandCannotExecute('请填写 API Key'); return }
+    if (!apiKey) { Notify.showErrorCommandCannotExecute(t('tts.enterApiKey', undefined, '请填写 API Key')); return }
 
     const speed = parseFloat(rateSlider.value)
     const speaker = speakerSel.value
@@ -361,13 +363,13 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: HTMLS
     engine.onFinish = async () => {
       if (autoReadAction === 'stop') {
         const s = bar?.querySelector('#tm-s') as HTMLElement
-        if (s) s.textContent = '朗读完成'
+        if (s) s.textContent = t('tts.readingComplete', undefined, '朗读完成')
         engine.onStateChange = () => {}
-        await engine.speakOnce('本文档已经朗读完成', () => removeBar())
+        await engine.speakOnce(t('tts.documentReadingCompleteSpeech', undefined, '本文档已经朗读完成'), () => removeBar())
         return
       }
       const success = await navigateToAdjacentDoc(autoReadAction)
-      if (!success) { removeBar(); showMessage('已无更多文档', 2000, 'info'); return }
+      if (!success) { removeBar(); showMessage(t('tts.noMoreDocuments', undefined, '已无更多文档'), 2000, 'info'); return }
       await waitForDocLoaded()
       await engine.extractParagraphsAsync()
       engine.speak(0, undefined)
@@ -416,7 +418,7 @@ function createBar(engine: TTSController): void {
   barThemeUnsub = observeSiYuanThemeMode(() => applyFloatPanelBackground(b, undefined, 0.82))
   b.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false })
 
-  const status = el('span', '朗读中')
+  const status = el('span', t('tts.reading', undefined, '朗读中'))
   status.id = 'tm-s'
   status.style.cssText = 'font-weight:600;font-size:13px;white-space:nowrap;letter-spacing:-0.02em;'
   b.appendChild(status)
@@ -429,23 +431,23 @@ function createBar(engine: TTSController): void {
   b.appendChild(el('span', ''))!.style.flex = '1'
 
   // 控制按钮（SVG 图标）
-  b.appendChild(createIconButton('skip-back', '上一段', 18, () => engine.prevParagraph(), { isMobile: true }))
+  b.appendChild(createIconButton('skip-back', t('tts.previousParagraph', undefined, '上一段'), 18, () => engine.prevParagraph(), { isMobile: true }))
 
-  const pp = createIconButton('pause', '暂停', 20, () => {
+  const pp = createIconButton('pause', t('tts.pause', undefined, '暂停'), 20, () => {
     if (engine.isPlaying) engine.pause()
     else if (engine.isPaused) engine.resume()
   }, { isMobile: true, isPrimary: true })
   pp.id = 'tm-pp'
   b.appendChild(pp)
 
-  b.appendChild(createIconButton('skip-forward', '下一段', 18, () => engine.nextParagraph(), { isMobile: true }))
+  b.appendChild(createIconButton('skip-forward', t('tts.nextParagraph', undefined, '下一段'), 18, () => engine.nextParagraph(), { isMobile: true }))
 
   // 分隔线
   const sep = document.createElement('div')
   sep.style.cssText = 'width:1px;height:24px;background:var(--b3-theme-on-surface);opacity:0.1;margin:0 4px;'
   b.appendChild(sep)
 
-  b.appendChild(createIconButton('square', '停止', 18, () => { engine.stop(); removeBar() }, { isMobile: true }))
+  b.appendChild(createIconButton('square', t('tts.stop', undefined, '停止'), 18, () => { engine.stop(); removeBar() }, { isMobile: true }))
 
   document.body.appendChild(b)
   bar = b
@@ -456,8 +458,8 @@ function updateBar(st: string, idx: number, tot: number): void {
   const s = bar.querySelector('#tm-s') as HTMLElement
   const p = bar.querySelector('#tm-p') as HTMLElement
   const pp = bar.querySelector('#tm-pp') as HTMLElement
-  const m: Record<string, string> = { loading: '合成中', playing: '朗读中', paused: '已暂停', idle: '停止' }
-  if (s) s.textContent = m[st] || '朗读中'
+  const m: Record<string, string> = { loading: t('tts.synthesizing', undefined, '合成中'), playing: t('tts.reading', undefined, '朗读中'), paused: t('tts.paused', undefined, '已暂停'), idle: t('tts.stop', undefined, '停止') }
+  if (s) s.textContent = m[st] || t('tts.reading', undefined, '朗读中')
   if (p && tot > 0) p.textContent = `${idx + 1} / ${tot}`
   if (pp) {
     const isPlaying = st === 'playing' || st === 'loading'
@@ -482,10 +484,10 @@ function removeVis(): void {
 // ─── UI 工具 ──
 
 function buildRangeOptions(total: number): Array<{ v: string; t: string }> {
-  const opts: Array<{ v: string; t: string }> = [{ v: 'all', t: `全部 ${total} 段` }]
+  const opts: Array<{ v: string; t: string }> = [{ v: 'all', t: t('tts.allParagraphs', { total }, `全部 ${total} 段`) }]
   if (total > 5) {
-    opts.push({ v: 'first-half', t: `前半（1-${Math.floor(total / 2)}段）` })
-    opts.push({ v: 'second-half', t: `后半（${Math.floor(total / 2) + 1}-${total}段）` })
+    opts.push({ v: 'first-half', t: t('tts.firstHalfRange', { end: Math.floor(total / 2) }, `前半（1-${Math.floor(total / 2)}段）`) })
+    opts.push({ v: 'second-half', t: t('tts.secondHalfRange', { start: Math.floor(total / 2) + 1, total }, `后半（${Math.floor(total / 2) + 1}-${total}段）`) })
   }
   return opts
 }
@@ -532,8 +534,8 @@ function makeSelect(items: Array<{ v: string; t: string }>): HTMLSelectElement {
 function makeBtnRow(): { wrap: HTMLElement; cancel: HTMLElement; confirm: HTMLElement } {
   const wrap = document.createElement('div')
   wrap.style.cssText = 'display:flex;gap:10px;margin-top:4px'
-  const cancel = makeBtn('取消', { flex: 1, secondary: true })
-  const confirm = makeBtn('开始朗读', { flex: 2, primary: true })
+  const cancel = makeBtn(t('tts.cancel', undefined, '取消'), { flex: 1, secondary: true })
+  const confirm = makeBtn(t('tts.startReading', undefined, '开始朗读'), { flex: 2, primary: true })
   wrap.appendChild(cancel); wrap.appendChild(confirm)
   return { wrap, cancel, confirm }
 }

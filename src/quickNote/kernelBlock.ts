@@ -1,3 +1,4 @@
+import { logger } from '@/utils/logger'
 import { fetchSyncPost } from 'siyuan'
 import { appendBlock, deleteBlock, getChildBlocks, insertBlock, prependBlock, sql } from '../api'
 
@@ -164,7 +165,7 @@ export async function createQuickNoteDraftBlock(target: QuickNoteSaveTarget): Pr
 
     return insertDraftBlockLegacy(target)
   } catch (err) {
-    console.error('[QuickNote] createQuickNoteDraftBlock failed:', err)
+    logger.error('[QuickNote] createQuickNoteDraftBlock failed:', err)
     return null
   }
 }

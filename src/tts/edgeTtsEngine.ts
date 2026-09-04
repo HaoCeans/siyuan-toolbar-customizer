@@ -12,8 +12,10 @@
  * 协议参考：sireader 插件的 EdgeTTSCore 类
  */
 
+import { logger } from '@/utils/logger'
 import { TTSEngine, ParagraphInfo, getCurrentDocId } from './ttsEngine'
 import { fetchSyncPost } from 'siyuan'
+import { t } from '../i18n/runtime'
 
 // ─── 检测 Node.js 环境 ──────────────────────────────────
 // 使用 Function 构造器绕过 Vite 静态分析，确保 require 不被打包器吃掉
@@ -79,7 +81,7 @@ class NodeWS {
       }
     })
     this.socket.on('error', (err: Error) => {
-      console.error('[NodeWS] TLS 连接错误:', err.message)
+      logger.error('[NodeWS] TLS 连接错误:', err.message)
       this.onerror?.(err)
     })
     this.socket.on('close', () => this.onclose?.())
@@ -200,17 +202,17 @@ function createEdgeWS(): any {
 // ─── Edge TTS 中文语音列表 ──────────────────────────────────
 
 export const EDGE_TTS_VOICES = [
-  { name: 'zh-CN-XiaoxiaoNeural', displayName: '晓晓（女·温柔）' },
-  { name: 'zh-CN-YunxiNeural', displayName: '云希（男·阳光）' },
-  { name: 'zh-CN-XiaoyiNeural', displayName: '晓伊（女·活泼）' },
-  { name: 'zh-CN-YunjianNeural', displayName: '云健（男·沉稳）' },
-  { name: 'zh-CN-XiaochenNeural', displayName: '晓辰（女·知性）' },
-  { name: 'zh-CN-XiaohanNeural', displayName: '晓涵（女·甜美）' },
-  { name: 'zh-CN-XiaomoNeural', displayName: '晓墨（女·文艺）' },
-  { name: 'zh-CN-XiaoshuangNeural', displayName: '晓双（女·童声）' },
-  { name: 'zh-CN-YunfengNeural', displayName: '云枫（男·磁性）' },
-  { name: 'zh-CN-YunhaoNeural', displayName: '云皓（男·新闻）' },
-  { name: 'zh-CN-YunzeNeural', displayName: '云泽（男·纪录片）' },
+  { name: 'zh-CN-XiaoxiaoNeural', displayName: t('tts.voice.edge.xiaoxiao', undefined, '晓晓（女·温柔）') },
+  { name: 'zh-CN-YunxiNeural', displayName: t('tts.voice.edge.yunxi', undefined, '云希（男·阳光）') },
+  { name: 'zh-CN-XiaoyiNeural', displayName: t('tts.voice.edge.xiaoyi', undefined, '晓伊（女·活泼）') },
+  { name: 'zh-CN-YunjianNeural', displayName: t('tts.voice.edge.yunjian', undefined, '云健（男·沉稳）') },
+  { name: 'zh-CN-XiaochenNeural', displayName: t('tts.voice.edge.xiaochen', undefined, '晓辰（女·知性）') },
+  { name: 'zh-CN-XiaohanNeural', displayName: t('tts.voice.edge.xiaohan', undefined, '晓涵（女·甜美）') },
+  { name: 'zh-CN-XiaomoNeural', displayName: t('tts.voice.edge.xiaomo', undefined, '晓墨（女·文艺）') },
+  { name: 'zh-CN-XiaoshuangNeural', displayName: t('tts.voice.edge.xiaoshuang', undefined, '晓双（女·童声）') },
+  { name: 'zh-CN-YunfengNeural', displayName: t('tts.voice.edge.yunfeng', undefined, '云枫（男·磁性）') },
+  { name: 'zh-CN-YunhaoNeural', displayName: t('tts.voice.edge.yunhao', undefined, '云皓（男·新闻）') },
+  { name: 'zh-CN-YunzeNeural', displayName: t('tts.voice.edge.yunze', undefined, '云泽（男·纪录片）') },
 ]
 
 // ─── 常量 ──────────────────────────────────────────────────
@@ -486,8 +488,8 @@ export class EdgeTTSEngine {
       .catch(err => {
         if (this.stopped) return
         const msg = err instanceof Error ? err.message : String(err)
-        console.warn('[EdgeTTS] error:', msg)
-        this.onError?.(`朗读失败：${msg}`)
+        logger.warn('[EdgeTTS] error:', msg)
+        this.onError?.(t('tts.readingFailedRetry', undefined, '朗读失败，请重试或检查朗读设置'))
         this.stop()
       })
   }
@@ -687,12 +689,12 @@ async function fetchGoogleTTS(text: string, lang: string = 'zh-CN'): Promise<Arr
     for (const url of urls) {
       if (gotAudio) break
       try {
-        console.log(`[GoogleTTS] 请求段 ${i + 1}/${segments.length}, URL=${url.substring(0, 100)}...`)
+        logger.log(`[GoogleTTS] 请求段 ${i + 1}/${segments.length}, URL=${url.substring(0, 100)}...`)
         const result = await forwardProxy(url, 'GET', {}, [], 15000, 'audio/mpeg', '')
-        console.log(`[GoogleTTS] 响应: status=${result?.status}, hasBody=${!!result?.body}, bodyLen=${result?.body ? String(result.body).length : 0}, encoding=${result?.bodyEncoding}`)
+        logger.log(`[GoogleTTS] 响应: status=${result?.status}, hasBody=${!!result?.body}, bodyLen=${result?.body ? String(result.body).length : 0}, encoding=${result?.bodyEncoding}`)
 
         if (!result || result.status !== 200) {
-          console.warn(`[GoogleTTS] 状态异常: ${result?.status}`)
+          logger.warn(`[GoogleTTS] 状态异常: ${result?.status}`)
           continue
         }
 
@@ -708,7 +710,7 @@ async function fetchGoogleTTS(text: string, lang: string = 'zh-CN'): Promise<Arr
               bytes = new Uint8Array(bin.length)
               for (let j = 0; j < bin.length; j++) bytes[j] = bin.charCodeAt(j)
             } catch {
-              console.warn('[GoogleTTS] base64 解码失败')
+              logger.warn('[GoogleTTS] base64 解码失败')
             }
           }
           if (!bytes || bytes.length < 100) {
@@ -721,27 +723,27 @@ async function fetchGoogleTTS(text: string, lang: string = 'zh-CN'): Promise<Arr
         }
 
         if (!bytes || bytes.length < 100) {
-          console.warn(`[GoogleTTS] 音频数据太小: ${bytes?.length ?? 0} 字节`)
+          logger.warn(`[GoogleTTS] 音频数据太小: ${bytes?.length ?? 0} 字节`)
           continue
         }
 
         // 验证是否为有效音频（MP3 以 0xFF 0xFB 或 0x49 0x44 开头）
         const isMP3 = bytes[0] === 0xFF || (bytes[0] === 0x49 && bytes[1] === 0x44)
-        console.log(`[GoogleTTS] 数据大小=${bytes.length}, 首字节=${bytes[0].toString(16)} ${bytes[1].toString(16)}, isMP3=${isMP3}`)
+        logger.log(`[GoogleTTS] 数据大小=${bytes.length}, 首字节=${bytes[0].toString(16)} ${bytes[1].toString(16)}, isMP3=${isMP3}`)
 
         audioParts.push(bytes.buffer)
         gotAudio = true
       } catch (err) {
-        console.warn('[GoogleTTS] 段请求失败:', err instanceof Error ? err.message : String(err))
+        logger.warn('[GoogleTTS] 段请求失败:', err instanceof Error ? err.message : String(err))
       }
     }
   }
 
   if (audioParts.length === 0) {
-    console.error('[GoogleTTS] 所有段均失败，返回 null')
+    logger.error('[GoogleTTS] 所有段均失败，返回 null')
     return null
   }
-  console.log(`[GoogleTTS] 成功获取 ${audioParts.length} 段音频`)
+  logger.log(`[GoogleTTS] 成功获取 ${audioParts.length} 段音频`)
   return concatArrayBuffers(audioParts)
 }
 
@@ -896,7 +898,13 @@ export class GoogleTTSEngine {
         return this.playAudioData(audio)
       })
       .then(() => { if (!this.stopped) { this.currentIndex++; this.playCurrentParagraph() } })
-      .catch(err => { if (!this.stopped) { this.onError?.(err.message || 'Google TTS 失败'); this.stop() } })
+      .catch(err => {
+        if (!this.stopped) {
+          logger.warn('[GoogleTTS] error:', err)
+          this.onError?.(t('tts.googleFailedRetry', undefined, 'Google TTS 失败，请重试或检查网络连接'))
+          this.stop()
+        }
+      })
   }
 
   private async playAudioData(audioData: ArrayBuffer): Promise<void> {

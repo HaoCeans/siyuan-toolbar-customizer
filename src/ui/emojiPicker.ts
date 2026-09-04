@@ -3,6 +3,8 @@
  * 使用思源原生表情数据 window.siyuan.emojis
  */
 
+import { logger } from '@/utils/logger'
+import { getLocale, t } from '../i18n/runtime'
 export interface EmojiPickerOptions {
   title?: string
   currentValue?: string
@@ -41,12 +43,12 @@ function getSiYuanEmojis() {
  * 显示表情选择器弹窗
  */
 export function showEmojiPicker(options: EmojiPickerOptions): void {
-  const { title = "选择表情", onSelect } = options
+  const { title = t('emojiPicker.title', undefined, '选择表情'), onSelect } = options
 
   // 获取思源表情数据
   const emojiCategories = getSiYuanEmojis()
   if (!emojiCategories.length) {
-    console.warn("思源表情数据未加载")
+    logger.warn("思源表情数据未加载")
     return
   }
 
@@ -188,7 +190,8 @@ export function showEmojiPicker(options: EmojiPickerOptions): void {
   emojiCategories.forEach((cat: any, index: number) => {
     const tab = document.createElement("button")
     tab.className = "b3-button"
-    tab.textContent = cat.title_zh_cn || cat.title
+    const localizedTitleField = `title_${getLocale().toLowerCase().replace('-', '_')}`
+    tab.textContent = cat[localizedTitleField] || cat.title || cat.title_zh_cn || ''
     tab.dataset.categoryId = cat.id
     tab.style.cssText = `
       padding: 6px 12px;

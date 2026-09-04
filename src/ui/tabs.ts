@@ -3,6 +3,8 @@
  * 负责创建桌面端/手机端配置的标签切换功能
  */
 
+import { t } from '../i18n/runtime'
+
 // 保存注入的样式引用，用于清理和复用
 let injectedStyle: HTMLStyleElement | null = null
 // 递归调用计数器，防止无限循环
@@ -104,7 +106,7 @@ export function injectTabSwitcher(): void {
     const desktopTab = document.createElement('button')
     desktopTab.className = 'b3-button'
     desktopTab.dataset.tab = 'desktop'
-    desktopTab.textContent = '🖥️ 电脑配置'
+    desktopTab.textContent = t('tabs.desktop', undefined, '🖥️ 电脑配置')
     desktopTab.style.cssText = `
       flex: 1;
       padding: 8px 16px;
@@ -116,7 +118,7 @@ export function injectTabSwitcher(): void {
     const mobileTab = document.createElement('button')
     mobileTab.className = 'b3-button'
     mobileTab.dataset.tab = 'mobile'
-    mobileTab.textContent = '📱 手机配置'
+    mobileTab.textContent = t('tabs.mobile', undefined, '📱 手机配置')
     mobileTab.style.cssText = `
       flex: 1;
       padding: 8px 16px;
@@ -128,7 +130,7 @@ export function injectTabSwitcher(): void {
     const versionTab = document.createElement('button')
     versionTab.className = 'b3-button'
     versionTab.dataset.tab = 'version'
-    versionTab.textContent = '📋 数据迁移'
+    versionTab.textContent = t('tabs.migration', undefined, '📋 数据迁移')
     versionTab.style.cssText = `
       flex: 1;
       padding: 8px 16px;
@@ -140,7 +142,7 @@ export function injectTabSwitcher(): void {
     const activationTab = document.createElement('button')
     activationTab.className = 'b3-button'
     activationTab.dataset.tab = 'activation'
-    activationTab.textContent = '🔐 激活与权益'
+    activationTab.textContent = t('tabs.activation', undefined, '🔐 激活与权益')
     activationTab.style.cssText = `
       flex: 1;
       padding: 8px 16px;

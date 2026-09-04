@@ -1,8 +1,10 @@
+import { t } from '../i18n/runtime'
 /**
  * 自定义对话框
  * 用于替代 window.confirm 等原生对话框，兼容鸿蒙系统
  */
 
+import { logger } from '@/utils/logger'
 export interface ConfirmDialogOptions {
   title?: string
   message: string
@@ -23,7 +25,7 @@ export interface ConfirmDialogOptions {
  * @returns Promise<boolean> - 用户选择结果
  */
 export function showConfirmDialog(options: ConfirmDialogOptions): Promise<boolean> {
-  const { title = '确认', message, hint, confirmText = '确定', cancelText = '取消', extraButton, confirmInitiallyDisabled } = options
+  const { title = t('dialog.confirmTitle', undefined, '确认'), message, hint, confirmText = t('dialog.confirm', undefined, '确定'), cancelText = t('dialog.cancel', undefined, '取消'), extraButton, confirmInitiallyDisabled } = options
 
   return new Promise((resolve) => {
     const overlay = document.createElement('div')
@@ -124,7 +126,7 @@ export function showConfirmDialog(options: ConfirmDialogOptions): Promise<boolea
           confirmButton.disabled = false
           confirmButton.style.opacity = ''
         } catch (e) {
-          console.warn('[dialog extraButton] 执行失败:', e)
+          logger.warn('[dialog extraButton] 执行失败:', e)
         } finally {
           extraBtn.disabled = false
         }

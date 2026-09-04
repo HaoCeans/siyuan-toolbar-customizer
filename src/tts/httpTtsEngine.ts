@@ -6,9 +6,11 @@
  * 百度/有道通过思源 forwardProxy 代理；硅基流动桌面端可直接 fetch，手机端走 forwardProxy。
  */
 
+import { logger } from '@/utils/logger'
 import { getTTSEngine, ParagraphInfo, getCurrentDocId } from './ttsEngine'
 import { forwardProxy } from '../api'
 import { pluginInstance } from '../toolbarManager'
+import { t } from '../i18n/runtime'
 
 // ═══════════════════════════════════════════════════════════════
 // 常量
@@ -58,14 +60,14 @@ export interface TTSController {
 // ═══════════════════════════════════════════════════════════════
 
 export const SF_VOICES = [
-  { v: 'alex', t: 'Alex · 沉稳男声' },
-  { v: 'benjamin', t: 'Benjamin · 低沉男声' },
-  { v: 'charles', t: 'Charles · 磁性男声' },
-  { v: 'david', t: 'David · 欢快男声' },
-  { v: 'anna', t: 'Anna · 沉稳女声' },
-  { v: 'bella', t: 'Bella · 激情女声' },
-  { v: 'claire', t: 'Claire · 温柔女声（默认）' },
-  { v: 'diana', t: 'Diana · 欢快女声' },
+  { v: 'alex', t: t('tts.voice.sf.alex', undefined, 'Alex · 沉稳男声') },
+  { v: 'benjamin', t: t('tts.voice.sf.benjamin', undefined, 'Benjamin · 低沉男声') },
+  { v: 'charles', t: t('tts.voice.sf.charles', undefined, 'Charles · 磁性男声') },
+  { v: 'david', t: t('tts.voice.sf.david', undefined, 'David · 欢快男声') },
+  { v: 'anna', t: t('tts.voice.sf.anna', undefined, 'Anna · 沉稳女声') },
+  { v: 'bella', t: t('tts.voice.sf.bella', undefined, 'Bella · 激情女声') },
+  { v: 'claire', t: t('tts.voice.sf.claire', undefined, 'Claire · 温柔女声（默认）') },
+  { v: 'diana', t: t('tts.voice.sf.diana', undefined, 'Diana · 欢快女声') },
 ]
 
 const SF_MODEL = 'FunAudioLLM/CosyVoice2-0.5B'
@@ -238,7 +240,7 @@ async function fetchSiliconFlowViaProxy(text: string, speed: number, apiKey: str
     speed: Math.max(0.25, Math.min(4.0, speed)),
   }
 
-  console.log(`[SiliconFlowTTS] forwardProxy请求: voice=${payload.voice}, speed=${payload.speed.toFixed(2)}`)
+  logger.log(`[SiliconFlowTTS] forwardProxy请求: voice=${payload.voice}, speed=${payload.speed.toFixed(2)}`)
 
   const result = await forwardProxy(SF_API_URL, 'POST', payload, [
     { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -260,7 +262,7 @@ async function fetchSiliconFlowViaProxy(text: string, speed: number, apiKey: str
     throw new Error('硅基流动 API 返回非音频数据')
   }
 
-  console.log(`[SiliconFlowTTS] 成功: ${audioData.byteLength} 字节`)
+  logger.log(`[SiliconFlowTTS] 成功: ${audioData.byteLength} 字节`)
   return audioData
 }
 
@@ -273,7 +275,7 @@ async function fetchSiliconFlowDirect(text: string, speed: number, apiKey: strin
     speed: Math.max(0.25, Math.min(4.0, speed)),
   }
 
-  console.log(`[SiliconFlowTTS] 直接fetch请求: voice=${payload.voice}, speed=${payload.speed.toFixed(2)}`)
+  logger.log(`[SiliconFlowTTS] 直接fetch请求: voice=${payload.voice}, speed=${payload.speed.toFixed(2)}`)
 
   const resp = await fetch(SF_API_URL, {
     method: 'POST',
@@ -297,7 +299,7 @@ async function fetchSiliconFlowDirect(text: string, speed: number, apiKey: strin
     throw new Error('硅基流动 API 返回非音频数据')
   }
 
-  console.log(`[SiliconFlowTTS] 成功: ${audio.byteLength} 字节`)
+  logger.log(`[SiliconFlowTTS] 成功: ${audio.byteLength} 字节`)
   return audio
 }
 
@@ -465,7 +467,7 @@ export class HttpTTSEngine {
       this.currentIndex = -1
       this.notify()
       if (this.successCount === 0) {
-        this.onError?.('所有段落朗读均失败，请检查网络连接或朗读设置')
+        this.onError?.(t('tts.allParagraphsFailed', undefined, '所有段落朗读均失败，请检查网络连接或朗读设置'))
       } else {
         this.onFinish?.()
       }
@@ -491,7 +493,7 @@ export class HttpTTSEngine {
       .catch(err => {
         if (this.stopped) return
         const msg = err instanceof Error ? err.message : String(err)
-        console.warn('[HttpTTS] 段落朗读失败，跳过:', msg)
+        logger.warn('[HttpTTS] 段落朗读失败，跳过:', msg)
         // 跳过失败段落，继续下一段
         this.currentIndex++
         this.playCurrentParagraph()
@@ -501,7 +503,7 @@ export class HttpTTSEngine {
   private async fetchTTSAudio(text: string): Promise<ArrayBuffer> {
     // ★ API 模式：硅基流动 CosyVoice2
     if (this.mode === 'api' && this.apiToken) {
-      console.log(`[HttpTTS] API模式: 硅基流动 CosyVoice2 (directFetch=${this.directFetch})`)
+      logger.log(`[HttpTTS] API模式: 硅基流动 CosyVoice2 (directFetch=${this.directFetch})`)
       if (this.directFetch) {
         return fetchSiliconFlowDirect(text, this.speed, this.apiToken, String(this.speaker))
       }
@@ -515,7 +517,7 @@ export class HttpTTSEngine {
     for (let i = 0; i < chunks.length; i++) {
       if (this.stopped) throw new Error('stopped')
       const chunk = chunks[i]
-      console.log(`[HttpTTS] 免费模式 ${i + 1}/${chunks.length}: "${chunk.substring(0, 30)}..."`)
+      logger.log(`[HttpTTS] 免费模式 ${i + 1}/${chunks.length}: "${chunk.substring(0, 30)}..."`)
       const audio = await this.tryFetchChunk(chunk)
       audioParts.push(audio)
     }
@@ -555,27 +557,27 @@ export class HttpTTSEngine {
     try {
       const result = await forwardProxy(url, 'GET', {}, headers, 15000, 'audio/mp3', 'base64')
       if (!result || result.status !== 200) {
-        console.warn(`[HttpTTS] ${label} HTTP ${result?.status || '无响应'}`)
+        logger.warn(`[HttpTTS] ${label} HTTP ${result?.status || '无响应'}`)
         return null
       }
 
       const audioData = this.decodeResponseBody(result.body, result.bodyEncoding)
       if (!audioData || audioData.byteLength < 200) {
-        console.warn(`[HttpTTS] ${label} 数据太小: ${audioData?.byteLength || 0} 字节`)
+        logger.warn(`[HttpTTS] ${label} 数据太小: ${audioData?.byteLength || 0} 字节`)
         return null
       }
 
       const b0 = new Uint8Array(audioData)[0], b1 = new Uint8Array(audioData)[1]
       const valid = b0 === 0xFF || (b0 === 0x49 && b1 === 0x44) || (b0 === 0x52 && b1 === 0x49) || (b0 === 0x4F && b1 === 0x67)
       if (!valid) {
-        console.warn(`[HttpTTS] ${label} 非音频格式: ${b0.toString(16)} ${b1.toString(16)}`)
+        logger.warn(`[HttpTTS] ${label} 非音频格式: ${b0.toString(16)} ${b1.toString(16)}`)
         return null
       }
 
-      console.log(`[HttpTTS] ${label} 成功: ${audioData.byteLength} 字节`)
+      logger.log(`[HttpTTS] ${label} 成功: ${audioData.byteLength} 字节`)
       return audioData
     } catch (e) {
-      console.warn(`[HttpTTS] ${label} 失败:`, e instanceof Error ? e.message : String(e))
+      logger.warn(`[HttpTTS] ${label} 失败:`, e instanceof Error ? e.message : String(e))
       return null
     }
   }

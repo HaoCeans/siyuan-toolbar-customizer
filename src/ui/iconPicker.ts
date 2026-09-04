@@ -1,3 +1,4 @@
+import { getLocale, t } from '../i18n/runtime'
 /**
  * 图标选择器
  * 三级分区：思源图标 | 阿里图标 | 极简图标（Lucide）
@@ -15,6 +16,29 @@ export interface IconPickerOptions {
 }
 
 type PartitionType = 'siyuan' | 'ali' | 'lucide'
+
+function getSiYuanLocalizedText(item: any, field: 'title' | 'description'): string {
+  const localizedField = `${field}_${getLocale().toLowerCase().replace('-', '_')}`
+  return item?.[localizedField] || item?.[field] || item?.[`${field}_zh_cn`] || ''
+}
+
+function getAliCategoryDisplayName(id: string, fallbackName: string): string {
+  switch (id) {
+    case 'ali-food': return t('iconPicker.category.aliFood', undefined, fallbackName)
+    case 'ali-colourful-one': return t('iconPicker.category.aliColourfulOne', undefined, fallbackName)
+    case 'ali-colourful-two': return t('iconPicker.category.aliColourfulTwo', undefined, fallbackName)
+    case 'ali-colourful-three': return t('iconPicker.category.aliColourfulThree', undefined, fallbackName)
+    case 'ali-technology': return t('iconPicker.category.aliTechnology', undefined, fallbackName)
+    case 'ali-game': return t('iconPicker.category.aliGame', undefined, fallbackName)
+    case 'ali-emoji': return t('iconPicker.category.aliEmoji', undefined, fallbackName)
+    case 'ali-business': return t('iconPicker.category.aliBusiness', undefined, fallbackName)
+    case 'ali-desktop': return t('iconPicker.category.aliDesktop', undefined, fallbackName)
+    case 'ali-stars': return t('iconPicker.category.aliStars', undefined, fallbackName)
+    case 'ali-landmark': return t('iconPicker.category.aliLandmark', undefined, fallbackName)
+    case 'ali-navigation': return t('iconPicker.category.aliNavigation', undefined, fallbackName)
+    default: return fallbackName
+  }
+}
 
 /**
  * Unicode 转 Emoji 字符串
@@ -48,7 +72,7 @@ function getSiYuanEmojis() {
  * 显示图标选择器弹窗
  */
 export function showIconPicker(options: IconPickerOptions): void {
-  const { title = '选择图标', iconSize = 24, onSelect } = options
+  const { title = t('iconPicker.title', undefined, '选择图标'), iconSize = 24, onSelect } = options
 
   // 创建弹窗
   const dialog = document.createElement('div')
@@ -184,9 +208,9 @@ export function showIconPicker(options: IconPickerOptions): void {
   // ===== 搜索框占位符根据分区动态变化 =====
   const updateSearchPlaceholder = () => {
     const map: Record<PartitionType, string> = {
-      lucide: '极简图标搜索，请用"英文"...',
-      ali: '阿里图标搜索，请用"中文拼音"...',
-      siyuan: '思源图标搜索，请用"中文"...',
+      lucide: t('iconPicker.searchLucide', undefined, '极简图标搜索，请用"英文"...'),
+      ali: t('iconPicker.searchAli', undefined, '阿里图标搜索，请用"中文拼音"...'),
+      siyuan: t('iconPicker.searchSiyuan', undefined, '思源图标搜索，请用"中文"...'),
     }
     searchInput.placeholder = map[activePartition]
   }
@@ -332,9 +356,9 @@ export function showIconPicker(options: IconPickerOptions): void {
     if (activePartition === 'siyuan') {
       const emojiCategories = getSiYuanEmojis()
       emojiCategories.forEach((cat: any) => {
-        const catName = (cat.title_zh_cn || cat.title || '').toLowerCase()
+        const catName = `${getSiYuanLocalizedText(cat, 'title')} ${cat.title_zh_cn || ''}`.toLowerCase()
         ;(cat.items || []).forEach((item: any) => {
-          const desc = (item.description_zh_cn || item.description || '').toLowerCase()
+          const desc = `${getSiYuanLocalizedText(item, 'description')} ${item.description_zh_cn || ''}`.toLowerCase()
           const keys = (item.keywords || '').toLowerCase()
           if (desc.includes(keyword) || keys.includes(keyword) || catName.includes(keyword)) {
             const emoji = unicodeToEmoji(item.unicode)
@@ -345,7 +369,7 @@ export function showIconPicker(options: IconPickerOptions): void {
       })
     } else if (activePartition === 'ali') {
       aliIconCategories.forEach(cat => {
-        const catName = cat.name.toLowerCase()
+        const catName = `${getAliCategoryDisplayName(cat.id, cat.name)} ${cat.name}`.toLowerCase()
         cat.icons.forEach(iconPath => {
           const fileName = iconPath.split('/').pop()?.replace(/\.\w+$/, '').toLowerCase() || ''
           if (catName.includes(keyword) || fileName.includes(keyword)) {
@@ -369,9 +393,9 @@ export function showIconPicker(options: IconPickerOptions): void {
     const statusEl = document.createElement('div')
     statusEl.style.cssText = 'padding: 6px 0 10px 0; font-size: 13px; color: var(--b3-theme-on-surface-light);'
     if (matchedCount === 0) {
-      statusEl.textContent = `未找到匹配"${keyword}"的图标`
+      statusEl.textContent = t('iconPicker.noMatchKeyword', { keyword }, `未找到匹配"${keyword}"的图标`)
     } else {
-      statusEl.textContent = `找到 ${matchedCount} 个匹配"${keyword}"的图标`
+      statusEl.textContent = t('iconPicker.matchCount', { matchedCount, keyword }, `找到 ${matchedCount} 个匹配"${keyword}"的图标`)
     }
     categoryTabs.appendChild(statusEl)
 
@@ -385,7 +409,7 @@ export function showIconPicker(options: IconPickerOptions): void {
         color: var(--b3-theme-on-surface-light);
         font-size: 14px;
       `
-      emptyHint.textContent = '未找到匹配的图标'
+      emptyHint.textContent = t('iconPicker.empty', undefined, '未找到匹配的图标')
       grid.appendChild(emptyHint)
     }
 
@@ -485,13 +509,13 @@ export function showIconPicker(options: IconPickerOptions): void {
     if (allNames.length === 0) {
       const msg = document.createElement('div')
       msg.style.cssText = 'padding: 6px 0 10px 0; font-size: 13px; color: var(--b3-theme-on-surface-light);'
-      msg.textContent = 'Lucide 图标库未加载，请确认插件已正确打包 lucide 依赖'
+      msg.textContent = t('iconPicker.lucideUnavailable', undefined, 'Lucide 图标库未加载，请确认插件已正确打包 lucide 依赖')
       categoryTabs.appendChild(msg)
 
       const grid = replaceGrid()
       const emptyHint = document.createElement('div')
       emptyHint.style.cssText = 'grid-column:1/-1;text-align:center;padding:40px 20px;color:var(--b3-theme-on-surface-light);font-size:14px;'
-      emptyHint.textContent = '未能加载 Lucide 图标列表'
+      emptyHint.textContent = t('iconPicker.lucideEmpty', undefined, '未能加载 Lucide 图标列表')
       grid.appendChild(emptyHint)
       content.appendChild(grid)
       return
@@ -499,7 +523,7 @@ export function showIconPicker(options: IconPickerOptions): void {
 
     const countEl = document.createElement('div')
     countEl.style.cssText = 'padding: 6px 0 10px 0; font-size: 13px; color: var(--b3-theme-on-surface-light);'
-    countEl.textContent = `共 ${allNames.length} 个图标`
+    countEl.textContent = t('iconPicker.totalCount', { count: allNames.length }, `共 ${allNames.length} 个图标`)
     categoryTabs.appendChild(countEl)
 
     const grid = replaceGrid()
@@ -526,7 +550,7 @@ export function showIconPicker(options: IconPickerOptions): void {
       activeCategory = emojiCategories.find((c: any) => c.id === defaultCategoryId)?.id || emojiCategories[0]?.id
 
       emojiCategories.forEach((cat: any) => {
-        const tab = createCategoryTab(cat.id, cat.title_zh_cn || cat.title, activeCategory === cat.id, () => {
+        const tab = createCategoryTab(cat.id, getSiYuanLocalizedText(cat, 'title'), activeCategory === cat.id, () => {
           activeCategory = cat.id
           updateCategoryTabStyles()
           renderSiyuanContent(cat.id)
@@ -541,7 +565,7 @@ export function showIconPicker(options: IconPickerOptions): void {
       activeCategory = aliIconCategories.find(c => c.id === defaultCategoryId)?.id || aliIconCategories[0]?.id
 
       aliIconCategories.forEach(cat => {
-        const tab = createCategoryTab(cat.id, cat.name, activeCategory === cat.id, () => {
+        const tab = createCategoryTab(cat.id, getAliCategoryDisplayName(cat.id, cat.name), activeCategory === cat.id, () => {
           activeCategory = cat.id
           updateCategoryTabStyles()
           renderAliContent(cat.id)
@@ -634,9 +658,9 @@ export function showIconPicker(options: IconPickerOptions): void {
   }
 
   // 添加分区标签
-  partitionTabs.appendChild(createPartitionTab('lucide', '极简图标'))
-  partitionTabs.appendChild(createPartitionTab('ali', '阿里图标'))
-  partitionTabs.appendChild(createPartitionTab('siyuan', '思源图标'))
+  partitionTabs.appendChild(createPartitionTab('lucide', t('iconPicker.sectionLucide', undefined, '极简图标')))
+  partitionTabs.appendChild(createPartitionTab('ali', t('iconPicker.sectionAli', undefined, '阿里图标')))
+  partitionTabs.appendChild(createPartitionTab('siyuan', t('iconPicker.sectionSiyuan', undefined, '思源图标')))
 
   // 组装界面：搜索框 → 分区标签 → 分类标签
   content.appendChild(searchWrapper)

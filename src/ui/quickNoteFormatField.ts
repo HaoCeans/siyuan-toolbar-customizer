@@ -1,3 +1,4 @@
+import { t } from '../i18n/runtime'
 /**
  * 一键记事 - 输入格式选择字段（电脑端按钮配置 / 手机端全局配置共用）
  */
@@ -55,7 +56,7 @@ export function createQuickNoteFormatFieldFromOptions(options: QuickNoteFormatFi
   section.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
   const label = document.createElement('label')
-  label.textContent = '③弹窗输入框格式选择'
+  label.textContent = t('quickNoteFormatField.title', undefined, '③弹窗输入框格式选择')
   label.style.cssText = 'font-size: 14px; font-weight: 600; color: var(--b3-theme-on-background); margin-top: 4px;'
   section.appendChild(label)
 
@@ -100,11 +101,11 @@ export function createQuickNoteFormatFieldFromOptions(options: QuickNoteFormatFi
     labelDiv.style.cssText = 'flex: 1;'
 
     const titleEl = document.createElement('div')
-    titleEl.textContent = option.label
+    titleEl.textContent = t(option.labelKey, undefined, option.labelFallback)
     titleEl.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
 
     const descEl = document.createElement('div')
-    descEl.textContent = option.description
+    descEl.textContent = t(option.descriptionKey, undefined, option.descriptionFallback)
     descEl.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: 2px;'
 
     const applySelectedStyle = (selected: boolean) => {

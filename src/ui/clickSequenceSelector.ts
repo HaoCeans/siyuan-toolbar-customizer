@@ -1,3 +1,4 @@
+import { t } from '../i18n/runtime'
 /**
  * 点击序列选择器
  * 用于快速选择预设的点击序列
@@ -17,87 +18,89 @@ export interface ClickSequenceSelectorOptions {
 }
 
 // 预设的点击序列
-const PRESET_SEQUENCES: ClickSequenceOption[] = [
+function getPresetSequences(): ClickSequenceOption[] {
+  return [
   // 电脑端预设
   {
     id: 'plugin-settings-desktop',
-    name: '①打开插件设置',
-    description: '电脑端：插件 → 思源手机端增强',
-    sequence: ['barPlugins', 'text:思源手机端增强']
+    name: t('ui.clickSequenceSelector.item.1', undefined, '①打开插件设置'),
+    description: t('ui.clickSequenceSelector.1', undefined, '电脑端：插件 → 思源手机端增强'),
+    sequence: ['barPlugins', 'text:zh-CN=思源手机端增强|en=SiYuan Mobile Enhancer']
   },
   {
     id: 'open-browser-desktop',
-    name: '②打开伺服浏览器',
-    description: '电脑端：工作区 → 配置 → 鉴权 → 打开浏览器',
-    sequence: ['barWorkspace', 'config', 'text:鉴权', 'text:打开浏览器']
+    name: t('ui.clickSequenceSelector.item.2', undefined, '②打开伺服浏览器'),
+    description: t('ui.clickSequenceSelector.2', undefined, '电脑端：工作区 → 配置 → 鉴权 → 打开浏览器'),
+    sequence: ['barWorkspace', 'config', 'text:zh-CN=鉴权|en=Authentication', 'text:zh-CN=打开浏览器|en=Open browser']
   },
   // 手机端预设
   // 一、左侧文档树等功能点击
   {
     id: 'sidebar-file-mobile',
-    name: '①文档树指定文档',
-    description: 'toolbarFile → 文档树 → 填写文档名',
+    name: t('ui.clickSequenceSelector.item.3', undefined, '①文档树指定文档'),
+    description: t('ui.clickSequenceSelector.3', undefined, 'toolbarFile → 文档树 → 填写文档名'),
     sequence: ['toolbarFile', 'sidebar-file-tab', 'text:此汉字删掉填文档名'],
-    group: '一、左侧文档树等功能点击'
+    group: t('ui.clickSequenceSelector.group.left', undefined, '一、左侧文档树等功能点击')
   },
   {
     id: 'sidebar-outline-mobile',
-    name: '②大纲',
-    description: 'toolbarFile → 大纲',
+    name: t('ui.clickSequenceSelector.item.4', undefined, '②大纲'),
+    description: t('ui.clickSequenceSelector.4', undefined, 'toolbarFile → 大纲'),
     sequence: ['toolbarFile', 'sidebar-outline-tab'],
-    group: '一、左侧文档树等功能点击'
+    group: t('ui.clickSequenceSelector.group.left', undefined, '一、左侧文档树等功能点击')
   },
   {
     id: 'sidebar-bookmark-mobile',
-    name: '③书签',
-    description: 'toolbarFile → 书签',
+    name: t('ui.clickSequenceSelector.item.5', undefined, '③书签'),
+    description: t('ui.clickSequenceSelector.5', undefined, 'toolbarFile → 书签'),
     sequence: ['toolbarFile', 'sidebar-bookmark-tab'],
-    group: '一、左侧文档树等功能点击'
+    group: t('ui.clickSequenceSelector.group.left', undefined, '一、左侧文档树等功能点击')
   },
   {
     id: 'sidebar-tag-mobile',
-    name: '④标签',
-    description: 'toolbarFile → 标签',
+    name: t('ui.clickSequenceSelector.item.6', undefined, '④标签'),
+    description: t('ui.clickSequenceSelector.6', undefined, 'toolbarFile → 标签'),
     sequence: ['toolbarFile', 'sidebar-tag-tab'],
-    group: '一、左侧文档树等功能点击'
+    group: t('ui.clickSequenceSelector.group.left', undefined, '一、左侧文档树等功能点击')
   },
   {
     id: 'sidebar-backlink-mobile',
-    name: '⑤反向链接',
-    description: 'toolbarFile → 反向链接',
+    name: t('ui.clickSequenceSelector.item.7', undefined, '⑤反向链接'),
+    description: t('ui.clickSequenceSelector.7', undefined, 'toolbarFile → 反向链接'),
     sequence: ['toolbarFile', 'sidebar-backlink-tab'],
-    group: '一、左侧文档树等功能点击'
+    group: t('ui.clickSequenceSelector.group.left', undefined, '一、左侧文档树等功能点击')
   },
   {
     id: 'sidebar-inbox-mobile',
-    name: '⑥收集箱',
-    description: 'toolbarFile → 收集箱',
+    name: t('ui.clickSequenceSelector.item.8', undefined, '⑥收集箱'),
+    description: t('ui.clickSequenceSelector.8', undefined, 'toolbarFile → 收集箱'),
     sequence: ['toolbarFile', 'sidebar-inbox-tab'],
-    group: '一、左侧文档树等功能点击'
+    group: t('ui.clickSequenceSelector.group.left', undefined, '一、左侧文档树等功能点击')
   },
   {
     id: 'sidebar-plugin-mobile',
-    name: '⑦电脑侧边栏',
-    description: 'toolbarFile → 电脑侧边栏',
+    name: t('ui.clickSequenceSelector.item.9', undefined, '⑦电脑侧边栏'),
+    description: t('ui.clickSequenceSelector.9', undefined, 'toolbarFile → 电脑侧边栏'),
     sequence: ['toolbarFile', 'sidebar-plugin-tab'],
-    group: '一、左侧文档树等功能点击'
+    group: t('ui.clickSequenceSelector.group.left', undefined, '一、左侧文档树等功能点击')
   },
   // 二、右侧设置等功能点击
   {
     id: 'sync-now-mobile',
-    name: '①立即同步',
-    description: 'toolbarMore → 立即同步',
-    sequence: ['toolbarMore', 'text:立即同步'],
-    group: '二、右侧设置等功能点击'
+    name: t('ui.clickSequenceSelector.item.10', undefined, '①立即同步'),
+    description: t('ui.clickSequenceSelector.10', undefined, 'toolbarMore → 立即同步'),
+    sequence: ['toolbarMore', 'text:zh-CN=立即同步|en=Sync now'],
+    group: t('ui.clickSequenceSelector.group.right', undefined, '二、右侧设置等功能点击')
   },
   {
     id: 'plugin-settings-mobile',
-    name: '②插件设置',
-    description: 'toolbarMore → 插件 → 思源手机端增强',
-    sequence: ['toolbarMore', 'text:插件', 'text:思源手机端增强'],
-    group: '二、右侧设置等功能点击'
+    name: t('ui.clickSequenceSelector.item.11', undefined, '②插件设置'),
+    description: t('ui.clickSequenceSelector.11', undefined, 'toolbarMore → 插件 → 思源手机端增强'),
+    sequence: ['toolbarMore', 'text:zh-CN=插件|en=Plugin', 'text:zh-CN=思源手机端增强|en=SiYuan Mobile Enhancer'],
+    group: t('ui.clickSequenceSelector.group.right', undefined, '二、右侧设置等功能点击')
   }
-]
+  ]
+}
 
 /**
  * 显示点击序列选择器弹窗
@@ -107,7 +110,7 @@ export function showClickSequenceSelector(options: ClickSequenceSelectorOptions)
 
   // 根据平台过滤预设
   const platformSuffix = platform === 'desktop' ? 'desktop' : 'mobile'
-  const filteredPresets = PRESET_SEQUENCES.filter(p => p.id.endsWith(platformSuffix))
+  const filteredPresets = getPresetSequences().filter(p => p.id.endsWith(platformSuffix))
 
   const overlay = document.createElement('div')
   overlay.style.cssText = `
@@ -145,7 +148,7 @@ export function showClickSequenceSelector(options: ClickSequenceSelectorOptions)
     justify-content: space-between;
     align-items: center;
   `
-  header.innerHTML = `<span style="font-size: 16px; font-weight: 600;">选择点击模板</span>`
+  header.innerHTML = `<span style="font-size: 16px; font-weight: 600;">${t('ui.clickSequenceSelector.title', undefined, '选择点击模板')}</span>`
 
   const closeBtn = document.createElement('button')
   closeBtn.className = 'b3-button b3-button--text'
@@ -264,7 +267,7 @@ export function showClickSequenceSelector(options: ClickSequenceSelectorOptions)
     font-size: 11px;
     color: var(--b3-theme-on-surface-light);
   `
-  hint.textContent = '💡 点击上方选项将序列填入输入框'
+  hint.textContent = t('clickSequenceSelector.hint', undefined, '💡 点击上方选项将序列填入输入框')
 
   content.appendChild(sequenceList)
   content.appendChild(hint)

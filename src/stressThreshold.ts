@@ -3,6 +3,8 @@
  * 用于在编辑器工具栏添加按钮，显示数据库任务计划安排
  */
 
+import { logger } from '@/utils/logger'
+import { t } from './i18n/runtime'
 import { 
   IProtyle, 
   fetchSyncPost, 
@@ -240,8 +242,8 @@ export function initStressThreshold(
       try {
         await loadAndShowData(plugin, config);
       } catch (error: any) {
-        console.error('按钮点击处理失败:', error);
-        showMessage(`加载数据失败: ${error.message}`, 3000, 'error');
+        logger.error('按钮点击处理失败:', error);
+        showMessage(t('stressThreshold.loadFailed', { error: error.message }, '加载数据失败: {error}'), 3000, 'error');
       } finally {
         setTimeout(() => {
           btn.textContent = originalText;
@@ -265,7 +267,7 @@ export function initStressThreshold(
               }
             });
           } catch (error) {
-            console.warn('移动端跳转失败:', error);
+            logger.warn('移动端跳转失败:', error);
           }
         }
       }
@@ -424,7 +426,7 @@ function parseTimeToMinutes(timeStr: string): number {
     }
   }
   
-  console.warn(`无效的时间格式: ${timeStr}，使用当前时间`);
+  logger.warn(`无效的时间格式: ${timeStr}，使用当前时间`);
   const now = new Date();
   return now.getHours() * 60 + now.getMinutes();
 }
@@ -442,7 +444,15 @@ function minutesToHHMM(minutes: number): string {
  * 获取星期几（中文）
  */
 function getWeekday(date: Date): string {
-  const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const weekdays = [
+    t('stressThreshold.weekdays.sunday', undefined, '周日'),
+    t('stressThreshold.weekdays.monday', undefined, '周一'),
+    t('stressThreshold.weekdays.tuesday', undefined, '周二'),
+    t('stressThreshold.weekdays.wednesday', undefined, '周三'),
+    t('stressThreshold.weekdays.thursday', undefined, '周四'),
+    t('stressThreshold.weekdays.friday', undefined, '周五'),
+    t('stressThreshold.weekdays.saturday', undefined, '周六'),
+  ];
   return weekdays[date.getDay()];
 }
 
@@ -486,7 +496,7 @@ function formatTimeRangeByConfig(
       if (daysDiff === 0) {
         return `⏳${startTimeStr} - ${endTimeStr}`;
       } else {
-        return `⏳${daysDiff}天 ${startTimeStr} - ${endTimeStr}`;
+        return t('stressThreshold.daysAndTime', { days: daysDiff, start: startTimeStr, end: endTimeStr }, '⏳{days}天 {start} - {end}');
       }
     default:
       if (daysDiff === 0) {
@@ -571,7 +581,7 @@ async function getAvIdFromBlockId(blockId: string): Promise<string | null> {
     }
     return null;
   } catch (error) {
-    console.error('获取 avId 失败:', error);
+    logger.error('获取 avId 失败:', error);
     return null;
   }
 }
@@ -589,7 +599,7 @@ async function getAttributeViewInfo(avId: string): Promise<any> {
     }
     return null;
   } catch (error) {
-    console.error('获取属性视图信息失败:', error);
+    logger.error('获取属性视图信息失败:', error);
     return null;
   }
 }
@@ -622,7 +632,7 @@ async function findViewIdByName(avId: string, viewName: string): Promise<string 
     
     return null;
   } catch (error) {
-    console.error('查找视图ID失败:', error);
+    logger.error('查找视图ID失败:', error);
     return null;
   }
 }
@@ -640,7 +650,7 @@ async function getAttributeViewKeys(avId: string): Promise<any[]> {
     }
     return [];
   } catch (error) {
-    console.error('获取键信息失败:', error);
+    logger.error('获取键信息失败:', error);
     return [];
   }
 }
@@ -664,7 +674,7 @@ async function getDatabaseData(avId: string, viewId: string, query: string = '')
     
     return { rows: [] };
   } catch (error) {
-    console.error('获取数据库数据失败:', error);
+    logger.error('获取数据库数据失败:', error);
     throw error;
   }
 }
@@ -815,7 +825,7 @@ function showCardsPopup(processedData: any, config: StressThresholdConfig, plugi
   popup.ondblclick = () => popup.remove();
   
   const title = document.createElement('div');
-  title.textContent = '任务计划安排';
+  title.textContent = t('stressThreshold.title', undefined, '任务计划安排');
   title.style.cssText = `
     font-size: 16px;
     font-weight: 600;
@@ -830,7 +840,7 @@ function showCardsPopup(processedData: any, config: StressThresholdConfig, plugi
   
   if (processedData.rows.length === 0) {
     const emptyMessage = document.createElement('div');
-    emptyMessage.textContent = '没有数据';
+    emptyMessage.textContent = t('stressThreshold.noData', undefined, '没有数据');
     emptyMessage.style.cssText = `
       padding: 30px;
       text-align: center;
@@ -907,7 +917,7 @@ function showCardsPopup(processedData: any, config: StressThresholdConfig, plugi
                         }
                       });
                     } catch (error) {
-                      console.warn('移动端跳转失败:', error);
+                      logger.warn('移动端跳转失败:', error);
                     }
                   }
                 } else {
@@ -920,7 +930,7 @@ function showCardsPopup(processedData: any, config: StressThresholdConfig, plugi
                         }
                       });
                     } catch (error) {
-                      console.warn('跳转失败:', error);
+                      logger.warn('跳转失败:', error);
                     }
                   }
                 }
@@ -965,9 +975,9 @@ function showCardsPopup(processedData: any, config: StressThresholdConfig, plugi
   
   const note = document.createElement('div');
   if (isMobileDevice()) {
-    note.textContent = '双击任意位置关闭 | 点击任务可打开固定页面';
+    note.textContent = t('stressThreshold.fixedPageHint', undefined, '双击任意位置关闭 | 点击任务可打开固定页面');
   } else {
-    note.textContent = '双击任意位置关闭 | 点击紫色任务可跳转';
+    note.textContent = t('stressThreshold.taskJumpHint', undefined, '双击任意位置关闭 | 点击紫色任务可跳转');
   }
   note.style.cssText = `
     margin-top: ${rowCount > 0 ? '14px' : '20px'};
@@ -993,12 +1003,12 @@ async function loadAndShowData(plugin: any, config: StressThresholdConfig) {
     if (!avId && config.blockId) {
       avId = await getAvIdFromBlockId(config.blockId);
       if (!avId) {
-        throw new Error(`无法从blockId ${config.blockId} 获取数据库ID`);
+        throw new Error(t('stressThreshold.databaseIdFromBlockFailed', { blockId: config.blockId }, '无法从 blockId {blockId} 获取数据库 ID'));
       }
     }
     
     if (!avId) {
-      throw new Error('请配置 databaseId 或 blockId');
+      throw new Error(t('stressThreshold.databaseIdRequired', undefined, '请配置 databaseId 或 blockId'));
     }
     
     let viewId = config.viewId;
@@ -1006,7 +1016,7 @@ async function loadAndShowData(plugin: any, config: StressThresholdConfig) {
     if (!viewId && config.viewName) {
       viewId = await findViewIdByName(avId, config.viewName);
       if (!viewId) {
-        console.warn(`未找到视图"${config.viewName}"，将使用默认视图`);
+        logger.warn(`未找到视图"${config.viewName}"，将使用默认视图`);
       }
     }
     
@@ -1015,7 +1025,7 @@ async function loadAndShowData(plugin: any, config: StressThresholdConfig) {
     const processedData = await processData(data, keys, config);
     
     if (processedData.rows.length === 0) {
-      showMessage('数据库中没有数据或数据格式无法识别', 3000, 'error');
+      showMessage(t('stressThreshold.invalidData', undefined, '数据库中没有数据或数据格式无法识别'), 3000, 'error');
       return;
     }
     
@@ -1027,8 +1037,8 @@ async function loadAndShowData(plugin: any, config: StressThresholdConfig) {
     }
     
   } catch (error: any) {
-    console.error('加载数据失败:', error);
-    showMessage(`加载数据失败: ${error.message}`, 3000, 'error');
+    logger.error('加载数据失败:', error);
+    showMessage(t('stressThreshold.loadFailed', { error: error.message }, '加载数据失败: {error}'), 3000, 'error');
   }
 }
 

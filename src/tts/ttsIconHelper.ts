@@ -57,6 +57,8 @@ export function createIconButton(
   options: IconButtonOptions = {},
 ): HTMLElement {
   const btn = document.createElement('div')
+  btn.title = title
+  btn.setAttribute('aria-label', title)
   btn.innerHTML = lucideSvg(iconName, size)
 
   const baseSize = options.isPrimary ? 42 : 36

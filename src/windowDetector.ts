@@ -1,4 +1,6 @@
-import { isMobileDevice, pluginInstance, setPluginInstance, showPopupSelectDialog, processTemplateVariables, getToolbarAvailableWidth, getButtonWidth, showTemplateContextMenu } from './toolbarManager';
+import { logger } from '@/utils/logger'
+import { t } from './i18n/runtime'
+import { isMobileDevice, pluginInstance, setPluginInstance, showPopupSelectDialog, processTemplateVariables, getToolbarAvailableWidth, getButtonWidth, getButtonDisplayName, showTemplateContextMenu } from './toolbarManager';
 import * as Notify from './notification';
 import { createQuickNoteInputArea, insertTextIntoQuickNoteDialog, type QuickNoteInputHandle } from './quickNote/inputArea';
 import { resolveQuickNoteInputFormat } from './quickNote/resolveFormat';
@@ -300,13 +302,17 @@ async function runQuickNoteSave(
   if (!payload) return false;
 
   if (saveType === 'document' && !documentId) {
-    const tipPrefix = isFromButton ? '【按钮】' : '【自启动一键记事】';
-    alert(`⚠️ 请先在${tipPrefix}设置中，配置文档ID`);
+    const tipPrefix = isFromButton
+      ? t('quickNote.settingsSource.button', undefined, '【按钮】')
+      : t('quickNote.settingsSource.autoCapture', undefined, '【自启动一键记事】');
+    alert(t('quickNote.configureDocumentInSource', { source: tipPrefix }, `⚠️ 请先在${tipPrefix}设置中，配置文档ID`));
     return false;
   }
   if (saveType === 'daily' && !notebookId) {
-    const tipPrefix = isFromButton ? '【按钮】' : '【自启动一键记事】';
-    alert(`⚠️ 请先在${tipPrefix}设置中，配置笔记本ID`);
+    const tipPrefix = isFromButton
+      ? t('quickNote.settingsSource.button', undefined, '【按钮】')
+      : t('quickNote.settingsSource.autoCapture', undefined, '【自启动一键记事】');
+    alert(t('quickNote.configureNotebookInSource', { source: tipPrefix }, `⚠️ 请先在${tipPrefix}设置中，配置笔记本ID`));
     return false;
   }
 
@@ -323,11 +329,11 @@ async function runQuickNoteSave(
       });
     }
     if (!ok) {
-      alert('保存失败，请重试');
+      alert(t('quickNote.saveFailedRetry', undefined, '保存失败，请重试'));
     }
     return ok;
   } catch {
-    alert('记事保存失败，请重试');
+    alert(t('quickNote.noteSaveFailedRetry', undefined, '记事保存失败，请重试'));
     return false;
   }
 }
@@ -488,8 +494,8 @@ async function showNoteInputDialogDesktop(
 
   const title = document.createElement('h2');
   title.textContent = captureMode
-    ? (documentId ? '⚡ 追加' : '⚡ 记事')
-    : (documentId ? '📒 文档记事' : '📒 日记记事');
+    ? (documentId ? t('quickNote.title.append', undefined, '⚡ 追加') : t('quickNote.title.note', undefined, '⚡ 记事'))
+    : (documentId ? t('quickNote.title.document', undefined, '📒 文档记事') : t('quickNote.title.daily', undefined, '📒 日记记事'));
   title.style.cssText = captureMode ? `
     margin: 0 0 6px 0;
     color: ${isDark ? '#e0e0e0' : '#333'};
@@ -519,7 +525,9 @@ async function showNoteInputDialogDesktop(
     isDark,
     compact: captureMode,
     fontSize,
-    placeholder: documentId ? '请输入要追加到文档的内容...' : '请输入您的日记内容...',
+    placeholder: documentId
+      ? t('quickNote.placeholder.appendDocument', undefined, '请输入要追加到文档的内容...')
+      : t('quickNote.placeholder.daily', undefined, '请输入您的日记内容...'),
     saveTarget: inputFormat === 'block'
       ? { saveType, notebookId, documentId, insertPosition }
       : undefined,
@@ -532,7 +540,7 @@ async function showNoteInputDialogDesktop(
     pasteCleanup?.()
     pasteCleanup = installImagePasteHandler(inputHandle)
   } catch (e) {
-    console.warn('[QuickNote] 安装粘贴处理器失败:', e)
+    logger.warn('[QuickNote] 安装粘贴处理器失败:', e)
   }
 
   const hint = document.createElement('div');
@@ -545,7 +553,7 @@ async function showNoteInputDialogDesktop(
   if (inputHandle.isPlainTextarea()) {
     hint.innerHTML = captureMode
       ? ''
-      : '💡 <kbd>Shift+Enter</kbd> 发送 · <kbd>Enter</kbd> 换行 · <kbd>Esc</kbd> 取消';
+      : t('quickNote.keyboardHintHtml', undefined, '💡 <kbd>Shift+Enter</kbd> 发送 · <kbd>Enter</kbd> 换行 · <kbd>Esc</kbd> 取消');
   } else {
     hint.innerHTML = captureMode
       ? ''
@@ -573,7 +581,7 @@ async function showNoteInputDialogDesktop(
   `;
 
   const cancelBtn = document.createElement('button');
-  cancelBtn.textContent = '取消';
+  cancelBtn.textContent = t('quickNote.cancel', undefined, '取消');
   cancelBtn.className = 'b3-button b3-button--outline';
   cancelBtn.style.cssText = captureMode ? `
     flex: 1;
@@ -590,13 +598,13 @@ async function showNoteInputDialogDesktop(
   cancelBtn.onclick = async () => {
     const hasContent = await inputHandle.getContent()
     if (hasContent) {
-      if (!confirm('当前内容尚未保存，确定要取消吗？')) return
+      if (!confirm(t('quickNote.confirmDiscard', undefined, '当前内容尚未保存，确定要取消吗？'))) return
     }
     await teardownQuickNoteDialog(dialog, false);
   };
 
   const saveBtn = document.createElement('button');
-  saveBtn.textContent = '发送';
+  saveBtn.textContent = t('quickNote.send', undefined, '发送');
   saveBtn.className = 'b3-button b3-button--primary';
   saveBtn.style.cssText = captureMode ? `
     flex: 1;
@@ -629,13 +637,15 @@ async function showNoteInputDialogDesktop(
       if (success) {
         await Promise.resolve(inputHandle.clearAfterSave());
         inputHandle.focus();
-        showSuccessMessage(saveType === 'document' ? '✅ 内容已追加到文档' : '✅ 记事已保存');
+        showSuccessMessage(saveType === 'document'
+          ? t('quickNote.savedToDocument', undefined, '✅ 内容已追加到文档')
+          : t('quickNote.saved', undefined, '✅ 记事已保存'));
         if (captureMode && captureSettings.minimizeAfterSend) {
           minimizeSiyuanMainWindow();
         }
       }
     } catch {
-      alert('记事保存失败，请重试');
+      alert(t('quickNote.noteSaveFailedRetry', undefined, '记事保存失败，请重试'));
     }
   };
 
@@ -778,8 +788,8 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     title.textContent = '📒 LifeLog';
   } else {
     title.textContent = isAppleStyle
-      ? (documentId ? '文档记事' : '日记记事')
-      : (documentId ? '📒 文档记事' : '📒 日记记事');
+      ? (documentId ? t('quickNote.title.documentPlain', undefined, '文档记事') : t('quickNote.title.dailyPlain', undefined, '日记记事'))
+      : (documentId ? t('quickNote.title.document', undefined, '📒 文档记事') : t('quickNote.title.daily', undefined, '📒 日记记事'));
   }
   lifelogDialogTitle = title;
   title.style.cssText = isAppleStyle ? `
@@ -821,8 +831,10 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
   if (pendingLifelogConfig) inputFormat = 'plain';
   const fontSize = getQuickNoteFontSize(true);
   const placeholder = documentId
-    ? (isAppleStyle ? '追加到文档' : '请输入要追加到文档的内容...')
-    : (isAppleStyle ? '' : '请输入您的日记内容...');
+    ? (isAppleStyle
+      ? t('quickNote.placeholder.appendDocumentShort', undefined, '追加到文档')
+      : t('quickNote.placeholder.appendDocument', undefined, '请输入要追加到文档的内容...'))
+    : (isAppleStyle ? '' : t('quickNote.placeholder.daily', undefined, '请输入您的日记内容...'));
 
   const inputHandle = await createQuickNoteInputArea({
     format: inputFormat,
@@ -843,7 +855,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     pasteCleanup?.()
     pasteCleanup = installImagePasteHandler(inputHandle)
   } catch (e) {
-    console.warn('[QuickNote] 安装粘贴处理器失败:', e)
+    logger.warn('[QuickNote] 安装粘贴处理器失败:', e)
   }
 
   // 金句占位 overlay（输入法未打开 + 空输入时随机展示文档段落）
@@ -972,7 +984,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
   `;
 
   const saveBtn = document.createElement('button');
-  saveBtn.textContent = '发送';
+  saveBtn.textContent = t('quickNote.send', undefined, '发送');
   saveBtn.style.cssText = `
     font-size: 17px;
     letter-spacing: 0.5px;
@@ -1004,10 +1016,10 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
         const content = `${hours}:${minutes} ${lifelogSelectedCategory}：${text}\n`;
         const ok = await saveLifelogContent(lifelogNotebookId, content);
         if (ok) {
-          showSuccessMessage('✅ Lifelog 已保存');
+          showSuccessMessage(t('quickNote.lifelogSaved', undefined, '✅ Lifelog 已保存'));
           await teardownQuickNoteDialog(dialog, true);
         } else {
-          alert('Lifelog 保存失败，请重试');
+          alert(t('quickNote.lifelogSaveFailedRetry', undefined, 'Lifelog 保存失败，请重试'));
         }
         return;
       }
@@ -1020,16 +1032,18 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
         isFromButton,
       );
       if (success) {
-        showSuccessMessage(saveType === 'document' ? '✅ 内容已追加到文档' : '✅ 记事已保存');
+        showSuccessMessage(saveType === 'document'
+          ? t('quickNote.savedToDocument', undefined, '✅ 内容已追加到文档')
+          : t('quickNote.saved', undefined, '✅ 记事已保存'));
         await teardownQuickNoteDialog(dialog, true);
       }
     } catch {
-      alert('记事保存失败，请重试');
+      alert(t('quickNote.noteSaveFailedRetry', undefined, '记事保存失败，请重试'));
     }
   };
 
   const cancelBtn = document.createElement('button');
-  cancelBtn.textContent = '取消';
+  cancelBtn.textContent = t('quickNote.cancel', undefined, '取消');
   cancelBtn.style.cssText = `
     font-size: 17px;
     letter-spacing: 0.5px;
@@ -1073,7 +1087,7 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
           animation: tc-confirm-scale-in 0.2s ease-out;
         `;
         const msg = document.createElement('div');
-        msg.textContent = '当前内容尚未保存，确定要取消吗？';
+        msg.textContent = t('quickNote.confirmDiscard', undefined, '当前内容尚未保存，确定要取消吗？');
         msg.style.cssText = `
           padding: 20px 16px 18px;
           font-size: 17px;
@@ -1109,8 +1123,8 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
           };
           return btn;
         };
-        actions.appendChild(makeAction('确定', false, true));
-        actions.appendChild(makeAction('取消', true, false));
+        actions.appendChild(makeAction(t('quickNote.confirm', undefined, '确定'), false, true));
+        actions.appendChild(makeAction(t('quickNote.cancel', undefined, '取消'), true, false));
         box.appendChild(msg);
         box.appendChild(actions);
         overlay.appendChild(box);
@@ -1199,8 +1213,8 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
 
     const outdentSvg = '<svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><polyline points="7 3 4 6 7 9"/><line x1="6" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>';
     const indentSvg = '<svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><polyline points="17 3 20 6 17 9"/><line x1="3" y1="12" x2="18" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>';
-    const outdentBtn = makeListBtn(outdentSvg, '减少缩进', true);
-    const indentBtn = makeListBtn(indentSvg, '提升层级', false);
+    const outdentBtn = makeListBtn(outdentSvg, t('quickNote.decreaseIndent', undefined, '减少缩进'), true);
+    const indentBtn = makeListBtn(indentSvg, t('quickNote.increaseIndent', undefined, '提升层级'), false);
     buttonContainer.appendChild(outdentBtn);
     buttonContainer.appendChild(indentBtn);
     lifelogIndentBtns = [outdentBtn, indentBtn];
@@ -1409,7 +1423,8 @@ function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null, 
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   `;
   
-  clonedBtn.title = buttonConfig.name || '';
+  const buttonDisplayName = getButtonDisplayName(buttonConfig);
+  clonedBtn.title = buttonDisplayName;
   clonedBtn.dataset.buttonId = buttonConfig.id;
   
   // 设置按钮内容（图标）
@@ -1457,14 +1472,14 @@ function createClonedButton(buttonConfig: any, originalBtn: HTMLElement | null, 
       clonedBtn.style.fontSize = `${buttonConfig.iconSize || 16}px`;
     }
   } else {
-    clonedBtn.textContent = buttonConfig.name || '按钮';
+    clonedBtn.textContent = buttonDisplayName || t('quickNote.buttonFallback', undefined, '按钮');
   }
 
   // 如果开启显示名称，显示文字代替图标
-  if (buttonConfig.showName && buttonConfig.name) {
-    const nameLength = buttonConfig.name?.length || 0;
+  if (buttonConfig.showName && buttonDisplayName) {
+    const nameLength = buttonDisplayName.length;
     // 最多显示4个字，超过则截取前4个字
-    const displayName = nameLength > 4 ? buttonConfig.name?.slice(0, 4) : buttonConfig.name;
+    const displayName = nameLength > 4 ? buttonDisplayName.slice(0, 4) : buttonDisplayName;
     clonedBtn.innerHTML = '';
     const nameSpan = document.createElement('span');
     nameSpan.textContent = displayName;
@@ -1640,7 +1655,7 @@ function renderButtons(
 
   if (buttonsContainer.children.length === 0 && overflowPanel.children.length === 0) {
     const noButtonsMsg = document.createElement('div')
-    noButtonsMsg.textContent = '暂无可用按钮'
+    noButtonsMsg.textContent = t('quickNote.noAvailableButtons', undefined, '暂无可用按钮')
     noButtonsMsg.style.cssText = `
       font-size: 12px;
       color: #999;
@@ -1664,7 +1679,7 @@ function renderButtons(
 async function switchToLifelogMode(buttonConfig: any): Promise<void> {
   const notebookId = buttonConfig.lifeLogNotebookId;
   if (!notebookId) {
-    Notify.showErrorCommandCannotExecute('请先配置笔记本ID');
+    Notify.showErrorCommandCannotExecute(t('quickNote.configureNotebook', undefined, '请先配置笔记本ID'));
     return;
   }
   if (!lifelogToolbarContainer) return;
@@ -1708,7 +1723,7 @@ async function switchToLifelogMode(buttonConfig: any): Promise<void> {
         animation: tc-confirm-scale-in 0.2s ease-out;
       `;
       const msg = document.createElement('div');
-      msg.textContent = '当前内容尚未保存，切换到 LifeLog 将清空，确定吗？';
+      msg.textContent = t('quickNote.confirmSwitchToLifelog', undefined, '当前内容尚未保存，切换到 LifeLog 将清空，确定吗？');
       msg.style.cssText = `padding: 20px 16px 18px; font-size: 17px; text-align: center; color: ${isSiyuanDarkMode() ? '#e0e0e0' : '#1c1c1e'}; line-height: 1.5;`;
       const actions = document.createElement('div');
       actions.style.cssText = `border-top: 0.5px solid ${isSiyuanDarkMode() ? '#38383a' : '#c6c6c8'}; display: flex;`;
@@ -1719,8 +1734,8 @@ async function switchToLifelogMode(buttonConfig: any): Promise<void> {
         btn.onclick = () => { overlay.remove(); resolve(isConfirm); };
         return btn;
       };
-      actions.appendChild(mkBtn('确定', true));
-      actions.appendChild(mkBtn('取消', false));
+      actions.appendChild(mkBtn(t('quickNote.confirm', undefined, '确定'), true));
+      actions.appendChild(mkBtn(t('quickNote.cancel', undefined, '取消'), false));
       box.appendChild(msg); box.appendChild(actions);
       overlay.appendChild(box);
       if (!document.getElementById('tc-confirm-anim-style')) {
@@ -1754,7 +1769,7 @@ async function switchToLifelogMode(buttonConfig: any): Promise<void> {
       const isDark = isSiyuanDarkMode();
       const fontSize = getQuickNoteFontSize(true);
       const newHandle = await createQuickNoteInputArea({
-        format: 'plain', isMobile: true, isDark, fontSize, placeholder: '请输入内容...',
+        format: 'plain', isMobile: true, isDark, fontSize, placeholder: t('quickNote.placeholder.content', undefined, '请输入内容...'),
       });
       setActiveQuickNoteInput(newHandle);
       noteSection?.appendChild(newHandle.element);
@@ -1930,7 +1945,7 @@ async function handleButtonClick(
           }
         }
       } catch (e) {
-        console.warn('[QuickNote] 图片插入失败:', e)
+        logger.warn('[QuickNote] 图片插入失败:', e)
       }
       return;
     }
@@ -1955,7 +1970,7 @@ async function handleButtonClick(
     }
     
   } catch (error) {
-    alert('按钮执行失败，请重试');
+    alert(t('quickNote.buttonExecutionFailedRetry', undefined, '按钮执行失败，请重试'));
   }
 }
 
@@ -1976,7 +1991,7 @@ function copyBottomToolbarButtons(container: HTMLElement) {
     if (buttonConfigs.length === 0) {
       // 如果没有按钮配置，显示提示信息
       const noButtonsMsg = document.createElement('div');
-      noButtonsMsg.textContent = '暂无按钮配置';
+      noButtonsMsg.textContent = t('quickNote.noButtonConfig', undefined, '暂无按钮配置');
       noButtonsMsg.style.cssText = `
         font-size: 12px;
         color: #999;
@@ -2026,7 +2041,7 @@ function copyBottomToolbarButtons(container: HTMLElement) {
 
   } catch (error) {
     const errorMsg = document.createElement('div');
-    errorMsg.textContent = '按钮加载失败';
+    errorMsg.textContent = t('quickNote.buttonLoadFailed', undefined, '按钮加载失败');
     errorMsg.style.cssText = `
       font-size: 12px;
       color: #ff6b6b;
@@ -2042,7 +2057,7 @@ function copyDesktopQuickNoteToolbarButtons(container: HTMLElement, useOverflowS
     const buttonConfigs = pluginInstance?.desktopButtonConfigs || [];
     if (buttonConfigs.length === 0) {
       const noButtonsMsg = document.createElement('div');
-      noButtonsMsg.textContent = '暂无电脑端按钮配置';
+      noButtonsMsg.textContent = t('quickNote.noDesktopButtonConfig', undefined, '暂无电脑端按钮配置');
       noButtonsMsg.style.cssText = 'font-size: 12px; color: #999; text-align: center; padding: 12px;';
       container.appendChild(noButtonsMsg);
       return;
@@ -2060,7 +2075,7 @@ function copyDesktopQuickNoteToolbarButtons(container: HTMLElement, useOverflowS
     );
   } catch {
     const errorMsg = document.createElement('div');
-    errorMsg.textContent = '按钮加载失败';
+    errorMsg.textContent = t('quickNote.buttonLoadFailed', undefined, '按钮加载失败');
     errorMsg.style.cssText = 'font-size: 12px; color: #ff6b6b; text-align: center; padding: 12px;';
     container.appendChild(errorMsg);
   }
@@ -2513,7 +2528,9 @@ export function getAppVisibilityStatus(): { isVisible: boolean, status: string }
   const isVisible = isAppInForeground();
   return {
     isVisible,
-    status: isVisible ? '前台' : '后台'
+    status: isVisible
+      ? t('windowDetector.visibility.foreground', undefined, '前台')
+      : t('windowDetector.visibility.background', undefined, '后台')
   };
 }
 
@@ -2550,7 +2567,7 @@ export { showSmallWindowTip, showSiyuanEditorDialog, shouldUseQuickNoteFloatWind
  */
 export function triggerLifelogQuickNote(buttonConfig: any): void {
   if (!buttonConfig.lifeLogNotebookId) {
-    Notify.showErrorCommandCannotExecute('请先配置笔记本ID');
+    Notify.showErrorCommandCannotExecute(t('quickNote.configureNotebook', undefined, '请先配置笔记本ID'));
     return;
   }
   pendingLifelogConfig = buttonConfig;
@@ -2603,16 +2620,16 @@ export async function saveQuickNotePlainTextFromFloat(
 ): Promise<QuickNoteFloatSaveResult> {
   const trimmed = text.trim();
   if (!trimmed) {
-    return { ok: false, message: '请输入内容' };
+    return { ok: false, message: t('quickNote.emptyContent', undefined, '请输入内容') };
   }
 
   const { notebookId, documentId, saveType, insertPosition } = resolveQuickNoteTargetConfig(isFromButton);
 
   if (saveType === 'document' && !documentId) {
-    return { ok: false, message: '请先在设置中配置文档 ID' };
+    return { ok: false, message: t('quickNote.configureDocumentInSettings', undefined, '请先在设置中配置文档 ID') };
   }
   if (saveType === 'daily' && !notebookId) {
-    return { ok: false, message: '请先在设置中配置笔记本 ID' };
+    return { ok: false, message: t('quickNote.configureNotebookInSettings', undefined, '请先在设置中配置笔记本 ID') };
   }
 
   try {
@@ -2621,7 +2638,7 @@ export async function saveQuickNotePlainTextFromFloat(
       { saveType, notebookId, documentId, insertPosition },
     );
     if (!ok) {
-      return { ok: false, message: '保存失败，请重试' };
+      return { ok: false, message: t('quickNote.saveFailedRetry', undefined, '保存失败，请重试') };
     }
 
     const captureSettings = getDesktopQuickNoteCaptureSettings();
@@ -2631,18 +2648,20 @@ export async function saveQuickNotePlainTextFromFloat(
 
     return {
       ok: true,
-      message: saveType === 'document' ? '✅ 内容已追加到文档' : '✅ 记事已保存',
+      message: saveType === 'document'
+        ? t('quickNote.savedToDocument', undefined, '✅ 内容已追加到文档')
+        : t('quickNote.saved', undefined, '✅ 记事已保存'),
       clear: true,
     };
   } catch {
-    return { ok: false, message: '保存失败，请重试' };
+    return { ok: false, message: t('quickNote.saveFailedRetry', undefined, '保存失败，请重试') };
   }
 }
 
 export function getQuickNoteFloatTitle(isFromButton: boolean): string {
   const { documentId, saveType } = resolveQuickNoteTargetConfig(isFromButton);
-  if (saveType === 'document' && documentId) return '⚡ 快速追加到文档';
-  return '⚡ 快速记事';
+  if (saveType === 'document' && documentId) return t('quickNote.float.appendTitle', undefined, '⚡ 快速追加到文档');
+  return t('quickNote.float.title', undefined, '⚡ 快速记事');
 }
 
 export function getQuickNoteFloatPlaceholder(isFromButton: boolean): string {

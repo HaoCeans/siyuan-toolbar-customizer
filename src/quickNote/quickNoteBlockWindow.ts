@@ -2,11 +2,15 @@
  * 桌面端块格式一键记事 — 纯 BrowserWindow 方式
  */
 import { fetchSyncPost, showMessage } from 'siyuan'
+import { t } from '../i18n/runtime'
 import { createQuickNoteDraftBlock, deleteQuickNoteDraftBlock, type QuickNoteSaveTarget } from './kernelBlock'
 import { pluginInstance } from '../toolbarManager'
+import { isLoggingEnabled, logger } from '../utils/logger'
 
 const WIN_W = 300, WIN_H = 300, BOUNDS_KEY = '__qn_block_window_bounds'
-const QUICKNOTE_TITLE = '⚡ 快捷记事'
+function getQuickNoteTitle(): string {
+  return t('quickNote.block.windowTitle', undefined, '⚡ 快捷记事')
+}
 const BASE_HIDE = '.layout-tab-bar,.protyle-title,.protyle-background,.protyle-scroll,#status{display:none!important}'
 const BREADCRUMB_HIDE = '.protyle-breadcrumb{display:none!important}'
 const BREADCRUMB_SHOW = '.protyle-breadcrumb{margin-top:25px!important}'
@@ -30,13 +34,15 @@ function getMainId(): number | null { try { return (window as any).require?.('@e
 function focusMainWindow(): void { try { const m = getBW()?.fromId(getMainId()); if (m && !m.isDestroyed?.() && !m.isMinimized?.()) m.focus() } catch { /* ignore */ } }
 
 /** 销毁所有记事弹窗（通过窗口标记 __qn_block_window 匹配） */
-function destroyAllBlockWindows(): void {
+function destroyAllBlockWindows(excludeId?: number): void {
   try {
     const BW = getBW(), mainId = getMainId()
     if (!BW) return
     for (const w of (BW.getAllWindows?.() || [])) {
       try {
         if (!w || w.isDestroyed?.() || w.id === mainId) continue
+        // 排除自身：close 流程中调用时不能把自己提前 destroy（会跳过 close 内后续清理）
+        if (excludeId !== undefined && w.id === excludeId) continue
         if ((w as any).__qn_block_window) w.destroy?.()
       } catch { /* skip */ }
     }
@@ -46,6 +52,18 @@ function destroyAllBlockWindows(): void {
 /** 启动时清理残留的僵尸弹窗 */
 export function cleanupOrphanBlockWindows(): void {
   destroyAllBlockWindows()
+}
+
+/**
+ * 手动清理一键记事（块格式）弹窗残留：销毁所有带 __qn_block_window 标记的残留窗口并复位草稿状态。
+ * 用途：思源主进程会用"窗口 hash 是否含目标文档 ID"决定点击文档时把焦点给哪个窗口；
+ * 残留弹窗会让主窗口点日记/文档无反应（占用）。执行后残留窗口销毁，文档立即可正常打开。
+ * （彻底方案见 DEV_NOTES：草稿块独立于日记；当前提供手动兜底）
+ */
+export function cleanupBlockWindowResidue(): void {
+  destroyAllBlockWindows()
+  _clearDraftTracking()
+  try { localStorage.removeItem(BLOCK_EMPTY_KEY) } catch { /* ignore */ }
 }
 function loadBounds(): any { try { const r = localStorage.getItem(BOUNDS_KEY); return r ? JSON.parse(r) : null } catch { return null } }
 function saveBounds(win: any): void {
@@ -80,7 +98,7 @@ function _buildBlockUrl(blockId: string): string {
   const version = new URL(window.location.href).searchParams.get('v') || ''
   const vPart = version ? 'v=' + encodeURIComponent(version) + '&' : ''
   const json = encodeURIComponent(JSON.stringify([{
-    title: QUICKNOTE_TITLE, pin: true, active: true,
+    title: getQuickNoteTitle(), pin: true, active: true,
     instance: 'Tab', action: 'Tab',
     children: { blockId, rootId: blockId, mode: 'wysiwyg', instance: 'Editor', action: ['cb-get-focus'] },
   }]))
@@ -92,8 +110,11 @@ function _buildBlockUrl(blockId: string): string {
 //
 // 注意：SiYuan 内部路由使用 history.pushState/replaceState 修改 URL hash，
 // 只拦截 location.hash setter 是不够的，必须同时拦截 History API。
-const HASH_FIX_JS = `(function(){
-	  if (window.__qn_hashFixed) return;
+function _getHashFixJS(): string {
+  return `(function(){
+		  var logEnabled=${isLoggingEnabled() ? 'true' : 'false'};
+		  if (window.__qn_hashFixed) return;
+
 	  window.__qn_hashFixed = true;
 
 	  // 1. 拦截 location.hash 的 setter
@@ -110,12 +131,12 @@ const HASH_FIX_JS = `(function(){
 	        },
 	        configurable: true
 	      });
-	      console.log('[QN-HASH] hash setter 拦截成功');
+	      if(logEnabled) console.log('[QN-HASH] hash setter 拦截成功');
 	    } else {
-	      console.log('[QN-HASH] 无法获取hash descriptor, 降级到轮询');
+	      if(logEnabled) console.log('[QN-HASH] 无法获取hash descriptor, 降级到轮询');
 	    }
 	  } catch(e) {
-	    console.log('[QN-HASH] hash setter 拦截失败:', e, ', 降级到轮询');
+	    if(logEnabled) console.log('[QN-HASH] hash setter 拦截失败:', e, ', 降级到轮询');
 	  }
 
 	  // 2. 拦截 history.pushState / replaceState
@@ -131,9 +152,9 @@ const HASH_FIX_JS = `(function(){
 	      _origReplaceState.apply(this, arguments);
 	      if (window.location.hash) window.location.hash = '';
 	    };
-	    console.log('[QN-HASH] history API 拦截成功');
+	    if(logEnabled) console.log('[QN-HASH] history API 拦截成功');
 	  } catch(e) {
-	    console.log('[QN-HASH] history API 拦截失败:', e);
+	    if(logEnabled) console.log('[QN-HASH] history API 拦截失败:', e);
 	  }
 
 	  // 3. 兜底：200ms 轮询（捕获通过 location.href 等其他途径设置的 hash）
@@ -142,8 +163,11 @@ const HASH_FIX_JS = `(function(){
 	    if (window.location.hash) window.location.hash = '';
 	  }, 200);
 	})()`
+}
 
 function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string; hideFloatingJS: string; hideBreadcrumbJS: string } {
+  const quickNoteTitle = getQuickNoteTitle()
+  const dragWindowTitle = t('quickNote.block.dragWindow', undefined, '拖动窗口')
   const toolbarOn = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteToolbarVisible !== false
   const hideFloating = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteHideFloatingToolbar !== false
   let hideCSS = BASE_HIDE + (toolbarOn ? BREADCRUMB_SHOW : BREADCRUMB_HIDE) + DRAG_CSS + THIRD_PARTY_BREADCRUMB_HIDE
@@ -151,9 +175,9 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
   return {
     hideJS: `(function(){
       var s=document.createElement('style');s.textContent=${JSON.stringify(hideCSS)};document.head.appendChild(s);
-      var d=document.createElement('div');d.id='qn-drag-handle';d.title='拖动窗口';document.body.appendChild(d);
+      var d=document.createElement('div');d.id='qn-drag-handle';d.title=${JSON.stringify(dragWindowTitle)};document.body.appendChild(d);
     })()`,
-    titleJS: `(function(){var t=${JSON.stringify(QUICKNOTE_TITLE)};document.title=t;Object.defineProperty(document,'title',{get:function(){return t},set:function(){return t}})})()`,
+    titleJS: `(function(){var t=${JSON.stringify(quickNoteTitle)};document.title=t;Object.defineProperty(document,'title',{get:function(){return t},set:function(){return t}})})()`,
     closeHookJS: `(function(){
       function forceClose(){
         try{
@@ -236,10 +260,10 @@ function _injectScripts(win: any, scripts: { hideJS: string; titleJS: string; cl
   win.webContents.executeJavaScript(scripts.closeHookJS).catch(()=>{})
   win.webContents.executeJavaScript(scripts.pollJS).catch(()=>{})
   // 注入隐藏胶囊的脚本
-  win.webContents.executeJavaScript(scripts.hideFloatingJS).catch((e: any) => console.error('[QN-FLOAT] inject failed', e))
+  win.webContents.executeJavaScript(scripts.hideFloatingJS).catch((e: any) => logger.error('[QN-FLOAT] inject failed', e))
   // 注入隐藏第三方「层级导航」插件面包屑的脚本
-  win.webContents.executeJavaScript(scripts.hideBreadcrumbJS).catch((e: any) => console.error('[QN-BREADCRUMB] inject failed', e))
-  try { win.setTitle(QUICKNOTE_TITLE) } catch {}
+  win.webContents.executeJavaScript(scripts.hideBreadcrumbJS).catch((e: any) => logger.error('[QN-BREADCRUMB] inject failed', e))
+  try { win.setTitle(getQuickNoteTitle()) } catch {}
   if (show) { win.show(); win.focus() }
 }
 
@@ -256,14 +280,14 @@ function createOneWindow(blockId: string): boolean {
   _clearDraftTracking()
 
   const BW = getBW()
-  if (!BW) { showMessage('无法创建窗口', 3000, 'error'); return false }
+  if (!BW) { showMessage(t('quickNote.block.unableCreateWindow', undefined, '无法创建窗口'), 3000, 'error'); return false }
   try {
     const bounds = getBounds()
     const win = new BW({
       show: false, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height,
       minWidth: 300, minHeight: 200, alwaysOnTop: true,
       frame: false,
-      title: QUICKNOTE_TITLE, webPreferences: { contextIsolation: false, nodeIntegration: true },
+      title: getQuickNoteTitle(), webPreferences: { contextIsolation: false, nodeIntegration: true },
     })
     qnWinId = win.id
     ;(win as any).__qn_block_window = true
@@ -272,6 +296,8 @@ function createOneWindow(blockId: string): boolean {
     try { localStorage.removeItem(BLOCK_EMPTY_KEY) } catch {}
 
     win.on('close', () => {
+      // × 关闭弹窗时自动清理其它残留弹窗（防僵尸窗口 hash 占用导致主窗口点文档无反应）
+      destroyAllBlockWindows(win.id)
       if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null }
       if (_saveBoundsTimer) { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = null }
       // 注意：不再主动清除 hash 轮询定时器，让它在渲染进程销毁时自然终止。
@@ -301,10 +327,10 @@ function createOneWindow(blockId: string): boolean {
       // 尽早注入隐藏第三方层级导航面包屑的脚本（dom-ready 时该插件可能尚未初始化，靠 observer 兜底）
       win.webContents.executeJavaScript(scripts.hideBreadcrumbJS).catch(()=>{})
       // 尽早注入 hash 修复，赶在 SiYuan 内部路由设置 hash 之前
-      win.webContents.executeJavaScript(HASH_FIX_JS).then(() => {
-        console.log('[QN-HASH] dom-ready: HASH_FIX_JS 注入成功')
+      win.webContents.executeJavaScript(_getHashFixJS()).then(() => {
+        logger.log('[QN-HASH] dom-ready: HASH_FIX_JS 注入成功')
       }).catch((e: any) => {
-        console.error('[QN-HASH] dom-ready: HASH_FIX_JS 注入失败', e)
+        logger.error('[QN-HASH] dom-ready: HASH_FIX_JS 注入失败', e)
       })
     })
     win.webContents.once('did-finish-load', () => {
@@ -312,7 +338,7 @@ function createOneWindow(blockId: string): boolean {
     })
     win.loadURL(_buildBlockUrl(blockId))
     return true
-  } catch (e) { showMessage('创建窗口失败', 3000, 'error'); return false }
+  } catch (e) { logger.error('[QN-BlockWindow] 创建窗口失败:', e); showMessage(t('quickNote.block.createWindowFailed', undefined, '创建窗口失败'), 3000, 'error'); return false }
 }
 
 export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): Promise<boolean> {
@@ -381,10 +407,10 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
     _clearDraftTracking()
   }
   const target = resolveSaveTarget(isFromButton)
-  if (target.saveType === 'document' && !target.documentId) { showMessage('请先配置文档 ID', 3000, 'error'); return false }
-  if (target.saveType === 'daily' && !target.notebookId) { showMessage('请先配置笔记本 ID', 3000, 'error'); return false }
+  if (target.saveType === 'document' && !target.documentId) { showMessage(t('quickNote.configureDocument', undefined, '请先配置文档 ID'), 3000, 'error'); return false }
+  if (target.saveType === 'daily' && !target.notebookId) { showMessage(t('quickNote.configureNotebookSpaced', undefined, '请先配置笔记本 ID'), 3000, 'error'); return false }
   const blockId = await createQuickNoteDraftBlock(target)
-  if (!blockId) { showMessage('创建编辑块失败', 3000, 'error'); return false }
+  if (!blockId) { showMessage(t('quickNote.block.createFailed', undefined, '创建编辑块失败'), 3000, 'error'); return false }
   return createOneWindow(blockId)
 }
 

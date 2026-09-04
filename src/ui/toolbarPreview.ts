@@ -1,3 +1,4 @@
+import { t } from '../i18n/runtime'
 /**
  * 工具栏所见即所得预览（电脑端 / 手机端共用）
  *
@@ -12,6 +13,7 @@
 import type { ButtonConfig } from '../toolbarManager'
 import { isOverflowButton } from '../toolbarManager'
 import { lucideToSvg } from '../utils/lucideHelper'
+import { getButtonDisplayName } from '../toolbarManager'
 
 export interface ToolbarPreviewOptions {
   /** 取当前按钮配置数组（直接引用，预览会实时反映其变化） */
@@ -59,7 +61,7 @@ export function createToolbarPreview(opts: ToolbarPreviewOptions): HTMLElement &
     margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
   `
   const titleLabel = document.createElement('span')
-  titleLabel.textContent = '按钮预览（可拖动排序）'
+  titleLabel.textContent = t('toolbarPreview.title', undefined, '按钮预览（可拖动排序）')
   titleLabel.style.cssText = 'font-weight:600;color:var(--b3-theme-on-surface);'
   title.appendChild(titleLabel)
 
@@ -167,14 +169,14 @@ export function createToolbarPreview(opts: ToolbarPreviewOptions): HTMLElement &
     // 说明文字
     const hint = document.createElement('div')
     hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-bottom: 6px;'
-    hint.textContent = '💊 侧边胶囊模式：点击右侧微缩胶囊展开竖排面板'
+    hint.textContent = t('toolbarPreview.sideHint', undefined, '💊 侧边胶囊模式：点击右侧微缩胶囊展开竖排面板')
     stage.appendChild(hint)
 
     // 微缩胶囊（吸附侧由 ① 配置决定，预览固定画在右侧）
     const capsuleRow = document.createElement('div')
     capsuleRow.style.cssText = 'display: flex; justify-content: flex-end; margin-bottom: 8px;'
     const capsule = document.createElement('div')
-    capsule.title = '点击展开/收起'
+    capsule.title = t('toolbarPreview.toggle', undefined, '点击展开/收起')
     capsule.style.cssText = `
       display: flex; align-items: center; justify-content: center;
       width: 36px; height: 36px; border-radius: 12px; cursor: pointer;
@@ -207,7 +209,7 @@ export function createToolbarPreview(opts: ToolbarPreviewOptions): HTMLElement &
 
     if (visibleButtons.length === 0) {
       const empty = document.createElement('span')
-      empty.textContent = '（空）'
+      empty.textContent = t('toolbarPreview.empty', undefined, '（空）')
       empty.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light); opacity: 0.6;'
       panel.appendChild(empty)
     } else {
@@ -256,7 +258,7 @@ export function createToolbarPreview(opts: ToolbarPreviewOptions): HTMLElement &
 
     if (barButtons.length === 0) {
       const hint = document.createElement('span')
-      hint.textContent = '（空）'
+      hint.textContent = t('toolbarPreview.empty', undefined, '（空）')
       hint.style.cssText = 'font-size:12px;color:var(--b3-theme-on-surface-light);opacity:0.6;'
       bar.appendChild(hint)
       return bar
@@ -343,7 +345,7 @@ export function createToolbarPreview(opts: ToolbarPreviewOptions): HTMLElement &
       user-select: none; flex-shrink: 0; gap: ${Math.round(4 * sf)}px;
       transition: opacity 0.15s ease; position: relative;
     `
-    el.title = button.name
+    el.title = getButtonDisplayName(button)
 
     // 内容用缩放后的尺寸
     renderButtonContent(el, scaledConfig)
@@ -493,7 +495,7 @@ export function createToolbarPreview(opts: ToolbarPreviewOptions): HTMLElement &
 
 function renderButtonContent(el: HTMLElement, button: ButtonConfig): void {
   if (button.showName) {
-    const name = button.name || ''
+    const name = getButtonDisplayName(button)
     const display = name.length > 4 ? name.slice(0, 4) : name
     let fontSize = 18
     const len = display.length

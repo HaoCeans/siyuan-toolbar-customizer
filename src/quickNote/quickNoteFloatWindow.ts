@@ -1,3 +1,5 @@
+import { logger } from '@/utils/logger'
+import { getLocale, t } from '../i18n/runtime'
 import floatWindowHtml from './quick-note-float-window.html?raw'
 import { getDesktopQuickNoteCaptureSettings } from './desktopCapture'
 import { getQuickNoteFontSize } from './fontSize'
@@ -48,6 +50,24 @@ const FLOAT_MIN_H = 120
 const QUICKNOTE_FLOAT_WINDOW_ELECTRON_ID_KEY = '__quickNoteFloatWindowElectronId'
 const QUICKNOTE_FLOAT_WINDOW_BOUNDS_KEY = '__quickNoteFloatWindowBounds'
 const QUICKNOTE_FLOAT_WINDOW_MARKER = 'quick-note-float'
+
+
+function getFloatUi() {
+  return {
+    documentTitle: t('quickNote.float.documentTitle', undefined, '快速记事'),
+    defaultTitle: t('quickNote.title.note', undefined, '⚡ 记事'),
+    close: t('quickNote.close', undefined, '关闭'),
+    keyboardHint: t('quickNote.float.keyboardHintHtml', undefined, '<kbd>Shift+Enter</kbd> 发送 · <kbd>Esc</kbd> 取消'),
+    cancel: t('quickNote.cancel', undefined, '取消'),
+    send: t('quickNote.send', undefined, '发送'),
+    emptyContent: t('quickNote.emptyContent', undefined, '请输入内容'),
+    sending: t('quickNote.sending', undefined, '发送中…'),
+    saved: t('quickNote.savedPlain', undefined, '已保存'),
+    saveFailed: t('quickNote.saveFailed', undefined, '保存失败'),
+    saveFailedRetry: t('quickNote.saveFailedRetry', undefined, '保存失败，请重试'),
+    parseFailed: t('quickNote.float.parseFailed', undefined, '数据解析失败'),
+  }
+}
 
 function getDefaultFloatWindowBounds() {
   const screenW = window.screen.availWidth || window.screen.width
@@ -203,7 +223,9 @@ function applyFloatWindowVisibility(win: any, visible: boolean): void {
       // 在 show 前先推送关键状态（主题/标题/字号），确保首帧就是正确外观
       const essential = {
         isDark: deps?.isDarkMode() ?? false,
-        title: deps?.getFloatTitle() ?? '⚡ 记事',
+        title: deps?.getFloatTitle() ?? t('quickNote.title.note', undefined, '⚡ 记事'),
+        locale: getLocale(),
+        ui: getFloatUi(),
         placeholder: deps?.getPlaceholder() ?? '',
         fontSize: getQuickNoteFontSize(false),
       }
@@ -392,7 +414,7 @@ function createFloatWindow(): void {
     floatWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`).catch((err) => {
       // 忽略导航错误（如 ERR_ABORTED），避免产生未处理的 Promise rejection；
       // 仅记录日志便于排查（重复 loadURL 曾导致 ERR_ABORTED -3 的误报）
-      console.warn('[QuickNoteFloat] 悬浮窗导航异常:', err)
+      logger.warn('[QuickNoteFloat] 悬浮窗导航异常:', err)
     })
 
     floatWindow.webContents.once('did-finish-load', async () => {
@@ -401,7 +423,7 @@ function createFloatWindow(): void {
       applyFloatWindowVisibility(floatWindow, floatWindowWantsVisible)
     })
   } catch (e) {
-    console.error('[QuickNoteFloat] 创建悬浮窗失败:', e)
+    logger.error('[QuickNoteFloat] 创建悬浮窗失败:', e)
   } finally {
     floatWindowCreating = false
   }
@@ -419,7 +441,9 @@ async function buildFloatStatePayload(extra?: Record<string, unknown>): Promise<
   }
   return {
     isDark: deps?.isDarkMode() ?? false,
-    title: deps?.getFloatTitle() ?? '⚡ 记事',
+    title: deps?.getFloatTitle() ?? t('quickNote.title.note', undefined, '⚡ 记事'),
+    locale: getLocale(),
+    ui: getFloatUi(),
     placeholder: deps?.getPlaceholder() ?? '',
     fontSize: getQuickNoteFontSize(false),
     initialText,
@@ -513,36 +537,38 @@ export async function handleQuickNoteFloatCommand(cmd: string, payload?: string)
     let data: { text?: string } = {}
     try {
       if (payload) data = JSON.parse(decodeURIComponent(payload))
-    } catch {
+    } catch (err) {
+      logger.warn('[QuickNoteFloat] 数据解析失败:', err)
       pushFloatState({
-        status: { text: '数据解析失败', type: 'err' },
+        status: { text: t('quickNote.float.parseFailed', undefined, '数据解析失败'), type: 'err' },
       })
       return
     }
 
     const text = (data.text || '').trim()
     if (!text) {
-      pushFloatState({ status: { text: '请输入内容', type: 'err' } })
+      pushFloatState({ status: { text: t('quickNote.emptyContent', undefined, '请输入内容'), type: 'err' } })
       return
     }
 
-    pushFloatState({ status: { text: '发送中…', type: '' } })
+    pushFloatState({ status: { text: t('quickNote.sending', undefined, '发送中…'), type: '' } })
 
     try {
       const result = await deps.onSave(text, floatSaveIsFromButton)
       if (result.ok) {
         pushFloatState({
-          status: { text: result.message || '已保存', type: 'ok' },
+          status: { text: result.message || t('quickNote.savedPlain', undefined, '已保存'), type: 'ok' },
           clear: result.clear !== false,
           focus: true,
         })
       } else {
         pushFloatState({
-          status: { text: result.message || '保存失败', type: 'err' },
+          status: { text: result.message || t('quickNote.saveFailed', undefined, '保存失败'), type: 'err' },
         })
       }
-    } catch {
-      pushFloatState({ status: { text: '保存失败，请重试', type: 'err' } })
+    } catch (err) {
+      logger.warn('[QuickNoteFloat] 保存失败:', err)
+      pushFloatState({ status: { text: t('quickNote.saveFailedRetry', undefined, '保存失败，请重试'), type: 'err' } })
     }
   }
 }

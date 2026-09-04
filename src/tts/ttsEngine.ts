@@ -6,6 +6,8 @@
  * 手机端（Android WebView）speechSynthesis 通常不可用，需要检测并提示。
  */
 
+import { logger } from '@/utils/logger'
+import { t } from '../i18n/runtime'
 // ─── 类型 ────────────────────────────────────────────────
 
 export interface TTSOptions {
@@ -113,10 +115,10 @@ export class TTSEngine {
    */
   get unavailableReason(): string {
     if (!this.synth) {
-      return '当前环境不支持 speechSynthesis API'
+      return t('tts.speechSynthesisUnavailable', undefined, '当前环境不支持 speechSynthesis API')
     }
     if (this.synth.getVoices().length === 0) {
-      return '当前 WebView 未提供任何语音引擎，Android WebView 通常不支持语音合成'
+      return t('tts.webViewVoiceUnavailable', undefined, '当前 WebView 未提供任何语音引擎，Android WebView 通常不支持语音合成')
     }
     return ''
   }
@@ -181,7 +183,7 @@ export class TTSEngine {
 
   speak(options: TTSOptions): boolean {
     if (!this.synth) {
-      console.warn('[TTS] speechSynthesis not available')
+      logger.warn('[TTS] speechSynthesis not available')
       return false
     }
 
@@ -361,7 +363,7 @@ export class TTSEngine {
       // interrupted / network / 其他错误：继续下一段
       // Chrome 15 秒 bug 会触发 'interrupted'，不能静默忽略
       if (this.state !== 'idle') {
-        console.warn('[TTS] utterance error:', e.error, '→ 继续下一段')
+        logger.warn('[TTS] utterance error:', e.error, '→ 继续下一段')
         setTimeout(() => this.speakParagraph(index + 1), 150)
       }
     }
@@ -433,12 +435,12 @@ export function getCurrentDocId(): string {
   // ① 手机端：直接从 protyle 实例拿
   const w = window as any
   const mobileProtyle = w.siyuan?.mobile?.editor?.protyle
-  console.log('[TTS-DEBUG] getCurrentDocId: siyuan.mobile.editor.protyle 存在?', !!mobileProtyle)
+  logger.log('[TTS-DEBUG] getCurrentDocId: siyuan.mobile.editor.protyle 存在?', !!mobileProtyle)
   if (mobileProtyle?.block?.rootID) {
-    console.log('[TTS-DEBUG] getCurrentDocId: 从 mobile protyle 拿到 rootID =', mobileProtyle.block.rootID)
+    logger.log('[TTS-DEBUG] getCurrentDocId: 从 mobile protyle 拿到 rootID =', mobileProtyle.block.rootID)
     return mobileProtyle.block.rootID
   }
-  console.log('[TTS-DEBUG] getCurrentDocId: mobile protyle.block.rootID 不存在, block=', mobileProtyle?.block)
+  logger.log('[TTS-DEBUG] getCurrentDocId: mobile protyle.block.rootID 不存在, block=', mobileProtyle?.block)
 
   // ② DOM 查询（参考 siyuan-sireader SP() 函数）
   const selectors = [
@@ -450,14 +452,14 @@ export function getCurrentDocId(): string {
   for (const sel of selectors) {
     const el = document.querySelector(sel)
     const id = (el as HTMLElement)?.dataset?.nodeId
-    console.log(`[TTS-DEBUG] getCurrentDocId: 选择器 "${sel}" → el=${!!el}, nodeId=${id || '(空)'}`)
+    logger.log(`[TTS-DEBUG] getCurrentDocId: 选择器 "${sel}" → el=${!!el}, nodeId=${id || '(空)'}`)
     if (id) return id
   }
 
   // ③ 兜底：从 protyle-wysiwyg 找第一个块
   const firstBlock = document.querySelector('.protyle-wysiwyg [data-node-id]')
   const fallbackId = firstBlock ? (firstBlock as HTMLElement).dataset.nodeId || '' : ''
-  console.log('[TTS-DEBUG] getCurrentDocId: 兜底 protyle-wysiwyg [data-node-id] →', fallbackId || '(空)')
+  logger.log('[TTS-DEBUG] getCurrentDocId: 兜底 protyle-wysiwyg [data-node-id] →', fallbackId || '(空)')
   return fallbackId
 }
 

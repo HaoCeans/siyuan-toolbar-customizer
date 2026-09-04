@@ -1,3 +1,4 @@
+import { t } from '../i18n/runtime'
 /**
  * 字段创建工具模块
  * 提供设置界面中各种输入字段的创建函数
@@ -81,7 +82,7 @@ export function createDesktopIconField(
     cursor: pointer;
     background: var(--b3-theme-background);
   `
-  iconDisplay.title = '点击选择图标'
+  iconDisplay.title = t('fields.chooseIcon', undefined, '点击选择图标')
 
   // 图标容器
   const iconContainer = document.createElement('span')
@@ -484,7 +485,7 @@ export function createIconField(
     border-radius: 6px;
     border: 1px solid var(--b3-border-color);
   `
-  iconDisplay.title = '点击选择图标'
+  iconDisplay.title = t('fields.chooseIcon', undefined, '点击选择图标')
 
   // 图标容器
   const iconContainer = document.createElement('span')
@@ -520,7 +521,7 @@ export function createIconField(
   // 提示信息
   const hint = document.createElement('div')
   hint.style.cssText = 'font-size: 10px; color: var(--b3-theme-on-surface-light); margin-top: 2px;'
-  hint.textContent = '点击输入框选择图标'
+  hint.textContent = t('fields.chooseIconHint', undefined, '点击输入框选择图标')
 
   field.appendChild(labelRow)
   field.appendChild(inputWrapper)

@@ -16,6 +16,8 @@ import {
 import "@/index.scss";
 import PluginInfoString from '@/../plugin.json'
 import { destroy, init } from '@/main'
+import { logger, setLoggingEnabled } from '@/utils/logger'
+import { clearI18n, initializeI18n, t } from '@/i18n/runtime'
 
 // 导入新功能模块
 import {
@@ -50,7 +52,8 @@ import {
   markDesktopBreadcrumbForFloating,
   safeSetInterval,
   clearSafeInterval,
-  restoreMobileToolbarOriginal
+  restoreMobileToolbarOriginal,
+  getButtonDisplayName
 } from './toolbarManager'
 
 // TTS 设置持久化初始化
@@ -73,7 +76,7 @@ import {
   handleQuickNoteFloatCommand,
   isQuickNoteFloatSaveFromButton,
 } from './quickNote/quickNoteFloatWindow'
-import { destroyDesktopQuickNoteBlockWindow, cleanupOrphanBlockWindows } from './quickNote/quickNoteBlockWindow'
+import { destroyDesktopQuickNoteBlockWindow, cleanupOrphanBlockWindows, cleanupBlockWindowResidue } from './quickNote/quickNoteBlockWindow'
 import { cleanupImagePicker } from './quickNote/imageInsert'
 
 // 导入 StressThreshold 清理函数
@@ -156,6 +159,7 @@ export default class ToolbarCustomizer extends Plugin {
   private mobileConfig: MobileToolbarConfig = DEFAULT_MOBILE_CONFIG
   private desktopButtonConfigs: ButtonConfig[] = []  // 电脑端按钮配置
   private mobileButtonConfigs: ButtonConfig[] = []   // 手机端按钮配置
+  private loggingEnabled = false
   private currentEditingButton: ButtonConfig | null = null
 
   // 全局按钮配置（批量设置所有按钮的默认值）
@@ -302,6 +306,7 @@ export default class ToolbarCustomizer extends Plugin {
   }
 
   async onload() {
+    initializeI18n(this.i18n, (window as any)?.siyuan?.config?.lang)
     // 设置插件实例（供 toolbarManager 和 windowDetector 中需要访问配置的 API 调用使用）
     setPluginInstance(this);
     
@@ -344,6 +349,15 @@ export default class ToolbarCustomizer extends Plugin {
       // 即使三个 protyle 事件全错过，只要内核活着 WS 在推，工具栏迟早补齐。
       this.eventBusWsHeartbeatHandler = () => this.onWsHeartbeat()
       this.eventBus.on('ws-main', this.eventBusWsHeartbeatHandler)
+    }
+
+    // 日志配置独立加载；读取失败不能阻断按钮、工具栏等其他配置初始化
+    try {
+      const savedLoggingConfig = await this.loadData('loggingConfig')
+      this.loggingEnabled = savedLoggingConfig?.enabled === true
+      setLoggingEnabled(this.loggingEnabled)
+    } catch (error) {
+      logger.error('[日志设置] 加载失败:', error)
     }
 
     // ===== 加载配置 =====
@@ -409,6 +423,7 @@ export default class ToolbarCustomizer extends Plugin {
           this.desktopButtonConfigs.unshift({
             id: 'overflow-button-desktop',
             name: '扩展工具栏',
+            nameKey: 'button.default.overflow',
             type: 'builtin',
             builtinId: 'overflow',
             icon: '⋯',
@@ -450,6 +465,7 @@ export default class ToolbarCustomizer extends Plugin {
           this.mobileButtonConfigs.unshift({
             id: 'overflow-button-mobile',
             name: '扩展工具栏',
+            nameKey: 'button.default.overflow',
             type: 'builtin',
             builtinId: 'overflow',
             icon: '⋯',
@@ -485,7 +501,7 @@ export default class ToolbarCustomizer extends Plugin {
         if (isUpgradingOldUser) {
           // 延迟到 DOM 就绪后显示（onload 阶段 DOM 可能还没渲染完）
           setTimeout(() => {
-            showMessage('🆕 新增底部悬浮胶囊工具栏，可在「插件设置 → 电脑端全局工具栏配置」中调整位置和样式', 8000, 'info')
+            showMessage(t('plugin.desktopFloatingToolbarNotice', undefined, '🆕 新增底部悬浮胶囊工具栏，可在「插件设置 → 电脑端全局工具栏配置」中调整位置和样式'), 8000, 'info')
           }, 2000)
           // 保存标记，避免重复提示
           this.desktopFeatureConfig.hasSeenDesktopFloatingNotice = true
@@ -591,26 +607,26 @@ export default class ToolbarCustomizer extends Plugin {
         if (licenseManager.migrateLegacyPerm()) {
           await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
           await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
-          console.log('[License] 老用户授权字段已迁移为 perm')
+          logger.log('[License] 老用户授权字段已迁移为 perm')
         }
       } catch (migrateErr) {
-        console.warn('[License] 迁移老用户授权字段失败（不影响使用）:', migrateErr)
+        logger.warn('[License] 迁移老用户授权字段失败（不影响使用）:', migrateErr)
       }
 
       if (!hasShownWelcome) {
         // 新用户，显示欢迎提示
         setTimeout(() => {
           if (this.isMobile) {
-            showMessage('欢迎使用本插件！🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦搜索\n⑧最近文档\n⑨鲸鱼快速批注', 0, 'info')
+            showMessage(t('plugin.welcomeMobile', undefined, '欢迎使用本插件！🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦搜索\n⑧最近文档\n⑨鲸鱼快速批注'), 0, 'info')
           } else {
-            showMessage('欢迎使用本插件🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦②打开伺服浏览器\n⑧最近文档\n⑨鲸鱼快速批注', 0, 'info')
+            showMessage(t('plugin.welcomeDesktop', undefined, '欢迎使用本插件🎉\n\n已经默认添加按钮：\n①更多\n②打开菜单\n③锁住文档\n④插件设置\n⑤打开日记\n⑥插入时间\n⑦打开伺服浏览器\n⑧最近文档\n⑨鲸鱼快速批注'), 0, 'info')
           }
           // 立即写入标记，不再依赖用户打开设置面板
           this.saveData('hasShownWelcome', true).catch(() => { /* ignore */ })
         }, 2000)
       }
     } catch (error) {
-      console.warn('加载配置失败，使用默认配置:', error)
+      logger.warn('加载配置失败，使用默认配置:', error)
     }
 
     // ===== 初始化 Vue 应用 =====
@@ -640,7 +656,6 @@ export default class ToolbarCustomizer extends Plugin {
 	    if (!this.isMobile && !this.isInWindow) {
 	      this.addCommand({
 	        langKey: 'quickNoteGlobalCapture',
-	        langText: '一键记事（全局捕获）',
 	        hotkey: '⌥⇧N',
 	        globalCallback: () => {
 	          void triggerDesktopQuickNoteGlobalCapture()
@@ -655,10 +670,22 @@ export default class ToolbarCustomizer extends Plugin {
 	    if (!this.isMobile) {
 	      this.addCommand({
 	        langKey: 'lifelogGlobalCapture',
-	        langText: '叶归LifeLog（全局捕获）',
 	        hotkey: '⌥⇧L',
 	        globalCallback: () => {
 	          void triggerDesktopLifelogGlobalCaptureSmart()
+	        },
+	      })
+	    }
+
+	    // 手动清理一键记事弹窗残留（命令面板可触发）：解决"打开过弹窗后点日记/文档无反应"（残留窗口 hash 占用）
+	    if (!this.isMobile && !this.isInWindow) {
+      this.addCommand({
+        langKey: 'cleanupQuickNoteWindows',
+        hotkey: '',
+        callback: async () => {
+	          cleanupBlockWindowResidue()
+	          destroyQuickNoteFloatWindow()
+	          showMessage(t('cleanupQuickNoteWindowsDone', undefined, '一键记事弹窗残留已清理'), 3000, 'info')
 	        },
 	      })
 	    }
@@ -684,7 +711,7 @@ export default class ToolbarCustomizer extends Plugin {
           if (blockId) {
             localStorage.removeItem(key)
             deleteQuickNoteDraftBlock(blockId)
-              .then(() => console.log('[QuickNote] 清理残留草稿块:', blockId, 'from', key))
+              .then(() => logger.log('[QuickNote] 清理残留草稿块:', blockId, 'from', key))
               .catch(() => {})
           }
         }
@@ -898,7 +925,7 @@ export default class ToolbarCustomizer extends Plugin {
 
       contextMenuButtons.forEach((btn) => {
         menu.addItem({
-          label: btn.name || '模板插入',
+          label: getButtonDisplayName(btn) || t('toolbarManager.2', undefined, '模板插入'),
           icon: 'iconEdit',
           click: () => {
             const editorTarget = protyleElement?.querySelector('[contenteditable="true"]') as HTMLElement | undefined
@@ -954,9 +981,9 @@ export default class ToolbarCustomizer extends Plugin {
               el = el.parentElement
               depth++
             }
-            console.warn('[QuickNote DOM] 未命中 quick-note wrapper，textarea 祖先链：', chain)
+            logger.warn('[QuickNote DOM] 未命中 quick-note wrapper，textarea 祖先链：', chain)
           } catch (err) {
-            console.warn('[QuickNote DOM] 祖先链打印失败:', err)
+            logger.warn('[QuickNote DOM] 祖先链打印失败:', err)
           }
         }
         return
@@ -1083,6 +1110,14 @@ export default class ToolbarCustomizer extends Plugin {
 
   /** 思源同步仅变更插件存储数据（dataChangePlugins）时调用，不会触发 onunload/onload */
   async onDataChanged() {
+    try {
+      const savedLoggingConfig = await this.loadData('loggingConfig')
+      this.loggingEnabled = savedLoggingConfig?.enabled === true
+      setLoggingEnabled(this.loggingEnabled)
+    } catch (error) {
+      logger.error('[日志设置] 同步失败:', error)
+    }
+
     // 重新加载按钮配置
     const savedMobileButtons = await this.loadData('mobileButtonConfigs')
     if (Array.isArray(savedMobileButtons)) {
@@ -1114,8 +1149,6 @@ export default class ToolbarCustomizer extends Plugin {
 
     // 清理资源
     cleanup()
-    // 插件卸载时清除 pluginInstance（cleanup 中不再清除，因为重初始化时也会调用 cleanup）
-    setPluginInstance(null)
     destroy()
 
     // 清理标签切换器资源
@@ -1192,6 +1225,10 @@ export default class ToolbarCustomizer extends Plugin {
       document.removeEventListener('contextmenu', this.quickNoteTextareaContextMenuHandler, true)
       this.quickNoteTextareaContextMenuHandler = null
     }
+
+    // 所有业务模块清理完成后再释放共享运行时。
+    setPluginInstance(null)
+    clearI18n()
 
   }
 
@@ -1284,7 +1321,7 @@ export default class ToolbarCustomizer extends Plugin {
           mobileGlobalButtonChanged
 
         if (!hasAnyChange) {
-          showMessage('配置无变化，未保存', 3000, 'info')
+          showMessage(t('plugin.configUnchanged', undefined, '配置无变化，未保存'), 3000, 'info')
           await new Promise(r => setTimeout(r, 100))
           return
         }
@@ -1312,7 +1349,7 @@ export default class ToolbarCustomizer extends Plugin {
           await this.saveData('mobileGlobalButtonConfig', this.mobileGlobalButtonConfig)
         }
 
-        showMessage('设置已保存，正在重载...', 2000, 'info')
+        showMessage(t('plugin.settingsSavedReloading', undefined, '设置已保存，正在重载...'), 2000, 'info')
 
         // 使用官方 API 重载界面
         await fetchSyncPost('/api/ui/reloadUI', {})
@@ -1342,6 +1379,7 @@ export default class ToolbarCustomizer extends Plugin {
         mobileGlobalButtonConfig: this.mobileGlobalButtonConfig,
         desktopFeatureConfig: this.desktopFeatureConfig,
         mobileFeatureConfig: this.mobileFeatureConfig,
+        loggingEnabled: this.loggingEnabled,
         mobileConfig: this.mobileConfig,
         version: this.version,
         isAuthorToolActivated: () => this.isAuthorToolActivated(),
@@ -1350,6 +1388,24 @@ export default class ToolbarCustomizer extends Plugin {
         showIconPicker: (current, onSelect) => this.showIconPicker(current, onSelect),
         saveData: (key, value) => this.saveData(key, value),
         removeData: (key) => this.removeData(key),
+        setLoggingEnabled: async (enabled) => {
+          const previous = this.loggingEnabled
+          this.loggingEnabled = enabled === true
+          setLoggingEnabled(this.loggingEnabled)
+          try {
+            await this.saveData('loggingConfig', { enabled: this.loggingEnabled })
+          } catch (error) {
+            this.loggingEnabled = previous
+            setLoggingEnabled(previous)
+            throw error
+          }
+        },
+        resetLogging: async () => {
+          await this.removeData('loggingConfig')
+          this.loggingEnabled = false
+          context.loggingEnabled = false
+          setLoggingEnabled(false)
+        },
         applyFeatures: () => this.applyFeatures(),
         applyDesktopToolbarPosition: () => this.applyDesktopToolbarPosition(),
         refreshButtons: () => {
@@ -1360,7 +1416,7 @@ export default class ToolbarCustomizer extends Plugin {
       createDesktopSettingLayout(setting, context)
     }
 
-    setting.open('思源手机端增强')
+    setting.open(t('plugin.settingsTitle', undefined, '思源手机端增强'))
 
     // 电脑端：对话框打开后注入标签栏
     if (!this.isMobile) {
@@ -1393,6 +1449,11 @@ export default class ToolbarCustomizer extends Plugin {
       showButtonIdPicker: (currentValue, onSelect) => this.showButtonIdPicker(currentValue, onSelect),
       saveData: (key, value) => this.saveData(key, value),
       removeData: (key) => this.removeData(key),
+      resetLogging: async () => {
+        await this.removeData('loggingConfig')
+        this.loggingEnabled = false
+        setLoggingEnabled(false)
+      },
       applyFeatures: () => this.applyFeatures(),
       applyDesktopToolbarPosition: () => this.applyDesktopToolbarPosition(),
       applyMobileToolbarStyle: () => this.applyMobileToolbarStyle(),
@@ -1448,7 +1509,11 @@ export default class ToolbarCustomizer extends Plugin {
 
   // 自定义确认对话框（已迁移到 ui/dialog.ts，兼容鸿蒙系统）
   private showConfirmDialog(message: string): Promise<boolean> {
-    return showConfirmDialogModal({ message, confirmText: '删除', cancelText: '取消' })
+    return showConfirmDialogModal({
+      message,
+      confirmText: t('dialog.delete', undefined, '删除'),
+      cancelText: t('dialog.cancel', undefined, '取消')
+    })
   }
 
   // 图标选择器（已迁移到 ui/iconPicker.ts）

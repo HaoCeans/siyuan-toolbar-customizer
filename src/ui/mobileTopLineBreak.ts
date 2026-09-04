@@ -1,3 +1,4 @@
+import { t } from '../i18n/runtime'
 /**
  * 手机端顶部工具栏：在 #toolbarSync 左侧插入 H，点击触发与 Enter 相同的分段（硬换行）
  */
@@ -145,7 +146,7 @@ function dispatchHardEnterInEditor() {
 
   const wysiwyg = getMobileWysiwyg()
   if (!wysiwyg) {
-    showMessage('请先打开文档后再使用换行', 2000, 'info')
+    showMessage(t('mobileTopLineBreak.noDocument', undefined, '请先打开文档后再使用换行'), 2000, 'info')
     return
   }
 
@@ -173,7 +174,7 @@ function insertIfNeeded() {
   btn.id = BTN_ID
   btn.className = 'siyuan-toolbar-customizer-mobile-linebreak-btn'
   btn.setAttribute('role', 'button')
-  btn.setAttribute('aria-label', '换行')
+  btn.setAttribute('aria-label', t('mobileTopLineBreak.label', undefined, '换行'))
   btn.tabIndex = -1
   btn.style.cssText = [
     'box-sizing:border-box',

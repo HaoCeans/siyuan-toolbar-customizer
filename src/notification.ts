@@ -4,6 +4,7 @@
  */
 
 import { showMessage } from "siyuan"
+import { t } from "./i18n/runtime"
 
 // ===== 通知配置常量 =====
 
@@ -31,7 +32,7 @@ export type NotificationType = 'info' | 'warning' | 'error'
  */
 export function showButtonExecNotification(buttonName: string, enabled: boolean): void {
   if (enabled) {
-    showMessage(`执行: ${buttonName}`, NOTIFICATION_DURATION.NORMAL, 'info')
+    showMessage(t('notification.buttonExecuted', { buttonName }), NOTIFICATION_DURATION.NORMAL, 'info')
   }
 }
 
@@ -44,7 +45,7 @@ export function showButtonExecNotification(buttonName: string, enabled: boolean)
  */
 export function showOverflowToolbarOpened(layers: number, enabled: boolean = true): void {
   if (enabled) {
-    showMessage(`扩展工具栏已弹出（${layers}层）`, NOTIFICATION_DURATION.SHORT, 'info')
+    showMessage(t('notification.overflowToolbarOpened', { layers }), NOTIFICATION_DURATION.SHORT, 'info')
   }
 }
 
@@ -54,7 +55,7 @@ export function showOverflowToolbarOpened(layers: number, enabled: boolean = tru
  */
 export function showOverflowToolbarClosed(enabled: boolean = true): void {
   if (enabled) {
-    showMessage('扩展工具栏已关闭', NOTIFICATION_DURATION.SHORT, 'info')
+    showMessage(t('notification.overflowToolbarClosed'), NOTIFICATION_DURATION.SHORT, 'info')
   }
 }
 
@@ -65,7 +66,7 @@ export function showOverflowToolbarClosed(enabled: boolean = true): void {
  * @param buttonName 按钮名称
  */
 export function showErrorButtonNotConfigured(buttonName: string): void {
-  showMessage(`按钮"${buttonName}"未配置功能ID`, NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.buttonNotConfigured', { buttonName }), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
@@ -73,7 +74,7 @@ export function showErrorButtonNotConfigured(buttonName: string): void {
  * @param builtinId 功能ID
  */
 export function showErrorBuiltinNotFound(builtinId: string): void {
-  showMessage(`未找到功能: ${builtinId}`, NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.builtinNotFound', { builtinId }), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
@@ -81,21 +82,21 @@ export function showErrorBuiltinNotFound(builtinId: string): void {
  * @param buttonName 按钮名称
  */
 export function showErrorTemplateNotConfigured(buttonName: string): void {
-  showMessage(`按钮"${buttonName}"未配置模板内容`, NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.templateNotConfigured', { buttonName }), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
  * 显示编辑器未聚焦提示
  */
 export function showInfoEditorNotFocused(): void {
-  showMessage('请先聚焦到编辑器', NOTIFICATION_DURATION.ERROR, 'info')
+  showMessage(t('notification.editorNotFocused'), NOTIFICATION_DURATION.ERROR, 'info')
 }
 
 /**
  * 显示插入模板失败错误
  */
 export function showErrorInsertTemplateFailed(): void {
-  showMessage('插入模板失败，请确保编辑器处于可编辑状态', NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.insertTemplateFailed'), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
@@ -103,7 +104,7 @@ export function showErrorInsertTemplateFailed(): void {
  * @param buttonName 按钮名称
  */
 export function showErrorClickSequenceNotConfigured(buttonName: string): void {
-  showMessage(`按钮"${buttonName}"未配置点击序列`, NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.clickSequenceNotConfigured', { buttonName }), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
@@ -112,7 +113,7 @@ export function showErrorClickSequenceNotConfigured(buttonName: string): void {
  * @param selector 选择器
  */
 export function showErrorClickSequenceStepFailed(step: number, selector: string): void {
-  showMessage(`点击序列失败: 步骤 ${step} - ${selector}`, NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.clickSequenceStepFailed', { step, selector }), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
@@ -120,7 +121,7 @@ export function showErrorClickSequenceStepFailed(step: number, selector: string)
  * @param buttonName 按钮名称
  */
 export function showErrorShortcutNotConfigured(buttonName: string): void {
-  showMessage(`按钮"${buttonName}"未配置快捷键`, NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.shortcutNotConfigured', { buttonName }), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
@@ -128,7 +129,7 @@ export function showErrorShortcutNotConfigured(buttonName: string): void {
  * @param shortcutKey 快捷键
  */
 export function showWarningShortcutMaybeInvalid(shortcutKey: string): void {
-  showMessage(`快捷键可能无效: ${shortcutKey}`, NOTIFICATION_DURATION.LONG, 'info')
+  showMessage(t('notification.shortcutMaybeInvalid', { shortcutKey }), NOTIFICATION_DURATION.LONG, 'info')
 }
 
 /**
@@ -136,7 +137,7 @@ export function showWarningShortcutMaybeInvalid(shortcutKey: string): void {
  * @param shortcutKey 快捷键
  */
 export function showErrorShortcutCannotParse(shortcutKey: string): void {
-  showMessage(`无法解析快捷键: ${shortcutKey}`, NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.shortcutCannotParse', { shortcutKey }), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
@@ -145,7 +146,7 @@ export function showErrorShortcutCannotParse(shortcutKey: string): void {
  * @param error 错误信息
  */
 export function showErrorShortcutFailed(shortcutKey: string, error: unknown): void {
-  showMessage(`执行快捷键失败: ${shortcutKey} - ${error}`, NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.shortcutFailed', { shortcutKey, error: String(error) }), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
@@ -153,7 +154,7 @@ export function showErrorShortcutFailed(shortcutKey: string, error: unknown): vo
  * @param command 命令名
  */
 export function showErrorCommandCannotExecute(command: string): void {
-  showMessage(`无法执行命令: ${command}`, NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.commandCannotExecute', { command }), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
@@ -161,7 +162,7 @@ export function showErrorCommandCannotExecute(command: string): void {
  * @param error 错误信息
  */
 export function showErrorScriptFailed(error: unknown): void {
-  showMessage(`执行脚本失败: ${error}`, NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.scriptFailed', { error: String(error) }), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 // ===== 日记相关通知 =====
@@ -170,14 +171,14 @@ export function showErrorScriptFailed(error: unknown): void {
  * 显示已打开日记并跳转到底部通知
  */
 export function showInfoDiaryOpenedAndScrolled(): void {
-  showMessage('已打开日记并跳转到底部', NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(t('notification.diaryOpenedAndScrolled'), NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 /**
  * 显示日记已打开通知
  */
 export function showInfoDiaryOpened(): void {
-  showMessage('日记已打开', NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(t('notification.diaryOpened'), NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 /**
@@ -185,7 +186,7 @@ export function showInfoDiaryOpened(): void {
  * @param error 错误信息
  */
 export function showErrorDiaryFailed(error: unknown): void {
-  showMessage(`❌ 打开日记失败: ${error}`, NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.diaryFailed', { error: String(error) }), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 // ===== 复制相关通知 =====
@@ -194,7 +195,7 @@ export function showErrorDiaryFailed(error: unknown): void {
  * 显示复制成功通知
  */
 export function showInfoCopySuccess(): void {
-  showMessage(`复制成功`, NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(t('notification.copySuccess'), NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 /**
@@ -205,7 +206,7 @@ export function showInfoTemplateInserted(enabled: boolean = true): void {
   if (!enabled) return
   
   const successMsg = document.createElement('div')
-  successMsg.textContent = '模板已插入'
+  successMsg.textContent = t('notification.templateInserted')
   successMsg.style.cssText = `
     position: fixed;
     top: 20px;
@@ -239,14 +240,14 @@ export function showSuccess(message: string): void {
  * @param content 被复制的内容
  */
 export function showInfoCopied(content: string): void {
-  showMessage(`已复制: ${content}`, NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(t('notification.copied', { content }), NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 /**
  * 显示复制失败错误
  */
 export function showErrorCopyFailed(): void {
-  showMessage(`复制失败`, NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.copyFailed'), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 // ===== 数据库悬浮弹窗通知 =====
@@ -255,21 +256,21 @@ export function showErrorCopyFailed(): void {
  * 显示无法获取数据库ID错误
  */
 export function showErrorCannotGetDatabaseId(): void {
-  showMessage('❌ 无法获取数据库ID，请检查配置', NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.cannotGetDatabaseId'), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
  * 显示获取数据库信息失败错误
  */
 export function showErrorDatabaseInfoFailed(): void {
-  showMessage('❌ 获取数据库信息失败', NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.databaseInfoFailed'), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
  * 显示获取数据失败错误
  */
 export function showErrorDataFetchFailed(): void {
-  showMessage('❌ 获取数据失败', NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.dataFetchFailed'), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
@@ -277,14 +278,14 @@ export function showErrorDataFetchFailed(): void {
  * @param error 错误信息
  */
 export function showErrorQueryFailed(error: unknown): void {
-  showMessage(`❌ 查询失败: ${error instanceof Error ? error.message : error}`, NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.queryFailed', { error: String(error instanceof Error ? error.message : error) }), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
  * 显示没有数据提示
  */
 export function showInfoNoData(): void {
-  showMessage('没有数据', NOTIFICATION_DURATION.ERROR, 'info')
+  showMessage(t('notification.noData'), NOTIFICATION_DURATION.ERROR, 'info')
 }
 
 // ===== 设置界面通知 =====
@@ -293,14 +294,14 @@ export function showInfoNoData(): void {
  * 显示已开启所有按钮提示通知
  */
 export function showInfoNotificationEnabled(): void {
-  showMessage('已开启所有按钮提示', NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(t('notification.allButtonTipsEnabled'), NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 /**
  * 显示已关闭所有按钮提示通知
  */
 export function showInfoNotificationDisabled(): void {
-  showMessage('已关闭所有按钮提示', NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(t('notification.allButtonTipsDisabled'), NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 /**
@@ -308,7 +309,7 @@ export function showInfoNotificationDisabled(): void {
  * @param enabled 是否启用
  */
 export function showNotificationToggleStatus(enabled: boolean): void {
-  showMessage(enabled ? '已开启所有按钮提示' : '已关闭所有按钮提示', NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(enabled ? t('notification.allButtonTipsEnabled') : t('notification.allButtonTipsDisabled'), NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 // ===== 设置界面相关通知 =====
@@ -318,32 +319,32 @@ export function showNotificationToggleStatus(enabled: boolean): void {
  * @param configName 配置名称
  */
 export function showInfoConfigModified(configName: string): void {
-  showMessage(`${configName}已修改，请点击保存生效`, NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(t('notification.configModified', { configName }), NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 /**
  * 显示图标大小已修改提示
  */
 export function showInfoIconSizeModified(): void {
-  showMessage('图标大小已修改，请点击保存生效', NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(t('notification.iconSizeModified'), NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 /**
  * 显示按钮宽度已修改提示
  */
 export function showInfoButtonWidthModified(): void {
-  showMessage('按钮宽度已修改，请点击保存生效', NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(t('notification.buttonWidthModified'), NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 /**
  * 显示右边距已修改提示
  */
 export function showInfoMarginRightModified(): void {
-  showMessage('右边距已修改，请点击保存生效', NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(t('notification.marginRightModified'), NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 export function showInfoExternalButtonsReserveWidthModified(): void {
-  showMessage('其他插件按钮预留宽度已修改，请点击保存生效', NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(t('notification.externalButtonsReserveWidthModified'), NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 // ===== 作者工具通知 =====
@@ -352,7 +353,7 @@ export function showInfoExternalButtonsReserveWidthModified(): void {
  * 显示作者工具已激活通知（旧版兼容，建议改用 showLicenseActivated）
  */
 export function showInfoAuthorToolActivated(): void {
-  showMessage('鲸鱼定制工具箱已激活！请重新打开设置页面', NOTIFICATION_DURATION.ERROR, 'info')
+  showMessage(t('notification.authorToolActivated'), NOTIFICATION_DURATION.ERROR, 'info')
 }
 
 /**
@@ -360,28 +361,28 @@ export function showInfoAuthorToolActivated(): void {
  * @param reason 失败原因（来自 ValidationResult.reason）
  */
 export function showErrorActivationCodeInvalid(reason?: string): void {
-  let msg = '激活码错误，请重试'
+  let msg = t('notification.activationCodeInvalid')
   switch (reason) {
     case 'format':
-      msg = '激活码格式错误，请检查是否完整复制（应为 6 段以 WHALE- 开头）'
+      msg = t('notification.activationCodeInvalidFormat')
       break
     case 'plan':
-      msg = '不支持的套餐类型'
+      msg = t('notification.activationCodeInvalidPlan')
       break
     case 'date':
-      msg = '激活码日期格式错误'
+      msg = t('notification.activationCodeInvalidDate')
       break
     case 'signature':
-      msg = '激活码签名验证失败，可能已被篡改'
+      msg = t('notification.activationCodeInvalidSignature')
       break
     case 'account':
-      msg = '激活码与当前思源账号不匹配，请用绑定该码的账号登录'
+      msg = t('notification.activationCodeInvalidAccount')
       break
     case 'expired':
-      msg = '激活码已超过最后激活期限，请联系作者重新发放'
+      msg = t('notification.activationCodeExpired')
       break
     case 'trial_used':
-      msg = '本设备已使用过免费试用，无法再次试用'
+      msg = t('notification.activationCodeTrialUsed')
       break
   }
   showMessage(msg, NOTIFICATION_DURATION.ERROR, 'error')
@@ -394,21 +395,21 @@ export function showErrorActivationCodeInvalid(reason?: string): void {
  * @param daysLeft 剩余试用天数（不含宽限期）
  */
 export function showTrialStarted(daysLeft: number): void {
-  showMessage(`🎉 免费试用已开始！${daysLeft} 天内可使用全部付费功能`, NOTIFICATION_DURATION.LONG, 'info')
+  showMessage(t('notification.trialStarted', { daysLeft }), NOTIFICATION_DURATION.LONG, 'info')
 }
 
 /**
  * 显示试用期已结束通知（点击付费按钮时触发）
  */
 export function showTrialExpired(): void {
-  showMessage('⏰ 试用期已结束，请在「插件设置 → 激活与权益」中续费', NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.trialExpired'), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
  * 显示激活已过期通知（点击付费按钮时触发，月卡过期）
  */
 export function showLicenseExpired(): void {
-  showMessage('❌ 激活已过期，请在「插件设置 → 激活与权益」中续费', NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.licenseExpired'), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
@@ -416,14 +417,14 @@ export function showLicenseExpired(): void {
  * @param daysLeft 剩余天数（含宽限期）
  */
 export function showLicenseExpiringSoon(daysLeft: number): void {
-  showMessage(`⏳ 激活即将过期，剩余 ${daysLeft} 天，请及时续费`, NOTIFICATION_DURATION.LONG, 'info')
+  showMessage(t('notification.licenseExpiringSoon', { daysLeft }), NOTIFICATION_DURATION.LONG, 'info')
 }
 
 /**
  * 显示需要激活通知（点击付费按钮但未激活/未试用时触发）
  */
 export function showActivationRequired(): void {
-  showMessage('🔒 此功能需激活，请在「插件设置 → 激活与权益」中激活', NOTIFICATION_DURATION.ERROR, 'error')
+  showMessage(t('notification.activationRequired'), NOTIFICATION_DURATION.ERROR, 'error')
 }
 
 /**
@@ -432,8 +433,10 @@ export function showActivationRequired(): void {
  * @param daysLeftText 剩余天数文案（"3 天" / "30 天" / "永久"）
  */
 export function showLicenseActivated(planText: string, daysLeftText: string | number): void {
-  const daysStr = typeof daysLeftText === 'number' ? `${daysLeftText} 天` : daysLeftText
-  showMessage(`✅ 激活成功！套餐：${planText}，有效期：${daysStr}`, NOTIFICATION_DURATION.ERROR, 'info')
+  const daysStr = typeof daysLeftText === 'number'
+    ? t('notification.days', { days: daysLeftText })
+    : daysLeftText
+  showMessage(t('notification.licenseActivated', { planText, daysLeft: daysStr }), NOTIFICATION_DURATION.ERROR, 'info')
 }
 
 // ===== 桌面端设置通知 =====
@@ -443,26 +446,26 @@ export function showLicenseActivated(planText: string, daysLeftText: string | nu
  * @param enabled 是否启用全局配置
  */
 export function showGlobalConfigEnabledStatus(enabled: boolean): void {
-  showMessage(enabled ? '已启用全局按钮配置' : '已禁用全局按钮配置，各按钮使用独立配置', NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(enabled ? t('notification.globalConfigEnabled') : t('notification.globalConfigDisabled'), NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 /**
  * 显示图标大小已应用通知
  */
 export function showInfoIconSizeApplied(): void {
-  showMessage('图标大小已应用到所有按钮', NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(t('notification.iconSizeApplied'), NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 /**
  * 显示按钮宽度已应用通知
  */
 export function showInfoButtonWidthApplied(): void {
-  showMessage('按钮宽度已应用到所有按钮', NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(t('notification.buttonWidthApplied'), NOTIFICATION_DURATION.NORMAL, 'info')
 }
 
 /**
  * 显示右边距已应用通知
  */
 export function showInfoMarginRightApplied(): void {
-  showMessage('右边距已应用到所有按钮', NOTIFICATION_DURATION.NORMAL, 'info')
+  showMessage(t('notification.marginRightApplied'), NOTIFICATION_DURATION.NORMAL, 'info')
 }

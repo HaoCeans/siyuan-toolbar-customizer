@@ -3,7 +3,9 @@
  * 负责创建和管理移动端的按钮配置界面
  */
 
-import { ButtonConfig } from '../../toolbarManager'
+import { logger } from '@/utils/logger'
+import { t } from '../../i18n/runtime'
+import { ButtonConfig, getButtonDisplayName } from '../../toolbarManager'
 import { updateMaxVisibleTabs } from '../../ui/mobileTabs'
 import { showClickSequenceSelector } from '../clickSequenceSelector'
 import { showButtonSelector, ButtonInfo } from '../buttonSelector'
@@ -349,7 +351,7 @@ export function createMobileButtonItem(
     border-radius: 4px;
     transition: background 0.15s ease, color 0.15s ease;
   `
-  dragHandle.title = '长按拖动排序'
+  dragHandle.title = t('ui.buttonItems.mobile.1', undefined, '长按拖动排序')
 
   // 手机端拖拽手柄触感反馈：触摸时立即变色，让用户知道"这个可以交互"
   // 用 pointerdown 覆盖 touch 和 mouse 两种场景
@@ -404,14 +406,14 @@ export function createMobileButtonItem(
   const infoDiv = document.createElement('div')
   infoDiv.style.cssText = 'flex: 1; min-width: 0;'
   const typeLabels: Record<string, string> = {
-    'builtin': '①思源内置功能【简单】',
-    'template': '②手写模板插入【简单】',
-    'shortcut': '③电脑端快捷键【简单】',
-    'quick-note': '④一键记事弹窗【简单】',
-    'click-sequence': '⑤自动化模拟点击【难】',
-    'author-tool': '⑥鲸鱼定制工具箱'
+    'builtin': t('ui.buttonItems.mobile.2', undefined, '①思源内置功能【简单】'),
+    'template': t('ui.buttonItems.mobile.3', undefined, '②手写模板插入【简单】'),
+    'shortcut': t('ui.buttonItems.mobile.4', undefined, '③电脑端快捷键【简单】'),
+    'quick-note': t('ui.buttonItems.mobile.5', undefined, '④一键记事弹窗【简单】'),
+    'click-sequence': t('ui.buttonItems.mobile.6', undefined, '⑤自动化模拟点击【难】'),
+    'author-tool': t('ui.buttonItems.mobile.7', undefined, '⑥鲸鱼定制工具箱')
   }
-  const typeLabel = (button.id === 'overflow-button-mobile') ? '扩展工具栏' : (typeLabels[button.type] || button.type)
+  const typeLabel = (button.id === 'overflow-button-mobile') ? t('ui.buttonItems.mobile.8', undefined, '扩展工具栏') : (typeLabels[button.type] || button.type)
 
   // 获取溢出层级信息
   const overflowLevel = button.overflowLevel ?? 0
@@ -422,9 +424,9 @@ export function createMobileButtonItem(
   // 只有在扩展工具栏启用时才显示层级信息
   let levelLabel = ''
   if (isOverflowEnabled && overflowLevel > 0) {
-    levelLabel = `<span style="color: var(--b3-theme-primary); font-weight: 600;">第${overflowLevel}层</span>`
+    levelLabel = `<span style="color: var(--b3-theme-primary); font-weight: 600;">${t('ui.buttonItems.mobile.overflowLevel', { level: overflowLevel }, '第{level}层')}</span>`
   } else if (isOverflowEnabled && overflowLevel === 0) {
-    levelLabel = `<span style="color: #22c55e; font-weight: 600;"> · 常见</span>`
+    levelLabel = `<span style="color: #22c55e; font-weight: 600;">${t('ui.buttonItems.mobile.commonLevel', undefined, ' · 常见')}</span>`
   }
 
   const isAuthorTool = button.type === 'author-tool'
@@ -432,7 +434,7 @@ export function createMobileButtonItem(
     ? 'font-size: 11px; color: #a855f7; font-weight: 600;'
     : 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
   infoDiv.innerHTML = `
-    <div style="font-weight: 500; font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 4px;">${button.name}</div>
+    <div style="font-weight: 500; font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 4px;">${getButtonDisplayName(button)}</div>
     <div style="${typeStyle}">
       ${typeLabel}${levelLabel}
     </div>
@@ -449,7 +451,7 @@ export function createMobileButtonItem(
 
   const deleteBtn = document.createElement('button')
   deleteBtn.className = 'b3-button b3-button--text'
-  deleteBtn.textContent = '删除'
+  deleteBtn.textContent = t('ui.buttonItems.mobile.9', undefined, '删除')
   deleteBtn.style.cssText = `
     padding: 4px 10px;
     font-size: 12px;
@@ -459,7 +461,7 @@ export function createMobileButtonItem(
   `
   deleteBtn.onclick = async (e) => {
     e.stopPropagation()
-    if (await context.showConfirmDialog(`确定删除"${button.name}"？`)) {
+    if (await context.showConfirmDialog(t('ui.buttonItems.mobile.deleteConfirm', { buttonName: getButtonDisplayName(button) }, '确定删除"{buttonName}"？'))) {
       // 从配置数组中删除
       const realIndex = configsArray.findIndex(btn => btn.id === button.id)
       if (realIndex !== -1) {
@@ -481,11 +483,11 @@ export function createMobileButtonItem(
   enabledToggle.className = 'b3-switch'
   enabledToggle.checked = button.enabled !== false
   enabledToggle.style.cssText = 'transform: scale(0.8); flex-shrink: 0; cursor: pointer;'
-  enabledToggle.title = button.enabled !== false ? '点击禁用按钮' : '点击启用按钮'
+  enabledToggle.title = button.enabled !== false ? t('ui.buttonItems.mobile.10', undefined, '点击禁用按钮') : t('ui.buttonItems.mobile.11', undefined, '点击启用按钮')
   enabledToggle.onclick = (e) => {
     e.stopPropagation()
     button.enabled = enabledToggle.checked
-    enabledToggle.title = enabledToggle.checked ? '点击禁用按钮' : '点击启用按钮'
+    enabledToggle.title = enabledToggle.checked ? t('ui.buttonItems.mobile.12', undefined, '点击禁用按钮') : t('ui.buttonItems.mobile.13', undefined, '点击启用按钮')
     // 更新按钮项的透明度
     item.style.opacity = enabledToggle.checked ? '1' : '0.5'
     // 重新计算溢出层级（启用/禁用会影响按钮是否显示）
@@ -520,7 +522,7 @@ export function createMobileButtonItem(
   `
 
   // 名称输入框 - 需要保存引用以便在选择按钮时更新
-  const nameField = createInputField('名称', button.name, '按钮显示名称', (v) => {
+  const nameField = createInputField(t('ui.buttonItems.mobile.name', undefined, '名称'), button.name, t('ui.buttonItems.mobile.namePlaceholder', undefined, '按钮显示名称'), (v) => {
     button.name = v
     infoDiv.querySelector('div:first-child')!.textContent = v
   })
@@ -539,7 +541,7 @@ export function createMobileButtonItem(
     `
 
     // 层数输入
-    const layersField = createInputField('扩展工具栏层数', (button.layers || 1).toString(), '1-5层，点击后弹出对应层数的工具栏', (v) => {
+    const layersField = createInputField(t('ui.buttonItems.mobile.overflowLayers', undefined, '扩展工具栏层数'), (button.layers || 1).toString(), t('ui.buttonItems.mobile.overflowLayersPlaceholder', undefined, '1-5层，点击后弹出对应层数的工具栏'), (v) => {
       let num = parseInt(v) || 1
       if (num < 1) num = 1
       if (num > 5) num = 5
@@ -556,7 +558,7 @@ export function createMobileButtonItem(
     const animRow = document.createElement('div')
     animRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px;'
     const animLabel = document.createElement('span')
-    animLabel.textContent = '打开动态动画'
+    animLabel.textContent = t('ui.buttonItems.mobile.14', undefined, '打开动态动画')
     animLabel.style.cssText = 'font-size: 13px; font-weight: 600;'
     const animToggle = document.createElement('input')
     animToggle.type = 'checkbox'
@@ -581,35 +583,35 @@ export function createMobileButtonItem(
       line-height: 1.6;
       color: var(--b3-theme-on-surface);
     `
-    descDiv.innerHTML = `
+    descDiv.innerHTML = t('ui.buttonItems.mobile.overflowHelp', undefined, `
       <div style="font-weight: 600; margin-bottom: 6px; color: var(--b3-theme-primary);">💡 扩展工具栏说明</div>
       <div>• <strong>关闭按钮</strong>：只显示思源默认工具栏</div>
       <div>• <strong>开启按钮</strong>：工具栏第一位显示"⋯"按钮</div>
       <div>• <strong>点击"⋯"</strong>：弹出扩展工具栏</div>
       <div style="margin-top: 4px;">📊 <strong>层数设置</strong>：1层=1个工具栏，最多5层</div>
-    `
+    `)
     layersContainer.appendChild(descDiv)
 
     editForm.appendChild(layersContainer)
   } else {
     // 类型选择 - 普通按钮显示
     const typeOptions = [
-      { value: 'builtin', label: '①思源内置功能【简单】' },
-      { value: 'template', label: '②手写模板插入【简单】' },
-      { value: 'shortcut', label: '③电脑端快捷键【简单】' },
-      { value: 'quick-note', label: '④一键记事弹窗【简单】' },
-      { value: 'click-sequence', label: '⑤自动化模拟点击【难】' }
+      { value: 'builtin', label: t('ui.buttonItems.mobile.15', undefined, '①思源内置功能【简单】') },
+      { value: 'template', label: t('ui.buttonItems.mobile.16', undefined, '②手写模板插入【简单】') },
+      { value: 'shortcut', label: t('ui.buttonItems.mobile.17', undefined, '③电脑端快捷键【简单】') },
+      { value: 'quick-note', label: t('ui.buttonItems.mobile.18', undefined, '④一键记事弹窗【简单】') },
+      { value: 'click-sequence', label: t('ui.buttonItems.mobile.19', undefined, '⑤自动化模拟点击【难】') }
     ]
     if (context.isAuthorToolActivated()) {
       typeOptions.push(
-        { value: 'author-tool', label: '⑥鲸鱼定制工具箱' }
+        { value: 'author-tool', label: t('ui.buttonItems.mobile.20', undefined, '⑥鲸鱼定制工具箱') }
       )
     } else {
       typeOptions.push(
-        { value: 'author-tool', label: '⑥鲸鱼定制工具箱（跳转激活）' }
+        { value: 'author-tool', label: t('ui.buttonItems.mobile.21', undefined, '⑥鲸鱼定制工具箱（跳转激活）') }
       )
     }
-    const typeField = createSelectField('选择功能', button.type, typeOptions, (v) => {
+    const typeField = createSelectField(t('ui.buttonItems.mobile.selectFunction', undefined, '选择功能'), button.type, typeOptions, (v) => {
       // 如果选择的是鲸鱼定制工具箱但未激活，跳转到激活区域
       if (v === 'author-tool' && !context.isAuthorToolActivated()) {
         // 恢复之前的选择
@@ -623,7 +625,7 @@ export function createMobileButtonItem(
           if (activationElement) {
             activationElement.scrollIntoView({ behavior: 'smooth', block: 'center' })
           } else {
-            console.warn('[Mobile Debug] whale-toolbox-activation-mobile not found!')
+            logger.warn('[Mobile Debug] whale-toolbox-activation-mobile not found!')
           }
         }, 100)
         return
@@ -665,7 +667,7 @@ export function createMobileButtonItem(
 
       const label = document.createElement('label')
       label.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
-      label.textContent = '按钮选择器'
+      label.textContent = t('ui.buttonItems.mobile.22', undefined, '按钮选择器')
 
       const inputWrapper = document.createElement('div')
       inputWrapper.style.cssText = 'display: flex; gap: 8px; align-items: center;'
@@ -673,13 +675,13 @@ export function createMobileButtonItem(
       const input = document.createElement('input')
       input.type = 'text'
       input.value = button.builtinId || ''
-      input.placeholder = '选择或输入按钮ID'
+      input.placeholder = t('ui.buttonItems.mobile.23', undefined, '选择或输入按钮ID')
       input.className = 'b3-text-field'
       input.style.cssText = 'flex: 1;'
 
       const selectBtn = document.createElement('button')
       selectBtn.className = 'b3-button b3-button--outline'
-      selectBtn.textContent = '选择'
+      selectBtn.textContent = t('ui.buttonItems.mobile.24', undefined, '选择')
       selectBtn.style.cssText = 'padding: 6px 12px; font-size: 13px; flex-shrink: 0; white-space: nowrap;'
 
       input.oninput = () => {
@@ -690,14 +692,22 @@ export function createMobileButtonItem(
         context.showButtonIdPicker(input.value, (result) => {
           input.value = result.id
           button.builtinId = result.id
-          // 自动填充名称和图标
-          button.name = result.name
           button.icon = result.icon
+
+          // Selector labels are localized UI text, not stable configuration defaults.
+          // Preserve an existing user name; only seed an empty name canonically.
+          if (!button.name.trim()) {
+            button.name = result.fallbackName
+            // Arbitrary user-created IDs are not covered by the current nameKey
+            // resolver, so attaching the selector key would not localize them.
+            delete button.nameKey
+          }
+
           // 更新显示
-          infoDiv.querySelector('div:first-child')!.textContent = result.name
+          infoDiv.querySelector('div:first-child')!.textContent = getButtonDisplayName(button)
           updateIconDisplay(iconSpan, result.icon)
           // 同步更新名称和图标输入框
-          if (nameInput) nameInput.value = result.name
+          if (nameInput) nameInput.value = button.name
           if (iconInput) iconInput.value = result.icon
           if (iconPreview) updateIconDisplay(iconPreview, result.icon)
         })
@@ -712,13 +722,13 @@ export function createMobileButtonItem(
       const templateContainer = document.createElement('div')
       templateContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
 
-      const textarea = createTextareaField('模板内容', button.template || '', '插入的文本', (v) => { button.template = v })
+      const textarea = createTextareaField(t('ui.buttonItems.mobile.templateContent', undefined, '模板内容'), button.template || '', t('ui.buttonItems.mobile.templatePlaceholder', undefined, '插入的文本'), (v) => { button.template = v })
       templateContainer.appendChild(textarea)
 
       // 添加变量说明
       const hint = document.createElement('div')
       hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding: 8px; background: var(--b3-theme-surface); border-radius: 4px;'
-      hint.innerHTML = `
+      hint.innerHTML = t('ui.buttonItems.mobile.templateVariablesHelp', undefined, `
         <div style="font-weight: 500; margin-bottom: 6px;">💡 支持的模板变量：</div>
         <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; font-family: monospace; font-size: 10px;">
           <code>{{date}}</code><span>日期 (2026-01-18)</span>
@@ -734,19 +744,19 @@ export function createMobileButtonItem(
           <code>{{timestamp}}</code><span>Unix时间戳 (毫秒)</span>
           <code>{{newline}}</code><span>换行符</span>
         </div>
-      `
+      `)
       templateContainer.appendChild(hint)
       
       // 笔记本ID配置（可选）
       const notebookIdLabel = document.createElement('label')
-      notebookIdLabel.textContent = '📚 追加到每日笔记（可选）'
+      notebookIdLabel.textContent = t('ui.buttonItems.mobile.25', undefined, '📚 追加到每日笔记（可选）')
       notebookIdLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
       templateContainer.appendChild(notebookIdLabel)
       
       const notebookIdInput = document.createElement('input')
       notebookIdInput.type = 'text'
       notebookIdInput.className = 'b3-text-field'
-      notebookIdInput.placeholder = '笔记本ID，留空则在当前编辑器插入'
+      notebookIdInput.placeholder = t('ui.buttonItems.mobile.26', undefined, '笔记本ID，留空则在当前编辑器插入')
       notebookIdInput.value = button.templateNotebookId || ''
       notebookIdInput.style.cssText = 'font-size: 13px;'
       notebookIdInput.onchange = () => { button.templateNotebookId = notebookIdInput.value }
@@ -754,7 +764,7 @@ export function createMobileButtonItem(
       
       const notebookIdHint = document.createElement('div')
       notebookIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-      notebookIdHint.textContent = '💡 填写笔记本ID后，点击按钮将直接追加到该笔记本的每日笔记'
+      notebookIdHint.textContent = t('ui.buttonItems.mobile.27', undefined, '💡 填写笔记本ID后，点击按钮将直接追加到该笔记本的每日笔记')
       templateContainer.appendChild(notebookIdHint)
 
       // 显示在右键菜单开关
@@ -762,7 +772,7 @@ export function createMobileButtonItem(
       contextMenuItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px;'
       const contextMenuLabel = document.createElement('label')
       contextMenuLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
-      contextMenuLabel.textContent = '📋 显示在文本右键菜单'
+      contextMenuLabel.textContent = t('ui.buttonItems.mobile.28', undefined, '📋 显示在文本右键菜单')
       const contextMenuSwitch = document.createElement('input')
       contextMenuSwitch.type = 'checkbox'
       contextMenuSwitch.className = 'b3-switch'
@@ -783,14 +793,14 @@ export function createMobileButtonItem(
       labelRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px;'
 
       const label = document.createElement('label')
-      label.textContent = '点击序列（每行一个选择器）'
+      label.textContent = t('ui.buttonItems.mobile.29', undefined, '点击序列（每行一个选择器）')
       label.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
       labelRow.appendChild(label)
 
       // 预设按钮
       const presetBtn = document.createElement('button')
       presetBtn.className = 'b3-button b3-button--outline'
-      presetBtn.textContent = '选择模板'
+      presetBtn.textContent = t('ui.buttonItems.mobile.30', undefined, '选择模板')
       presetBtn.style.cssText = 'padding: 4px 12px; font-size: 12px; white-space: nowrap;'
       presetBtn.onclick = () => {
         // 根据配置数组判断当前是手机配置还是电脑配置区域
@@ -823,7 +833,7 @@ export function createMobileButtonItem(
 
       const hint = document.createElement('div')
       hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
-      hint.innerHTML = '<div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px;"><strong style="color: var(--b3-theme-primary);">🌟 社区可用代码分享（推荐）</strong><br><a href="https://ld246.com/article/1771266377449" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">https://ld246.com/article/1771266377449</a></div>💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong><br>• <strong>间隔时间（如 200ms / 1s，单独占一行，设置后续步骤的等待时间）</strong><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">思源笔记常用功能 ID 速查表（GitHub）</a><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">模拟点击序列使用说明（GitHub）</a>'
+      hint.innerHTML = t('ui.buttonItems.mobile.clickSequenceHelp')
 
       clickSequenceContainer.appendChild(hint)
 
@@ -833,14 +843,14 @@ export function createMobileButtonItem(
       const shortcutContainer = document.createElement('div')
       shortcutContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
 
-      const inputField = createInputField('快捷键组合', button.shortcutKey || '', '快捷键格式：Alt+5 / Ctrl+B等', (v) => { button.shortcutKey = v })
+      const inputField = createInputField(t('ui.buttonItems.mobile.shortcutCombination', undefined, '快捷键组合'), button.shortcutKey || '', t('ui.buttonItems.mobile.shortcutPlaceholder', undefined, '快捷键格式：Alt+5 / Ctrl+B等'), (v) => { button.shortcutKey = v })
       inputField.querySelector('input')!.style.fontFamily = 'monospace'
       shortcutContainer.appendChild(inputField)
 
       // 添加快捷键提示
       const hint = document.createElement('div')
       hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding: 8px; background: var(--b3-theme-surface); border-radius: 4px; overflow-x: auto;'
-      hint.innerHTML = `
+      hint.innerHTML = t('ui.buttonItems.mobile.shortcutHelp', undefined, `
         <table style="width: 100%; border-collapse: collapse; font-family: monospace;">
           <tr><td>💡更多快捷键，请查看：思源桌面端➡设置➡快捷键</td></tr>
           <tr><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">快捷键</th><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">功能</th></tr>
@@ -858,7 +868,7 @@ export function createMobileButtonItem(
           <tr><td><code>Alt+7</code></td><td>反向链接</td></tr>
           <tr><td><code>Ctrl+W</code></td><td>关闭标签页</td></tr>
         </table>
-      `
+      `)
 
       shortcutContainer.appendChild(hint)
       typeFieldsContainer.appendChild(shortcutContainer)
@@ -869,17 +879,17 @@ export function createMobileButtonItem(
 
       const header = document.createElement('div')
       header.style.cssText = 'display: flex; align-items: center; gap: 8px;'
-      header.innerHTML = '<span style="font-size: 16px;">🔐</span><span style="font-weight: 600; color: #8b5cf6;">鲸鱼定制工具箱配置</span>'
+      header.innerHTML = t('ui.buttonItems.mobile.31', undefined, '<span style="font-size: 16px;">🔐</span><span style="font-weight: 600; color: #8b5cf6;">鲸鱼定制工具箱配置</span>')
       authorToolContainer.appendChild(header)
 
       const desc = document.createElement('div')
       desc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light);'
-      desc.textContent = '选择功能类型并配置相关参数。'
+      desc.textContent = t('ui.buttonItems.mobile.32', undefined, '选择功能类型并配置相关参数。')
       authorToolContainer.appendChild(desc)
 
       // 子类型选择
       const subtypeLabel = document.createElement('label')
-      subtypeLabel.textContent = '功能类型'
+      subtypeLabel.textContent = t('ui.buttonItems.mobile.33', undefined, '功能类型')
       subtypeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
       authorToolContainer.appendChild(subtypeLabel)
 
@@ -889,23 +899,23 @@ export function createMobileButtonItem(
       subtypeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
       const currentSubtype = button.authorToolSubtype || 'button-sequence'
       subtypeSelect.innerHTML = `
-        <option value="button-sequence" ${currentSubtype === 'button-sequence' ? 'selected' : ''}>① 连续点击自定义按钮</option>
-        <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>② 打开指定ID块</option>
-        <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>③ 数据库悬浮弹窗</option>
-        <option value="diary" ${currentSubtype === 'diary' || currentSubtype === 'diary-top' || currentSubtype === 'diary-bottom' ? 'selected' : ''}>④ 日记顶部或底部</option>
-        <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>⑤ 叶归LifeLog适配</option>
-        <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
-        <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
-        <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>⑧ 图片快捷导入</option>
-        <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>⑨ 悬浮标签页Tab</option>
-        <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>⑩ 悬浮大纲</option>
-        <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 前一篇/后一篇文档</option>
-	        <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
-	        <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
-		        <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
-		        <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 沉浸阅读模式${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
-		        <option value="quick-attach" ${currentSubtype === 'quick-attach' ? 'selected' : ''}>⑯ 快速添加附件</option>
-	      `
+        <option value="button-sequence" ${currentSubtype === 'button-sequence' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypeButtonSequence', undefined, '① 连续点击自定义按钮')}</option>
+        <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypeOpenDoc', undefined, '② 打开指定ID块')}</option>
+        <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypeDatabase', undefined, '③ 数据库悬浮弹窗')}</option>
+        <option value="diary" ${currentSubtype === 'diary' || currentSubtype === 'diary-top' || currentSubtype === 'diary-bottom' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypeDiary', undefined, '④ 日记顶部或底部')}</option>
+        <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypeLifeLog', undefined, '⑤ 叶归LifeLog适配')}</option>
+        <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypePopupSelect', undefined, '⑥ 弹窗框模板选择')}</option>
+        <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypeScrollDoc', undefined, '⑦ 滚动文档顶部或底部')}</option>
+        <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypeImageUpload', undefined, '⑧ 图片快捷导入')}</option>
+        <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypeMobileTabs', undefined, '⑨ 悬浮标签页Tab')}</option>
+        <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypeMobileOutline', undefined, '⑩ 悬浮大纲')}</option>
+        <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypeDocNav', undefined, '⑪ 前一篇/后一篇文档')}</option>
+        <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypeSlideComment', undefined, '⑫ 滑动快速批注')}${context.isAuthorToolActivated() ? '' : t('ui.buttonItems.mobile.freeTrialSuffix', undefined, '（免费试用）')}</option>
+        <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypeTts', undefined, '⑬ 文档朗读')}</option>
+        <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypeClearEmptyBlocks', undefined, '⑭ 一键清理空块')}</option>
+        <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypeToggleLock', undefined, '⑮ 沉浸阅读模式')}${context.isAuthorToolActivated() ? '' : t('ui.buttonItems.mobile.freeTrialSuffix', undefined, '（免费试用）')}</option>
+        <option value="quick-attach" ${currentSubtype === 'quick-attach' ? 'selected' : ''}>${t('ui.buttonItems.mobile.subtypeQuickAttach', undefined, '⑯ 快速添加附件')}</option>
+      `
 	      subtypeSelect.onchange = () => {
 	        button.authorToolSubtype = subtypeSelect.value as any
 	        // 未激活时仅允许 toggle-lock
@@ -921,12 +931,12 @@ export function createMobileButtonItem(
       const docConfigDiv = document.createElement('div')
       docConfigDiv.id = 'open-doc-config-mobile'
 
-      docConfigDiv.appendChild(createInputField('📱 目标块ID', button.mobileTargetDocId || '', '如: 20251215234003-j3i7wjc 或 20251215234003-j3i7wjc-a1b2c3', (v) => { button.mobileTargetDocId = v }))
+      docConfigDiv.appendChild(createInputField(t('ui.buttonItems.mobile.targetBlockId', undefined, '📱 目标块ID'), button.mobileTargetDocId || '', t('ui.buttonItems.mobile.targetBlockIdPlaceholder', undefined, '如: 20251215234003-j3i7wjc 或 20251215234003-j3i7wjc-a1b2c3'), (v) => { button.mobileTargetDocId = v }))
 
       // 添加提示
       const docHint = document.createElement('div')
       docHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: 4px;'
-      docHint.textContent = '💡 支持文档ID（打开文档）或块ID（打开文档并定位到该块）'
+      docHint.textContent = t('ui.buttonItems.mobile.34', undefined, '💡 支持文档ID（打开文档）或块ID（打开文档并定位到该块）')
       docConfigDiv.appendChild(docHint)
 
       authorToolContainer.appendChild(docConfigDiv)
@@ -937,29 +947,29 @@ export function createMobileButtonItem(
       dbConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
       // 数据库块ID
-      dbConfigDiv.appendChild(createInputField('数据库块ID', button.dbBlockId || '', '如: 20251215234003-j3i7wjc', (v) => { button.dbBlockId = v }))
+      dbConfigDiv.appendChild(createInputField(t('ui.buttonItems.mobile.databaseBlockId', undefined, '数据库块ID'), button.dbBlockId || '', t('ui.buttonItems.mobile.exampleBlockId', undefined, '如: 20251215234003-j3i7wjc'), (v) => { button.dbBlockId = v }))
 
       // 数据库ID
-      dbConfigDiv.appendChild(createInputField('数据库ID（可选）', button.dbId || '', '如: 20251215234003-4kzcfp3', (v) => { button.dbId = v }))
+      dbConfigDiv.appendChild(createInputField(t('ui.buttonItems.mobile.databaseIdOptional', undefined, '数据库ID（可选）'), button.dbId || '', t('ui.buttonItems.mobile.exampleDatabaseId', undefined, '如: 20251215234003-4kzcfp3'), (v) => { button.dbId = v }))
 
       // 视图名称
-      dbConfigDiv.appendChild(createInputField('视图名称', button.viewName || '', '如: 今日DO表格', (v) => { button.viewName = v }))
+      dbConfigDiv.appendChild(createInputField(t('ui.buttonItems.mobile.viewName', undefined, '视图名称'), button.viewName || '', t('ui.buttonItems.mobile.exampleViewName', undefined, '如: 今日DO表格'), (v) => { button.viewName = v }))
 
       // 主键列
-      dbConfigDiv.appendChild(createInputField('主键列名称', button.primaryKeyColumn || 'DO', '如: DO', (v) => { button.primaryKeyColumn = v }))
+      dbConfigDiv.appendChild(createInputField(t('ui.buttonItems.mobile.primaryKeyColumn', undefined, '主键列名称'), button.primaryKeyColumn || 'DO', t('ui.buttonItems.mobile.exampleDo', undefined, '如: DO'), (v) => { button.primaryKeyColumn = v }))
 
       // 起始时间
-      dbConfigDiv.appendChild(createInputField('起始时间', button.startTimeStr || 'now', 'now 或 HH:MM', (v) => { button.startTimeStr = v }))
+      dbConfigDiv.appendChild(createInputField(t('ui.buttonItems.mobile.startTime', undefined, '起始时间'), button.startTimeStr || 'now', t('ui.buttonItems.mobile.startTimePlaceholder', undefined, 'now 或 HH:MM'), (v) => { button.startTimeStr = v }))
 
       // 行间额外分钟
-      dbConfigDiv.appendChild(createInputField('行间额外分钟数', (button.extraMinutes ?? 20).toString(), '如: 20', (v) => { button.extraMinutes = parseInt(v) || 20 }, 'number'))
+      dbConfigDiv.appendChild(createInputField(t('ui.buttonItems.mobile.extraMinutes', undefined, '行间额外分钟数'), (button.extraMinutes ?? 20).toString(), t('ui.buttonItems.mobile.example20', undefined, '如: 20'), (v) => { button.extraMinutes = parseInt(v) || 20 }, 'number'))
 
       // 最大显示行数
-      dbConfigDiv.appendChild(createInputField('最大显示行数', (button.maxRows ?? 5).toString(), '如: 5', (v) => { button.maxRows = parseInt(v) || 5 }, 'number'))
+      dbConfigDiv.appendChild(createInputField(t('ui.buttonItems.mobile.maxRows', undefined, '最大显示行数'), (button.maxRows ?? 5).toString(), t('ui.buttonItems.mobile.example5', undefined, '如: 5'), (v) => { button.maxRows = parseInt(v) || 5 }, 'number'))
 
       // 显示模式
       const displayModeLabel = document.createElement('label')
-      displayModeLabel.textContent = '显示模式'
+      displayModeLabel.textContent = t('ui.buttonItems.mobile.35', undefined, '显示模式')
       displayModeLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
       dbConfigDiv.appendChild(displayModeLabel)
 
@@ -968,8 +978,8 @@ export function createMobileButtonItem(
       displayModeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
       const currentDisplayMode = button.dbDisplayMode || 'cards'
       displayModeSelect.innerHTML = `
-        <option value="cards" ${currentDisplayMode === 'cards' ? 'selected' : ''}>卡片模式</option>
-        <option value="table" ${currentDisplayMode === 'table' ? 'selected' : ''}>表格模式</option>
+        <option value="cards" ${currentDisplayMode === 'cards' ? 'selected' : ''}>${t('ui.buttonItems.mobile.cardsMode', undefined, '卡片模式')}</option>
+        <option value="table" ${currentDisplayMode === 'table' ? 'selected' : ''}>${t('ui.buttonItems.mobile.tableMode', undefined, '表格模式')}</option>
       `
       displayModeSelect.onchange = () => {
         button.dbDisplayMode = displayModeSelect.value as 'cards' | 'table'
@@ -991,14 +1001,14 @@ export function createMobileButtonItem(
 
       // 容器高度
       const containerHeightLabel = document.createElement('label')
-      containerHeightLabel.textContent = '容器高度（卡片模式）'
+      containerHeightLabel.textContent = t('ui.buttonItems.mobile.36', undefined, '容器高度（卡片模式）')
       containerHeightLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
       cardConfigDivMobile.appendChild(containerHeightLabel)
 
       const containerHeightInput = document.createElement('input')
       containerHeightInput.type = 'text'
       containerHeightInput.className = 'b3-text-field'
-      containerHeightInput.placeholder = '如: 700px（留空自动适应）'
+      containerHeightInput.placeholder = t('ui.buttonItems.mobile.37', undefined, '如: 700px（留空自动适应）')
       containerHeightInput.value = button.cardContainerHeight || ''
       containerHeightInput.style.cssText = 'font-size: 13px;'
       containerHeightInput.onchange = () => { button.cardContainerHeight = containerHeightInput.value }
@@ -1006,14 +1016,14 @@ export function createMobileButtonItem(
 
       // 可滚动容器最大高度
       const scrollMaxHeightLabel = document.createElement('label')
-      scrollMaxHeightLabel.textContent = '可滚动容器最大高度（卡片模式）'
+      scrollMaxHeightLabel.textContent = t('ui.buttonItems.mobile.38', undefined, '可滚动容器最大高度（卡片模式）')
       scrollMaxHeightLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
       cardConfigDivMobile.appendChild(scrollMaxHeightLabel)
 
       const scrollMaxHeightInput = document.createElement('input')
       scrollMaxHeightInput.type = 'text'
       scrollMaxHeightInput.className = 'b3-text-field'
-      scrollMaxHeightInput.placeholder = '如: 700px'
+      scrollMaxHeightInput.placeholder = t('ui.buttonItems.mobile.39', undefined, '如: 700px')
       scrollMaxHeightInput.value = button.cardScrollMaxHeight || '700px'
       scrollMaxHeightInput.style.cssText = 'font-size: 13px;'
       scrollMaxHeightInput.onchange = () => { button.cardScrollMaxHeight = scrollMaxHeightInput.value }
@@ -1022,12 +1032,12 @@ export function createMobileButtonItem(
       dbConfigDiv.appendChild(cardConfigDivMobile)
 
       // 要显示的列名
-      dbConfigDiv.appendChild(createInputField('显示列名（逗号分隔）', (button.showColumns || []).join(','), 'DO,预计分钟,时间段', (v) => {
+      dbConfigDiv.appendChild(createInputField(t('ui.buttonItems.mobile.showColumns', undefined, '显示列名（逗号分隔）'), (button.showColumns || []).join(','), t('ui.buttonItems.mobile.showColumnsPlaceholder', undefined, 'DO,预计分钟,时间段'), (v) => {
         button.showColumns = v.split(',').map(s => s.trim()).filter(s => s)
       }))
 
       // 时间段列名
-      dbConfigDiv.appendChild(createInputField('时间段列名', button.timeRangeColumnName || '时间段', '如: 时间段', (v) => { button.timeRangeColumnName = v }))
+      dbConfigDiv.appendChild(createInputField(t('ui.buttonItems.mobile.timeRangeColumn', undefined, '时间段列名'), button.timeRangeColumnName || '时间段', t('ui.buttonItems.mobile.timeRangeColumnPlaceholder', undefined, '如: 时间段'), (v) => { button.timeRangeColumnName = v }))
 
       authorToolContainer.appendChild(dbConfigDiv)
 
@@ -1038,14 +1048,14 @@ export function createMobileButtonItem(
       
       // 笔记本ID输入
       const notebookIdLabel = document.createElement('label')
-      notebookIdLabel.textContent = '📚 笔记本ID'
+      notebookIdLabel.textContent = t('ui.buttonItems.mobile.40', undefined, '📚 笔记本ID')
       notebookIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
       lifeLogConfigDiv.appendChild(notebookIdLabel)
       
       const notebookIdInput = document.createElement('input')
       notebookIdInput.type = 'text'
       notebookIdInput.className = 'b3-text-field'
-      notebookIdInput.placeholder = '请输入笔记本ID，如：20250101000000-aaaaaa'
+      notebookIdInput.placeholder = t('ui.buttonItems.mobile.41', undefined, '请输入笔记本ID，如：20250101000000-aaaaaa')
       notebookIdInput.value = button.lifeLogNotebookId || ''
       notebookIdInput.style.cssText = 'font-size: 13px;'
       notebookIdInput.onchange = () => { button.lifeLogNotebookId = notebookIdInput.value }
@@ -1053,19 +1063,19 @@ export function createMobileButtonItem(
       
       const notebookIdHint = document.createElement('div')
       notebookIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-      notebookIdHint.textContent = '💡 指定内容将要追加到的笔记本ID，不能为空'
+      notebookIdHint.textContent = t('ui.buttonItems.mobile.42', undefined, '💡 指定内容将要追加到的笔记本ID，不能为空')
       lifeLogConfigDiv.appendChild(notebookIdHint)
       
       // 分类选项输入
       const categoriesLabel = document.createElement('label')
-      categoriesLabel.textContent = '📝 分类选项（每行一个）'
+      categoriesLabel.textContent = t('ui.buttonItems.mobile.43', undefined, '📝 分类选项（每行一个）')
       categoriesLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
       lifeLogConfigDiv.appendChild(categoriesLabel)
 
       const categoriesTextarea = document.createElement('textarea')
       categoriesTextarea.className = 'b3-text-field'
       categoriesTextarea.value = button.lifeLogCategories?.join('\n') || '学习\n工作\n生活'
-      categoriesTextarea.placeholder = '每行输入一个分类，例如：\n学习\n工作\n生活'
+      categoriesTextarea.placeholder = t('ui.buttonItems.mobile.44', undefined, '每行输入一个分类，例如：\n学习\n工作\n生活')
       categoriesTextarea.rows = 4
       categoriesTextarea.style.cssText = 'font-size: 13px; resize: vertical; min-height: 100px;'
       categoriesTextarea.onchange = () => { 
@@ -1075,12 +1085,12 @@ export function createMobileButtonItem(
 
       const categoriesHint = document.createElement('div')
       categoriesHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-      categoriesHint.textContent = '💡 每行输入一个分类选项，点击按钮后会弹出选择对话框'
+      categoriesHint.textContent = t('ui.buttonItems.mobile.45', undefined, '💡 每行输入一个分类选项，点击按钮后会弹出选择对话框')
       lifeLogConfigDiv.appendChild(categoriesHint)
 
       // 分类按钮字体大小
       const fontSizeLabel = document.createElement('label')
-      fontSizeLabel.textContent = '🔤 分类按钮字体大小（px）'
+      fontSizeLabel.textContent = t('ui.buttonItems.mobile.46', undefined, '🔤 分类按钮字体大小（px）')
       fontSizeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
       lifeLogConfigDiv.appendChild(fontSizeLabel)
 
@@ -1096,7 +1106,7 @@ export function createMobileButtonItem(
 
       // 分类按钮内边距
       const paddingLabel = document.createElement('label')
-      paddingLabel.textContent = '📐 分类按钮上下边距（px）'
+      paddingLabel.textContent = t('ui.buttonItems.mobile.47', undefined, '📐 分类按钮上下边距（px）')
       paddingLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
       lifeLogConfigDiv.appendChild(paddingLabel)
 
@@ -1112,7 +1122,7 @@ export function createMobileButtonItem(
 
       // 输入框字体大小
       const inputFontSizeLabel = document.createElement('label')
-      inputFontSizeLabel.textContent = '📝 输入框字体大小（px）'
+      inputFontSizeLabel.textContent = t('ui.buttonItems.mobile.48', undefined, '📝 输入框字体大小（px）')
       inputFontSizeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
       lifeLogConfigDiv.appendChild(inputFontSizeLabel)
 
@@ -1134,13 +1144,13 @@ export function createMobileButtonItem(
       popupSelectConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
       const popupSelectTitle = document.createElement('label')
-      popupSelectTitle.textContent = '📋 模板列表'
+      popupSelectTitle.textContent = t('ui.buttonItems.mobile.49', undefined, '📋 模板列表')
       popupSelectTitle.style.cssText = 'font-size: 13px; font-weight: 500;'
       popupSelectConfigDiv.appendChild(popupSelectTitle)
 
       const popupSelectHint = document.createElement('div')
       popupSelectHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-      popupSelectHint.textContent = '💡 左边填模板名称（显示在弹窗上），右边填插入的模板内容'
+      popupSelectHint.textContent = t('ui.buttonItems.mobile.50', undefined, '💡 左边填模板名称（显示在弹窗上），右边填插入的模板内容')
       popupSelectConfigDiv.appendChild(popupSelectHint)
 
       const popupSelectRowsContainer = document.createElement('div')
@@ -1164,7 +1174,7 @@ export function createMobileButtonItem(
           const nameInput = document.createElement('input')
           nameInput.type = 'text'
           nameInput.className = 'b3-text-field'
-          nameInput.placeholder = '模板名称'
+          nameInput.placeholder = t('ui.buttonItems.mobile.51', undefined, '模板名称')
           nameInput.value = tpl.name
           nameInput.style.cssText = 'font-size: 13px; flex: 1; min-width: 0;'
           nameInput.onchange = () => { button.popupSelectTemplates![idx].name = nameInput.value }
@@ -1172,7 +1182,7 @@ export function createMobileButtonItem(
           const contentInput = document.createElement('input')
           contentInput.type = 'text'
           contentInput.className = 'b3-text-field'
-          contentInput.placeholder = '模板内容'
+          contentInput.placeholder = t('ui.buttonItems.mobile.52', undefined, '模板内容')
           contentInput.value = tpl.content
           contentInput.style.cssText = 'font-size: 13px; flex: 2; min-width: 0;'
           contentInput.onchange = () => { button.popupSelectTemplates![idx].content = contentInput.value }
@@ -1196,7 +1206,7 @@ export function createMobileButtonItem(
       renderPopupSelectRows()
 
       const addRowBtn = document.createElement('button')
-      addRowBtn.textContent = '+ 添加模板'
+      addRowBtn.textContent = t('ui.buttonItems.mobile.53', undefined, '+ 添加模板')
       addRowBtn.style.cssText = 'padding: 6px 12px; border: 1px dashed var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 13px; align-self: flex-start;'
       addRowBtn.onclick = () => {
         button.popupSelectTemplates!.push({ name: '', content: '' })
@@ -1212,13 +1222,13 @@ export function createMobileButtonItem(
       buttonSequenceConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
       const buttonSequenceTitle = document.createElement('label')
-      buttonSequenceTitle.textContent = '🔗 按钮序列'
+      buttonSequenceTitle.textContent = t('ui.buttonItems.mobile.54', undefined, '🔗 按钮序列')
       buttonSequenceTitle.style.cssText = 'font-size: 13px; font-weight: 500;'
       buttonSequenceConfigDiv.appendChild(buttonSequenceTitle)
 
       const buttonSequenceHint = document.createElement('div')
       buttonSequenceHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-      buttonSequenceHint.textContent = '💡 左边选择要点击的按钮，右边填点击后等待的间隔时间（毫秒）'
+      buttonSequenceHint.textContent = t('ui.buttonItems.mobile.55', undefined, '💡 左边选择要点击的按钮，右边填点击后等待的间隔时间（毫秒）')
       buttonSequenceConfigDiv.appendChild(buttonSequenceHint)
 
       const buttonSequenceRowsContainer = document.createElement('div')
@@ -1263,7 +1273,7 @@ export function createMobileButtonItem(
           // 使用 DOM 方式构建选项（避免 HTML 转义问题）
           const defaultOption = document.createElement('option')
           defaultOption.value = ''
-          defaultOption.textContent = '-- 请选择按钮 --'
+          defaultOption.textContent = t('ui.buttonItems.mobile.56', undefined, '-- 请选择按钮 --')
           nameSelect.appendChild(defaultOption)
           
           availableButtons.forEach((btn) => {
@@ -1280,7 +1290,7 @@ export function createMobileButtonItem(
               iconDisplay = '🖼️'  // 使用图片图标表示
             }
                     
-            option.textContent = `${iconDisplay} ${btn.name}`
+            option.textContent = `${iconDisplay} ${getButtonDisplayName(btn)}`
             // 通过ID匹配当前选中的按钮（使用 buttonId 而不是 buttonName）
             if (step.buttonId === btn.id) {
               option.selected = true
@@ -1300,7 +1310,7 @@ export function createMobileButtonItem(
           const delayInput = document.createElement('input')
           delayInput.type = 'number'
           delayInput.className = 'b3-text-field'
-          delayInput.placeholder = '间隔(ms)'
+          delayInput.placeholder = t('ui.buttonItems.mobile.57', undefined, '间隔(ms)')
           delayInput.value = String(step.delayMs || 200)
           delayInput.style.cssText = 'font-size: 13px; flex: 1; min-width: 60px; max-width: 100%;' // 添加样式防止超出容器
           delayInput.onchange = () => { button.buttonSequenceSteps![idx].delayMs = parseInt(delayInput.value) || 200 }
@@ -1324,7 +1334,7 @@ export function createMobileButtonItem(
       renderButtonSequenceRows()
 
       const addSequenceRowBtn = document.createElement('button')
-      addSequenceRowBtn.textContent = '+ 添加步骤'
+      addSequenceRowBtn.textContent = t('ui.buttonItems.mobile.58', undefined, '+ 添加步骤')
       addSequenceRowBtn.style.cssText = 'padding: 6px 12px; border: 1px dashed var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 13px; align-self: flex-start;'
       addSequenceRowBtn.onclick = () => {
         button.buttonSequenceSteps!.push({ buttonId: '', buttonName: '', delayMs: 200 })
@@ -1340,7 +1350,7 @@ export function createMobileButtonItem(
       scrollDocConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
       const scrollDocTitle = document.createElement('label')
-      scrollDocTitle.textContent = '📜 滚动方向'
+      scrollDocTitle.textContent = t('ui.buttonItems.mobile.59', undefined, '📜 滚动方向')
       scrollDocTitle.style.cssText = 'font-size: 13px; font-weight: 500;'
       scrollDocConfigDiv.appendChild(scrollDocTitle)
 
@@ -1360,7 +1370,7 @@ export function createMobileButtonItem(
       topRadio.checked = currentDirection === 'top'
       topRadio.onchange = () => { button.scrollDirection = 'top' }
       topRadioWrapper.appendChild(topRadio)
-      topRadioWrapper.appendChild(document.createTextNode('滚动文档顶部'))
+      topRadioWrapper.appendChild(document.createTextNode(t('ui.buttonItems.mobile.scrollToTop', undefined, '滚动文档顶部')))
       radioContainer.appendChild(topRadioWrapper)
 
       // 滚动到底部选项
@@ -1373,7 +1383,7 @@ export function createMobileButtonItem(
       bottomRadio.checked = currentDirection === 'bottom'
       bottomRadio.onchange = () => { button.scrollDirection = 'bottom' }
       bottomRadioWrapper.appendChild(bottomRadio)
-      bottomRadioWrapper.appendChild(document.createTextNode('滚动文档底部'))
+      bottomRadioWrapper.appendChild(document.createTextNode(t('ui.buttonItems.mobile.scrollToBottom', undefined, '滚动文档底部')))
       radioContainer.appendChild(bottomRadioWrapper)
 
       scrollDocConfigDiv.appendChild(radioContainer)
@@ -1386,14 +1396,14 @@ export function createMobileButtonItem(
 
       // 功能说明
       const imageUploadDesc = document.createElement('div')
-      imageUploadDesc.innerHTML = `
+      imageUploadDesc.innerHTML = t('ui.buttonItems.mobile.imageUploadHelp', undefined, `
         <div style="font-size: 12px; color: #60a5fa; margin-bottom: 8px;">
           📸 <strong>使用说明：</strong>选择本地图片后自动上传并插入到今日日记底部
         </div>
         <div style="font-size: 11px; color: var(--b3-theme-on-surface-light); background: var(--b3-theme-surface-light); padding: 6px 10px; border-radius: 6px; margin-bottom: 10px; line-height: 1.5;">
           💡 <strong>记事弹窗插入：</strong>若在「一键记事」中开启<strong>思源块编辑模式</strong>，点击图片按钮会直接插入到弹窗编辑器光标位置（支持多选、连续插入），不再追加到日记。
         </div>
-      `
+      `)
       imageUploadConfigDiv.appendChild(imageUploadDesc)
 
       // 笔记本ID
@@ -1401,14 +1411,14 @@ export function createMobileButtonItem(
       notebookIdRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
 
       const imgNotebookLabel = document.createElement('label')
-      imgNotebookLabel.innerHTML = '📓 <strong>日记笔记本ID</strong>'
+      imgNotebookLabel.innerHTML = t('ui.buttonItems.mobile.60', undefined, '📓 <strong>日记笔记本ID</strong>')
       imgNotebookLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 120px; flex-shrink: 0;'
 
       const imgNotebookInput = document.createElement('input')
       imgNotebookInput.className = 'b3-text-field'
       imgNotebookInput.type = 'text'
       imgNotebookInput.value = button.imageUploadNotebookId || ''
-      imgNotebookInput.placeholder = '输入日记所在笔记本ID'
+      imgNotebookInput.placeholder = t('ui.buttonItems.mobile.61', undefined, '输入日记所在笔记本ID')
       imgNotebookInput.style.cssText = 'width: 100%; font-size: 14px; padding: 6px 8px;'
       imgNotebookInput.onchange = () => { button.imageUploadNotebookId = imgNotebookInput.value }
 
@@ -1425,7 +1435,7 @@ export function createMobileButtonItem(
 
       const opacityLabel = document.createElement('label')
       opacityLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
-      opacityLabel.textContent = '悬浮弹窗透明度'
+      opacityLabel.textContent = t('ui.buttonItems.mobile.62', undefined, '悬浮弹窗透明度')
       floatOpacityConfigDiv.appendChild(opacityLabel)
 
       const opacityRow = document.createElement('div')
@@ -1452,7 +1462,7 @@ export function createMobileButtonItem(
             try {
               await context.saveData('mobileButtonConfigs', context.buttonConfigs)
             } catch (e) {
-              console.warn('[floatOpacity] persist failed:', e)
+              logger.warn('[floatOpacity] persist failed:', e)
             }
           })()
         }, 250)
@@ -1480,7 +1490,7 @@ export function createMobileButtonItem(
 
       const opacityHint = document.createElement('div')
       opacityHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
-      opacityHint.textContent = '💡 调整悬浮弹窗背景的透明度，数值越小越透明（最小 1%）'
+      opacityHint.textContent = t('ui.buttonItems.mobile.63', undefined, '💡 调整悬浮弹窗背景的透明度，数值越小越透明（最小 1%）')
 
       opacityRow.appendChild(opacitySlider)
       opacityRow.appendChild(opacityValue)
@@ -1496,7 +1506,7 @@ export function createMobileButtonItem(
 
       const autoHideLabel = document.createElement('label')
       autoHideLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
-      autoHideLabel.textContent = '滚动隐藏/显示'
+      autoHideLabel.textContent = t('ui.buttonItems.mobile.64', undefined, '滚动隐藏/显示')
 
       const autoHideSwitch = document.createElement('input')
       autoHideSwitch.type = 'checkbox'
@@ -1508,7 +1518,7 @@ export function createMobileButtonItem(
 
       const autoHideHint = document.createElement('div')
       autoHideHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
-      autoHideHint.textContent = '向上滚动：面板消失；向下滚动：面板重新出现'
+      autoHideHint.textContent = t('ui.buttonItems.mobile.65', undefined, '向上滚动：面板消失；向下滚动：面板重新出现')
 
       autoHideSwitch.onchange = async () => {
         button.autoHideOnScroll = autoHideSwitch.checked
@@ -1527,7 +1537,7 @@ export function createMobileButtonItem(
 
       const bottomDistLabel = document.createElement('label')
       bottomDistLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
-      bottomDistLabel.textContent = '距离底部高度'
+      bottomDistLabel.textContent = t('ui.buttonItems.mobile.66', undefined, '距离底部高度')
 
       const bottomDistRow = document.createElement('div')
       bottomDistRow.style.cssText = 'display: flex; align-items: center; gap: 12px;'
@@ -1555,7 +1565,7 @@ export function createMobileButtonItem(
 
       const bottomDistHint = document.createElement('div')
       bottomDistHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
-      bottomDistHint.textContent = '💡 调整导航栏距离屏幕底部的距离（0~200px）'
+      bottomDistHint.textContent = t('ui.buttonItems.mobile.67', undefined, '💡 调整导航栏距离屏幕底部的距离（0~200px）')
 
       bottomDistRow.appendChild(bottomDistSlider)
       bottomDistRow.appendChild(bottomDistValue)
@@ -1571,7 +1581,7 @@ export function createMobileButtonItem(
 
       const positionLabel = document.createElement('label')
       positionLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
-      positionLabel.textContent = '弹窗位置'
+      positionLabel.textContent = t('ui.buttonItems.mobile.68', undefined, '弹窗位置')
       positionContainer.appendChild(positionLabel)
 
       const positionOptionsWrap = document.createElement('div')
@@ -1580,9 +1590,9 @@ export function createMobileButtonItem(
       const currentPositionValue = button.floatPanelPosition || 'center'
 
       const positionItems = [
-        { value: 'top', label: '⬆️ 顶部' },
-        { value: 'center', label: '⏺ 居中（默认）' },
-        { value: 'bottom', label: '⬇️ 底部' },
+        { value: 'top', label: t('ui.buttonItems.mobile.69', undefined, '⬆️ 顶部') },
+        { value: 'center', label: t('ui.buttonItems.mobile.70', undefined, '⏺ 居中（默认）') },
+        { value: 'bottom', label: t('ui.buttonItems.mobile.71', undefined, '⬇️ 底部') },
       ]
 
       positionItems.forEach(item => {
@@ -1611,7 +1621,7 @@ export function createMobileButtonItem(
 
       const positionHint = document.createElement('div')
       positionHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); opacity: 0.7; margin-top: 2px;'
-      positionHint.textContent = '💡 选择悬浮弹窗的垂直位置'
+      positionHint.textContent = t('ui.buttonItems.mobile.72', undefined, '💡 选择悬浮弹窗的垂直位置')
 
       positionContainer.appendChild(positionOptionsWrap)
       positionContainer.appendChild(positionHint)
@@ -1627,7 +1637,7 @@ export function createMobileButtonItem(
 
       const maxVisibleLabel = document.createElement('label')
       maxVisibleLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
-      maxVisibleLabel.textContent = '最大可见标签数'
+      maxVisibleLabel.textContent = t('ui.buttonItems.mobile.73', undefined, '最大可见标签数')
 
       const maxVisibleInput = document.createElement('input')
       maxVisibleInput.type = 'number'
@@ -1641,7 +1651,7 @@ export function createMobileButtonItem(
 
       const maxVisibleHint = document.createElement('div')
       maxVisibleHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
-      maxVisibleHint.textContent = '超出此数量的标签页可手动向下滚动查看（1~10，默认 10）'
+      maxVisibleHint.textContent = t('ui.buttonItems.mobile.74', undefined, '超出此数量的标签页可手动向下滚动查看（1~10，默认 10）')
 
       maxVisibleInput.addEventListener('change', async () => {
         let val = parseInt(maxVisibleInput.value)
@@ -1665,7 +1675,7 @@ export function createMobileButtonItem(
 
 	      const collapseStyleLabel = document.createElement('label')
 	      collapseStyleLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
-	      collapseStyleLabel.textContent = '折叠样式'
+	      collapseStyleLabel.textContent = t('ui.buttonItems.mobile.75', undefined, '折叠样式')
 	      collapseStyleContainer.appendChild(collapseStyleLabel)
 
 	      const collapseStyleOptionsWrap = document.createElement('div')
@@ -1674,8 +1684,8 @@ export function createMobileButtonItem(
 	      const currentCollapseStyle = button.collapseStyle || 'preview'
 
 	      const collapseStyleItems = [
-	        { value: 'preview', label: '方案一：收起显示项目预览' },
-	        { value: 'minimal', label: '方案二：收起仅显示展开手柄' },
+	        { value: 'preview', label: t('ui.buttonItems.mobile.76', undefined, '方案一：收起显示项目预览') },
+	        { value: 'minimal', label: t('ui.buttonItems.mobile.77', undefined, '方案二：收起仅显示展开手柄') },
 	      ]
 
 	      collapseStyleItems.forEach(item => {
@@ -1706,7 +1716,7 @@ export function createMobileButtonItem(
 
 	      const collapseStyleHint = document.createElement('div')
 	      collapseStyleHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); opacity: 0.7; margin-top: 2px;'
-	      collapseStyleHint.textContent = '💡 选择收起时面板的显示方式'
+	      collapseStyleHint.textContent = t('ui.buttonItems.mobile.78', undefined, '💡 选择收起时面板的显示方式')
 
 	      collapseStyleContainer.appendChild(collapseStyleOptionsWrap)
 	      collapseStyleContainer.appendChild(collapseStyleHint)
@@ -1721,12 +1731,12 @@ export function createMobileButtonItem(
 
       const diaryTitle = document.createElement('div')
       diaryTitle.style.cssText = 'font-size: 14px; font-weight: 600; color: #22c55e; display: flex; align-items: center; gap: 8px;'
-      diaryTitle.innerHTML = '<span>📇</span><span>功能说明</span>'
+      diaryTitle.innerHTML = t('ui.buttonItems.mobile.79', undefined, '<span>📇</span><span>功能说明</span>')
       diaryConfigDiv.appendChild(diaryTitle)
 
       const diaryDesc = document.createElement('div')
       diaryDesc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.6;'
-      diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 或 API 打开日记<br>2. 根据下方设置决定跳转位置<br>💡 配置笔记本ID后将直接使用API，无需弹窗选择'
+      diaryDesc.innerHTML = t('ui.buttonItems.mobile.80', undefined, '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 或 API 打开日记<br>2. 根据下方设置决定跳转位置<br>💡 配置笔记本ID后将直接使用API，无需弹窗选择')
       diaryConfigDiv.appendChild(diaryDesc)
 
       // 位置选择配置
@@ -1734,7 +1744,7 @@ export function createMobileButtonItem(
       diaryPositionContainerMobile.style.cssText = 'display: flex; flex-direction: column; gap: 10px; margin-top: 12px; padding: 12px; background: rgba(66, 133, 244, 0.08); border-radius: 6px; border: 1px solid rgba(66, 133, 244, 0.2);'
 
       const diaryPositionLabelMobile = document.createElement('label')
-      diaryPositionLabelMobile.textContent = '📍 打开后位置'
+      diaryPositionLabelMobile.textContent = t('ui.buttonItems.mobile.81', undefined, '📍 打开后位置')
       diaryPositionLabelMobile.style.cssText = 'font-size: 14px; color: var(--b3-theme-primary); font-weight: 600; display: flex; align-items: center; gap: 6px;'
       diaryPositionContainerMobile.appendChild(diaryPositionLabelMobile)
 
@@ -1766,7 +1776,7 @@ export function createMobileButtonItem(
         }
       })
       diaryTopRadioContainerMobile.appendChild(diaryTopRadioMobile)
-      diaryTopRadioContainerMobile.appendChild(document.createTextNode('⬆️ 日记顶部'))
+      diaryTopRadioContainerMobile.appendChild(document.createTextNode(t('ui.buttonItems.mobile.diaryTop', undefined, '⬆️ 日记顶部')))
       diaryPositionOptionsMobile.appendChild(diaryTopRadioContainerMobile)
 
       // 底部选项
@@ -1792,7 +1802,7 @@ export function createMobileButtonItem(
         }
       })
       diaryBottomRadioContainerMobile.appendChild(diaryBottomRadioMobile)
-      diaryBottomRadioContainerMobile.appendChild(document.createTextNode('⬇️ 日记底部'))
+      diaryBottomRadioContainerMobile.appendChild(document.createTextNode(t('ui.buttonItems.mobile.diaryBottom', undefined, '⬇️ 日记底部')))
       diaryPositionOptionsMobile.appendChild(diaryBottomRadioContainerMobile)
 
       diaryPositionContainerMobile.appendChild(diaryPositionOptionsMobile)
@@ -1808,14 +1818,14 @@ export function createMobileButtonItem(
       diaryNotebookIdContainerMobile.style.cssText = 'display: flex; flex-direction: column; gap: 6px; margin-top: 8px;'
 
       const diaryNotebookIdLabelMobile = document.createElement('label')
-      diaryNotebookIdLabelMobile.textContent = '📚 笔记本ID（可选）'
+      diaryNotebookIdLabelMobile.textContent = t('ui.buttonItems.mobile.82', undefined, '📚 笔记本ID（可选）')
       diaryNotebookIdLabelMobile.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); font-weight: 500;'
       diaryNotebookIdContainerMobile.appendChild(diaryNotebookIdLabelMobile)
 
       const diaryNotebookIdInputMobile = document.createElement('input')
       diaryNotebookIdInputMobile.type = 'text'
       diaryNotebookIdInputMobile.value = button.diaryNotebookId || ''
-      diaryNotebookIdInputMobile.placeholder = '留空则使用 Alt+5 快捷键，如：20250101000000-aaaaaa'
+      diaryNotebookIdInputMobile.placeholder = t('ui.buttonItems.mobile.83', undefined, '留空则使用 Alt+5 快捷键，如：20250101000000-aaaaaa')
       diaryNotebookIdInputMobile.style.cssText = 'width: 100%; padding: 8px 12px; border: 1px solid var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-background); color: var(--b3-theme-on-background); font-size: 14px;'
       diaryNotebookIdInputMobile.addEventListener('input', () => {
         button.diaryNotebookId = diaryNotebookIdInputMobile.value
@@ -1824,7 +1834,7 @@ export function createMobileButtonItem(
 
       const diaryNotebookIdHintMobile = document.createElement('div')
       diaryNotebookIdHintMobile.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
-      diaryNotebookIdHintMobile.textContent = '💡 填写后将直接调用API创建日记，不会弹出选择框'
+      diaryNotebookIdHintMobile.textContent = t('ui.buttonItems.mobile.84', undefined, '💡 填写后将直接调用API创建日记，不会弹出选择框')
       diaryNotebookIdContainerMobile.appendChild(diaryNotebookIdHintMobile)
 
       diaryConfigDiv.appendChild(diaryNotebookIdContainerMobile)
@@ -1834,7 +1844,7 @@ export function createMobileButtonItem(
       waitTimeContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px; margin-top: 8px;'
 
       const waitTimeLabel = document.createElement('label')
-      waitTimeLabel.textContent = '⏱ 移动端等待时间（毫秒）'
+      waitTimeLabel.textContent = t('ui.buttonItems.mobile.85', undefined, '⏱ 移动端等待时间（毫秒）')
       waitTimeLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); font-weight: 500;'
       waitTimeContainer.appendChild(waitTimeLabel)
 
@@ -1852,7 +1862,7 @@ export function createMobileButtonItem(
 
       const waitTimeHint = document.createElement('div')
       waitTimeHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
-      waitTimeHint.textContent = '💡 移动端加载日记较慢时可增加此值，默认 1000ms'
+      waitTimeHint.textContent = t('ui.buttonItems.mobile.86', undefined, '💡 移动端加载日记较慢时可增加此值，默认 1000ms')
       waitTimeContainer.appendChild(waitTimeHint)
 
       diaryConfigDiv.appendChild(waitTimeContainer)
@@ -1996,13 +2006,13 @@ export function createMobileButtonItem(
       toggleLockExtras.style.cssText = 'display: none; flex-direction: column; gap: 6px; margin-top: 4px;'
       const descTitle = document.createElement('div')
       descTitle.style.cssText = 'font-size: 12px; font-weight: 600; color: var(--b3-theme-primary); margin-bottom: 6px;'
-      descTitle.textContent = '📋 功能说明'
+      descTitle.textContent = t('ui.buttonItems.mobile.87', undefined, '📋 功能说明')
       toggleLockExtras.appendChild(descTitle)
       const descBox = document.createElement('div')
       descBox.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); background: var(--b3-theme-primary-lightest); border: 1px solid var(--b3-theme-primary-light); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; line-height: 1.6;'
-      descBox.innerHTML = '🔒 <b>锁定文档</b>：防止误编辑，按钮显示锁定图标<br>🔓 <b>再次点击</b>：解锁文档，恢复编辑'
+      descBox.innerHTML = t('ui.buttonItems.mobile.88', undefined, '🔒 <b>锁定文档</b>：防止误编辑，按钮显示锁定图标<br>🔓 <b>再次点击</b>：解锁文档，恢复编辑')
       toggleLockExtras.appendChild(descBox)
-      toggleLockExtras.appendChild(createIconField('🔒锁定图标', button.lockIcon || '🔒', (v) => {
+      toggleLockExtras.appendChild(createIconField(t('ui.buttonItems.mobile.lockIcon', undefined, '🔒锁定图标'), button.lockIcon || '🔒', (v) => {
         button.lockIcon = v
       }, context.showIconPicker, button.iconSize))
       authorToolContainer.appendChild(toggleLockExtras)
@@ -2016,12 +2026,12 @@ export function createMobileButtonItem(
 
       const header = document.createElement('div');
       header.style.cssText = 'display: flex; align-items: center; gap: 8px;';
-      header.innerHTML = '<span style="font-size: 16px;">📝</span><span style="font-weight: 600; color: #3b82f6;">功能说明</span>';
+      header.innerHTML = t('ui.buttonItems.mobile.89', undefined, '<span style="font-size: 16px;">📝</span><span style="font-weight: 600; color: #3b82f6;">功能说明</span>');
       quickNoteContainer.appendChild(header);
 
       const desc = document.createElement('div');
       desc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface-light); line-height: 1.6;';
-      desc.innerHTML = '本按钮的功能是触发一键记事弹窗。<br>注：配置项统一使用【一键记事弹窗】中的配置：保存方式、插入位置、目标ID';
+      desc.innerHTML = t('ui.buttonItems.mobile.90', undefined, '本按钮的功能是触发一键记事弹窗。<br>注：配置项统一使用【一键记事弹窗】中的配置：保存方式、插入位置、目标ID');
       quickNoteContainer.appendChild(desc);
 
       const linkContainer = document.createElement('div');
@@ -2029,7 +2039,7 @@ export function createMobileButtonItem(
 
       const link = document.createElement('a');
       link.href = '#';
-      link.textContent = '👉 点击此处跳转到【一键记事弹窗】配置';
+      link.textContent = t('ui.buttonItems.mobile.91', undefined, '👉 点击此处跳转到【一键记事弹窗】配置');
       link.style.cssText = 'color: #3b82f6; text-decoration: underline; cursor: pointer; font-size: 13px;';
       link.onclick = (e) => {
         e.preventDefault();
@@ -2044,7 +2054,7 @@ export function createMobileButtonItem(
             targetElement.style.background = originalBg;
           }, 2000);
         } else {
-          alert('未找到【一键记事弹窗】配置区域，请在移动端设置');
+          alert(t('ui.buttonItems.mobile.quickNoteSettingsNotFound', undefined, '未找到【一键记事弹窗】配置区域，请在移动端设置'));
         }
       };
       linkContainer.appendChild(link);
@@ -2060,7 +2070,7 @@ export function createMobileButtonItem(
   }
 
   // 图标输入框 - 需要保存引用以便在选择按钮时更新
-  const iconField = createIconField('图标', button.icon, (v) => {
+  const iconField = createIconField(t('ui.buttonItems.mobile.icon', undefined, '图标'), button.icon, (v) => {
     button.icon = v
     // 更新显示的图标 - 使用特定的 class 来查找
     const iconSpan = item.querySelector('.toolbar-customizer-button-icon') as HTMLElement
@@ -2069,9 +2079,9 @@ export function createMobileButtonItem(
   editForm.appendChild(iconField)
   const iconInput = iconField.querySelector('input') as HTMLInputElement
   const iconPreview = iconField.querySelector('span') as HTMLElement
-  editForm.appendChild(createInputField('图标大小', button.iconSize.toString(), '18', (v) => { button.iconSize = parseInt(v) || 18 }, 'number'))
-  editForm.appendChild(createInputField('按钮宽度', button.minWidth.toString(), '32', (v) => { button.minWidth = parseInt(v) || 32 }, 'number'))
-  editForm.appendChild(createInputField('右边距', button.marginRight.toString(), '8', (v) => { button.marginRight = parseInt(v) || 8 }, 'number'))
+  editForm.appendChild(createInputField(t('ui.buttonItems.mobile.iconSize', undefined, '图标大小'), button.iconSize.toString(), '18', (v) => { button.iconSize = parseInt(v) || 18 }, 'number'))
+  editForm.appendChild(createInputField(t('ui.buttonItems.mobile.buttonWidth', undefined, '按钮宽度'), button.minWidth.toString(), '32', (v) => { button.minWidth = parseInt(v) || 32 }, 'number'))
+  editForm.appendChild(createInputField(t('ui.buttonItems.mobile.rightMargin', undefined, '右边距'), button.marginRight.toString(), '8', (v) => { button.marginRight = parseInt(v) || 8 }, 'number'))
   // 扩展工具栏按钮不显示排序字段（固定第一位）
   if (!isOverflowButton) {
     // 排序显示将移动到设置末尾
@@ -2088,7 +2098,7 @@ export function createMobileButtonItem(
   `
 
   // 右上角提示开关
-  const notificationField = createSwitchField('右上角提示', button.showNotification, (v) => {
+  const notificationField = createSwitchField(t('ui.buttonItems.mobile.notification', undefined, '右上角提示'), button.showNotification, (v) => {
     button.showNotification = v
   })
   switchesContainer.appendChild(notificationField)
@@ -2099,14 +2109,14 @@ export function createMobileButtonItem(
   switchesContainer.appendChild(divider)
 
   // 只显示名称开关
-  const showNameField = createSwitchField('只显示名称', button.showName ?? false, (v) => {
+  const showNameField = createSwitchField(t('ui.buttonItems.mobile.showNameOnly', undefined, '只显示名称'), button.showName ?? false, (v) => {
     button.showName = v
   })
   switchesContainer.appendChild(showNameField)
   // 添加提示文字
   const showNameHint = document.createElement('div')
   showNameHint.style.cssText = 'font-size: 10px; color: var(--b3-theme-on-surface-light); margin-top: 4px;'
-  showNameHint.textContent = '💡关闭只显示图标；最多显示4个字（大小自适应）'
+  showNameHint.textContent = t('ui.buttonItems.mobile.92', undefined, '💡关闭只显示图标；最多显示4个字（大小自适应）')
   switchesContainer.appendChild(showNameHint)
 
   editForm.appendChild(switchesContainer)
@@ -2134,7 +2144,7 @@ export function createMobileButtonItem(
       text-align: center;
       margin-bottom: 4px;
     `
-    sortLabel.textContent = '📊 当前排序位置'
+    sortLabel.textContent = t('ui.buttonItems.mobile.93', undefined, '📊 当前排序位置')
     sortDisplayContainer.appendChild(sortLabel)
     
     const sortValueDisplay = document.createElement('div')
@@ -2159,7 +2169,7 @@ export function createMobileButtonItem(
       margin-top: 4px;
       display: none;
     `
-    sortHint.textContent = '💡 拖动按钮调整位置，排序会自动更新'
+    sortHint.textContent = t('ui.buttonItems.mobile.94', undefined, '💡 拖动按钮调整位置，排序会自动更新')
     sortDisplayContainer.appendChild(sortHint)
     
     editForm.appendChild(sortDisplayContainer)

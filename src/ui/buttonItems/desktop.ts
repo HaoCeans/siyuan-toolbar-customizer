@@ -3,7 +3,9 @@
  * 负责创建和管理桌面端的按钮配置界面
  */
 
-import { ButtonConfig } from '../../toolbarManager'
+import { logger } from '@/utils/logger'
+import { t } from '../../i18n/runtime'
+import { ButtonConfig, getButtonDisplayName } from '../../toolbarManager'
 import { showClickSequenceSelector } from '../clickSequenceSelector'
 import {
   createDesktopField,
@@ -133,7 +135,7 @@ export function createDesktopButtonItem(
     cursor: move;
     flex-shrink: 0;
   `
-  dragHandle.title = '拖动排序'
+  dragHandle.title = t('ui.buttonItems.desktop.1', undefined, '拖动排序')
 
   const iconSpan = document.createElement('span')
   iconSpan.className = 'toolbar-customizer-button-icon'
@@ -154,13 +156,13 @@ export function createDesktopButtonItem(
   const infoDiv = document.createElement('div')
   infoDiv.style.cssText = 'flex: 1; min-width: 0;'
   const typeLabels: Record<string, string> = {
-    'builtin': '扩展工具栏',
-    'builtin-refresh': '①基础功能：刷新重载全屏【简单】',
-    'template': '②手写模板插入【简单】',
-    'shortcut': '③电脑端快捷键【简单】',
-    'quick-note': '④一键记事弹窗【简单】',
-    'click-sequence': '⑤自动化模拟点击【难】',
-    'author-tool': '⑥鲸鱼定制工具箱'
+    'builtin': t('ui.buttonItems.desktop.2', undefined, '扩展工具栏'),
+    'builtin-refresh': t('ui.buttonItems.desktop.3', undefined, '①基础功能：刷新重载全屏【简单】'),
+    'template': t('ui.buttonItems.desktop.4', undefined, '②手写模板插入【简单】'),
+    'shortcut': t('ui.buttonItems.desktop.5', undefined, '③电脑端快捷键【简单】'),
+    'quick-note': t('ui.buttonItems.desktop.6', undefined, '④一键记事弹窗【简单】'),
+    'click-sequence': t('ui.buttonItems.desktop.7', undefined, '⑤自动化模拟点击【难】'),
+    'author-tool': t('ui.buttonItems.desktop.8', undefined, '⑥鲸鱼定制工具箱')
   }
   const typeLabel = typeLabels[button.type] || button.type
   const isAuthorTool = button.type === 'author-tool'
@@ -168,7 +170,7 @@ export function createDesktopButtonItem(
     ? 'font-size: 11px; color: #a855f7; font-weight: 600;'
     : 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
   infoDiv.innerHTML = `
-    <div style="font-weight: 500; font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 4px;">${button.name}</div>
+    <div style="font-weight: 500; font-size: 14px; color: var(--b3-theme-on-background); margin-bottom: 4px;">${getButtonDisplayName(button)}</div>
     <div style="${typeStyle}">
       ${typeLabel}
     </div>
@@ -185,7 +187,7 @@ export function createDesktopButtonItem(
 
   const deleteBtn = document.createElement('button')
   deleteBtn.className = 'b3-button b3-button--text'
-  deleteBtn.textContent = '删除'
+  deleteBtn.textContent = t('ui.buttonItems.desktop.9', undefined, '删除')
   deleteBtn.style.cssText = `
     padding: 4px 10px;
     font-size: 12px;
@@ -195,7 +197,7 @@ export function createDesktopButtonItem(
   `
   deleteBtn.onclick = async (e) => {
     e.stopPropagation()
-    if (await context.showConfirmDialog(`确定删除"${button.name}"？`)) {
+    if (await context.showConfirmDialog(t('ui.buttonItems.desktop.deleteConfirm', { buttonName: getButtonDisplayName(button) }, '确定删除"{buttonName}"？'))) {
       // 从配置数组中删除
       const realIndex = configsArray.findIndex(btn => btn.id === button.id)
       if (realIndex !== -1) {
@@ -215,11 +217,11 @@ export function createDesktopButtonItem(
   enabledToggle.className = 'b3-switch'
   enabledToggle.checked = button.enabled !== false
   enabledToggle.style.cssText = 'transform: scale(0.8); flex-shrink: 0; cursor: pointer;'
-  enabledToggle.title = button.enabled !== false ? '点击禁用按钮' : '点击启用按钮'
+  enabledToggle.title = button.enabled !== false ? t('ui.buttonItems.desktop.10', undefined, '点击禁用按钮') : t('ui.buttonItems.desktop.11', undefined, '点击启用按钮')
   enabledToggle.onclick = (e) => {
     e.stopPropagation()
     button.enabled = enabledToggle.checked
-    enabledToggle.title = enabledToggle.checked ? '点击禁用按钮' : '点击启用按钮'
+    enabledToggle.title = enabledToggle.checked ? t('ui.buttonItems.desktop.12', undefined, '点击禁用按钮') : t('ui.buttonItems.desktop.13', undefined, '点击启用按钮')
     // 更新按钮项的透明度
     item.style.opacity = enabledToggle.checked ? '1' : '0.5'
     // 通知父级刷新，同步更新预览
@@ -255,7 +257,7 @@ export function createDesktopButtonItem(
   `
 
   // 名称输入框
-  const nameField = createDesktopField('名称', button.name, '按钮显示名称', (v) => {
+  const nameField = createDesktopField(t('ui.buttonItems.desktop.14', undefined, '名称'), button.name, t('ui.buttonItems.desktop.15', undefined, '按钮显示名称'), (v) => {
     button.name = v
     infoDiv.querySelector('div:first-child')!.textContent = v
   })
@@ -273,7 +275,7 @@ export function createDesktopButtonItem(
     `
 
     // 层数设置
-    const layersField = createDesktopField('扩展工具栏层数', (button.layers || 1).toString(), '1-5层', (v) => {
+    const layersField = createDesktopField(t('ui.buttonItems.desktop.16', undefined, '扩展工具栏层数'), (button.layers || 1).toString(), t('ui.buttonItems.desktop.17', undefined, '1-5层'), (v) => {
       let num = parseInt(v) || 1
       if (num < 1) num = 1
       if (num > 5) num = 5
@@ -298,7 +300,7 @@ export function createDesktopButtonItem(
 
     const bplTitle = document.createElement('div')
     bplTitle.style.cssText = 'font-size: 13px; font-weight: 600; color: var(--b3-theme-primary);'
-    bplTitle.textContent = '📊 每层按钮数量'
+    bplTitle.textContent = t('ui.buttonItems.desktop.18', undefined, '📊 每层按钮数量')
     bplContainer.appendChild(bplTitle)
 
     for (let i = 0; i <= layerCount; i++) {
@@ -306,7 +308,9 @@ export function createDesktopButtonItem(
       row.style.cssText = 'display: flex; align-items: center; gap: 8px;'
       const label = document.createElement('span')
       label.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 80px;'
-      label.textContent = i === 0 ? '主工具栏' : `第 ${i} 层`
+      label.textContent = i === 0
+        ? t('ui.buttonItems.desktop.19', undefined, '主工具栏')
+        : t('ui.buttonItems.desktop.layerLabel', { layer: i }, `第 ${i} 层`)
       const input = document.createElement('input')
       input.type = 'number'
       input.className = 'b3-text-field'
@@ -328,13 +332,13 @@ export function createDesktopButtonItem(
     overflowContainer.appendChild(bplContainer)
 
     // 扩展工具栏高度
-    const heightField = createDesktopField('扩展工具栏高度 (px)', (button.overflowToolbarHeight || 32).toString(), '32', (v) => {
+    const heightField = createDesktopField(t('ui.buttonItems.desktop.20', undefined, '扩展工具栏高度 (px)'), (button.overflowToolbarHeight || 32).toString(), '32', (v) => {
       button.overflowToolbarHeight = parseInt(v) || 32
     }, 'number')
     overflowContainer.appendChild(heightField)
 
     // 扩展工具栏宽度
-    const widthField = createDesktopField('扩展工具栏宽度 (px)', (button.overflowToolbarWidth || 0).toString(), '0', (v) => {
+    const widthField = createDesktopField(t('ui.buttonItems.desktop.21', undefined, '扩展工具栏宽度 (px)'), (button.overflowToolbarWidth || 0).toString(), '0', (v) => {
       button.overflowToolbarWidth = Math.min(parseInt(v) || 0, 1300)
     }, 'number')
     overflowContainer.appendChild(widthField)
@@ -344,7 +348,7 @@ export function createDesktopButtonItem(
     animRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
     const animLabel = document.createElement('span')
     animLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
-    animLabel.textContent = '打开动态动画'
+    animLabel.textContent = t('ui.buttonItems.desktop.22', undefined, '打开动态动画')
     const animToggle = document.createElement('input')
     animToggle.type = 'checkbox'
     animToggle.className = 'b3-switch'
@@ -364,12 +368,12 @@ export function createDesktopButtonItem(
       border-radius: 4px; font-size: 12px; line-height: 1.6; color: var(--b3-theme-on-surface);
     `
     descDiv.innerHTML = `
-      <div style="font-weight: 600; margin-bottom: 6px; color: var(--b3-theme-primary);">💡 扩展工具栏说明</div>
-      <div>• <strong>关闭按钮</strong>：只显示主工具栏按钮</div>
-      <div>• <strong>开启按钮</strong>：工具栏显示"⋯"按钮</div>
-      <div>• <strong>点击"⋯"</strong>：弹出扩展工具栏</div>
-      <div>• 按 sort 排序后，前 N 个在主工具栏，接下来 M 个在第1层，以此类推</div>
-      <div>• 背景颜色跟随主工具栏</div>
+      <div style="font-weight: 600; margin-bottom: 6px; color: var(--b3-theme-primary);">${t('ui.buttonItems.desktop.overflowHelpTitle', undefined, '💡 扩展工具栏说明')}</div>
+      <div>• <strong>${t('ui.buttonItems.desktop.overflowHelpOff', undefined, '关闭按钮')}</strong>：${t('ui.buttonItems.desktop.overflowHelpOffDesc', undefined, '只显示主工具栏按钮')}</div>
+      <div>• <strong>${t('ui.buttonItems.desktop.overflowHelpOn', undefined, '开启按钮')}</strong>：${t('ui.buttonItems.desktop.overflowHelpOnDesc', undefined, '工具栏显示"⋯"按钮')}</div>
+      <div>• <strong>${t('ui.buttonItems.desktop.overflowHelpClick', undefined, '点击"⋯"')}</strong>：${t('ui.buttonItems.desktop.overflowHelpClickDesc', undefined, '弹出扩展工具栏')}</div>
+      <div>• ${t('ui.buttonItems.desktop.overflowHelpSort', undefined, '按 sort 排序后，前 N 个在主工具栏，接下来 M 个在第1层，以此类推')}</div>
+      <div>• ${t('ui.buttonItems.desktop.overflowHelpBg', undefined, '背景颜色跟随主工具栏')}</div>
     `
     overflowContainer.appendChild(descDiv)
 
@@ -380,26 +384,26 @@ export function createDesktopButtonItem(
   if (!isOverflowButton) {
   // 构建功能类型选项数组（根据激活状态决定是否显示鲸鱼定制工具箱）
   const typeOptions = [
-    { value: 'builtin-refresh', label: '①基础功能：刷新重载全屏【简单】' },
-    { value: 'template', label: '②手写模板插入【简单】' },
-    { value: 'shortcut', label: '③电脑端快捷键【简单】' },
-    { value: 'quick-note', label: '④一键记事弹窗【简单】' },
-    { value: 'click-sequence', label: '⑤自动化模拟点击【难】' }
+    { value: 'builtin-refresh', label: t('ui.buttonItems.desktop.23', undefined, '①基础功能：刷新重载全屏【简单】') },
+    { value: 'template', label: t('ui.buttonItems.desktop.24', undefined, '②手写模板插入【简单】') },
+    { value: 'shortcut', label: t('ui.buttonItems.desktop.25', undefined, '③电脑端快捷键【简单】') },
+    { value: 'quick-note', label: t('ui.buttonItems.desktop.26', undefined, '④一键记事弹窗【简单】') },
+    { value: 'click-sequence', label: t('ui.buttonItems.desktop.27', undefined, '⑤自动化模拟点击【难】') }
   ]
   if (context.isAuthorToolActivated()) {
     typeOptions.push(
-      { value: 'author-tool', label: '⑥鲸鱼定制工具箱' }
+      { value: 'author-tool', label: t('ui.buttonItems.desktop.28', undefined, '⑥鲸鱼定制工具箱') }
     )
   } else {
     // 未激活时：toggle-lock / slide-comment 显示"免费试用"，其他显示"跳转激活"
     const isFreeTrial = button.type === 'author-tool' && (button.authorToolSubtype === 'toggle-lock' || button.authorToolSubtype === 'slide-comment')
     typeOptions.push({
       value: 'author-tool',
-      label: isFreeTrial ? '⑥鲸鱼定制工具箱（免费试用）' : '⑥鲸鱼定制工具箱（跳转激活）'
+      label: isFreeTrial ? t('ui.buttonItems.desktop.29', undefined, '⑥鲸鱼定制工具箱（免费试用）') : t('ui.buttonItems.desktop.30', undefined, '⑥鲸鱼定制工具箱（跳转激活）')
     })
   }
 
-	  const typeSelectField = createDesktopSelectField('选择功能', button.type, typeOptions, (v) => {
+	  const typeSelectField = createDesktopSelectField(t('ui.buttonItems.desktop.31', undefined, '选择功能'), button.type, typeOptions, (v) => {
 	    // 选择鲸鱼定制工具箱但未激活：仅 toggle-lock / slide-comment 允许，其他跳转激活
 	    if (v === 'author-tool' && !context.isAuthorToolActivated()) {
 	      const isFreeTrial2 = button.authorToolSubtype === 'toggle-lock' || button.authorToolSubtype === 'slide-comment'
@@ -441,13 +445,13 @@ export function createDesktopButtonItem(
     const typeDesc = infoDiv.querySelector('div:last-child')
     if (typeDesc) {
       const typeLabels: Record<string, string> = {
-        'builtin': '扩展工具栏',
-        'builtin-refresh': '①基础功能：刷新重载全屏【简单】',
-        'template': '②手写模板插入【简单】',
-        'shortcut': '③电脑端快捷键【简单】',
-        'quick-note': '④一键记事弹窗【简单】',
-        'click-sequence': '⑤自动化模拟点击【难】',
-        'author-tool': '⑥鲸鱼定制工具箱'
+        'builtin': t('ui.buttonItems.desktop.32', undefined, '扩展工具栏'),
+        'builtin-refresh': t('ui.buttonItems.desktop.33', undefined, '①基础功能：刷新重载全屏【简单】'),
+        'template': t('ui.buttonItems.desktop.34', undefined, '②手写模板插入【简单】'),
+        'shortcut': t('ui.buttonItems.desktop.35', undefined, '③电脑端快捷键【简单】'),
+        'quick-note': t('ui.buttonItems.desktop.36', undefined, '④一键记事弹窗【简单】'),
+        'click-sequence': t('ui.buttonItems.desktop.37', undefined, '⑤自动化模拟点击【难】'),
+        'author-tool': t('ui.buttonItems.desktop.38', undefined, '⑥鲸鱼定制工具箱')
       }
       typeDesc.textContent = typeLabels[button.type] || button.type
     }
@@ -477,7 +481,7 @@ export function createDesktopButtonItem(
   
     // 功能选择标题
     const titleLabel = document.createElement('label')
-    titleLabel.textContent = '选择功能'
+    titleLabel.textContent = t('ui.buttonItems.desktop.39', undefined, '选择功能')
     titleLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-surface);'
     builtinRefreshContainer.appendChild(titleLabel)
   
@@ -487,10 +491,10 @@ export function createDesktopButtonItem(
   
     // 定义三个功能选项
     const refreshOptions = [
-      { value: 'refresh', label: '① 刷新文档', desc: '重新加载当前编辑的文档' },
-      { value: 'reload', label: '② 重载思源', desc: '重新启动思源应用' },
-      { value: 'fullscreen', label: '③ 思源全屏切换', desc: '思源在全屏和普通模式之间切换' },
-      { value: 'doc-fullscreen', label: '④ 文档全屏切换', desc: '文档在全屏和普通模式之间切换' }
+      { value: 'refresh', label: t('ui.buttonItems.desktop.40', undefined, '① 刷新文档'), desc: t('ui.buttonItems.desktop.41', undefined, '重新加载当前编辑的文档') },
+      { value: 'reload', label: t('ui.buttonItems.desktop.42', undefined, '② 重载思源'), desc: t('ui.buttonItems.desktop.43', undefined, '重新启动思源应用') },
+      { value: 'fullscreen', label: t('ui.buttonItems.desktop.44', undefined, '③ 思源全屏切换'), desc: t('ui.buttonItems.desktop.45', undefined, '思源在全屏和普通模式之间切换') },
+      { value: 'doc-fullscreen', label: t('ui.buttonItems.desktop.46', undefined, '④ 文档全屏切换'), desc: t('ui.buttonItems.desktop.47', undefined, '文档在全屏和普通模式之间切换') }
     ]
   
     // 创建每个功能的按钮组
@@ -563,7 +567,7 @@ export function createDesktopButtonItem(
   
     const hint = document.createElement('div')
     hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
-    hint.textContent = '💡 选择要执行的思源功能'
+    hint.textContent = t('ui.buttonItems.desktop.48', undefined, '💡 选择要执行的思源功能')
     builtinRefreshContainer.appendChild(hint)
   
     editForm.appendChild(builtinRefreshContainer)
@@ -571,7 +575,7 @@ export function createDesktopButtonItem(
     const templateField = document.createElement('div')
     templateField.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
     const label = document.createElement('label')
-    label.textContent = '模板内容'
+    label.textContent = t('ui.buttonItems.desktop.49', undefined, '模板内容')
     label.style.cssText = 'font-size: 13px;'
     const textarea = document.createElement('textarea')
     textarea.className = 'b3-text-field'
@@ -583,39 +587,39 @@ export function createDesktopButtonItem(
     const hint = document.createElement('div')
     hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding: 8px; background: var(--b3-theme-surface); border-radius: 4px; margin-top: 4px;'
     hint.innerHTML = `
-      <div style="font-weight: 500; margin-bottom: 4px;">💡 支持的模板变量：</div>
+      <div style="font-weight: 500; margin-bottom: 4px;">${t('ui.buttonItems.desktop.templateVarsHelp', undefined, '💡 支持的模板变量：')}</div>
       <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-family: monospace;">
-        <code>{{date}}</code><span>当前日期 (2026-01-18)</span>
-        <code>{{time}}</code><span>当前时间 (14:30:45)</span>
-        <code>{{datetime}}</code><span>日期时间 (2026-01-18 14:30:45)</span>
-        <code>{{year}}</code><span>年份 (2026)</span>
-        <code>{{month}}</code><span>月份 (01)</span>
-        <code>{{day}}</code><span>日期 (18)</span>
-        <code>{{hour}}</code><span>小时 (14)</span>
-        <code>{{minute}}</code><span>分钟 (30)</span>
-        <code>{{second}}</code><span>秒 (45)</span>
-        <code>{{week}}</code><span>星期几 (星期六)</span>
-        <code>{{timestamp}}</code><span>Unix时间戳 (毫秒)</span>
-        <code>{{newline}}</code><span>换行符</span>
+        <code>{{date}}</code><span>${t('ui.buttonItems.desktop.templateVarDate', undefined, '当前日期 (2026-01-18)')}</span>
+        <code>{{time}}</code><span>${t('ui.buttonItems.desktop.templateVarTime', undefined, '当前时间 (14:30:45)')}</span>
+        <code>{{datetime}}</code><span>${t('ui.buttonItems.desktop.templateVarDatetime', undefined, '日期时间 (2026-01-18 14:30:45)')}</span>
+        <code>{{year}}</code><span>${t('ui.buttonItems.desktop.templateVarYear', undefined, '年份 (2026)')}</span>
+        <code>{{month}}</code><span>${t('ui.buttonItems.desktop.templateVarMonth', undefined, '月份 (01)')}</span>
+        <code>{{day}}</code><span>${t('ui.buttonItems.desktop.templateVarDay', undefined, '日期 (18)')}</span>
+        <code>{{hour}}</code><span>${t('ui.buttonItems.desktop.templateVarHour', undefined, '小时 (14)')}</span>
+        <code>{{minute}}</code><span>${t('ui.buttonItems.desktop.templateVarMinute', undefined, '分钟 (30)')}</span>
+        <code>{{second}}</code><span>${t('ui.buttonItems.desktop.templateVarSecond', undefined, '秒 (45)')}</span>
+        <code>{{week}}</code><span>${t('ui.buttonItems.desktop.templateVarWeek', undefined, '星期几 (星期六)')}</span>
+        <code>{{timestamp}}</code><span>${t('ui.buttonItems.desktop.templateVarTimestamp', undefined, 'Unix时间戳 (毫秒)')}</span>
+        <code>{{newline}}</code><span>${t('ui.buttonItems.desktop.templateVarNewline', undefined, '换行符')}</span>
       </div>
     `
 
     // 笔记本ID配置（可选）
     const notebookIdLabel = document.createElement('label')
-    notebookIdLabel.textContent = '📚 追加到每日笔记（可选）'
+    notebookIdLabel.textContent = t('ui.buttonItems.desktop.50', undefined, '📚 追加到每日笔记（可选）')
     notebookIdLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 12px;'
     
     const notebookIdInput = document.createElement('input')
     notebookIdInput.type = 'text'
     notebookIdInput.className = 'b3-text-field'
-    notebookIdInput.placeholder = '笔记本ID，留空则在当前编辑器光标位置插入'
+    notebookIdInput.placeholder = t('ui.buttonItems.desktop.51', undefined, '笔记本ID，留空则在当前编辑器光标位置插入')
     notebookIdInput.value = button.templateNotebookId || ''
     notebookIdInput.style.cssText = 'font-size: 13px;'
     notebookIdInput.onchange = () => { button.templateNotebookId = notebookIdInput.value }
     
     const notebookIdHint = document.createElement('div')
     notebookIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    notebookIdHint.textContent = '💡 填写笔记本ID后，点击按钮将直接追加到该笔记本的每日笔记；留空则需先选择编辑器'
+    notebookIdHint.textContent = t('ui.buttonItems.desktop.52', undefined, '💡 填写笔记本ID后，点击按钮将直接追加到该笔记本的每日笔记；留空则需先选择编辑器')
 
     templateField.appendChild(label)
     templateField.appendChild(textarea)
@@ -629,7 +633,7 @@ export function createDesktopButtonItem(
     contextMenuItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px;'
     const contextMenuLabel = document.createElement('label')
     contextMenuLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
-    contextMenuLabel.textContent = '📋 显示在文本右键菜单'
+    contextMenuLabel.textContent = t('ui.buttonItems.desktop.53', undefined, '📋 显示在文本右键菜单')
     const contextMenuSwitch = document.createElement('input')
     contextMenuSwitch.type = 'checkbox'
     contextMenuSwitch.className = 'b3-switch'
@@ -652,14 +656,14 @@ export function createDesktopButtonItem(
     labelRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px;'
 
     const label = document.createElement('label')
-    label.textContent = '点击序列（每行一个选择器）'
+    label.textContent = t('ui.buttonItems.desktop.54', undefined, '点击序列（每行一个选择器）')
     label.style.cssText = 'font-size: 13px;'
     labelRow.appendChild(label)
 
     // 预设按钮
     const presetBtn = document.createElement('button')
     presetBtn.className = 'b3-button b3-button--outline'
-    presetBtn.textContent = '选择模板'
+    presetBtn.textContent = t('ui.buttonItems.desktop.55', undefined, '选择模板')
     presetBtn.style.cssText = 'padding: 4px 12px; font-size: 12px; white-space: nowrap;'
     presetBtn.onclick = () => {
       showClickSequenceSelector({
@@ -690,7 +694,7 @@ export function createDesktopButtonItem(
 
     const hint = document.createElement('div')
     hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
-    hint.innerHTML = '<div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px;"><strong style="color: var(--b3-theme-primary);">🌟 社区可用代码分享（推荐）</strong><br><a href="https://ld246.com/article/1771266377449" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">https://ld246.com/article/1771266377449</a></div>💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong><br>• <strong>鼠标悬浮（如 *text:复制）【加*可处理鼠标悬浮自动打开的功能】</strong><br>• <strong>间隔时间（如 200ms / 1s，单独占一行，设置后续步骤的等待时间）</strong><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">思源笔记常用功能 ID 速查表（GitHub）</a><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">模拟点击序列使用说明（GitHub）</a>'
+    hint.innerHTML = t('ui.buttonItems.desktop.clickSequenceHelp')
     clickSequenceField.appendChild(hint)
 
     editForm.appendChild(clickSequenceField)
@@ -706,14 +710,14 @@ export function createDesktopButtonItem(
     shortcutField.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
 
     const label = document.createElement('label')
-    label.textContent = '快捷键组合'
+    label.textContent = t('ui.buttonItems.desktop.56', undefined, '快捷键组合')
     label.style.cssText = 'font-size: 13px;'
     shortcutField.appendChild(label)
 
     const input = document.createElement('input')
     input.className = 'b3-text-field fn__flex-1'
     input.type = 'text'
-    input.placeholder = '快捷键格式：Alt+5 / Ctrl+B等'
+    input.placeholder = t('ui.buttonItems.desktop.57', undefined, '快捷键格式：Alt+5 / Ctrl+B等')
     input.value = button.shortcutKey || ''
     input.style.cssText = 'font-family: monospace;'
     input.onchange = () => { button.shortcutKey = input.value }
@@ -724,21 +728,21 @@ export function createDesktopButtonItem(
     hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding: 8px; background: var(--b3-theme-surface); border-radius: 4px; overflow-x: auto;'
     hint.innerHTML = `
       <table style="width: 100%; border-collapse: collapse; font-family: monospace;">
-        <tr><td>💡更多快捷键，请查看：思源桌面端➡设置➡快捷键</td></tr>
-        <tr><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">快捷键</th><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">功能</th></tr>
-        <tr><td><code>Alt+5</code></td><td>打开日记</td></tr>
-        <tr><td><code>Alt+P</code></td><td>打开设置</td></tr>
-        <tr><td><code>Alt+Shift+P</code></td><td>命令面板</td></tr>
-        <tr><td><code>Ctrl+P</code></td><td>全局搜索</td></tr>
-        <tr><td><code>Ctrl+F</code></td><td>当前文档搜索</td></tr>
-        <tr><td><code>Ctrl+H</code></td><td>替换</td></tr>
-        <tr><td><code>Ctrl+N</code></td><td>新建文档</td></tr>
-        <tr><td><code>Alt+1</code></td><td>文件树</td></tr>
-        <tr><td><code>Alt+2</code></td><td>大纲</td></tr>
-        <tr><td><code>Alt+3</code></td><td>书签</td></tr>
-        <tr><td><code>Alt+4</code></td><td>标签</td></tr>
-        <tr><td><code>Alt+7</code></td><td>反向链接</td></tr>
-        <tr><td><code>Ctrl+W</code></td><td>关闭标签页</td></tr>
+        <tr><td>💡${t('ui.buttonItems.desktop.shortcutHelp', undefined, '更多快捷键，请查看：思源桌面端➡设置➡快捷键')}</td></tr>
+        <tr><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">${t('ui.buttonItems.desktop.shortcutKey', undefined, '快捷键')}</th><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">${t('ui.buttonItems.desktop.shortcutFunction', undefined, '功能')}</th></tr>
+        <tr><td><code>Alt+5</code></td><td>${t('ui.buttonItems.desktop.shortcutDiary', undefined, '打开日记')}</td></tr>
+        <tr><td><code>Alt+P</code></td><td>${t('ui.buttonItems.desktop.shortcutSettings', undefined, '打开设置')}</td></tr>
+        <tr><td><code>Alt+Shift+P</code></td><td>${t('ui.buttonItems.desktop.shortcutCommand', undefined, '命令面板')}</td></tr>
+        <tr><td><code>Ctrl+P</code></td><td>${t('ui.buttonItems.desktop.shortcutGlobalSearch', undefined, '全局搜索')}</td></tr>
+        <tr><td><code>Ctrl+F</code></td><td>${t('ui.buttonItems.desktop.shortcutDocSearch', undefined, '当前文档搜索')}</td></tr>
+        <tr><td><code>Ctrl+H</code></td><td>${t('ui.buttonItems.desktop.shortcutReplace', undefined, '替换')}</td></tr>
+        <tr><td><code>Ctrl+N</code></td><td>${t('ui.buttonItems.desktop.shortcutNewDoc', undefined, '新建文档')}</td></tr>
+        <tr><td><code>Alt+1</code></td><td>${t('ui.buttonItems.desktop.shortcutFileTree', undefined, '文件树')}</td></tr>
+        <tr><td><code>Alt+2</code></td><td>${t('ui.buttonItems.desktop.shortcutOutline', undefined, '大纲')}</td></tr>
+        <tr><td><code>Alt+3</code></td><td>${t('ui.buttonItems.desktop.shortcutBookmark', undefined, '书签')}</td></tr>
+        <tr><td><code>Alt+4</code></td><td>${t('ui.buttonItems.desktop.shortcutTag', undefined, '标签')}</td></tr>
+        <tr><td><code>Alt+7</code></td><td>${t('ui.buttonItems.desktop.shortcutBacklink', undefined, '反向链接')}</td></tr>
+        <tr><td><code>Ctrl+W</code></td><td>${t('ui.buttonItems.desktop.shortcutCloseTab', undefined, '关闭标签页')}</td></tr>
       </table>
     `
 
@@ -753,17 +757,17 @@ export function createDesktopButtonItem(
 
     const header = document.createElement('div')
     header.style.cssText = 'display: flex; align-items: center; gap: 8px;'
-    header.innerHTML = '<span style="font-size: 16px;">🔐</span><span style="font-weight: 600; color: #8b5cf6;">鲸鱼定制工具箱配置</span>'
+    header.innerHTML = t('ui.buttonItems.desktop.58', undefined, '<span style="font-size: 16px;">🔐</span><span style="font-weight: 600; color: #8b5cf6;">鲸鱼定制工具箱配置</span>')
     authorToolField.appendChild(header)
 
     const desc = document.createElement('div')
     desc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light);'
-    desc.textContent = '选择功能类型并配置相关参数。'
+    desc.textContent = t('ui.buttonItems.desktop.59', undefined, '选择功能类型并配置相关参数。')
     authorToolField.appendChild(desc)
 
     // 子类型选择
     const subtypeLabel = document.createElement('label')
-    subtypeLabel.textContent = '功能类型'
+    subtypeLabel.textContent = t('ui.buttonItems.desktop.60', undefined, '功能类型')
     subtypeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
     authorToolField.appendChild(subtypeLabel)
 
@@ -772,22 +776,22 @@ export function createDesktopButtonItem(
     subtypeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
     const currentSubtype = button.authorToolSubtype || 'button-sequence'
     subtypeSelect.innerHTML = `
-      <option value="button-sequence" ${currentSubtype === 'button-sequence' ? 'selected' : ''}>① 连续点击自定义按钮</option>
-      <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>② 打开指定ID块</option>
-      <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>③ 数据库悬浮弹窗</option>
-      <option value="diary" ${currentSubtype === 'diary' || currentSubtype === 'diary-top' || currentSubtype === 'diary-bottom' ? 'selected' : ''}>④ 日记顶部或底部</option>
-      <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>⑤ 叶归LifeLog适配</option>
-      <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
-      <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
-      <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>⑧ 图片快捷导入</option>
-      <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>⑨ 悬浮标签页Tab</option>
-      <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>⑩ 悬浮大纲</option>
-      <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 前一篇/后一篇文档</option>
-	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
-	      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
-	      <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
-	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 沉浸阅读模式${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
-	      <option value="quick-attach" ${currentSubtype === 'quick-attach' ? 'selected' : ''}>⑯ 快速添加附件</option>
+      <option value="button-sequence" ${currentSubtype === 'button-sequence' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeButtonSequence', undefined, '① 连续点击自定义按钮')}</option>
+      <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeOpenDoc', undefined, '② 打开指定ID块')}</option>
+      <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeDatabase', undefined, '③ 数据库悬浮弹窗')}</option>
+      <option value="diary" ${currentSubtype === 'diary' || currentSubtype === 'diary-top' || currentSubtype === 'diary-bottom' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeDiary', undefined, '④ 日记顶部或底部')}</option>
+      <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeLifeLog', undefined, '⑤ 叶归LifeLog适配')}</option>
+      <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypePopup', undefined, '⑥ 弹窗框模板选择')}</option>
+      <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeScroll', undefined, '⑦ 滚动文档顶部或底部')}</option>
+      <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeImage', undefined, '⑧ 图片快捷导入')}</option>
+      <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeTabs', undefined, '⑨ 悬浮标签页Tab')}</option>
+      <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeOutline', undefined, '⑩ 悬浮大纲')}</option>
+      <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeDocNav', undefined, '⑪ 前一篇/后一篇文档')}</option>
+	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeComment', undefined, '⑫ 滑动快速批注')}${context.isAuthorToolActivated() ? '' : t('ui.buttonItems.desktop.trial', undefined, '（免费试用）')}</option>
+	      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeTts', undefined, '⑬ 文档朗读')}</option>
+	      <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeClear', undefined, '⑭ 一键清理空块')}</option>
+	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeLock', undefined, '⑮ 沉浸阅读模式')}${context.isAuthorToolActivated() ? '' : t('ui.buttonItems.desktop.trial', undefined, '（免费试用）')}</option>
+	      <option value="quick-attach" ${currentSubtype === 'quick-attach' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeAttach', undefined, '⑯ 快速添加附件')}</option>
 	    `
 	    subtypeSelect.onchange = () => {
 	      button.authorToolSubtype = subtypeSelect.value as any
@@ -810,14 +814,14 @@ export function createDesktopButtonItem(
 
     // 目标块ID
     const docIdLabel = document.createElement('label')
-    docIdLabel.textContent = '📄 目标块ID'
+    docIdLabel.textContent = t('ui.buttonItems.desktop.61', undefined, '📄 目标块ID')
     docIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     docConfigDiv.appendChild(docIdLabel)
 
     const docIdInput = document.createElement('input')
     docIdInput.type = 'text'
     docIdInput.className = 'b3-text-field'
-    docIdInput.placeholder = '如: 20251215234003-j3i7wjc 或 20251215234003-j3i7wjc-a1b2c3'
+    docIdInput.placeholder = t('ui.buttonItems.desktop.62', undefined, '如: 20251215234003-j3i7wjc 或 20251215234003-j3i7wjc-a1b2c3')
     docIdInput.value = button.targetDocId || ''
     docIdInput.style.cssText = 'font-size: 13px;'
     docIdInput.onchange = () => { button.targetDocId = docIdInput.value }
@@ -825,7 +829,7 @@ export function createDesktopButtonItem(
 
     const docIdHint = document.createElement('div')
     docIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    docIdHint.textContent = '💡 支持文档ID（打开文档）或块ID（打开文档并定位到该块）'
+    docIdHint.textContent = t('ui.buttonItems.desktop.63', undefined, '💡 支持文档ID（打开文档）或块ID（打开文档并定位到该块）')
     docConfigDiv.appendChild(docIdHint)
 
     authorToolField.appendChild(docConfigDiv)
@@ -842,12 +846,12 @@ export function createDesktopButtonItem(
 
     const diaryTitle = document.createElement('div')
     diaryTitle.style.cssText = 'font-size: 14px; font-weight: 600; color: #22c55e; display: flex; align-items: center; gap: 8px;'
-    diaryTitle.innerHTML = '<span>📇</span><span>功能说明</span>'
+    diaryTitle.innerHTML = t('ui.buttonItems.desktop.64', undefined, '<span>📇</span><span>功能说明</span>')
     diaryConfigDiv.appendChild(diaryTitle)
 
     const diaryDesc = document.createElement('div')
     diaryDesc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.6;'
-    diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 或 API 打开日记<br>2. 根据下方设置决定跳转位置<br>💡 配置笔记本ID后将直接使用API，无需弹窗选择'
+    diaryDesc.innerHTML = t('ui.buttonItems.desktop.65', undefined, '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 或 API 打开日记<br>2. 根据下方设置决定跳转位置<br>💡 配置笔记本ID后将直接使用API，无需弹窗选择')
     diaryConfigDiv.appendChild(diaryDesc)
 
     // 位置选择配置
@@ -855,7 +859,7 @@ export function createDesktopButtonItem(
     diaryPositionContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px; margin-top: 12px; padding: 12px; background: rgba(66, 133, 244, 0.08); border-radius: 6px; border: 1px solid rgba(66, 133, 244, 0.2);'
 
     const diaryPositionLabel = document.createElement('label')
-    diaryPositionLabel.textContent = '📍 打开后位置'
+    diaryPositionLabel.textContent = t('ui.buttonItems.desktop.66', undefined, '📍 打开后位置')
     diaryPositionLabel.style.cssText = 'font-size: 14px; color: var(--b3-theme-primary); font-weight: 600; display: flex; align-items: center; gap: 6px;'
     diaryPositionContainer.appendChild(diaryPositionLabel)
 
@@ -881,7 +885,7 @@ export function createDesktopButtonItem(
       }
     })
     diaryTopRadioContainer.appendChild(diaryTopRadio)
-    diaryTopRadioContainer.appendChild(document.createTextNode('⬆️ 日记顶部'))
+    diaryTopRadioContainer.appendChild(document.createTextNode(t('ui.buttonItems.desktop.diaryTop', undefined, '⬆️ 日记顶部')))
     diaryPositionOptions.appendChild(diaryTopRadioContainer)
 
     // 底部选项
@@ -901,7 +905,7 @@ export function createDesktopButtonItem(
       }
     })
     diaryBottomRadioContainer.appendChild(diaryBottomRadio)
-    diaryBottomRadioContainer.appendChild(document.createTextNode('⬇️ 日记底部'))
+    diaryBottomRadioContainer.appendChild(document.createTextNode(t('ui.buttonItems.desktop.diaryBottom', undefined, '⬇️ 日记底部')))
     diaryPositionOptions.appendChild(diaryBottomRadioContainer)
 
     diaryPositionContainer.appendChild(diaryPositionOptions)
@@ -917,7 +921,7 @@ export function createDesktopButtonItem(
     diaryNotebookIdContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px; margin-top: 8px;'
 
     const diaryNotebookIdLabel = document.createElement('label')
-    diaryNotebookIdLabel.textContent = '📚 笔记本ID（可选）'
+    diaryNotebookIdLabel.textContent = t('ui.buttonItems.desktop.67', undefined, '📚 笔记本ID（可选）')
     diaryNotebookIdLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); font-weight: 500;'
     diaryNotebookIdContainer.appendChild(diaryNotebookIdLabel)
 
@@ -925,7 +929,7 @@ export function createDesktopButtonItem(
     diaryNotebookIdInput.type = 'text'
     diaryNotebookIdInput.className = 'b3-text-field'
     diaryNotebookIdInput.value = button.diaryNotebookId || ''
-    diaryNotebookIdInput.placeholder = '留空则使用 Alt+5 快捷键，如：20250101000000-aaaaaa'
+    diaryNotebookIdInput.placeholder = t('ui.buttonItems.desktop.68', undefined, '留空则使用 Alt+5 快捷键，如：20250101000000-aaaaaa')
     diaryNotebookIdInput.style.cssText = 'font-size: 13px;'
     diaryNotebookIdInput.addEventListener('input', () => {
       button.diaryNotebookId = diaryNotebookIdInput.value
@@ -934,7 +938,7 @@ export function createDesktopButtonItem(
 
     const diaryNotebookIdHint = document.createElement('div')
     diaryNotebookIdHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
-    diaryNotebookIdHint.textContent = '💡 填写后将直接调用API创建日记，不会弹出选择框'
+    diaryNotebookIdHint.textContent = t('ui.buttonItems.desktop.69', undefined, '💡 填写后将直接调用API创建日记，不会弹出选择框')
     diaryNotebookIdContainer.appendChild(diaryNotebookIdHint)
 
     diaryConfigDiv.appendChild(diaryNotebookIdContainer)
@@ -944,7 +948,7 @@ export function createDesktopButtonItem(
     waitTimeContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px; margin-top: 8px;'
 
     const waitTimeLabel = document.createElement('label')
-    waitTimeLabel.textContent = '⏱ 移动端等待时间（毫秒）'
+    waitTimeLabel.textContent = t('ui.buttonItems.desktop.70', undefined, '⏱ 移动端等待时间（毫秒）')
     waitTimeLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); font-weight: 500;'
     waitTimeContainer.appendChild(waitTimeLabel)
 
@@ -952,7 +956,7 @@ export function createDesktopButtonItem(
     waitTimeInput.type = 'number'
     waitTimeInput.className = 'b3-text-field'
     waitTimeInput.value = String(button.diaryWaitTime || 1000)
-    waitTimeInput.placeholder = '默认 1000'
+    waitTimeInput.placeholder = t('ui.buttonItems.desktop.71', undefined, '默认 1000')
     waitTimeInput.style.cssText = 'font-size: 13px;'
     waitTimeInput.addEventListener('input', () => {
       button.diaryWaitTime = parseInt(waitTimeInput.value) || 1000
@@ -961,7 +965,7 @@ export function createDesktopButtonItem(
 
     const waitTimeHint = document.createElement('div')
     waitTimeHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
-    waitTimeHint.textContent = '💡 移动端加载日记较慢时可增加此值，范围 100-10000ms'
+    waitTimeHint.textContent = t('ui.buttonItems.desktop.72', undefined, '💡 移动端加载日记较慢时可增加此值，范围 100-10000ms')
     waitTimeContainer.appendChild(waitTimeHint)
 
     diaryConfigDiv.appendChild(waitTimeContainer)
@@ -975,14 +979,14 @@ export function createDesktopButtonItem(
     
     // 笔记本ID输入
     const notebookIdLabel = document.createElement('label')
-    notebookIdLabel.textContent = '📚 笔记本ID'
+    notebookIdLabel.textContent = t('ui.buttonItems.desktop.73', undefined, '📚 笔记本ID')
     notebookIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     lifeLogConfigDiv.appendChild(notebookIdLabel)
     
     const notebookIdInput = document.createElement('input')
     notebookIdInput.type = 'text'
     notebookIdInput.className = 'b3-text-field'
-    notebookIdInput.placeholder = '请输入笔记本ID，如：20250101000000-aaaaaa'
+    notebookIdInput.placeholder = t('ui.buttonItems.desktop.74', undefined, '请输入笔记本ID，如：20250101000000-aaaaaa')
     notebookIdInput.value = button.lifeLogNotebookId || ''
     notebookIdInput.style.cssText = 'font-size: 13px;'
     notebookIdInput.onchange = () => { button.lifeLogNotebookId = notebookIdInput.value }
@@ -990,19 +994,19 @@ export function createDesktopButtonItem(
     
     const notebookIdHint = document.createElement('div')
     notebookIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    notebookIdHint.textContent = '💡 指定内容将要追加到的笔记本ID，不能为空'
+    notebookIdHint.textContent = t('ui.buttonItems.desktop.75', undefined, '💡 指定内容将要追加到的笔记本ID，不能为空')
     lifeLogConfigDiv.appendChild(notebookIdHint)
     
     // 分类选项输入
     const categoriesLabel = document.createElement('label')
-    categoriesLabel.textContent = '📝 分类选项（每行一个）'
+    categoriesLabel.textContent = t('ui.buttonItems.desktop.76', undefined, '📝 分类选项（每行一个）')
     categoriesLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
     lifeLogConfigDiv.appendChild(categoriesLabel)
 
     const categoriesTextarea = document.createElement('textarea')
     categoriesTextarea.className = 'b3-text-field'
     categoriesTextarea.value = button.lifeLogCategories?.join('\n') || '学习\n工作\n生活'
-    categoriesTextarea.placeholder = '每行输入一个分类，例如：\n学习\n工作\n生活'
+    categoriesTextarea.placeholder = t('ui.buttonItems.desktop.77', undefined, '每行输入一个分类，例如：\n学习\n工作\n生活')
     categoriesTextarea.rows = 4
     categoriesTextarea.style.cssText = 'font-size: 13px; resize: vertical; min-height: 100px;'
     categoriesTextarea.onchange = () => { 
@@ -1012,12 +1016,12 @@ export function createDesktopButtonItem(
 
     const categoriesHint = document.createElement('div')
     categoriesHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    categoriesHint.textContent = '💡 每行输入一个分类选项，点击按钮后会弹出选择对话框'
+    categoriesHint.textContent = t('ui.buttonItems.desktop.78', undefined, '💡 每行输入一个分类选项，点击按钮后会弹出选择对话框')
     lifeLogConfigDiv.appendChild(categoriesHint)
 
     // 分类按钮字体大小
     const fontSizeLabel = document.createElement('label')
-    fontSizeLabel.textContent = '🔤 分类按钮字体大小（px）'
+    fontSizeLabel.textContent = t('ui.buttonItems.desktop.79', undefined, '🔤 分类按钮字体大小（px）')
     fontSizeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
     lifeLogConfigDiv.appendChild(fontSizeLabel)
 
@@ -1033,7 +1037,7 @@ export function createDesktopButtonItem(
 
     // 分类按钮内边距
     const paddingLabel = document.createElement('label')
-    paddingLabel.textContent = '📐 分类按钮上下边距（px）'
+    paddingLabel.textContent = t('ui.buttonItems.desktop.80', undefined, '📐 分类按钮上下边距（px）')
     paddingLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
     lifeLogConfigDiv.appendChild(paddingLabel)
 
@@ -1049,7 +1053,7 @@ export function createDesktopButtonItem(
 
     // 分类按钮左右边距
     const hPaddingLabel = document.createElement('label')
-    hPaddingLabel.textContent = '↔️ 分类按钮左右边距（px）'
+    hPaddingLabel.textContent = t('ui.buttonItems.desktop.81', undefined, '↔️ 分类按钮左右边距（px）')
     hPaddingLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
     lifeLogConfigDiv.appendChild(hPaddingLabel)
 
@@ -1065,7 +1069,7 @@ export function createDesktopButtonItem(
 
     // 输入框字体大小
     const inputFontSizeLabel = document.createElement('label')
-    inputFontSizeLabel.textContent = '📝 输入框字体大小（px）'
+    inputFontSizeLabel.textContent = t('ui.buttonItems.desktop.82', undefined, '📝 输入框字体大小（px）')
     inputFontSizeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
     lifeLogConfigDiv.appendChild(inputFontSizeLabel)
 
@@ -1089,11 +1093,11 @@ export function createDesktopButtonItem(
     globalCaptureCheckbox.checked = button.lifelogGlobalCaptureEnabled === true
     globalCaptureCheckbox.onchange = () => { button.lifelogGlobalCaptureEnabled = globalCaptureCheckbox.checked }
     globalCaptureLabel.appendChild(globalCaptureCheckbox)
-    globalCaptureLabel.appendChild(document.createTextNode('⌨️ 启用全局快捷键 Alt Shift L'))
+    globalCaptureLabel.appendChild(document.createTextNode(t('ui.buttonItems.desktop.globalShortcut', undefined, '⌨️ 启用全局快捷键 Alt Shift L')))
     globalCaptureCard.appendChild(globalCaptureLabel)
     const captureHint = document.createElement('div')
     captureHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: 6px; margin-left: 26px;'
-    captureHint.textContent = '开启后，在任何界面按 Alt Shift L 即可呼出 LifeLog 对话框。如需修改快捷键，请在电脑端快捷键配置（Keymap）中搜索「叶归LifeLog」。弹窗内快捷键：Shift+方向键 选分类，Shift+Enter 发送，Esc 关闭'
+    captureHint.textContent = t('ui.buttonItems.desktop.83', undefined, '开启后，在任何界面按 Alt Shift L 即可呼出 LifeLog 对话框。如需修改快捷键，请在电脑端快捷键配置（Keymap）中搜索「叶归LifeLog」。弹窗内快捷键：Shift+方向键 选分类，Shift+Enter 发送，Esc 关闭')
     globalCaptureCard.appendChild(captureHint)
     lifeLogConfigDiv.appendChild(globalCaptureCard)
 
@@ -1105,13 +1109,13 @@ export function createDesktopButtonItem(
     popupSelectConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
     const popupSelectTitle = document.createElement('label')
-    popupSelectTitle.textContent = '📋 模板列表'
+    popupSelectTitle.textContent = t('ui.buttonItems.desktop.84', undefined, '📋 模板列表')
     popupSelectTitle.style.cssText = 'font-size: 13px; font-weight: 500;'
     popupSelectConfigDiv.appendChild(popupSelectTitle)
 
     const popupSelectHint = document.createElement('div')
     popupSelectHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    popupSelectHint.textContent = '💡 左边填模板名称（显示在弹窗上），右边填插入的模板内容'
+    popupSelectHint.textContent = t('ui.buttonItems.desktop.85', undefined, '💡 左边填模板名称（显示在弹窗上），右边填插入的模板内容')
     popupSelectConfigDiv.appendChild(popupSelectHint)
 
     const popupSelectRowsContainer = document.createElement('div')
@@ -1136,7 +1140,7 @@ export function createDesktopButtonItem(
         const nameInput = document.createElement('input')
         nameInput.type = 'text'
         nameInput.className = 'b3-text-field'
-        nameInput.placeholder = '模板名称'
+        nameInput.placeholder = t('ui.buttonItems.desktop.86', undefined, '模板名称')
         nameInput.value = tpl.name
         nameInput.style.cssText = 'font-size: 13px; flex: 1; min-width: 0;'
         nameInput.onchange = () => { button.popupSelectTemplates![idx].name = nameInput.value }
@@ -1144,7 +1148,7 @@ export function createDesktopButtonItem(
         const contentInput = document.createElement('input')
         contentInput.type = 'text'
         contentInput.className = 'b3-text-field'
-        contentInput.placeholder = '模板内容'
+        contentInput.placeholder = t('ui.buttonItems.desktop.87', undefined, '模板内容')
         contentInput.value = tpl.content
         contentInput.style.cssText = 'font-size: 13px; flex: 2; min-width: 0;'
         contentInput.onchange = () => { button.popupSelectTemplates![idx].content = contentInput.value }
@@ -1168,7 +1172,7 @@ export function createDesktopButtonItem(
     renderPopupSelectRows()
 
     const addRowBtn = document.createElement('button')
-    addRowBtn.textContent = '+ 添加模板'
+    addRowBtn.textContent = t('ui.buttonItems.desktop.88', undefined, '+ 添加模板')
     addRowBtn.style.cssText = 'padding: 6px 12px; border: 1px dashed var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 13px; align-self: flex-start;'
     addRowBtn.onclick = () => {
       button.popupSelectTemplates!.push({ name: '', content: '' })
@@ -1184,13 +1188,13 @@ export function createDesktopButtonItem(
     buttonSequenceConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
     const buttonSequenceTitle = document.createElement('label')
-    buttonSequenceTitle.textContent = '🔗 按钮序列'
+    buttonSequenceTitle.textContent = t('ui.buttonItems.desktop.89', undefined, '🔗 按钮序列')
     buttonSequenceTitle.style.cssText = 'font-size: 13px; font-weight: 500;'
     buttonSequenceConfigDiv.appendChild(buttonSequenceTitle)
 
     const buttonSequenceHint = document.createElement('div')
     buttonSequenceHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    buttonSequenceHint.textContent = '💡 左边选择要点击的按钮，右边填点击后等待的间隔时间（毫秒）'
+    buttonSequenceHint.textContent = t('ui.buttonItems.desktop.90', undefined, '💡 左边选择要点击的按钮，右边填点击后等待的间隔时间（毫秒）')
     buttonSequenceConfigDiv.appendChild(buttonSequenceHint)
 
     const buttonSequenceRowsContainer = document.createElement('div')
@@ -1237,7 +1241,7 @@ export function createDesktopButtonItem(
         // 使用 DOM 方式构建选项（避免 HTML 转义问题）
         const defaultOption = document.createElement('option')
         defaultOption.value = ''
-        defaultOption.textContent = '-- 请选择按钮 --'
+        defaultOption.textContent = t('ui.buttonItems.desktop.91', undefined, '-- 请选择按钮 --')
         nameSelect.appendChild(defaultOption)
 
         availableButtons.forEach((btn) => {
@@ -1254,7 +1258,7 @@ export function createDesktopButtonItem(
             iconDisplay = '🖼️'  // 使用图片图标表示
           }
           
-          option.textContent = `${iconDisplay} ${btn.name}`
+          option.textContent = `${iconDisplay} ${getButtonDisplayName(btn)}`
           // 通过ID匹配当前选中的按钮（使用 buttonId 而不是 buttonName）
           if (step.buttonId === btn.id) {
             option.selected = true
@@ -1274,7 +1278,7 @@ export function createDesktopButtonItem(
         const delayInput = document.createElement('input')
         delayInput.type = 'number'
         delayInput.className = 'b3-text-field'
-        delayInput.placeholder = '间隔(ms)'
+        delayInput.placeholder = t('ui.buttonItems.desktop.92', undefined, '间隔(ms)')
         delayInput.value = String(step.delayMs || 200)
         delayInput.style.cssText = 'font-size: 13px; flex: 1; min-width: 60px; max-width: 100%;' // 添加样式防止超出容器
         delayInput.onchange = () => { button.buttonSequenceSteps![idx].delayMs = parseInt(delayInput.value) || 200 }
@@ -1298,7 +1302,7 @@ export function createDesktopButtonItem(
     renderButtonSequenceRows()
 
     const addSequenceRowBtn = document.createElement('button')
-    addSequenceRowBtn.textContent = '+ 添加步骤'
+    addSequenceRowBtn.textContent = t('ui.buttonItems.desktop.93', undefined, '+ 添加步骤')
     addSequenceRowBtn.style.cssText = 'padding: 6px 12px; border: 1px dashed var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 13px; align-self: flex-start;'
     addSequenceRowBtn.onclick = () => {
       button.buttonSequenceSteps!.push({ buttonId: '', buttonName: '', delayMs: 200 })
@@ -1314,7 +1318,7 @@ export function createDesktopButtonItem(
     scrollDocConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
     const scrollDocTitle = document.createElement('label')
-    scrollDocTitle.textContent = '📜 滚动方向'
+    scrollDocTitle.textContent = t('ui.buttonItems.desktop.94', undefined, '📜 滚动方向')
     scrollDocTitle.style.cssText = 'font-size: 13px; font-weight: 500;'
     scrollDocConfigDiv.appendChild(scrollDocTitle)
 
@@ -1334,7 +1338,7 @@ export function createDesktopButtonItem(
     topRadio.checked = currentDirection === 'top'
     topRadio.onchange = () => { button.scrollDirection = 'top' }
     topRadioWrapper.appendChild(topRadio)
-    topRadioWrapper.appendChild(document.createTextNode('滚动文档顶部'))
+    topRadioWrapper.appendChild(document.createTextNode(t('ui.buttonItems.desktop.scrollTop', undefined, '滚动文档顶部')))
     radioContainer.appendChild(topRadioWrapper)
 
     // 滚动到底部选项
@@ -1347,7 +1351,7 @@ export function createDesktopButtonItem(
     bottomRadio.checked = currentDirection === 'bottom'
     bottomRadio.onchange = () => { button.scrollDirection = 'bottom' }
     bottomRadioWrapper.appendChild(bottomRadio)
-    bottomRadioWrapper.appendChild(document.createTextNode('滚动文档底部'))
+    bottomRadioWrapper.appendChild(document.createTextNode(t('ui.buttonItems.desktop.scrollBottom', undefined, '滚动文档底部')))
     radioContainer.appendChild(bottomRadioWrapper)
 
     scrollDocConfigDiv.appendChild(radioContainer)
@@ -1362,10 +1366,10 @@ export function createDesktopButtonItem(
     const img1Desc = document.createElement('div')
     img1Desc.innerHTML = `
       <div style="font-size: 12px; color: #60a5fa; margin-bottom: 8px;">
-        📸 <strong>使用说明：</strong>选择本地图片后自动上传并插入到今日日记底部
+        ${t('ui.buttonItems.desktop.imageHelp', undefined, '📸 <strong>使用说明：</strong>选择本地图片后自动上传并插入到今日日记底部')}
       </div>
       <div style="font-size: 11px; color: var(--b3-theme-on-surface-light); background: var(--b3-theme-surface-light); padding: 6px 10px; border-radius: 6px; margin-bottom: 10px; line-height: 1.5;">
-        💡 <strong>记事弹窗插入：</strong>若在「一键记事」中开启<strong>思源块编辑模式</strong>，点击图片按钮会直接插入到弹窗编辑器光标位置（支持多选、连续插入），不再追加到日记。
+        ${t('ui.buttonItems.desktop.imagePopupHelp', undefined, '💡 <strong>记事弹窗插入：</strong>若在「一键记事」中开启<strong>思源块编辑模式</strong>，点击图片按钮会直接插入到弹窗编辑器光标位置（支持多选、连续插入），不再追加到日记。')}
       </div>
     `
     img1UploadConfigDiv.appendChild(img1Desc)
@@ -1375,14 +1379,14 @@ export function createDesktopButtonItem(
     img1NotebookRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
 
     const img1NotebookLabel = document.createElement('label')
-    img1NotebookLabel.innerHTML = '📓 <strong>日记笔记本ID</strong>'
+    img1NotebookLabel.innerHTML = t('ui.buttonItems.desktop.95', undefined, '📓 <strong>日记笔记本ID</strong>')
     img1NotebookLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 120px; flex-shrink: 0;'
 
     const img1NotebookInput = document.createElement('input')
     img1NotebookInput.className = 'b3-text-field'
     img1NotebookInput.type = 'text'
     img1NotebookInput.value = button.imageUploadNotebookId || ''
-    img1NotebookInput.placeholder = '输入日记所在笔记本ID'
+    img1NotebookInput.placeholder = t('ui.buttonItems.desktop.96', undefined, '输入日记所在笔记本ID')
     img1NotebookInput.style.cssText = 'width: 100%; font-size: 14px; padding: 6px 8px;'
     img1NotebookInput.onchange = () => { button.imageUploadNotebookId = img1NotebookInput.value }
 
@@ -1394,14 +1398,14 @@ export function createDesktopButtonItem(
 
     // 数据库块ID
     const dbBlockIdLabel = document.createElement('label')
-    dbBlockIdLabel.textContent = '数据库块ID'
+    dbBlockIdLabel.textContent = t('ui.buttonItems.desktop.97', undefined, '数据库块ID')
     dbBlockIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(dbBlockIdLabel)
 
     const dbBlockIdInput = document.createElement('input')
     dbBlockIdInput.type = 'text'
     dbBlockIdInput.className = 'b3-text-field'
-    dbBlockIdInput.placeholder = '如: 20251215234003-j3i7wjc'
+    dbBlockIdInput.placeholder = t('ui.buttonItems.desktop.98', undefined, '如: 20251215234003-j3i7wjc')
     dbBlockIdInput.value = button.dbBlockId || ''
     dbBlockIdInput.style.cssText = 'font-size: 13px;'
     dbBlockIdInput.onchange = () => { button.dbBlockId = dbBlockIdInput.value }
@@ -1409,14 +1413,14 @@ export function createDesktopButtonItem(
 
     // 数据库ID（可选）
     const dbIdLabel = document.createElement('label')
-    dbIdLabel.textContent = '数据库ID（可选，留空则从块ID获取）'
+    dbIdLabel.textContent = t('ui.buttonItems.desktop.99', undefined, '数据库ID（可选，留空则从块ID获取）')
     dbIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(dbIdLabel)
 
     const dbIdInput = document.createElement('input')
     dbIdInput.type = 'text'
     dbIdInput.className = 'b3-text-field'
-    dbIdInput.placeholder = '如: 20251215234003-4kzcfp3'
+    dbIdInput.placeholder = t('ui.buttonItems.desktop.100', undefined, '如: 20251215234003-4kzcfp3')
     dbIdInput.value = button.dbId || ''
     dbIdInput.style.cssText = 'font-size: 13px;'
     dbIdInput.onchange = () => { button.dbId = dbIdInput.value }
@@ -1424,14 +1428,14 @@ export function createDesktopButtonItem(
 
     // 视图名称
     const viewNameLabel = document.createElement('label')
-    viewNameLabel.textContent = '视图名称'
+    viewNameLabel.textContent = t('ui.buttonItems.desktop.101', undefined, '视图名称')
     viewNameLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(viewNameLabel)
 
     const viewNameInput = document.createElement('input')
     viewNameInput.type = 'text'
     viewNameInput.className = 'b3-text-field'
-    viewNameInput.placeholder = '如: 今日DO表格'
+    viewNameInput.placeholder = t('ui.buttonItems.desktop.102', undefined, '如: 今日DO表格')
     viewNameInput.value = button.viewName || ''
     viewNameInput.style.cssText = 'font-size: 13px;'
     viewNameInput.onchange = () => { button.viewName = viewNameInput.value }
@@ -1439,14 +1443,14 @@ export function createDesktopButtonItem(
 
     // 主键列
     const primaryKeyLabel = document.createElement('label')
-    primaryKeyLabel.textContent = '主键列名称（用于点击跳转）'
+    primaryKeyLabel.textContent = t('ui.buttonItems.desktop.103', undefined, '主键列名称（用于点击跳转）')
     primaryKeyLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(primaryKeyLabel)
 
     const primaryKeyInput = document.createElement('input')
     primaryKeyInput.type = 'text'
     primaryKeyInput.className = 'b3-text-field'
-    primaryKeyInput.placeholder = '如: DO'
+    primaryKeyInput.placeholder = t('ui.buttonItems.desktop.104', undefined, '如: DO')
     primaryKeyInput.value = button.primaryKeyColumn || 'DO'
     primaryKeyInput.style.cssText = 'font-size: 13px;'
     primaryKeyInput.onchange = () => { button.primaryKeyColumn = primaryKeyInput.value }
@@ -1454,14 +1458,14 @@ export function createDesktopButtonItem(
 
     // 起始时间
     const startTimeLabel = document.createElement('label')
-    startTimeLabel.textContent = '起始时间（now 或 HH:MM）'
+    startTimeLabel.textContent = t('ui.buttonItems.desktop.105', undefined, '起始时间（now 或 HH:MM）')
     startTimeLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(startTimeLabel)
 
     const startTimeInput = document.createElement('input')
     startTimeInput.type = 'text'
     startTimeInput.className = 'b3-text-field'
-    startTimeInput.placeholder = '如: now 或 09:00'
+    startTimeInput.placeholder = t('ui.buttonItems.desktop.106', undefined, '如: now 或 09:00')
     startTimeInput.value = button.startTimeStr || 'now'
     startTimeInput.style.cssText = 'font-size: 13px;'
     startTimeInput.onchange = () => { button.startTimeStr = startTimeInput.value }
@@ -1469,14 +1473,14 @@ export function createDesktopButtonItem(
 
     // 行间额外分钟
     const extraMinutesLabel = document.createElement('label')
-    extraMinutesLabel.textContent = '行间额外分钟数（第一行不加）'
+    extraMinutesLabel.textContent = t('ui.buttonItems.desktop.107', undefined, '行间额外分钟数（第一行不加）')
     extraMinutesLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(extraMinutesLabel)
 
     const extraMinutesInput = document.createElement('input')
     extraMinutesInput.type = 'number'
     extraMinutesInput.className = 'b3-text-field'
-    extraMinutesInput.placeholder = '如: 20'
+    extraMinutesInput.placeholder = t('ui.buttonItems.desktop.108', undefined, '如: 20')
     extraMinutesInput.value = (button.extraMinutes ?? 20).toString()
     extraMinutesInput.style.cssText = 'font-size: 13px;'
     extraMinutesInput.onchange = () => { button.extraMinutes = parseInt(extraMinutesInput.value) || 20 }
@@ -1484,14 +1488,14 @@ export function createDesktopButtonItem(
 
     // 最大显示行数
     const maxRowsLabel = document.createElement('label')
-    maxRowsLabel.textContent = '最大显示行数'
+    maxRowsLabel.textContent = t('ui.buttonItems.desktop.109', undefined, '最大显示行数')
     maxRowsLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(maxRowsLabel)
 
     const maxRowsInput = document.createElement('input')
     maxRowsInput.type = 'number'
     maxRowsInput.className = 'b3-text-field'
-    maxRowsInput.placeholder = '如: 5'
+    maxRowsInput.placeholder = t('ui.buttonItems.desktop.110', undefined, '如: 5')
     maxRowsInput.value = (button.maxRows ?? 5).toString()
     maxRowsInput.style.cssText = 'font-size: 13px;'
     maxRowsInput.onchange = () => { button.maxRows = parseInt(maxRowsInput.value) || 5 }
@@ -1499,7 +1503,7 @@ export function createDesktopButtonItem(
 
     // 显示模式
     const displayModeLabel = document.createElement('label')
-    displayModeLabel.textContent = '显示模式'
+    displayModeLabel.textContent = t('ui.buttonItems.desktop.111', undefined, '显示模式')
     displayModeLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(displayModeLabel)
 
@@ -1508,22 +1512,22 @@ export function createDesktopButtonItem(
     displayModeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
     const currentDisplayMode = button.dbDisplayMode || 'cards'
     displayModeSelect.innerHTML = `
-      <option value="cards" ${currentDisplayMode === 'cards' ? 'selected' : ''}>卡片模式</option>
-      <option value="table" ${currentDisplayMode === 'table' ? 'selected' : ''}>表格模式</option>
+      <option value="cards" ${currentDisplayMode === 'cards' ? 'selected' : ''}>${t('ui.buttonItems.desktop.cardsMode', undefined, '卡片模式')}</option>
+      <option value="table" ${currentDisplayMode === 'table' ? 'selected' : ''}>${t('ui.buttonItems.desktop.tableMode', undefined, '表格模式')}</option>
     `
     displayModeSelect.onchange = () => { button.dbDisplayMode = displayModeSelect.value as 'cards' | 'table' }
     dbConfigDiv.appendChild(displayModeSelect)
 
     // 要显示的列名（逗号分隔）
     const showColumnsLabel = document.createElement('label')
-    showColumnsLabel.textContent = '要显示的列名（逗号分隔）'
+    showColumnsLabel.textContent = t('ui.buttonItems.desktop.112', undefined, '要显示的列名（逗号分隔）')
     showColumnsLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(showColumnsLabel)
 
     const showColumnsInput = document.createElement('input')
     showColumnsInput.type = 'text'
     showColumnsInput.className = 'b3-text-field'
-    showColumnsInput.placeholder = '如: DO,预计分钟,时间段'
+    showColumnsInput.placeholder = t('ui.buttonItems.desktop.113', undefined, '如: DO,预计分钟,时间段')
     showColumnsInput.value = (button.showColumns || []).join(',')
     showColumnsInput.style.cssText = 'font-size: 13px;'
     showColumnsInput.onchange = () => {
@@ -1533,14 +1537,14 @@ export function createDesktopButtonItem(
 
     // 时间段列名
     const timeRangeColLabel = document.createElement('label')
-    timeRangeColLabel.textContent = '时间段列名'
+    timeRangeColLabel.textContent = t('ui.buttonItems.desktop.114', undefined, '时间段列名')
     timeRangeColLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(timeRangeColLabel)
 
     const timeRangeColInput = document.createElement('input')
     timeRangeColInput.type = 'text'
     timeRangeColInput.className = 'b3-text-field'
-    timeRangeColInput.placeholder = '如: 时间段'
+    timeRangeColInput.placeholder = t('ui.buttonItems.desktop.115', undefined, '如: 时间段')
     timeRangeColInput.value = button.timeRangeColumnName || '时间段'
     timeRangeColInput.style.cssText = 'font-size: 13px;'
     timeRangeColInput.onchange = () => { button.timeRangeColumnName = timeRangeColInput.value }
@@ -1555,13 +1559,13 @@ export function createDesktopButtonItem(
 
 	    const collapseStyleLabel = document.createElement('label')
 	    collapseStyleLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-bottom: 4px;'
-	    collapseStyleLabel.textContent = '折叠样式'
+	    collapseStyleLabel.textContent = t('ui.buttonItems.desktop.116', undefined, '折叠样式')
 	    collapseStyleConfigDiv.appendChild(collapseStyleLabel)
 
 	    const currentCollapseStyle = button.collapseStyle || 'preview'
 	    const collapseStyleItems = [
-	      { value: 'preview', label: '方案一：收起显示项目预览' },
-	      { value: 'minimal', label: '方案二：收起仅显示展开手柄' },
+	      { value: 'preview', label: t('ui.buttonItems.desktop.117', undefined, '方案一：收起显示项目预览') },
+	      { value: 'minimal', label: t('ui.buttonItems.desktop.118', undefined, '方案二：收起仅显示展开手柄') },
 	    ]
 
 	    collapseStyleItems.forEach(item => {
@@ -1596,7 +1600,7 @@ export function createDesktopButtonItem(
 		    // 底部距离
 		    const docNavDistLabel = document.createElement('div')
 		    docNavDistLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
-		    docNavDistLabel.textContent = '距离底部高度'
+		    docNavDistLabel.textContent = t('ui.buttonItems.desktop.119', undefined, '距离底部高度')
 		    docNavConfigDiv.appendChild(docNavDistLabel)
 
 		    const docNavDistRow = document.createElement('div')
@@ -1628,7 +1632,7 @@ export function createDesktopButtonItem(
 
 		    const docNavDistHint = document.createElement('div')
 		    docNavDistHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
-		    docNavDistHint.textContent = '💡 调整导航栏距离屏幕底部的距离（0~200px）'
+		    docNavDistHint.textContent = t('ui.buttonItems.desktop.120', undefined, '💡 调整导航栏距离屏幕底部的距离（0~200px）')
 		    docNavConfigDiv.appendChild(docNavDistHint)
 
 		    // 滚动隐藏开关
@@ -1637,7 +1641,7 @@ export function createDesktopButtonItem(
 
 		    const docNavAutoHideLabel = document.createElement('label')
 		    docNavAutoHideLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
-		    docNavAutoHideLabel.textContent = '滚动隐藏/显示'
+		    docNavAutoHideLabel.textContent = t('ui.buttonItems.desktop.121', undefined, '滚动隐藏/显示')
 
 		    const docNavAutoHideSwitch = document.createElement('input')
 		    docNavAutoHideSwitch.type = 'checkbox'
@@ -1649,7 +1653,7 @@ export function createDesktopButtonItem(
 
 		    const docNavAutoHideHint = document.createElement('div')
 		    docNavAutoHideHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
-		    docNavAutoHideHint.textContent = '向上滚动：导航栏消失；向下滚动：导航栏重新出现'
+		    docNavAutoHideHint.textContent = t('ui.buttonItems.desktop.122', undefined, '向上滚动：导航栏消失；向下滚动：导航栏重新出现')
 
 		    docNavAutoHideSwitch.onchange = () => {
 		      button.autoHideOnScroll = docNavAutoHideSwitch.checked
@@ -1783,13 +1787,13 @@ export function createDesktopButtonItem(
 	    toggleLockExtras.style.display = 'none'
 	    const descTitle = document.createElement('div')
 	    descTitle.style.cssText = 'margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--b3-theme-primary); margin-bottom: 6px;'
-	    descTitle.textContent = '📋 功能说明'
+	    descTitle.textContent = t('ui.buttonItems.desktop.123', undefined, '📋 功能说明')
 	    toggleLockExtras.appendChild(descTitle)
 	    const descBox = document.createElement('div')
 	    descBox.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); background: var(--b3-theme-primary-lightest); border: 1px solid var(--b3-theme-primary-light); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; line-height: 1.6;'
-	    descBox.innerHTML = '🔒 <b>锁定文档</b>：防止误编辑，按钮显示锁定图标<br>🔓 <b>再次点击</b>：解锁文档，恢复编辑'
+	    descBox.innerHTML = t('ui.buttonItems.desktop.124', undefined, '🔒 <b>锁定文档</b>：防止误编辑，按钮显示锁定图标<br>🔓 <b>再次点击</b>：解锁文档，恢复编辑')
 	    toggleLockExtras.appendChild(descBox)
-	    toggleLockExtras.appendChild(createDesktopIconField('🔒锁定图标', button.lockIcon || '🔒', (v) => {
+	    toggleLockExtras.appendChild(createDesktopIconField(t('ui.buttonItems.desktop.125', undefined, '🔒锁定图标'), button.lockIcon || '🔒', (v) => {
 	      button.lockIcon = v
 	    }, context.showIconPicker, button.iconSize))
 	    authorToolField.appendChild(toggleLockExtras)
@@ -1798,13 +1802,13 @@ export function createDesktopButtonItem(
 	  }
 	  } // end if (!isOverflowButton)
 
-	  editForm.appendChild(createDesktopIconField('图标', button.icon, (v) => {
+	  editForm.appendChild(createDesktopIconField(t('ui.buttonItems.desktop.126', undefined, '图标'), button.icon, (v) => {
 	    button.icon = v
 	    // 更新显示的图标
 	    updateIconDisplay(iconSpan, v)
 	  }, context.showIconPicker, button.iconSize))
-	  editForm.appendChild(createDesktopField('图标大小', button.iconSize.toString(), '18', (v) => { button.iconSize = parseInt(v) || 18 }, 'number'))
-  editForm.appendChild(createDesktopField('右边距', button.marginRight.toString(), '8', (v) => { button.marginRight = parseInt(v) || 8 }, 'number'))
+	  editForm.appendChild(createDesktopField(t('ui.buttonItems.desktop.iconSize', undefined, '图标大小'), button.iconSize.toString(), '18', (v) => { button.iconSize = parseInt(v) || 18 }, 'number'))
+  editForm.appendChild(createDesktopField(t('ui.buttonItems.desktop.marginRight', undefined, '右边距'), button.marginRight.toString(), '8', (v) => { button.marginRight = parseInt(v) || 8 }, 'number'))
   // 排序显示将移动到设置末尾
 
   // 右上角提示开关
@@ -1813,7 +1817,7 @@ export function createDesktopButtonItem(
 
   const notificationLabel = document.createElement('label')
   notificationLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
-  notificationLabel.textContent = '右上角提示（默认打开提示）'
+  notificationLabel.textContent = t('ui.buttonItems.desktop.127', undefined, '右上角提示（默认打开提示）')
 
   const notificationSwitch = document.createElement('input')
   notificationSwitch.type = 'checkbox'
@@ -1846,7 +1850,7 @@ export function createDesktopButtonItem(
 
   const showNameLabel = document.createElement('label')
   showNameLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
-  showNameLabel.textContent = '只显示名称'
+  showNameLabel.textContent = t('ui.buttonItems.desktop.128', undefined, '只显示名称')
 
   const showNameSwitch = document.createElement('input')
   showNameSwitch.type = 'checkbox'
@@ -1861,7 +1865,7 @@ export function createDesktopButtonItem(
   // 添加提示文字
   const showNameHint = document.createElement('div')
   showNameHint.style.cssText = 'font-size: 10px; color: var(--b3-theme-on-surface-light); margin-top: 6px;'
-  showNameHint.textContent = '💡关闭只显示图标；最多显示4个字（大小自适应）'
+  showNameHint.textContent = t('ui.buttonItems.desktop.129', undefined, '💡关闭只显示图标；最多显示4个字（大小自适应）')
   switchesContainer.appendChild(showNameHint)
   editForm.appendChild(switchesContainer)
 
@@ -1888,7 +1892,7 @@ export function createDesktopButtonItem(
       text-align: center;
       margin-bottom: 4px;
     `
-    sortLabel.textContent = '📊 当前排序位置'
+    sortLabel.textContent = t('ui.buttonItems.desktop.130', undefined, '📊 当前排序位置')
     sortDisplayContainer.appendChild(sortLabel)
     
     const sortValueDisplay = document.createElement('div')
@@ -1913,7 +1917,7 @@ export function createDesktopButtonItem(
       margin-top: 4px;
       display: none;
     `
-    sortHint.textContent = '💡 拖动按钮调整位置，排序会自动更新'
+    sortHint.textContent = t('ui.buttonItems.desktop.131', undefined, '💡 拖动按钮调整位置，排序会自动更新')
     sortDisplayContainer.appendChild(sortHint)
     
     editForm.appendChild(sortDisplayContainer)
@@ -1962,29 +1966,29 @@ export function populateDesktopEditForm(
   renderList: (() => void) | undefined,
   context: DesktopButtonContext
 ): void {
-  form.appendChild(createDesktopField('名称', button.name, '按钮名称', (v) => {
+  form.appendChild(createDesktopField(t('ui.buttonItems.desktop.132', undefined, '名称'), button.name, t('ui.buttonItems.desktop.133', undefined, '按钮名称'), (v) => {
     button.name = v
     const nameEl = infoDiv.querySelector('div:first-child')
     if (nameEl) nameEl.textContent = v
   }))
   // 构建功能类型选项数组（根据激活状态决定是否显示鲸鱼定制工具箱）
   const typeOptions = [
-    { value: 'builtin-refresh', label: '①基础功能：刷新重载全屏【简单】' },
-    { value: 'template', label: '②手写模板插入【简单】' },
-    { value: 'shortcut', label: '③电脑端快捷键【简单】' },
-    { value: 'quick-note', label: '④一键记事弹窗【简单】' },
-    { value: 'click-sequence', label: '⑤自动化模拟点击【难】' }
+    { value: 'builtin-refresh', label: t('ui.buttonItems.desktop.134', undefined, '①基础功能：刷新重载全屏【简单】') },
+    { value: 'template', label: t('ui.buttonItems.desktop.135', undefined, '②手写模板插入【简单】') },
+    { value: 'shortcut', label: t('ui.buttonItems.desktop.136', undefined, '③电脑端快捷键【简单】') },
+    { value: 'quick-note', label: t('ui.buttonItems.desktop.137', undefined, '④一键记事弹窗【简单】') },
+    { value: 'click-sequence', label: t('ui.buttonItems.desktop.138', undefined, '⑤自动化模拟点击【难】') }
   ]
   if (context.isAuthorToolActivated()) {
     typeOptions.push(
-      { value: 'author-tool', label: '⑥鲸鱼定制工具箱' }
+      { value: 'author-tool', label: t('ui.buttonItems.desktop.139', undefined, '⑥鲸鱼定制工具箱') }
     )
   } else {
     typeOptions.push(
-      { value: 'author-tool', label: '⑥鲸鱼定制工具箱（跳转激活）' }
+      { value: 'author-tool', label: t('ui.buttonItems.desktop.140', undefined, '⑥鲸鱼定制工具箱（跳转激活）') }
     )
   }
-  form.appendChild(createDesktopSelectField('选择功能', button.type, typeOptions, (v) => {
+  form.appendChild(createDesktopSelectField(t('ui.buttonItems.desktop.141', undefined, '选择功能'), button.type, typeOptions, (v) => {
     // 如果选择的是鲸鱼定制工具箱但未激活，跳转到激活区域
     if (v === 'author-tool' && !context.isAuthorToolActivated()) {
       // 立即恢复 select 的值为原来的类型
@@ -1999,7 +2003,7 @@ export function populateDesktopEditForm(
         if (activationTab) {
           activationTab.click()
         } else {
-          console.warn('[Desktop Debug] activation tab button not found!')
+          logger.warn('[Desktop Debug] activation tab button not found!')
         }
       })
       
@@ -2029,13 +2033,13 @@ export function populateDesktopEditForm(
     const typeDesc = infoDiv.querySelector('div:last-child')
     if (typeDesc) {
       const typeLabels: Record<string, string> = {
-        'builtin': '扩展工具栏',
-        'builtin-refresh': '①基础功能：刷新重载全屏【简单】',
-        'template': '②手写模板插入【简单】',
-        'shortcut': '③电脑端快捷键【简单】',
-        'quick-note': '④一键记事弹窗【简单】',
-        'click-sequence': '⑤自动化模拟点击【难】',
-        'author-tool': '⑥鲸鱼定制工具箱'
+        'builtin': t('ui.buttonItems.desktop.142', undefined, '扩展工具栏'),
+        'builtin-refresh': t('ui.buttonItems.desktop.143', undefined, '①基础功能：刷新重载全屏【简单】'),
+        'template': t('ui.buttonItems.desktop.144', undefined, '②手写模板插入【简单】'),
+        'shortcut': t('ui.buttonItems.desktop.145', undefined, '③电脑端快捷键【简单】'),
+        'quick-note': t('ui.buttonItems.desktop.146', undefined, '④一键记事弹窗【简单】'),
+        'click-sequence': t('ui.buttonItems.desktop.147', undefined, '⑤自动化模拟点击【难】'),
+        'author-tool': t('ui.buttonItems.desktop.148', undefined, '⑥鲸鱼定制工具箱')
       }
       typeDesc.textContent = typeLabels[button.type] || button.type
     }
@@ -2101,7 +2105,7 @@ export function populateDesktopEditForm(
 
     // 功能选择标题
     const titleLabel = document.createElement('label')
-    titleLabel.textContent = '选择功能'
+    titleLabel.textContent = t('ui.buttonItems.desktop.149', undefined, '选择功能')
     titleLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-surface);'
     builtinRefreshContainer.appendChild(titleLabel)
 
@@ -2111,10 +2115,10 @@ export function populateDesktopEditForm(
 
     // 定义三个功能选项
     const refreshOptions = [
-      { value: 'refresh', label: '① 刷新文档', desc: '重新加载当前编辑的文档' },
-      { value: 'reload', label: '② 重载思源', desc: '重新启动思源应用' },
-      { value: 'fullscreen', label: '③ 思源全屏切换', desc: '思源在全屏和普通模式之间切换' },
-      { value: 'doc-fullscreen', label: '④ 文档全屏切换', desc: '文档在全屏和普通模式之间切换' }
+      { value: 'refresh', label: t('ui.buttonItems.desktop.150', undefined, '① 刷新文档'), desc: t('ui.buttonItems.desktop.151', undefined, '重新加载当前编辑的文档') },
+      { value: 'reload', label: t('ui.buttonItems.desktop.152', undefined, '② 重载思源'), desc: t('ui.buttonItems.desktop.153', undefined, '重新启动思源应用') },
+      { value: 'fullscreen', label: t('ui.buttonItems.desktop.154', undefined, '③ 思源全屏切换'), desc: t('ui.buttonItems.desktop.155', undefined, '思源在全屏和普通模式之间切换') },
+      { value: 'doc-fullscreen', label: t('ui.buttonItems.desktop.156', undefined, '④ 文档全屏切换'), desc: t('ui.buttonItems.desktop.157', undefined, '文档在全屏和普通模式之间切换') }
     ]
 
     // 创建每个功能的按钮组
@@ -2187,7 +2191,7 @@ export function populateDesktopEditForm(
 
     const hint = document.createElement('div')
     hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
-    hint.textContent = '💡 选择要执行的思源功能'
+    hint.textContent = t('ui.buttonItems.desktop.158', undefined, '💡 选择要执行的思源功能')
     builtinRefreshContainer.appendChild(hint)
 
     form.appendChild(builtinRefreshContainer)
@@ -2195,7 +2199,7 @@ export function populateDesktopEditForm(
     const templateField = document.createElement('div')
     templateField.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
     const label = document.createElement('label')
-    label.textContent = '模板内容'
+    label.textContent = t('ui.buttonItems.desktop.159', undefined, '模板内容')
     label.style.cssText = 'font-size: 13px;'
     const textarea = document.createElement('textarea')
     textarea.className = 'b3-text-field'
@@ -2207,39 +2211,39 @@ export function populateDesktopEditForm(
     const hint = document.createElement('div')
     hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding: 8px; background: var(--b3-theme-surface); border-radius: 4px; margin-top: 4px;'
     hint.innerHTML = `
-      <div style="font-weight: 500; margin-bottom: 4px;">💡 支持的模板变量：</div>
+      <div style="font-weight: 500; margin-bottom: 4px;">${t('ui.buttonItems.desktop.templateVarsHelp', undefined, '💡 支持的模板变量：')}</div>
       <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-family: monospace;">
-        <code>{{date}}</code><span>当前日期 (2026-01-18)</span>
-        <code>{{time}}</code><span>当前时间 (14:30:45)</span>
-        <code>{{datetime}}</code><span>日期时间 (2026-01-18 14:30:45)</span>
-        <code>{{year}}</code><span>年份 (2026)</span>
-        <code>{{month}}</code><span>月份 (01)</span>
-        <code>{{day}}</code><span>日期 (18)</span>
-        <code>{{hour}}</code><span>小时 (14)</span>
-        <code>{{minute}}</code><span>分钟 (30)</span>
-        <code>{{second}}</code><span>秒 (45)</span>
-        <code>{{week}}</code><span>星期几 (星期六)</span>
-        <code>{{timestamp}}</code><span>Unix时间戳 (毫秒)</span>
-        <code>{{newline}}</code><span>换行符</span>
+        <code>{{date}}</code><span>${t('ui.buttonItems.desktop.templateVarDate', undefined, '当前日期 (2026-01-18)')}</span>
+        <code>{{time}}</code><span>${t('ui.buttonItems.desktop.templateVarTime', undefined, '当前时间 (14:30:45)')}</span>
+        <code>{{datetime}}</code><span>${t('ui.buttonItems.desktop.templateVarDatetime', undefined, '日期时间 (2026-01-18 14:30:45)')}</span>
+        <code>{{year}}</code><span>${t('ui.buttonItems.desktop.templateVarYear', undefined, '年份 (2026)')}</span>
+        <code>{{month}}</code><span>${t('ui.buttonItems.desktop.templateVarMonth', undefined, '月份 (01)')}</span>
+        <code>{{day}}</code><span>${t('ui.buttonItems.desktop.templateVarDay', undefined, '日期 (18)')}</span>
+        <code>{{hour}}</code><span>${t('ui.buttonItems.desktop.templateVarHour', undefined, '小时 (14)')}</span>
+        <code>{{minute}}</code><span>${t('ui.buttonItems.desktop.templateVarMinute', undefined, '分钟 (30)')}</span>
+        <code>{{second}}</code><span>${t('ui.buttonItems.desktop.templateVarSecond', undefined, '秒 (45)')}</span>
+        <code>{{week}}</code><span>${t('ui.buttonItems.desktop.templateVarWeek', undefined, '星期几 (星期六)')}</span>
+        <code>{{timestamp}}</code><span>${t('ui.buttonItems.desktop.templateVarTimestamp', undefined, 'Unix时间戳 (毫秒)')}</span>
+        <code>{{newline}}</code><span>${t('ui.buttonItems.desktop.templateVarNewline', undefined, '换行符')}</span>
       </div>
     `
 
     // 笔记本ID配置（可选）
     const notebookIdLabel = document.createElement('label')
-    notebookIdLabel.textContent = '📚 追加到每日笔记（可选）'
+    notebookIdLabel.textContent = t('ui.buttonItems.desktop.160', undefined, '📚 追加到每日笔记（可选）')
     notebookIdLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 12px;'
 
     const notebookIdInput = document.createElement('input')
     notebookIdInput.type = 'text'
     notebookIdInput.className = 'b3-text-field'
-    notebookIdInput.placeholder = '笔记本ID，留空则在当前编辑器光标位置插入'
+    notebookIdInput.placeholder = t('ui.buttonItems.desktop.161', undefined, '笔记本ID，留空则在当前编辑器光标位置插入')
     notebookIdInput.value = button.templateNotebookId || ''
     notebookIdInput.style.cssText = 'font-size: 13px;'
     notebookIdInput.onchange = () => { button.templateNotebookId = notebookIdInput.value }
 
     const notebookIdHint = document.createElement('div')
     notebookIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    notebookIdHint.textContent = '💡 填写笔记本ID后，点击按钮将直接追加到该笔记本的每日笔记；留空则需先选择编辑器'
+    notebookIdHint.textContent = t('ui.buttonItems.desktop.162', undefined, '💡 填写笔记本ID后，点击按钮将直接追加到该笔记本的每日笔记；留空则需先选择编辑器')
 
     templateField.appendChild(label)
     templateField.appendChild(textarea)
@@ -2258,14 +2262,14 @@ export function populateDesktopEditForm(
     labelRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 8px;'
 
     const label = document.createElement('label')
-    label.textContent = '点击序列（每行一个选择器）'
+    label.textContent = t('ui.buttonItems.desktop.163', undefined, '点击序列（每行一个选择器）')
     label.style.cssText = 'font-size: 13px;'
     labelRow.appendChild(label)
 
     // 预设按钮
     const presetBtn = document.createElement('button')
     presetBtn.className = 'b3-button b3-button--outline'
-    presetBtn.textContent = '选择模板'
+    presetBtn.textContent = t('ui.buttonItems.desktop.164', undefined, '选择模板')
     presetBtn.style.cssText = 'padding: 4px 12px; font-size: 12px; white-space: nowrap;'
     presetBtn.onclick = () => {
       showClickSequenceSelector({
@@ -2296,7 +2300,7 @@ export function populateDesktopEditForm(
 
     const hint = document.createElement('div')
     hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
-    hint.innerHTML = '<div style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(59, 130, 246, 0.4); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px;"><strong style="color: var(--b3-theme-primary);">🌟 社区可用代码分享（推荐）</strong><br><a href="https://ld246.com/article/1771266377449" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">https://ld246.com/article/1771266377449</a></div>💡 每行填写一个选择器，支持：<br>• 简单标识符（如 barSettings）<br>• CSS选择器（如 #barSettings）<br>• <strong>文本内容（如 text:复制块引用）</strong><br>• <strong>鼠标悬浮（如 *text:复制）【加*可处理鼠标悬浮自动打开的功能】</strong><br>• <strong>间隔时间（如 200ms / 1s，单独占一行，设置后续步骤的等待时间）</strong><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">思源笔记常用功能 ID 速查表（GitHub）</a><br><a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md" target="_blank" style="color: var(--b3-theme-primary); text-decoration: none; font-weight: 500;">模拟点击序列使用说明（GitHub）</a>'
+    hint.innerHTML = t('ui.buttonItems.desktop.clickSequenceHelp')
     clickSequenceField.appendChild(hint)
 
     form.appendChild(clickSequenceField)
@@ -2308,14 +2312,14 @@ export function populateDesktopEditForm(
     shortcutField.style.cssText = 'display: flex; flex-direction: column; gap: 4px;'
 
     const label = document.createElement('label')
-    label.textContent = '快捷键组合'
+    label.textContent = t('ui.buttonItems.desktop.165', undefined, '快捷键组合')
     label.style.cssText = 'font-size: 13px;'
     shortcutField.appendChild(label)
 
     const input = document.createElement('input')
     input.className = 'b3-text-field fn__flex-1'
     input.type = 'text'
-    input.placeholder = '快捷键格式：Alt+5 / Ctrl+B等'
+    input.placeholder = t('ui.buttonItems.desktop.166', undefined, '快捷键格式：Alt+5 / Ctrl+B等')
     input.value = button.shortcutKey || ''
     input.style.cssText = 'font-family: monospace;'
     input.onchange = () => { button.shortcutKey = input.value }
@@ -2326,21 +2330,21 @@ export function populateDesktopEditForm(
     hint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding: 8px; background: var(--b3-theme-surface); border-radius: 4px; overflow-x: auto;'
     hint.innerHTML = `
       <table style="width: 100%; border-collapse: collapse; font-family: monospace;">
-        <tr><td>💡更多快捷键，请查看：思源桌面端➡设置➡快捷键</td></tr>
-        <tr><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">快捷键</th><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">功能</th></tr>
-        <tr><td><code>Alt+5</code></td><td>打开日记</td></tr>
-        <tr><td><code>Alt+P</code></td><td>打开设置</td></tr>
-        <tr><td><code>Alt+Shift+P</code></td><td>命令面板</td></tr>
-        <tr><td><code>Ctrl+P</code></td><td>全局搜索</td></tr>
-        <tr><td><code>Ctrl+F</code></td><td>当前文档搜索</td></tr>
-        <tr><td><code>Ctrl+H</code></td><td>替换</td></tr>
-        <tr><td><code>Ctrl+N</code></td><td>新建文档</td></tr>
-        <tr><td><code>Alt+1</code></td><td>文件树</td></tr>
-        <tr><td><code>Alt+2</code></td><td>大纲</td></tr>
-        <tr><td><code>Alt+3</code></td><td>书签</td></tr>
-        <tr><td><code>Alt+4</code></td><td>标签</td></tr>
-        <tr><td><code>Alt+7</code></td><td>反向链接</td></tr>
-        <tr><td><code>Ctrl+W</code></td><td>关闭标签页</td></tr>
+        <tr><td>💡${t('ui.buttonItems.desktop.shortcutHelp', undefined, '更多快捷键，请查看：思源桌面端➡设置➡快捷键')}</td></tr>
+        <tr><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">${t('ui.buttonItems.desktop.shortcutKey', undefined, '快捷键')}</th><th style="padding: 4px; text-align: left; border-bottom: 1px solid var(--b3-theme-border);">${t('ui.buttonItems.desktop.shortcutFunction', undefined, '功能')}</th></tr>
+        <tr><td><code>Alt+5</code></td><td>${t('ui.buttonItems.desktop.shortcutDiary', undefined, '打开日记')}</td></tr>
+        <tr><td><code>Alt+P</code></td><td>${t('ui.buttonItems.desktop.shortcutSettings', undefined, '打开设置')}</td></tr>
+        <tr><td><code>Alt+Shift+P</code></td><td>${t('ui.buttonItems.desktop.shortcutCommand', undefined, '命令面板')}</td></tr>
+        <tr><td><code>Ctrl+P</code></td><td>${t('ui.buttonItems.desktop.shortcutGlobalSearch', undefined, '全局搜索')}</td></tr>
+        <tr><td><code>Ctrl+F</code></td><td>${t('ui.buttonItems.desktop.shortcutDocSearch', undefined, '当前文档搜索')}</td></tr>
+        <tr><td><code>Ctrl+H</code></td><td>${t('ui.buttonItems.desktop.shortcutReplace', undefined, '替换')}</td></tr>
+        <tr><td><code>Ctrl+N</code></td><td>${t('ui.buttonItems.desktop.shortcutNewDoc', undefined, '新建文档')}</td></tr>
+        <tr><td><code>Alt+1</code></td><td>${t('ui.buttonItems.desktop.shortcutFileTree', undefined, '文件树')}</td></tr>
+        <tr><td><code>Alt+2</code></td><td>${t('ui.buttonItems.desktop.shortcutOutline', undefined, '大纲')}</td></tr>
+        <tr><td><code>Alt+3</code></td><td>${t('ui.buttonItems.desktop.shortcutBookmark', undefined, '书签')}</td></tr>
+        <tr><td><code>Alt+4</code></td><td>${t('ui.buttonItems.desktop.shortcutTag', undefined, '标签')}</td></tr>
+        <tr><td><code>Alt+7</code></td><td>${t('ui.buttonItems.desktop.shortcutBacklink', undefined, '反向链接')}</td></tr>
+        <tr><td><code>Ctrl+W</code></td><td>${t('ui.buttonItems.desktop.shortcutCloseTab', undefined, '关闭标签页')}</td></tr>
       </table>
     `
 
@@ -2355,17 +2359,17 @@ export function populateDesktopEditForm(
 
     const header = document.createElement('div')
     header.style.cssText = 'display: flex; align-items: center; gap: 8px;'
-    header.innerHTML = '<span style="font-size: 16px;">🔐</span><span style="font-weight: 600; color: #8b5cf6;">鲸鱼定制工具箱配置</span>'
+    header.innerHTML = t('ui.buttonItems.desktop.167', undefined, '<span style="font-size: 16px;">🔐</span><span style="font-weight: 600; color: #8b5cf6;">鲸鱼定制工具箱配置</span>')
     authorToolField.appendChild(header)
 
     const desc = document.createElement('div')
     desc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light);'
-    desc.textContent = '选择功能类型并配置相关参数。'
+    desc.textContent = t('ui.buttonItems.desktop.168', undefined, '选择功能类型并配置相关参数。')
     authorToolField.appendChild(desc)
 
     // 子类型选择
     const subtypeLabel = document.createElement('label')
-    subtypeLabel.textContent = '功能类型'
+    subtypeLabel.textContent = t('ui.buttonItems.desktop.169', undefined, '功能类型')
     subtypeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
     authorToolField.appendChild(subtypeLabel)
 
@@ -2374,22 +2378,22 @@ export function populateDesktopEditForm(
     subtypeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
     const currentSubtype = button.authorToolSubtype || 'button-sequence'
     subtypeSelect.innerHTML = `
-      <option value="button-sequence" ${currentSubtype === 'button-sequence' ? 'selected' : ''}>① 连续点击自定义按钮</option>
-      <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>② 打开指定ID块</option>
-      <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>③ 数据库悬浮弹窗</option>
-      <option value="diary" ${currentSubtype === 'diary' || currentSubtype === 'diary-top' || currentSubtype === 'diary-bottom' ? 'selected' : ''}>④ 日记顶部或底部</option>
-      <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>⑤ 叶归LifeLog适配</option>
-      <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>⑥ 弹窗框模板选择</option>
-      <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>⑦ 滚动文档顶部或底部</option>
-      <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>⑧ 图片快捷导入</option>
-      <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>⑨ 悬浮标签页Tab</option>
-      <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>⑩ 悬浮大纲</option>
-      <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>⑪ 前一篇/后一篇文档</option>
-	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>⑫ 滑动快速批注${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
-	      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>⑬ 文档朗读</option>
-	      <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>⑭ 一键清理空块</option>
-	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>⑮ 沉浸阅读模式${context.isAuthorToolActivated() ? '' : '（免费试用）'}</option>
-	      <option value="quick-attach" ${currentSubtype === 'quick-attach' ? 'selected' : ''}>⑯ 快速添加附件</option>
+      <option value="button-sequence" ${currentSubtype === 'button-sequence' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeButtonSequence', undefined, '① 连续点击自定义按钮')}</option>
+      <option value="open-doc" ${currentSubtype === 'open-doc' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeOpenDoc', undefined, '② 打开指定ID块')}</option>
+      <option value="database" ${currentSubtype === 'database' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeDatabase', undefined, '③ 数据库悬浮弹窗')}</option>
+      <option value="diary" ${currentSubtype === 'diary' || currentSubtype === 'diary-top' || currentSubtype === 'diary-bottom' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeDiary', undefined, '④ 日记顶部或底部')}</option>
+      <option value="life-log" ${currentSubtype === 'life-log' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeLifeLog', undefined, '⑤ 叶归LifeLog适配')}</option>
+      <option value="popup-select" ${currentSubtype === 'popup-select' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypePopup', undefined, '⑥ 弹窗框模板选择')}</option>
+      <option value="scroll-doc" ${currentSubtype === 'scroll-doc' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeScroll', undefined, '⑦ 滚动文档顶部或底部')}</option>
+      <option value="image-upload" ${currentSubtype === 'image-upload' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeImage', undefined, '⑧ 图片快捷导入')}</option>
+      <option value="mobile-tabs" ${currentSubtype === 'mobile-tabs' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeTabs', undefined, '⑨ 悬浮标签页Tab')}</option>
+      <option value="mobile-outline" ${currentSubtype === 'mobile-outline' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeOutline', undefined, '⑩ 悬浮大纲')}</option>
+      <option value="doc-nav" ${currentSubtype === 'doc-nav' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeDocNav', undefined, '⑪ 前一篇/后一篇文档')}</option>
+	      <option value="slide-comment" ${currentSubtype === 'slide-comment' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeComment', undefined, '⑫ 滑动快速批注')}${context.isAuthorToolActivated() ? '' : t('ui.buttonItems.desktop.trial', undefined, '（免费试用）')}</option>
+	      <option value="tts" ${currentSubtype === 'tts' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeTts', undefined, '⑬ 文档朗读')}</option>
+	      <option value="clear-empty-blocks" ${currentSubtype === 'clear-empty-blocks' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeClear', undefined, '⑭ 一键清理空块')}</option>
+	      <option value="toggle-lock" ${currentSubtype === 'toggle-lock' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeLock', undefined, '⑮ 沉浸阅读模式')}${context.isAuthorToolActivated() ? '' : t('ui.buttonItems.desktop.trial', undefined, '（免费试用）')}</option>
+	      <option value="quick-attach" ${currentSubtype === 'quick-attach' ? 'selected' : ''}>${t('ui.buttonItems.desktop.subtypeAttach', undefined, '⑯ 快速添加附件')}</option>
 	    `
 	    subtypeSelect.onchange = () => {
 	      button.authorToolSubtype = subtypeSelect.value as any
@@ -2409,14 +2413,14 @@ export function populateDesktopEditForm(
 
     // 目标块ID
     const docIdLabel = document.createElement('label')
-    docIdLabel.textContent = '📄 目标块ID'
+    docIdLabel.textContent = t('ui.buttonItems.desktop.170', undefined, '📄 目标块ID')
     docIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     docConfigDiv.appendChild(docIdLabel)
 
     const docIdInput = document.createElement('input')
     docIdInput.type = 'text'
     docIdInput.className = 'b3-text-field'
-    docIdInput.placeholder = '如: 20251215234003-j3i7wjc 或 20251215234003-j3i7wjc-a1b2c3'
+    docIdInput.placeholder = t('ui.buttonItems.desktop.171', undefined, '如: 20251215234003-j3i7wjc 或 20251215234003-j3i7wjc-a1b2c3')
     docIdInput.value = button.targetDocId || ''
     docIdInput.style.cssText = 'font-size: 13px;'
     docIdInput.onchange = () => { button.targetDocId = docIdInput.value }
@@ -2424,7 +2428,7 @@ export function populateDesktopEditForm(
 
     const docIdHint = document.createElement('div')
     docIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    docIdHint.textContent = '💡 支持文档ID（打开文档）或块ID（打开文档并定位到该块）'
+    docIdHint.textContent = t('ui.buttonItems.desktop.172', undefined, '💡 支持文档ID（打开文档）或块ID（打开文档并定位到该块）')
     docConfigDiv.appendChild(docIdHint)
 
     authorToolField.appendChild(docConfigDiv)
@@ -2436,14 +2440,14 @@ export function populateDesktopEditForm(
 
     // 数据库块ID
     const dbBlockIdLabel = document.createElement('label')
-    dbBlockIdLabel.textContent = '数据库块ID'
+    dbBlockIdLabel.textContent = t('ui.buttonItems.desktop.173', undefined, '数据库块ID')
     dbBlockIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(dbBlockIdLabel)
 
     const dbBlockIdInput = document.createElement('input')
     dbBlockIdInput.type = 'text'
     dbBlockIdInput.className = 'b3-text-field'
-    dbBlockIdInput.placeholder = '如: 20251215234003-j3i7wjc'
+    dbBlockIdInput.placeholder = t('ui.buttonItems.desktop.174', undefined, '如: 20251215234003-j3i7wjc')
     dbBlockIdInput.value = button.dbBlockId || ''
     dbBlockIdInput.style.cssText = 'font-size: 13px;'
     dbBlockIdInput.onchange = () => { button.dbBlockId = dbBlockIdInput.value }
@@ -2451,14 +2455,14 @@ export function populateDesktopEditForm(
 
     // 数据库ID（可选）
     const dbIdLabel = document.createElement('label')
-    dbIdLabel.textContent = '数据库ID（可选，留空则从块ID获取）'
+    dbIdLabel.textContent = t('ui.buttonItems.desktop.175', undefined, '数据库ID（可选，留空则从块ID获取）')
     dbIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(dbIdLabel)
 
     const dbIdInput = document.createElement('input')
     dbIdInput.type = 'text'
     dbIdInput.className = 'b3-text-field'
-    dbIdInput.placeholder = '如: 20251215234003-4kzcfp3'
+    dbIdInput.placeholder = t('ui.buttonItems.desktop.176', undefined, '如: 20251215234003-4kzcfp3')
     dbIdInput.value = button.dbId || ''
     dbIdInput.style.cssText = 'font-size: 13px;'
     dbIdInput.onchange = () => { button.dbId = dbIdInput.value }
@@ -2466,14 +2470,14 @@ export function populateDesktopEditForm(
 
     // 视图名称
     const viewNameLabel = document.createElement('label')
-    viewNameLabel.textContent = '视图名称'
+    viewNameLabel.textContent = t('ui.buttonItems.desktop.177', undefined, '视图名称')
     viewNameLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(viewNameLabel)
 
     const viewNameInput = document.createElement('input')
     viewNameInput.type = 'text'
     viewNameInput.className = 'b3-text-field'
-    viewNameInput.placeholder = '如: 今日DO表格'
+    viewNameInput.placeholder = t('ui.buttonItems.desktop.178', undefined, '如: 今日DO表格')
     viewNameInput.value = button.viewName || ''
     viewNameInput.style.cssText = 'font-size: 13px;'
     viewNameInput.onchange = () => { button.viewName = viewNameInput.value }
@@ -2481,14 +2485,14 @@ export function populateDesktopEditForm(
 
     // 主键列
     const primaryKeyLabel = document.createElement('label')
-    primaryKeyLabel.textContent = '主键列名称（用于点击跳转）'
+    primaryKeyLabel.textContent = t('ui.buttonItems.desktop.179', undefined, '主键列名称（用于点击跳转）')
     primaryKeyLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(primaryKeyLabel)
 
     const primaryKeyInput = document.createElement('input')
     primaryKeyInput.type = 'text'
     primaryKeyInput.className = 'b3-text-field'
-    primaryKeyInput.placeholder = '如: DO'
+    primaryKeyInput.placeholder = t('ui.buttonItems.desktop.180', undefined, '如: DO')
     primaryKeyInput.value = button.primaryKeyColumn || 'DO'
     primaryKeyInput.style.cssText = 'font-size: 13px;'
     primaryKeyInput.onchange = () => { button.primaryKeyColumn = primaryKeyInput.value }
@@ -2496,14 +2500,14 @@ export function populateDesktopEditForm(
 
     // 起始时间
     const startTimeLabel = document.createElement('label')
-    startTimeLabel.textContent = '起始时间（now 或 HH:MM）'
+    startTimeLabel.textContent = t('ui.buttonItems.desktop.181', undefined, '起始时间（now 或 HH:MM）')
     startTimeLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(startTimeLabel)
 
     const startTimeInput = document.createElement('input')
     startTimeInput.type = 'text'
     startTimeInput.className = 'b3-text-field'
-    startTimeInput.placeholder = '如: now 或 09:00'
+    startTimeInput.placeholder = t('ui.buttonItems.desktop.182', undefined, '如: now 或 09:00')
     startTimeInput.value = button.startTimeStr || 'now'
     startTimeInput.style.cssText = 'font-size: 13px;'
     startTimeInput.onchange = () => { button.startTimeStr = startTimeInput.value }
@@ -2513,7 +2517,7 @@ export function populateDesktopEditForm(
     const extraMinutesInput = document.createElement('input')
     extraMinutesInput.type = 'number'
     extraMinutesInput.className = 'b3-text-field'
-    extraMinutesInput.placeholder = '如: 20'
+    extraMinutesInput.placeholder = t('ui.buttonItems.desktop.183', undefined, '如: 20')
     extraMinutesInput.value = (button.extraMinutes ?? 20).toString()
     extraMinutesInput.style.cssText = 'font-size: 13px;'
     extraMinutesInput.onchange = () => { button.extraMinutes = parseInt(extraMinutesInput.value) || 20 }
@@ -2523,7 +2527,7 @@ export function populateDesktopEditForm(
     const maxRowsInput = document.createElement('input')
     maxRowsInput.type = 'number'
     maxRowsInput.className = 'b3-text-field'
-    maxRowsInput.placeholder = '如: 5'
+    maxRowsInput.placeholder = t('ui.buttonItems.desktop.184', undefined, '如: 5')
     maxRowsInput.value = (button.maxRows ?? 5).toString()
     maxRowsInput.style.cssText = 'font-size: 13px;'
     maxRowsInput.onchange = () => { button.maxRows = parseInt(maxRowsInput.value) || 5 }
@@ -2535,8 +2539,8 @@ export function populateDesktopEditForm(
     displayModeSelect.style.cssText = 'font-size: 13px; padding: 8px;'
     const currentDisplayMode = button.dbDisplayMode || 'cards'
     displayModeSelect.innerHTML = `
-      <option value="cards" ${currentDisplayMode === 'cards' ? 'selected' : ''}>卡片模式</option>
-      <option value="table" ${currentDisplayMode === 'table' ? 'selected' : ''}>表格模式</option>
+      <option value="cards" ${currentDisplayMode === 'cards' ? 'selected' : ''}>${t('ui.buttonItems.desktop.cardsMode', undefined, '卡片模式')}</option>
+      <option value="table" ${currentDisplayMode === 'table' ? 'selected' : ''}>${t('ui.buttonItems.desktop.tableMode', undefined, '表格模式')}</option>
     `
     displayModeSelect.onchange = () => {
       button.dbDisplayMode = displayModeSelect.value as 'cards' | 'table'
@@ -2558,14 +2562,14 @@ export function populateDesktopEditForm(
 
     // 容器高度
     const containerHeightLabel = document.createElement('label')
-    containerHeightLabel.textContent = '容器高度（卡片模式）'
+    containerHeightLabel.textContent = t('ui.buttonItems.desktop.185', undefined, '容器高度（卡片模式）')
     containerHeightLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     cardConfigDiv.appendChild(containerHeightLabel)
 
     const containerHeightInput = document.createElement('input')
     containerHeightInput.type = 'text'
     containerHeightInput.className = 'b3-text-field'
-    containerHeightInput.placeholder = '如: 700px（留空自动适应）'
+    containerHeightInput.placeholder = t('ui.buttonItems.desktop.186', undefined, '如: 700px（留空自动适应）')
     containerHeightInput.value = button.cardContainerHeight || ''
     containerHeightInput.style.cssText = 'font-size: 13px;'
     containerHeightInput.onchange = () => { button.cardContainerHeight = containerHeightInput.value }
@@ -2573,14 +2577,14 @@ export function populateDesktopEditForm(
 
     // 可滚动容器最大高度
     const scrollMaxHeightLabel = document.createElement('label')
-    scrollMaxHeightLabel.textContent = '可滚动容器最大高度（卡片模式）'
+    scrollMaxHeightLabel.textContent = t('ui.buttonItems.desktop.187', undefined, '可滚动容器最大高度（卡片模式）')
     scrollMaxHeightLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     cardConfigDiv.appendChild(scrollMaxHeightLabel)
 
     const scrollMaxHeightInput = document.createElement('input')
     scrollMaxHeightInput.type = 'text'
     scrollMaxHeightInput.className = 'b3-text-field'
-    scrollMaxHeightInput.placeholder = '如: 700px'
+    scrollMaxHeightInput.placeholder = t('ui.buttonItems.desktop.188', undefined, '如: 700px')
     scrollMaxHeightInput.value = button.cardScrollMaxHeight || '700px'
     scrollMaxHeightInput.style.cssText = 'font-size: 13px;'
     scrollMaxHeightInput.onchange = () => { button.cardScrollMaxHeight = scrollMaxHeightInput.value }
@@ -2592,7 +2596,7 @@ export function populateDesktopEditForm(
     const showColumnsInput = document.createElement('input')
     showColumnsInput.type = 'text'
     showColumnsInput.className = 'b3-text-field'
-    showColumnsInput.placeholder = '如: DO,预计分钟,时间段'
+    showColumnsInput.placeholder = t('ui.buttonItems.desktop.189', undefined, '如: DO,预计分钟,时间段')
     showColumnsInput.value = (button.showColumns || []).join(',')
     showColumnsInput.style.cssText = 'font-size: 13px;'
     showColumnsInput.onchange = () => {
@@ -2602,14 +2606,14 @@ export function populateDesktopEditForm(
 
     // 时间段列名
     const timeRangeColLabel = document.createElement('label')
-    timeRangeColLabel.textContent = '时间段列名'
+    timeRangeColLabel.textContent = t('ui.buttonItems.desktop.190', undefined, '时间段列名')
     timeRangeColLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     dbConfigDiv.appendChild(timeRangeColLabel)
 
     const timeRangeColInput = document.createElement('input')
     timeRangeColInput.type = 'text'
     timeRangeColInput.className = 'b3-text-field'
-    timeRangeColInput.placeholder = '如: 时间段'
+    timeRangeColInput.placeholder = t('ui.buttonItems.desktop.191', undefined, '如: 时间段')
     timeRangeColInput.value = button.timeRangeColumnName || '时间段'
     timeRangeColInput.style.cssText = 'font-size: 13px;'
     timeRangeColInput.onchange = () => { button.timeRangeColumnName = timeRangeColInput.value }
@@ -2624,12 +2628,12 @@ export function populateDesktopEditForm(
 
     const diaryTitle = document.createElement('div')
     diaryTitle.style.cssText = 'font-size: 14px; font-weight: 600; color: #22c55e; display: flex; align-items: center; gap: 8px;'
-    diaryTitle.innerHTML = '<span>📇</span><span>功能说明</span>'
+    diaryTitle.innerHTML = t('ui.buttonItems.desktop.192', undefined, '<span>📇</span><span>功能说明</span>')
     diaryConfigDiv.appendChild(diaryTitle)
 
     const diaryDesc = document.createElement('div')
     diaryDesc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.6;'
-    diaryDesc.innerHTML = '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 或 API 打开日记<br>2. 根据下方设置决定跳转位置<br>💡 配置笔记本ID后将直接使用API，无需弹窗选择'
+    diaryDesc.innerHTML = t('ui.buttonItems.desktop.193', undefined, '此功能会：<br>1. 使用快捷键 <b>Alt+5</b> 或 API 打开日记<br>2. 根据下方设置决定跳转位置<br>💡 配置笔记本ID后将直接使用API，无需弹窗选择')
     diaryConfigDiv.appendChild(diaryDesc)
 
     // 位置选择配置
@@ -2637,7 +2641,7 @@ export function populateDesktopEditForm(
     diaryPositionContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px; margin-top: 12px; padding: 12px; background: rgba(66, 133, 244, 0.08); border-radius: 6px; border: 1px solid rgba(66, 133, 244, 0.2);'
 
     const diaryPositionLabel = document.createElement('label')
-    diaryPositionLabel.textContent = '📍 打开后位置'
+    diaryPositionLabel.textContent = t('ui.buttonItems.desktop.194', undefined, '📍 打开后位置')
     diaryPositionLabel.style.cssText = 'font-size: 14px; color: var(--b3-theme-primary); font-weight: 600; display: flex; align-items: center; gap: 6px;'
     diaryPositionContainer.appendChild(diaryPositionLabel)
 
@@ -2663,7 +2667,7 @@ export function populateDesktopEditForm(
       }
     })
     diaryTopRadioContainer.appendChild(diaryTopRadio)
-    diaryTopRadioContainer.appendChild(document.createTextNode('⬆️ 日记顶部'))
+    diaryTopRadioContainer.appendChild(document.createTextNode(t('ui.buttonItems.desktop.diaryTop', undefined, '⬆️ 日记顶部')))
     diaryPositionOptions.appendChild(diaryTopRadioContainer)
 
     // 底部选项
@@ -2683,7 +2687,7 @@ export function populateDesktopEditForm(
       }
     })
     diaryBottomRadioContainer.appendChild(diaryBottomRadio)
-    diaryBottomRadioContainer.appendChild(document.createTextNode('⬇️ 日记底部'))
+    diaryBottomRadioContainer.appendChild(document.createTextNode(t('ui.buttonItems.desktop.diaryBottom', undefined, '⬇️ 日记底部')))
     diaryPositionOptions.appendChild(diaryBottomRadioContainer)
 
     diaryPositionContainer.appendChild(diaryPositionOptions)
@@ -2699,7 +2703,7 @@ export function populateDesktopEditForm(
     diaryNotebookIdContainer2.style.cssText = 'display: flex; flex-direction: column; gap: 6px; margin-top: 8px;'
 
     const diaryNotebookIdLabel2 = document.createElement('label')
-    diaryNotebookIdLabel2.textContent = '📚 笔记本ID（可选）'
+    diaryNotebookIdLabel2.textContent = t('ui.buttonItems.desktop.195', undefined, '📚 笔记本ID（可选）')
     diaryNotebookIdLabel2.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); font-weight: 500;'
     diaryNotebookIdContainer2.appendChild(diaryNotebookIdLabel2)
 
@@ -2707,7 +2711,7 @@ export function populateDesktopEditForm(
     diaryNotebookIdInput2.type = 'text'
     diaryNotebookIdInput2.className = 'b3-text-field'
     diaryNotebookIdInput2.value = button.diaryNotebookId || ''
-    diaryNotebookIdInput2.placeholder = '留空则使用 Alt+5 快捷键，如：20250101000000-aaaaaa'
+    diaryNotebookIdInput2.placeholder = t('ui.buttonItems.desktop.196', undefined, '留空则使用 Alt+5 快捷键，如：20250101000000-aaaaaa')
     diaryNotebookIdInput2.style.cssText = 'font-size: 13px;'
     diaryNotebookIdInput2.addEventListener('input', () => {
       button.diaryNotebookId = diaryNotebookIdInput2.value
@@ -2716,7 +2720,7 @@ export function populateDesktopEditForm(
 
     const diaryNotebookIdHint2 = document.createElement('div')
     diaryNotebookIdHint2.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
-    diaryNotebookIdHint2.textContent = '💡 填写后将直接调用API创建日记，不会弹出选择框'
+    diaryNotebookIdHint2.textContent = t('ui.buttonItems.desktop.197', undefined, '💡 填写后将直接调用API创建日记，不会弹出选择框')
     diaryNotebookIdContainer2.appendChild(diaryNotebookIdHint2)
 
     diaryConfigDiv.appendChild(diaryNotebookIdContainer2)
@@ -2726,7 +2730,7 @@ export function populateDesktopEditForm(
     waitTimeContainer.style.cssText = 'display: flex; flex-direction: column; gap: 6px; margin-top: 8px;'
 
     const waitTimeLabel = document.createElement('label')
-    waitTimeLabel.textContent = '⏱ 移动端等待时间（毫秒）'
+    waitTimeLabel.textContent = t('ui.buttonItems.desktop.198', undefined, '⏱ 移动端等待时间（毫秒）')
     waitTimeLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); font-weight: 500;'
     waitTimeContainer.appendChild(waitTimeLabel)
 
@@ -2734,7 +2738,7 @@ export function populateDesktopEditForm(
     waitTimeInput.type = 'number'
     waitTimeInput.className = 'b3-text-field'
     waitTimeInput.value = String(button.diaryWaitTime || 1000)
-    waitTimeInput.placeholder = '默认 1000'
+    waitTimeInput.placeholder = t('ui.buttonItems.desktop.199', undefined, '默认 1000')
     waitTimeInput.style.cssText = 'font-size: 13px;'
     waitTimeInput.addEventListener('input', () => {
       button.diaryWaitTime = parseInt(waitTimeInput.value) || 1000
@@ -2743,7 +2747,7 @@ export function populateDesktopEditForm(
 
     const waitTimeHint = document.createElement('div')
     waitTimeHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
-    waitTimeHint.textContent = '💡 移动端加载日记较慢时可增加此值，范围 100-10000ms'
+    waitTimeHint.textContent = t('ui.buttonItems.desktop.200', undefined, '💡 移动端加载日记较慢时可增加此值，范围 100-10000ms')
     waitTimeContainer.appendChild(waitTimeHint)
 
     diaryConfigDiv.appendChild(waitTimeContainer)
@@ -2757,14 +2761,14 @@ export function populateDesktopEditForm(
     
     // 笔记本ID输入
     const notebookIdLabel = document.createElement('label')
-    notebookIdLabel.textContent = '📚 笔记本ID'
+    notebookIdLabel.textContent = t('ui.buttonItems.desktop.201', undefined, '📚 笔记本ID')
     notebookIdLabel.style.cssText = 'font-size: 13px; font-weight: 500;'
     lifeLogConfigDiv.appendChild(notebookIdLabel)
     
     const notebookIdInput = document.createElement('input')
     notebookIdInput.type = 'text'
     notebookIdInput.className = 'b3-text-field'
-    notebookIdInput.placeholder = '请输入笔记本ID，如：20250101000000-aaaaaa'
+    notebookIdInput.placeholder = t('ui.buttonItems.desktop.202', undefined, '请输入笔记本ID，如：20250101000000-aaaaaa')
     notebookIdInput.value = button.lifeLogNotebookId || ''
     notebookIdInput.style.cssText = 'font-size: 13px;'
     notebookIdInput.onchange = () => { button.lifeLogNotebookId = notebookIdInput.value }
@@ -2772,19 +2776,19 @@ export function populateDesktopEditForm(
     
     const notebookIdHint = document.createElement('div')
     notebookIdHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    notebookIdHint.textContent = '💡 指定内容将要追加到的笔记本ID，不能为空'
+    notebookIdHint.textContent = t('ui.buttonItems.desktop.203', undefined, '💡 指定内容将要追加到的笔记本ID，不能为空')
     lifeLogConfigDiv.appendChild(notebookIdHint)
     
     // 分类选项输入
     const categoriesLabel = document.createElement('label')
-    categoriesLabel.textContent = '📝 分类选项（每行一个）'
+    categoriesLabel.textContent = t('ui.buttonItems.desktop.204', undefined, '📝 分类选项（每行一个）')
     categoriesLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
     lifeLogConfigDiv.appendChild(categoriesLabel)
 
     const categoriesTextarea = document.createElement('textarea')
     categoriesTextarea.className = 'b3-text-field'
     categoriesTextarea.value = button.lifeLogCategories?.join('\n') || '学习\n工作\n生活'
-    categoriesTextarea.placeholder = '每行输入一个分类，例如：\n学习\n工作\n生活'
+    categoriesTextarea.placeholder = t('ui.buttonItems.desktop.205', undefined, '每行输入一个分类，例如：\n学习\n工作\n生活')
     categoriesTextarea.rows = 4
     categoriesTextarea.style.cssText = 'font-size: 13px; resize: vertical; min-height: 100px;'
     categoriesTextarea.onchange = () => { 
@@ -2794,12 +2798,12 @@ export function populateDesktopEditForm(
 
     const categoriesHint = document.createElement('div')
     categoriesHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    categoriesHint.textContent = '💡 每行输入一个分类选项，点击按钮后会弹出选择对话框'
+    categoriesHint.textContent = t('ui.buttonItems.desktop.206', undefined, '💡 每行输入一个分类选项，点击按钮后会弹出选择对话框')
     lifeLogConfigDiv.appendChild(categoriesHint)
 
     // 分类按钮字体大小
     const fontSizeLabel = document.createElement('label')
-    fontSizeLabel.textContent = '🔤 分类按钮字体大小（px）'
+    fontSizeLabel.textContent = t('ui.buttonItems.desktop.207', undefined, '🔤 分类按钮字体大小（px）')
     fontSizeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
     lifeLogConfigDiv.appendChild(fontSizeLabel)
 
@@ -2815,7 +2819,7 @@ export function populateDesktopEditForm(
 
     // 分类按钮内边距
     const paddingLabel = document.createElement('label')
-    paddingLabel.textContent = '📐 分类按钮上下边距（px）'
+    paddingLabel.textContent = t('ui.buttonItems.desktop.208', undefined, '📐 分类按钮上下边距（px）')
     paddingLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
     lifeLogConfigDiv.appendChild(paddingLabel)
 
@@ -2831,7 +2835,7 @@ export function populateDesktopEditForm(
 
     // 分类按钮左右边距
     const hPaddingLabel = document.createElement('label')
-    hPaddingLabel.textContent = '↔️ 分类按钮左右边距（px）'
+    hPaddingLabel.textContent = t('ui.buttonItems.desktop.209', undefined, '↔️ 分类按钮左右边距（px）')
     hPaddingLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
     lifeLogConfigDiv.appendChild(hPaddingLabel)
 
@@ -2847,7 +2851,7 @@ export function populateDesktopEditForm(
 
     // 输入框字体大小
     const inputFontSizeLabel = document.createElement('label')
-    inputFontSizeLabel.textContent = '📝 输入框字体大小（px）'
+    inputFontSizeLabel.textContent = t('ui.buttonItems.desktop.210', undefined, '📝 输入框字体大小（px）')
     inputFontSizeLabel.style.cssText = 'font-size: 13px; font-weight: 500; margin-top: 8px;'
     lifeLogConfigDiv.appendChild(inputFontSizeLabel)
 
@@ -2871,11 +2875,11 @@ export function populateDesktopEditForm(
     globalCaptureCheckbox.checked = button.lifelogGlobalCaptureEnabled === true
     globalCaptureCheckbox.onchange = () => { button.lifelogGlobalCaptureEnabled = globalCaptureCheckbox.checked }
     globalCaptureLabel.appendChild(globalCaptureCheckbox)
-    globalCaptureLabel.appendChild(document.createTextNode('⌨️ 启用全局快捷键 Alt Shift L'))
+    globalCaptureLabel.appendChild(document.createTextNode(t('ui.buttonItems.desktop.globalShortcut', undefined, '⌨️ 启用全局快捷键 Alt Shift L')))
     globalCaptureCard.appendChild(globalCaptureLabel)
     const captureHint = document.createElement('div')
     captureHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); margin-top: 6px; margin-left: 26px;'
-    captureHint.textContent = '开启后，在任何界面按 Alt Shift L 即可呼出 LifeLog 对话框。如需修改快捷键，请在电脑端快捷键配置（Keymap）中搜索「叶归LifeLog」。弹窗内快捷键：Shift+方向键 选分类，Shift+Enter 发送，Esc 关闭'
+    captureHint.textContent = t('ui.buttonItems.desktop.211', undefined, '开启后，在任何界面按 Alt Shift L 即可呼出 LifeLog 对话框。如需修改快捷键，请在电脑端快捷键配置（Keymap）中搜索「叶归LifeLog」。弹窗内快捷键：Shift+方向键 选分类，Shift+Enter 发送，Esc 关闭')
     globalCaptureCard.appendChild(captureHint)
     lifeLogConfigDiv.appendChild(globalCaptureCard)
 
@@ -2887,13 +2891,13 @@ export function populateDesktopEditForm(
     popupSelectConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
     const popupSelectTitle2 = document.createElement('label')
-    popupSelectTitle2.textContent = '📋 模板列表'
+    popupSelectTitle2.textContent = t('ui.buttonItems.desktop.212', undefined, '📋 模板列表')
     popupSelectTitle2.style.cssText = 'font-size: 13px; font-weight: 500;'
     popupSelectConfigDiv.appendChild(popupSelectTitle2)
 
     const popupSelectHint2 = document.createElement('div')
     popupSelectHint2.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    popupSelectHint2.textContent = '💡 左边填模板名称（显示在弹窗上），右边填插入的模板内容'
+    popupSelectHint2.textContent = t('ui.buttonItems.desktop.213', undefined, '💡 左边填模板名称（显示在弹窗上），右边填插入的模板内容')
     popupSelectConfigDiv.appendChild(popupSelectHint2)
 
     const popupSelectRowsContainer2 = document.createElement('div')
@@ -2917,7 +2921,7 @@ export function populateDesktopEditForm(
         const nameInput = document.createElement('input')
         nameInput.type = 'text'
         nameInput.className = 'b3-text-field'
-        nameInput.placeholder = '模板名称'
+        nameInput.placeholder = t('ui.buttonItems.desktop.214', undefined, '模板名称')
         nameInput.value = tpl.name
         nameInput.style.cssText = 'font-size: 13px; flex: 1; min-width: 0;'
         nameInput.onchange = () => { button.popupSelectTemplates![idx].name = nameInput.value }
@@ -2925,7 +2929,7 @@ export function populateDesktopEditForm(
         const contentInput = document.createElement('input')
         contentInput.type = 'text'
         contentInput.className = 'b3-text-field'
-        contentInput.placeholder = '模板内容'
+        contentInput.placeholder = t('ui.buttonItems.desktop.215', undefined, '模板内容')
         contentInput.value = tpl.content
         contentInput.style.cssText = 'font-size: 13px; flex: 2; min-width: 0;'
         contentInput.onchange = () => { button.popupSelectTemplates![idx].content = contentInput.value }
@@ -2949,7 +2953,7 @@ export function populateDesktopEditForm(
     renderPopupSelectRows2()
 
     const addRowBtn2 = document.createElement('button')
-    addRowBtn2.textContent = '+ 添加模板'
+    addRowBtn2.textContent = t('ui.buttonItems.desktop.216', undefined, '+ 添加模板')
     addRowBtn2.style.cssText = 'padding: 6px 12px; border: 1px dashed var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 13px; align-self: flex-start;'
     addRowBtn2.onclick = () => {
       button.popupSelectTemplates!.push({ name: '', content: '' })
@@ -2965,13 +2969,13 @@ export function populateDesktopEditForm(
     buttonSequenceConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
     const buttonSequenceTitle2 = document.createElement('label')
-    buttonSequenceTitle2.textContent = '🔗 按钮序列'
+    buttonSequenceTitle2.textContent = t('ui.buttonItems.desktop.217', undefined, '🔗 按钮序列')
     buttonSequenceTitle2.style.cssText = 'font-size: 13px; font-weight: 500;'
     buttonSequenceConfigDiv.appendChild(buttonSequenceTitle2)
 
     const buttonSequenceHint2 = document.createElement('div')
     buttonSequenceHint2.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light);'
-    buttonSequenceHint2.textContent = '💡 左边选择要点击的按钮，右边填点击后等待的间隔时间（毫秒）'
+    buttonSequenceHint2.textContent = t('ui.buttonItems.desktop.218', undefined, '💡 左边选择要点击的按钮，右边填点击后等待的间隔时间（毫秒）')
     buttonSequenceConfigDiv.appendChild(buttonSequenceHint2)
 
     const buttonSequenceRowsContainer2 = document.createElement('div')
@@ -3016,7 +3020,7 @@ export function populateDesktopEditForm(
         // 使用 DOM 方式构建选项（避免 HTML 转义问题）
         const defaultOption = document.createElement('option')
         defaultOption.value = ''
-        defaultOption.textContent = '-- 请选择按钮 --'
+        defaultOption.textContent = t('ui.buttonItems.desktop.219', undefined, '-- 请选择按钮 --')
         nameSelect.appendChild(defaultOption)
 
         availableButtons.forEach((btn) => {
@@ -3033,7 +3037,7 @@ export function populateDesktopEditForm(
             iconDisplay = '🖼️'  // 使用图片图标表示
           }
           
-          option.textContent = `${iconDisplay} ${btn.name}`
+          option.textContent = `${iconDisplay} ${getButtonDisplayName(btn)}`
           // 通过ID匹配当前选中的按钮（使用 buttonId 而不是 buttonName）
           if (step.buttonId === btn.id) {
             option.selected = true
@@ -3053,7 +3057,7 @@ export function populateDesktopEditForm(
         const delayInput = document.createElement('input')
         delayInput.type = 'number'
         delayInput.className = 'b3-text-field'
-        delayInput.placeholder = '间隔(ms)'
+        delayInput.placeholder = t('ui.buttonItems.desktop.220', undefined, '间隔(ms)')
         delayInput.value = String(step.delayMs || 200)
         delayInput.style.cssText = 'font-size: 13px; flex: 1; min-width: 60px; max-width: 100%;' // 添加样式防止超出容器
         delayInput.onchange = () => { button.buttonSequenceSteps![idx].delayMs = parseInt(delayInput.value) || 200 }
@@ -3077,7 +3081,7 @@ export function populateDesktopEditForm(
     renderButtonSequenceRows2()
 
     const addSequenceRowBtn2 = document.createElement('button')
-    addSequenceRowBtn2.textContent = '+ 添加步骤'
+    addSequenceRowBtn2.textContent = t('ui.buttonItems.desktop.221', undefined, '+ 添加步骤')
     addSequenceRowBtn2.style.cssText = 'padding: 6px 12px; border: 1px dashed var(--b3-border-color); border-radius: 4px; background: var(--b3-theme-surface); color: var(--b3-theme-on-surface); cursor: pointer; font-size: 13px; align-self: flex-start;'
     addSequenceRowBtn2.onclick = () => {
       button.buttonSequenceSteps!.push({ buttonId: '', buttonName: '', delayMs: 200 })
@@ -3093,7 +3097,7 @@ export function populateDesktopEditForm(
     scrollDocConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
     const scrollDocTitle2 = document.createElement('label')
-    scrollDocTitle2.textContent = '📜 滚动方向'
+    scrollDocTitle2.textContent = t('ui.buttonItems.desktop.222', undefined, '📜 滚动方向')
     scrollDocTitle2.style.cssText = 'font-size: 13px; font-weight: 500;'
     scrollDocConfigDiv.appendChild(scrollDocTitle2)
 
@@ -3113,7 +3117,7 @@ export function populateDesktopEditForm(
     topRadio2.checked = currentDirection2 === 'top'
     topRadio2.onchange = () => { button.scrollDirection = 'top' }
     topRadioWrapper2.appendChild(topRadio2)
-    topRadioWrapper2.appendChild(document.createTextNode('滚动文档顶部'))
+    topRadioWrapper2.appendChild(document.createTextNode(t('ui.buttonItems.desktop.scrollTop', undefined, '滚动文档顶部')))
     radioContainer2.appendChild(topRadioWrapper2)
 
     // 滚动到底部选项
@@ -3126,7 +3130,7 @@ export function populateDesktopEditForm(
     bottomRadio2.checked = currentDirection2 === 'bottom'
     bottomRadio2.onchange = () => { button.scrollDirection = 'bottom' }
     bottomRadioWrapper2.appendChild(bottomRadio2)
-    bottomRadioWrapper2.appendChild(document.createTextNode('滚动文档底部'))
+    bottomRadioWrapper2.appendChild(document.createTextNode(t('ui.buttonItems.desktop.scrollBottom', undefined, '滚动文档底部')))
     radioContainer2.appendChild(bottomRadioWrapper2)
 
     scrollDocConfigDiv.appendChild(radioContainer2)
@@ -3141,10 +3145,10 @@ export function populateDesktopEditForm(
     const img2Desc = document.createElement('div')
     img2Desc.innerHTML = `
       <div style="font-size: 12px; color: #60a5fa; margin-bottom: 8px;">
-        📸 <strong>使用说明：</strong>选择本地图片后自动上传并插入到今日日记底部
+        ${t('ui.buttonItems.desktop.imageHelp', undefined, '📸 <strong>使用说明：</strong>选择本地图片后自动上传并插入到今日日记底部')}
       </div>
       <div style="font-size: 11px; color: var(--b3-theme-on-surface-light); background: var(--b3-theme-surface-light); padding: 6px 10px; border-radius: 6px; margin-bottom: 10px; line-height: 1.5;">
-        💡 <strong>记事弹窗插入：</strong>若在「一键记事」中开启<strong>思源块编辑模式</strong>，点击图片按钮会直接插入到弹窗编辑器光标位置（支持多选、连续插入），不再追加到日记。
+        ${t('ui.buttonItems.desktop.imagePopupHelp', undefined, '💡 <strong>记事弹窗插入：</strong>若在「一键记事」中开启<strong>思源块编辑模式</strong>，点击图片按钮会直接插入到弹窗编辑器光标位置（支持多选、连续插入），不再追加到日记。')}
       </div>
     `
     img2UploadConfigDiv.appendChild(img2Desc)
@@ -3154,14 +3158,14 @@ export function populateDesktopEditForm(
     img2NotebookRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
 
     const img2NotebookLabel = document.createElement('label')
-    img2NotebookLabel.innerHTML = '📓 <strong>日记笔记本ID</strong>'
+    img2NotebookLabel.innerHTML = t('ui.buttonItems.desktop.223', undefined, '📓 <strong>日记笔记本ID</strong>')
     img2NotebookLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 120px; flex-shrink: 0;'
 
     const img2NotebookInput = document.createElement('input')
     img2NotebookInput.className = 'b3-text-field'
     img2NotebookInput.type = 'text'
     img2NotebookInput.value = button.imageUploadNotebookId || ''
-    img2NotebookInput.placeholder = '输入日记所在笔记本ID'
+    img2NotebookInput.placeholder = t('ui.buttonItems.desktop.224', undefined, '输入日记所在笔记本ID')
     img2NotebookInput.style.cssText = 'width: 100%; font-size: 14px; padding: 6px 8px;'
     img2NotebookInput.onchange = () => { button.imageUploadNotebookId = img2NotebookInput.value }
 
@@ -3178,13 +3182,13 @@ export function populateDesktopEditForm(
 
 	    const collapseStyleLabel2 = document.createElement('label')
 	    collapseStyleLabel2.style.cssText = 'font-size: 13px; font-weight: 500; margin-bottom: 4px;'
-	    collapseStyleLabel2.textContent = '折叠样式'
+	    collapseStyleLabel2.textContent = t('ui.buttonItems.desktop.225', undefined, '折叠样式')
 	    collapseStyleConfigDiv2.appendChild(collapseStyleLabel2)
 
 	    const currentCollapseStyle2 = button.collapseStyle || 'preview'
 	    const collapseStyleItems2 = [
-	      { value: 'preview', label: '方案一：收起显示项目预览' },
-	      { value: 'minimal', label: '方案二：收起仅显示展开手柄' },
+	      { value: 'preview', label: t('ui.buttonItems.desktop.226', undefined, '方案一：收起显示项目预览') },
+	      { value: 'minimal', label: t('ui.buttonItems.desktop.227', undefined, '方案二：收起仅显示展开手柄') },
 	    ]
 
 	    collapseStyleItems2.forEach(item => {
@@ -3219,7 +3223,7 @@ export function populateDesktopEditForm(
 		    // 底部距离
 		    const docNavDistLabel2 = document.createElement('div')
 		    docNavDistLabel2.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
-		    docNavDistLabel2.textContent = '距离底部高度'
+		    docNavDistLabel2.textContent = t('ui.buttonItems.desktop.228', undefined, '距离底部高度')
 		    docNavConfigDiv2.appendChild(docNavDistLabel2)
 
 		    const docNavDistRow2 = document.createElement('div')
@@ -3251,7 +3255,7 @@ export function populateDesktopEditForm(
 
 		    const docNavDistHint2 = document.createElement('div')
 		    docNavDistHint2.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
-		    docNavDistHint2.textContent = '💡 调整导航栏距离屏幕底部的距离（0~200px）'
+		    docNavDistHint2.textContent = t('ui.buttonItems.desktop.229', undefined, '💡 调整导航栏距离屏幕底部的距离（0~200px）')
 		    docNavConfigDiv2.appendChild(docNavDistHint2)
 
 		    // 滚动隐藏开关
@@ -3260,7 +3264,7 @@ export function populateDesktopEditForm(
 
 		    const docNavAutoHideLabel2 = document.createElement('label')
 		    docNavAutoHideLabel2.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
-		    docNavAutoHideLabel2.textContent = '滚动隐藏/显示'
+		    docNavAutoHideLabel2.textContent = t('ui.buttonItems.desktop.230', undefined, '滚动隐藏/显示')
 
 		    const docNavAutoHideSwitch2 = document.createElement('input')
 		    docNavAutoHideSwitch2.type = 'checkbox'
@@ -3272,7 +3276,7 @@ export function populateDesktopEditForm(
 
 		    const docNavAutoHideHint2 = document.createElement('div')
 		    docNavAutoHideHint2.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
-		    docNavAutoHideHint2.textContent = '向上滚动：导航栏消失；向下滚动：导航栏重新出现'
+		    docNavAutoHideHint2.textContent = t('ui.buttonItems.desktop.231', undefined, '向上滚动：导航栏消失；向下滚动：导航栏重新出现')
 
 		    docNavAutoHideSwitch2.onchange = () => {
 		      button.autoHideOnScroll = docNavAutoHideSwitch2.checked
@@ -3406,24 +3410,24 @@ export function populateDesktopEditForm(
 	    toggleLockExtras2.style.display = 'none'
 	    const descTitle2 = document.createElement('div')
 	    descTitle2.style.cssText = 'margin-top: 4px; font-size: 12px; font-weight: 600; color: var(--b3-theme-primary); margin-bottom: 6px;'
-	    descTitle2.textContent = '📋 功能说明'
+	    descTitle2.textContent = t('ui.buttonItems.desktop.232', undefined, '📋 功能说明')
 	    toggleLockExtras2.appendChild(descTitle2)
 	    const descBox2 = document.createElement('div')
 	    descBox2.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); background: var(--b3-theme-primary-lightest); border: 1px solid var(--b3-theme-primary-light); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; line-height: 1.6;'
-	    descBox2.innerHTML = '🔒 <b>锁定文档</b>：防止误编辑，按钮显示锁定图标<br>🔓 <b>再次点击</b>：解锁文档，恢复编辑'
+	    descBox2.innerHTML = t('ui.buttonItems.desktop.233', undefined, '🔒 <b>锁定文档</b>：防止误编辑，按钮显示锁定图标<br>🔓 <b>再次点击</b>：解锁文档，恢复编辑')
 	    toggleLockExtras2.appendChild(descBox2)
-	    toggleLockExtras2.appendChild(createDesktopIconField('🔒锁定图标', button.lockIcon || '🔒', (v) => {
+	    toggleLockExtras2.appendChild(createDesktopIconField(t('ui.buttonItems.desktop.234', undefined, '🔒锁定图标'), button.lockIcon || '🔒', (v) => {
 	      button.lockIcon = v
 	    }, context.showIconPicker, button.iconSize))
 	    authorToolField.appendChild(toggleLockExtras2)
 	    ;(subtypeSelect as any).refreshForm?.()
 	  }
 
-	  form.appendChild(createDesktopIconField('图标', button.icon, (v) => {
+	  form.appendChild(createDesktopIconField(t('ui.buttonItems.desktop.235', undefined, '图标'), button.icon, (v) => {
 	    button.icon = v
 	  }, context.showIconPicker, button.iconSize))
-	  form.appendChild(createDesktopField('图标大小', button.iconSize.toString(), '18', (v) => { button.iconSize = parseInt(v) || 18 }, 'number'))
-  form.appendChild(createDesktopField('右边距', button.marginRight.toString(), '8', (v) => { button.marginRight = parseInt(v) || 8 }, 'number'))
+	  form.appendChild(createDesktopField(t('ui.buttonItems.desktop.iconSize', undefined, '图标大小'), button.iconSize.toString(), '18', (v) => { button.iconSize = parseInt(v) || 18 }, 'number'))
+  form.appendChild(createDesktopField(t('ui.buttonItems.desktop.marginRight', undefined, '右边距'), button.marginRight.toString(), '8', (v) => { button.marginRight = parseInt(v) || 8 }, 'number'))
   // 排序显示将移动到设置末尾
 
   // 右上角提示开关
@@ -3432,7 +3436,7 @@ export function populateDesktopEditForm(
 
   const notificationLabel = document.createElement('label')
   notificationLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
-  notificationLabel.textContent = '右上角提示'
+  notificationLabel.textContent = t('ui.buttonItems.desktop.236', undefined, '右上角提示')
 
   const notificationSwitch = document.createElement('input')
   notificationSwitch.type = 'checkbox'
@@ -3465,7 +3469,7 @@ export function populateDesktopEditForm(
 
   const showNameLabel = document.createElement('label')
   showNameLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
-  showNameLabel.textContent = '只显示名称'
+  showNameLabel.textContent = t('ui.buttonItems.desktop.237', undefined, '只显示名称')
 
   const showNameSwitch = document.createElement('input')
   showNameSwitch.type = 'checkbox'
@@ -3480,7 +3484,7 @@ export function populateDesktopEditForm(
   // 添加提示文字
   const showNameHint = document.createElement('div')
   showNameHint.style.cssText = 'font-size: 10px; color: var(--b3-theme-on-surface-light); margin-top: 6px;'
-  showNameHint.textContent = '💡关闭只显示图标；最多显示4个字（大小自适应）'
+  showNameHint.textContent = t('ui.buttonItems.desktop.238', undefined, '💡关闭只显示图标；最多显示4个字（大小自适应）')
   switchesContainer.appendChild(showNameHint)
   form.appendChild(switchesContainer)
 
@@ -3507,7 +3511,7 @@ export function populateDesktopEditForm(
       text-align: center;
       margin-bottom: 4px;
     `
-    sortLabel2.textContent = '📊 当前排序位置'
+    sortLabel2.textContent = t('ui.buttonItems.desktop.239', undefined, '📊 当前排序位置')
     sortDisplayContainer2.appendChild(sortLabel2)
     
     const sortValueDisplay2 = document.createElement('div')
@@ -3532,7 +3536,7 @@ export function populateDesktopEditForm(
       margin-top: 4px;
       display: none;
     `
-    sortHint2.textContent = '💡 拖动按钮调整位置，排序会自动更新'
+    sortHint2.textContent = t('ui.buttonItems.desktop.240', undefined, '💡 拖动按钮调整位置，排序会自动更新')
     sortDisplayContainer2.appendChild(sortHint2)
     
     form.appendChild(sortDisplayContainer2)

@@ -3,6 +3,7 @@
  * 支持桌面端拖拽，手机端保持原样
  */
 
+import { logger } from '@/utils/logger'
 interface DragState {
   isDragging: boolean
   startX: number
@@ -45,7 +46,7 @@ export function savePosition(panelId: string, x: number, y: number): void {
     const key = POSITION_STORAGE_PREFIX + panelId
     localStorage.setItem(key, JSON.stringify({ x, y, version: 1, savedAt: Date.now() }))
   } catch (err) {
-    console.warn('[DraggablePanel] 保存位置失败:', err)
+    logger.warn('[DraggablePanel] 保存位置失败:', err)
   }
 }
 
@@ -114,7 +115,7 @@ export function makeDraggable(
     : panel
 
   if (!handle) {
-    console.warn('[DraggablePanel] 未找到拖拽手柄:', config.handleSelector)
+    logger.warn('[DraggablePanel] 未找到拖拽手柄:', config.handleSelector)
     return () => {}
   }
 

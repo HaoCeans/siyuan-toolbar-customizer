@@ -1,6 +1,6 @@
 {
   "name": "siyuan-toolbar-customizer",
-  "version": "3.8.6",
+  "version": "3.8.7",
   "type": "module",
   "description": "A powerful toolbar customization plugin for SiYuan Notes",
   "author": "whale🐋",
@@ -26,6 +26,7 @@
     "release:minor": "node ./release.js --mode=minor",
     "release:major": "node ./release.js --mode=major",
     "build": "vite build",
+    "check:i18n": "node scripts/check-i18n.mjs",
     "keygen": "node scripts/gen-keypair.mjs",
     "gencode": "node scripts/gen-code.mjs",
     "setup": "node scripts/setup.mjs"

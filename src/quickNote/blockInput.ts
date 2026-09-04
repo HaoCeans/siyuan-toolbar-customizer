@@ -4,6 +4,7 @@
  */
 
 import { Protyle, getFrontend } from 'siyuan'
+import { t } from '../i18n/runtime'
 import type { QuickNoteInputAreaOptions, QuickNoteInputHandle } from './inputArea'
 import { destroyQuickNoteProtyle } from './protyleIsolate'
 import { createQuickNoteDraftBlock, deleteQuickNoteDraftBlock, blockExistsInKernel } from './kernelBlock'
@@ -254,18 +255,18 @@ export async function createBlockInputHandle(
   wrapper.style.setProperty('--qnote-protyle-font-size', `${options.fontSize}px`)
 
   const loadingEl = document.createElement('div')
-  loadingEl.textContent = '正在准备块编辑器…'
+  loadingEl.textContent = t('quickNote.block.preparing', undefined, '正在准备块编辑器…')
   loadingEl.style.cssText = 'flex: 1; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--b3-theme-on-surface-light);'
   wrapper.appendChild(loadingEl)
 
   if (!options.saveTarget) {
-    loadingEl.textContent = '块格式：缺少保存目标配置'
+    loadingEl.textContent = t('quickNote.block.missingTarget', undefined, '块格式：缺少保存目标配置')
     return buildFallbackHandle(wrapper, loadingEl)
   }
 
   const draftId = await createQuickNoteDraftBlock(options.saveTarget)
   if (!draftId) {
-    loadingEl.textContent = '创建编辑块失败，请检查笔记本/文档配置'
+    loadingEl.textContent = t('quickNote.block.createFailedCheckConfig', undefined, '创建编辑块失败，请检查笔记本/文档配置')
     return buildFallbackHandle(wrapper, loadingEl)
   }
 
@@ -315,7 +316,7 @@ export async function createBlockInputHandle(
     // 暴露 docRootId 供图片上传模块指定资源存入正确笔记本
     wrapper.dataset.qnoteDocRootId = state.docRootId
   } else {
-    loadingEl.textContent = '加载编辑块失败'
+    loadingEl.textContent = t('quickNote.block.loadFailed', undefined, '加载编辑块失败')
     wrapper.appendChild(loadingEl)
     await deleteQuickNoteDraftBlock(draftId)
     return buildFallbackHandle(wrapper, loadingEl)
@@ -433,10 +434,10 @@ export function createBlockFormatSettingsPlaceholder(): HTMLElement {
   const frontend = getFrontend()
   const isMobile = frontend === 'mobile' || frontend === 'browser-mobile'
   container.innerHTML =
-    '🧩 <strong style="color: #8b5cf6;">思源块格式</strong>：弹窗内直接编辑内核块，Enter 可多段落/列表，发送时逐块写入文档。' +
+    t('quickNote.block.descriptionHtml', undefined, '🧩 <strong style="color: #8b5cf6;">思源块格式</strong>：弹窗内直接编辑内核块，Enter 可多段落/列表，发送时逐块写入文档。') +
     (isMobile
-      ? '<br><span style="color: #999;">手机端块格式为弹窗内嵌编辑器，不另开独立窗口，无 400MB 级别的大额运存占用。与电脑端完全独立，请放心使用！</span>'
-      : '<br>⚠️ <span style="color: #e67e22;">注意：块格式为了能够丝滑地打开和使用，会加载完整 Protyle 编辑器到独立窗口，预计额外占用约 400MB 运存。关窗后释放。</span>' +
-        '<br><span style="color: #999;">仅在打开窗口时产生运存占用，关闭窗口即销毁，不持续占用。</span>')
+      ? t('quickNote.block.mobileDescriptionHtml', undefined, '<br><span style="color: #999;">手机端块格式为弹窗内嵌编辑器，不另开独立窗口，无 400MB 级别的大额运存占用。与电脑端完全独立，请放心使用！</span>')
+      : t('quickNote.block.desktopWarningHtml', undefined, '<br>⚠️ <span style="color: #e67e22;">注意：块格式为了能够丝滑地打开和使用，会加载完整 Protyle 编辑器到独立窗口，预计额外占用约 400MB 运存。关窗后释放。</span>') +
+        t('quickNote.block.desktopMemoryHtml', undefined, '<br><span style="color: #999;">仅在打开窗口时产生运存占用，关闭窗口即销毁，不持续占用。</span>'))
   return container
 }

@@ -1,3 +1,4 @@
+import { t } from '../i18n/runtime'
 /**
  * 按钮选择器
  * 用于选择思源内置按钮ID
@@ -7,52 +8,67 @@ import { updateIconDisplay } from '../data/icons'
 
 export interface ButtonInfo {
   id: string
+  /** Localized for the current locale when the selector invokes onSelect. */
   name: string
+  /** Stable translation key for callers that can persist translated defaults safely. */
+  nameKey: string
+  /** Stable canonical name; unlike name, this must not change with the locale. */
+  fallbackName: string
   icon: string
 }
+
+type BuiltinButtonDefinition = Omit<ButtonInfo, 'name'>
 
 export interface ButtonSelectorOptions {
   currentValue?: string
   onSelect: (result: ButtonInfo) => void
 }
 
-// 思源内置按钮列表（v3.7+ 手机端菜单 ID 已更新）
-const BUILTIN_BUTTONS: ButtonInfo[] = [
+// Keep module-level data locale-independent. Translation runtime may not be ready yet
+// when this module is imported.
+const BUILTIN_BUTTONS: BuiltinButtonDefinition[] = [
   // ===== 顶部工具栏 =====
-  { id: 'toolbarMore', name: '右上角：设置（☰ 菜单）', icon: 'iconSettings' },
-  { id: 'toolbarFile', name: '左上角：文档树', icon: 'iconFolder' },
+  { id: 'toolbarMore', nameKey: 'ui.buttonSelector.item.1', fallbackName: '右上角：设置（☰ 菜单）', icon: 'iconSettings' },
+  { id: 'toolbarFile', nameKey: 'ui.buttonSelector.item.2', fallbackName: '左上角：文档树', icon: 'iconFolder' },
 
   // ===== 菜单内 - 常用功能（无需展开子菜单）=====
-  { id: 'menuRecent', name: '最近的文档', icon: 'iconList' },
-  { id: 'menuSearch', name: '搜索', icon: 'iconSearch' },
-  { id: 'menuCommand', name: '命令面板', icon: 'iconTerminal' },
-  { id: 'menuSyncNow', name: '立即同步', icon: 'iconCloudSucc' },
-  { id: 'menuNewDoc', name: '新建文档', icon: 'iconFile' },
-  { id: 'menuNewNotebook', name: '新建笔记本', icon: 'iconFilesRoot' },
-  { id: 'menuNewDaily', name: '日记', icon: 'iconCalendar' },
-  { id: 'menuCard', name: '间隔重复', icon: 'iconRiffCard' },
-  { id: 'menuLock', name: '锁屏', icon: 'iconLock' },
-  { id: 'menuHistory', name: '数据历史', icon: 'iconHistory' },
+  { id: 'menuRecent', nameKey: 'ui.buttonSelector.item.3', fallbackName: '最近的文档', icon: 'iconList' },
+  { id: 'menuSearch', nameKey: 'ui.buttonSelector.item.4', fallbackName: '搜索', icon: 'iconSearch' },
+  { id: 'menuCommand', nameKey: 'ui.buttonSelector.item.5', fallbackName: '命令面板', icon: 'iconTerminal' },
+  { id: 'menuSyncNow', nameKey: 'ui.buttonSelector.item.6', fallbackName: '立即同步', icon: 'iconCloudSucc' },
+  { id: 'menuNewDoc', nameKey: 'ui.buttonSelector.item.7', fallbackName: '新建文档', icon: 'iconFile' },
+  { id: 'menuNewNotebook', nameKey: 'ui.buttonSelector.item.8', fallbackName: '新建笔记本', icon: 'iconFilesRoot' },
+  { id: 'menuNewDaily', nameKey: 'ui.buttonSelector.item.9', fallbackName: '日记', icon: 'iconCalendar' },
+  { id: 'menuCard', nameKey: 'ui.buttonSelector.item.10', fallbackName: '间隔重复', icon: 'iconRiffCard' },
+  { id: 'menuLock', nameKey: 'ui.buttonSelector.item.11', fallbackName: '锁屏', icon: 'iconLock' },
+  { id: 'menuHistory', nameKey: 'ui.buttonSelector.item.12', fallbackName: '数据历史', icon: 'iconHistory' },
 
   // ===== 菜单内 - 设置项（v3.7+ 已改名 menuConfig*）=====
-  { id: 'menuConfigEditor', name: '编辑器', icon: 'iconEdit' },
-  { id: 'menuConfigFile', name: '文档', icon: 'iconFiles' },
-  { id: 'menuConfigAppearance', name: '外观', icon: 'iconTheme' },
-  { id: 'menuConfigFlashcard', name: '闪卡', icon: 'iconRiffCard' },
-  { id: 'menuConfigAi', name: '人工智能', icon: 'iconSparkles' },
-  { id: 'menuConfigSecretsVariables', name: '密钥和变量', icon: 'iconSquareAsterisk' },
-  { id: 'menuConfigAssets', name: '资源', icon: 'iconImage' },
-  { id: 'menuConfigExport', name: '导出', icon: 'iconUpload' },
-  { id: 'menuConfigSearch', name: '搜索（设置）', icon: 'iconSearch' },
-  { id: 'menuConfigSync', name: '账号与同步', icon: 'iconCloud' },
-  { id: 'menuConfigAccess', name: '鉴权', icon: 'iconLock' },
-  { id: 'menuConfigApp', name: '应用', icon: 'iconLayoutGrid' },
-  { id: 'menuConfigAbout', name: '关于', icon: 'iconInfo' },
+  { id: 'menuConfigEditor', nameKey: 'ui.buttonSelector.item.13', fallbackName: '编辑器', icon: 'iconEdit' },
+  { id: 'menuConfigFile', nameKey: 'ui.buttonSelector.item.14', fallbackName: '文档', icon: 'iconFiles' },
+  { id: 'menuConfigAppearance', nameKey: 'ui.buttonSelector.item.15', fallbackName: '外观', icon: 'iconTheme' },
+  { id: 'menuConfigFlashcard', nameKey: 'ui.buttonSelector.item.16', fallbackName: '闪卡', icon: 'iconRiffCard' },
+  { id: 'menuConfigAi', nameKey: 'ui.buttonSelector.item.17', fallbackName: '人工智能', icon: 'iconSparkles' },
+  { id: 'menuConfigSecretsVariables', nameKey: 'ui.buttonSelector.item.18', fallbackName: '密钥和变量', icon: 'iconSquareAsterisk' },
+  { id: 'menuConfigAssets', nameKey: 'ui.buttonSelector.item.19', fallbackName: '资源', icon: 'iconImage' },
+  { id: 'menuConfigExport', nameKey: 'ui.buttonSelector.item.20', fallbackName: '导出', icon: 'iconUpload' },
+  { id: 'menuConfigSearch', nameKey: 'ui.buttonSelector.item.21', fallbackName: '搜索（设置）', icon: 'iconSearch' },
+  { id: 'menuConfigSync', nameKey: 'ui.buttonSelector.item.22', fallbackName: '账号与同步', icon: 'iconCloud' },
+  { id: 'menuConfigAccess', nameKey: 'ui.buttonSelector.item.23', fallbackName: '鉴权', icon: 'iconLock' },
+  { id: 'menuConfigApp', nameKey: 'ui.buttonSelector.item.24', fallbackName: '应用', icon: 'iconLayoutGrid' },
+  { id: 'menuConfigAbout', nameKey: 'ui.buttonSelector.item.25', fallbackName: '关于', icon: 'iconInfo' },
 
   // ===== 菜单内 - 其他 =====
-  { id: 'menuPlugin', name: '插件', icon: 'iconPlugin' },
-  { id: 'menuHelp', name: '用户指南', icon: 'iconHelp' },
+  { id: 'menuPlugin', nameKey: 'ui.buttonSelector.item.26', fallbackName: '插件', icon: 'iconPlugin' },
+  { id: 'menuHelp', nameKey: 'ui.buttonSelector.item.27', fallbackName: '用户指南', icon: 'iconHelp' },
 ]
+
+function localizeButton(button: BuiltinButtonDefinition): ButtonInfo {
+  return {
+    ...button,
+    name: t(button.nameKey, undefined, button.fallbackName),
+  }
+}
 
 /**
  * 旧 ID → 新 ID 别名映射表
@@ -123,7 +139,7 @@ export function showButtonSelector(options: ButtonSelectorOptions): void {
     justify-content: space-between;
     align-items: center;
   `
-  header.innerHTML = `<div style="font-size: 16px; font-weight: 500;">选择按钮</div>`
+  header.innerHTML = `<div style="font-size: 16px; font-weight: 500;">${t('ui.buttonSelector.title', undefined, '选择按钮')}</div>`
 
   const closeBtn = document.createElement('button')
   closeBtn.className = 'b3-button b3-button--text'
@@ -137,7 +153,7 @@ export function showButtonSelector(options: ButtonSelectorOptions): void {
   searchWrapper.style.cssText = `padding: 12px 20px; border-bottom: 1px solid var(--b3-border-color);`
   const searchInput = document.createElement('input')
   searchInput.type = 'text'
-  searchInput.placeholder = '搜索按钮...'
+  searchInput.placeholder = t('buttonSelector.search', undefined, '搜索按钮...')
   searchInput.className = 'b3-text-field'
   searchInput.style.cssText = `width: 100%; padding: 8px 12px;`
   searchWrapper.appendChild(searchInput)
@@ -159,9 +175,12 @@ export function showButtonSelector(options: ButtonSelectorOptions): void {
     buttonList.innerHTML = ''
 
     // 过滤并渲染按钮
-    const filteredButtons = BUILTIN_BUTTONS.filter(
-      b => b.name.toLowerCase().includes(filter.toLowerCase()) ||
-           b.id.toLowerCase().includes(filter.toLowerCase())
+    const localizedButtons = BUILTIN_BUTTONS.map(localizeButton)
+    const normalizedFilter = filter.toLowerCase()
+    const filteredButtons = localizedButtons.filter(
+      b => b.name.toLowerCase().includes(normalizedFilter) ||
+           b.fallbackName.toLowerCase().includes(normalizedFilter) ||
+           b.id.toLowerCase().includes(normalizedFilter)
     )
 
     if (filteredButtons.length === 0) {
@@ -172,7 +191,7 @@ export function showButtonSelector(options: ButtonSelectorOptions): void {
         color: var(--b3-theme-on-surface-light);
         font-size: 13px;
       `
-      noResult.textContent = '未找到匹配的按钮'
+      noResult.textContent = t('buttonSelector.empty', undefined, '未找到匹配的按钮')
       buttonList.appendChild(noResult)
       return
     }

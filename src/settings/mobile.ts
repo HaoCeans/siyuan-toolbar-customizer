@@ -3,6 +3,8 @@
  * 处理手机端思源手机端增强的设置界面
  */
 
+import { t } from '../i18n/runtime'
+import { logger } from '@/utils/logger'
 import { validateActivationCode } from '../utils/activationCodeValidator'
 import type { LicenseStatus } from '../utils/licenseManager'
 import { TRIAL_CODE, clearTrial } from '../utils/licenseManager'
@@ -15,7 +17,7 @@ import * as Notify from '../notification'
 import { createMobileButtonItem, type MobileButtonContext } from '../ui/buttonItems/mobile'
 import { createToolbarPreview } from '../ui/toolbarPreview'
 import { createMobileQuickNoteFormatField } from '../ui/quickNoteFormatField'
-import { calculateButtonOverflow, getToolbarAvailableWidth, getButtonWidth, resetAllConfigsToFactoryDefaults } from '../toolbarManager'
+import { calculateButtonOverflow, getButtonDisplayName, getToolbarAvailableWidth, getButtonWidth, resetAllConfigsToFactoryDefaults } from '../toolbarManager'
 import { showConfirmDialog } from '../ui/dialog'
 import { lucideToSvg } from '../utils/lucideHelper'
 
@@ -133,11 +135,11 @@ function showPayModalMobile(planName: string, userName: string): void {
 
   const wechatTab = document.createElement('button')
   wechatTab.className = 'toolbar-customizer-pay-tab active'
-  wechatTab.textContent = '微信'
+  wechatTab.textContent = t("settings.mobile.1", undefined, "微信")
 
   const alipayTab = document.createElement('button')
   alipayTab.className = 'toolbar-customizer-pay-tab'
-  alipayTab.textContent = '支付宝'
+  alipayTab.textContent = t("settings.mobile.2", undefined, "支付宝")
 
   const loadQr = (tab: 'wechat' | 'alipay') => {
     qrCurrent.innerHTML = ''
@@ -145,12 +147,12 @@ function showPayModalMobile(planName: string, userName: string): void {
     const url = `/plugins/siyuan-toolbar-customizer/${fileName}?_t=${Date.now()}`
     const img = document.createElement('img')
     img.className = 'toolbar-customizer-pay-qr'
-    img.alt = '收款码'
+    img.alt = t("settings.mobile.3", undefined, "收款码")
     img.onload = () => { qrCurrent.appendChild(img) }
     img.onerror = () => {
       const placeholder = document.createElement('div')
       placeholder.className = 'toolbar-customizer-pay-qr'
-      placeholder.textContent = '收款码占位'
+      placeholder.textContent = t("settings.mobile.4", undefined, "收款码占位")
       qrCurrent.appendChild(placeholder)
     }
     img.src = url
@@ -172,7 +174,11 @@ function showPayModalMobile(planName: string, userName: string): void {
 
   const tip = document.createElement('div')
   tip.className = 'toolbar-customizer-pay-tip'
-  tip.innerHTML = `付款后请将用户名<strong>${userName}</strong>和付款截图发至 1711455244@qq.com 邮箱或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入QQ群</a>联系群主。`
+  tip.innerHTML = t(
+    'settings.common.paymentInstructionsHtml',
+    { user: `<strong>${userName}</strong>` },
+    '付款后请将用户名{user}和付款截图发至 1711455244@qq.com 邮箱或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入QQ群</a>联系群主。'
+  )
 
   dialog.appendChild(closeBtn)
   dialog.appendChild(titleEl)
@@ -229,7 +235,7 @@ function showActivationInfoModal(isActivated: boolean, onStartTrial?: () => void
   `
   const title = document.createElement('div')
   title.style.cssText = 'font-size: 16px; font-weight: 700; color: #722ed1;'
-  title.textContent = '🔐 激活方式说明'
+  title.textContent = t("settings.mobile.5", undefined, "🔐 激活方式说明")
   const closeBtn = document.createElement('button')
   closeBtn.className = 'b3-button b3-button--text'
   closeBtn.textContent = '✕'
@@ -249,16 +255,16 @@ function showActivationInfoModal(isActivated: boolean, onStartTrial?: () => void
 
   const pricingTitle = document.createElement('div')
   pricingTitle.style.cssText = 'font-size: 14px; font-weight: bold; color: var(--b3-theme-on-background); margin-bottom: 10px;'
-  pricingTitle.textContent = '📐 激活方案定价原则'
+  pricingTitle.textContent = t("settings.mobile.6", undefined, "📐 激活方案定价原则")
   pricingBox.appendChild(pricingTitle)
 
   const principles = [
-    { text: '免费功能已经占据80%，通常免费功能已经可以满足需求', highlight: false },
-    { text: '鲸鱼定制工具箱功能均为定制，每项功能，作者均额外花费大量时间制作，并调整适配', highlight: false },
-    { text: '目前鲸鱼定制工具箱有17项定制功能，其中2项免费，共15项付费功能', highlight: false },
-    { text: '基于花费的时间和精力，以及前期的定制均为免费，作者决定每项定制定价为3元，进而决定永久价格', highlight: true },
-    { text: '后续将继续增加定制功能，价格也会适当上涨', highlight: false },
-    { text: '同时适当增加部分免费定制功能，不大幅调整价格', highlight: false },
+    { text: t("settings.mobile.7", undefined, "免费功能已经占据80%，通常免费功能已经可以满足需求"), highlight: false },
+    { text: t("settings.mobile.8", undefined, "鲸鱼定制工具箱功能均为定制，每项功能，作者均额外花费大量时间制作，并调整适配"), highlight: false },
+    { text: t("settings.mobile.9", undefined, "目前鲸鱼定制工具箱有17项定制功能，其中2项免费，共15项付费功能"), highlight: false },
+    { text: t("settings.mobile.10", undefined, "基于花费的时间和精力，以及前期的定制均为免费，作者决定每项定制定价为3元，进而决定永久价格"), highlight: true },
+    { text: t("settings.mobile.11", undefined, "后续将继续增加定制功能，价格也会适当上涨"), highlight: false },
+    { text: t("settings.mobile.12", undefined, "同时适当增加部分免费定制功能，不大幅调整价格"), highlight: false },
   ]
   principles.forEach((item, idx) => {
     const row = document.createElement('div')
@@ -281,7 +287,7 @@ function showActivationInfoModal(isActivated: boolean, onStartTrial?: () => void
 
   const plansTitle = document.createElement('div')
   plansTitle.style.cssText = 'font-size: 15px; font-weight: bold; color: #722ed1; margin-bottom: 12px; text-align: center;'
-  plansTitle.textContent = '📦 激活码方案'
+  plansTitle.textContent = t("settings.mobile.13", undefined, "📦 激活码方案")
   plansBox.appendChild(plansTitle)
 
   // 手机端单列排列（与电脑端 2×2 网格不同）
@@ -289,12 +295,12 @@ function showActivationInfoModal(isActivated: boolean, onStartTrial?: () => void
   plansWrapper.style.cssText = 'display: flex; flex-direction: column; gap: 10px;'
 
   const planCards = [
-    { name: '免费试用', price: '0', unit: '元', duration: '3 天', badge: '免费', hot: false, isTrial: true, desc: '全部 15 项付费功能免费体验 3 天，每设备限一次', features: ['全功能体验', '无需付款', '每设备限一次'] },
-    { name: '月卡', price: '12', unit: '元', duration: '30 天', badge: '推荐', hot: true, desc: '30 天激活码（电脑+手机），适合短期高强度使用', features: ['30 天激活码（电脑+手机）', '15项付费功能全解锁', '含 5 天宽限期'] },
-    { name: '永久正价', price: '45', unit: '元', duration: '永久', badge: '', hot: false, desc: '鲸鱼定制工具箱永久激活码（电脑+手机），解锁全部15项付费功能', features: ['永久激活码（电脑+手机）', '15项付费功能全解锁'] },
-    { name: '普通优惠', price: '36', unit: '元', duration: '永久(8折)', badge: '', hot: false, desc: '鲸鱼定制工具箱永久激活码（电脑+手机），限时优惠 10 个，送完即止', features: ['永久激活码（电脑+手机）', '限时8折优惠'] },
-    { name: '学生优惠', price: '22.5', unit: '元', duration: '永久(5折)', badge: '', hot: false, desc: '需提供可证明在读学生身份的信息', features: ['永久激活码（电脑+手机）', '限时5折优惠', '需学生身份证明'] },
-    { name: '定制开发', price: '100', unit: '元起', duration: '手工费', badge: '', hot: false, desc: '有专门需求的可联系作者开发专属功能，只展示给你自己使用，也可决定是否纳入工具箱', features: ['专属功能定制', '仅自己可见/纳入工具箱', '作者评估实现'] },
+    { name: t("settings.mobile.14", undefined, "免费试用"), price: '0', unit: t("settings.mobile.15", undefined, "元"), duration: t("settings.mobile.16", undefined, "3 天"), badge: t("settings.mobile.17", undefined, "免费"), hot: false, isTrial: true, desc: t("settings.mobile.18", undefined, "全部 15 项付费功能免费体验 3 天，每设备限一次"), features: [t("settings.mobile.19", undefined, "全功能体验"), t("settings.mobile.20", undefined, "无需付款"), t("settings.mobile.21", undefined, "每设备限一次")] },
+    { name: t("settings.mobile.22", undefined, "月卡"), price: '12', unit: t("settings.mobile.23", undefined, "元"), duration: t("settings.mobile.24", undefined, "30 天"), badge: t("settings.mobile.25", undefined, "推荐"), hot: true, desc: t("settings.mobile.26", undefined, "30 天激活码（电脑+手机），适合短期高强度使用"), features: [t("settings.mobile.27", undefined, "30 天激活码（电脑+手机）"), t("settings.mobile.28", undefined, "15项付费功能全解锁"), t("settings.mobile.29", undefined, "含 5 天宽限期")] },
+    { name: t("settings.mobile.30", undefined, "永久正价"), price: '45', unit: t("settings.mobile.31", undefined, "元"), duration: t("settings.mobile.32", undefined, "永久"), badge: '', hot: false, desc: t("settings.mobile.33", undefined, "鲸鱼定制工具箱永久激活码（电脑+手机），解锁全部15项付费功能"), features: [t("settings.mobile.34", undefined, "永久激活码（电脑+手机）"), t("settings.mobile.35", undefined, "15项付费功能全解锁")] },
+    { name: t("settings.mobile.36", undefined, "普通优惠"), price: '36', unit: t("settings.mobile.37", undefined, "元"), duration: t("settings.mobile.38", undefined, "永久(8折)"), badge: '', hot: false, desc: t("settings.mobile.39", undefined, "鲸鱼定制工具箱永久激活码（电脑+手机），限时优惠 10 个，送完即止"), features: [t("settings.mobile.40", undefined, "永久激活码（电脑+手机）"), t("settings.mobile.41", undefined, "限时8折优惠")] },
+    { name: t("settings.mobile.42", undefined, "学生优惠"), price: '22.5', unit: t("settings.mobile.43", undefined, "元"), duration: t("settings.mobile.44", undefined, "永久(5折)"), badge: '', hot: false, desc: t("settings.mobile.45", undefined, "需提供可证明在读学生身份的信息"), features: [t("settings.mobile.46", undefined, "永久激活码（电脑+手机）"), t("settings.mobile.47", undefined, "限时5折优惠"), t("settings.mobile.48", undefined, "需学生身份证明")] },
+    { name: t("settings.mobile.49", undefined, "定制开发"), price: '100', unit: t("settings.mobile.50", undefined, "元起"), duration: t("settings.mobile.51", undefined, "手工费"), badge: '', hot: false, desc: t("settings.mobile.52", undefined, "有专门需求的可联系作者开发专属功能，只展示给你自己使用，也可决定是否纳入工具箱"), features: [t("settings.mobile.53", undefined, "专属功能定制"), t("settings.mobile.54", undefined, "仅自己可见/纳入工具箱"), t("settings.mobile.55", undefined, "作者评估实现")] },
   ]
 
   planCards.forEach(card => {
@@ -352,7 +358,7 @@ function showActivationInfoModal(isActivated: boolean, onStartTrial?: () => void
 	    const btnBdr = card.hot ? 'var(--b3-theme-primary)' : 'var(--b3-border-color)'
 	    buyBtn.style.cssText = `margin-top: 8px; padding: 6px 0; font-size: 11px; cursor: pointer; background: ${btnBg}; color: ${btnClr}; border: 1px solid ${btnBdr}; border-radius: 6px;`
 	    if ((card as any).isTrial) {
-	      buyBtn.textContent = '立即试用'
+	      buyBtn.textContent = t("settings.mobile.56", undefined, "立即试用")
 	      buyBtn.onclick = () => {
 	        if (onStartTrial) {
 	          onStartTrial()
@@ -360,7 +366,7 @@ function showActivationInfoModal(isActivated: boolean, onStartTrial?: () => void
 	        }
 	      }
 	    } else {
-	      buyBtn.textContent = '扫码购买'
+	      buyBtn.textContent = t("settings.mobile.57", undefined, "扫码购买")
 	      buyBtn.onclick = () => showPayModalMobile(card.name, currentUserName())
 	    }
 	    cardEl.appendChild(buyBtn)
@@ -377,24 +383,24 @@ function showActivationInfoModal(isActivated: boolean, onStartTrial?: () => void
 
   const accountHint = document.createElement('div')
   accountHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); margin-bottom: 6px;'
-  accountHint.textContent = '付款时请提供以下用户名'
+  accountHint.textContent = t("settings.mobile.58", undefined, "付款时请提供以下用户名")
   accountBox.appendChild(accountHint)
 
   const accountRow = document.createElement('div')
   accountRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
   const accountName = document.createElement('span')
   accountName.style.cssText = 'font-size: 15px; font-weight: 700; color: var(--b3-theme-on-background);'
-  accountName.textContent = currentUserName() || '未登录思源账号'
+  accountName.textContent = currentUserName() || t("settings.mobile.59", undefined, "未登录思源账号")
   accountRow.appendChild(accountName)
 
   const copyBtn = document.createElement('button')
   copyBtn.style.cssText = 'padding: 2px 10px; font-size: 12px; color: var(--b3-theme-primary); background: transparent; border: 1px solid var(--b3-theme-primary); border-radius: 4px; cursor: pointer;'
-  copyBtn.textContent = '复制'
+  copyBtn.textContent = t("settings.mobile.60", undefined, "复制")
   copyBtn.onclick = async () => {
     const name = currentUserName()
     if (!name) {
-      copyBtn.textContent = '未登录'
-      setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
+      copyBtn.textContent = t("settings.mobile.61", undefined, "未登录")
+      setTimeout(() => { copyBtn.textContent = t("settings.mobile.62", undefined, "复制") }, 2000)
       return
     }
     try {
@@ -410,11 +416,11 @@ function showActivationInfoModal(isActivated: boolean, onStartTrial?: () => void
         document.execCommand('copy')
         document.body.removeChild(ta)
       }
-      copyBtn.textContent = '已复制！'
-      setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
+      copyBtn.textContent = t("settings.mobile.63", undefined, "已复制！")
+      setTimeout(() => { copyBtn.textContent = t("settings.mobile.64", undefined, "复制") }, 2000)
     } catch {
-      copyBtn.textContent = '复制失败'
-      setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
+      copyBtn.textContent = t("settings.mobile.65", undefined, "复制失败")
+      setTimeout(() => { copyBtn.textContent = t("settings.mobile.66", undefined, "复制") }, 2000)
     }
   }
   accountRow.appendChild(copyBtn)
@@ -422,12 +428,12 @@ function showActivationInfoModal(isActivated: boolean, onStartTrial?: () => void
 
   const accountNotice = document.createElement('div')
   accountNotice.style.cssText = 'font-size: 11px; color: #d4380d; margin-top: 6px; padding: 6px 8px; background: color-mix(in srgb, #ff4d4f 8%, transparent); border-radius: 4px; line-height: 1.5; font-weight: 500;'
-  accountNotice.textContent = '激活码将根据该用户名直接绑定你的思源账号，请务必发送'
+  accountNotice.textContent = t("settings.mobile.67", undefined, "激活码将根据该用户名直接绑定你的思源账号，请务必发送")
   accountBox.appendChild(accountNotice)
 
   const accountTip = document.createElement('div')
   accountTip.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); margin-top: 6px; line-height: 1.5;'
-  accountTip.innerHTML = '无法在付款备注提供时，可将用户名和付款截图发送至 1711455244@qq.com，或 <a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主。'
+  accountTip.innerHTML = t("settings.mobile.68", undefined, "无法在付款备注提供时，可将用户名和付款截图发送至 1711455244@qq.com，或 <a href=\"https://qm.qq.com/q/EzwqDQpYA0\" target=\"_blank\" style=\"color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);\">加入 QQ 群</a>联系群主。")
   accountBox.appendChild(accountTip)
   content.appendChild(accountBox)
 
@@ -437,16 +443,16 @@ function showActivationInfoModal(isActivated: boolean, onStartTrial?: () => void
 
   const flowTitle = document.createElement('div')
   flowTitle.style.cssText = 'font-size: 14px; font-weight: bold; color: #722ed1; margin-bottom: 12px;'
-  flowTitle.textContent = '📋 付款发码流程'
+  flowTitle.textContent = t("settings.mobile.69", undefined, "📋 付款发码流程")
   flowBox.appendChild(flowTitle)
 
   const flowSteps = document.createElement('div')
   flowSteps.style.cssText = 'display: flex; flex-direction: column; gap: 10px;'
   const steps = [
-    { title: '选择方案', desc: '选择适合你的套餐方案，点击「扫码购买」' },
-    { title: '扫码转账', desc: '使用微信或支付宝扫码付款，付款备注请提供用户名「<strong>' + (currentUserName() || (isActivated ? '已激活用户' : '你的思源账号用户名')) + '</strong>」' },
-    { title: '提供信息', desc: '将付款截图和用户名<strong>' + (currentUserName() || '（你的思源账号）') + '</strong>发送至 1711455244@qq.com 邮箱，或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主' },
-    { title: '获取激活码', desc: '群主核实后发放激活码，回到本页粘贴激活即可解锁全部功能' },
+    { title: t("settings.mobile.70", undefined, "选择方案"), desc: t("settings.mobile.71", undefined, "选择适合你的套餐方案，点击「扫码购买」") },
+    { title: t("settings.mobile.72", undefined, "扫码转账"), desc: t("settings.mobile.73", undefined, "使用微信或支付宝扫码付款，付款备注请提供用户名「<strong>") + (currentUserName() || (isActivated ? t("settings.mobile.74", undefined, "已激活用户") : t("settings.mobile.75", undefined, "你的思源账号用户名"))) + '</strong>」' },
+    { title: t("settings.mobile.76", undefined, "提供信息"), desc: t("settings.mobile.77", undefined, "将付款截图和用户名<strong>") + (currentUserName() || t("settings.mobile.78", undefined, "（你的思源账号）")) + t("settings.mobile.79", undefined, "</strong>发送至 1711455244@qq.com 邮箱，或<a href=\"https://qm.qq.com/q/EzwqDQpYA0\" target=\"_blank\" style=\"color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);\">加入 QQ 群</a>联系群主") },
+    { title: t("settings.mobile.80", undefined, "获取激活码"), desc: t("settings.mobile.81", undefined, "群主核实后发放激活码，回到本页粘贴激活即可解锁全部功能") },
   ]
   steps.forEach((step, i) => {
     const stepRow = document.createElement('div')
@@ -595,6 +601,7 @@ export interface MobileSettingsContext {
   showButtonIdPicker: (currentValue: string, onSelect: (result: any) => void) => void
   saveData: (key: string, value: any) => Promise<void>
   removeData: (key: string) => Promise<void>
+  resetLogging: () => Promise<void>
   applyFeatures: () => void
   applyDesktopToolbarPosition: () => void
   applyMobileToolbarStyle: () => void
@@ -676,8 +683,8 @@ export function createMobileToolbarColorConfigItem(
   onSave: (newConfig: MobileToolbarConfig) => void
 ): { title: string; description: string; createActionElement: () => HTMLElement } {
   return {
-    title: '②工具栏背景颜色',
-    description: '💡点击色块选择颜色，或直接输入颜色值，或跟随主题',
+    title: t("settings.mobile.82", undefined, "②工具栏背景颜色"),
+    description: t("settings.mobile.83", undefined, "💡点击色块选择颜色，或直接输入颜色值，或跟随主题"),
     createActionElement: () => {
       const container = document.createElement('div')
       container.style.cssText = 'display: flex; flex-direction: column; gap: 10px;'
@@ -687,7 +694,7 @@ export function createMobileToolbarColorConfigItem(
       lightRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
 
       const lightLabel = document.createElement('span')
-      lightLabel.textContent = '☀️ 明亮模式：'
+      lightLabel.textContent = t("settings.mobile.84", undefined, "☀️ 明亮模式：")
       lightLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 85px;'
 
       // 明亮模式颜色选择器
@@ -726,7 +733,7 @@ export function createMobileToolbarColorConfigItem(
       darkRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
 
       const darkLabel = document.createElement('span')
-      darkLabel.textContent = '🌙 黑暗模式：'
+      darkLabel.textContent = t("settings.mobile.85", undefined, "🌙 黑暗模式：")
       darkLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 85px;'
 
       // 黑暗模式颜色选择器
@@ -782,7 +789,7 @@ export function createMobileToolbarColorConfigItem(
       }
 
       const followThemeLabel = document.createElement('label')
-      followThemeLabel.textContent = '跟随主题（默认）'
+      followThemeLabel.textContent = t("settings.mobile.86", undefined, "跟随主题（默认）")
       followThemeLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background);'
 
       followThemeRow.appendChild(followThemeCheckbox)
@@ -808,8 +815,8 @@ export function createBottomToolbarConfigItem(
   onSave: (newConfig: MobileToolbarConfig) => void
 ): { title: string; description: string; createActionElement: () => HTMLElement } {
   return {
-    title: '📱 底部工具栏配置',
-    description: '💡 开启后才能调整输入法位置相关设置',
+    title: t("settings.mobile.87", undefined, "📱 底部工具栏配置"),
+    description: t("settings.mobile.88", undefined, "💡 开启后才能调整输入法位置相关设置"),
     createActionElement: () => {
       const container = document.createElement('div')
       container.className = 'toolbar-customizer-content'
@@ -830,7 +837,7 @@ export function createBottomToolbarConfigItem(
       `
 
       const toggleLabel = document.createElement('span')
-      toggleLabel.textContent = '是否将工具栏置底'
+      toggleLabel.textContent = t("settings.mobile.89", undefined, "是否将工具栏置底")
       toggleLabel.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-surface); font-weight: 500;'
 
       const toggle = document.createElement('input')
@@ -868,56 +875,7 @@ export function createMobileSettingLayout(
 	  if (!document.getElementById('toolbar-customizer-mobile-center')) {
 	    const style = document.createElement('style')
 	    style.id = 'toolbar-customizer-mobile-center'
-	    style.textContent = `
-	      [data-plugin-dialog="toolbar-customizer"] .b3-dialog__container {
-	        max-width: 100% !important;
-	      }
-      /* 默认全部纵向堆叠（裸 input 除外，如 b3-switch 保持原生外观） */
-      [data-plugin-dialog="toolbar-customizer"] .config-item {
-        flex-direction: column !important;
-        align-items: stretch !important;
-      }
-      [data-plugin-dialog="toolbar-customizer"] .config-item > .fn__flex-1 {
-        width: 100% !important;
-        flex: none !important;
-      }
-      [data-plugin-dialog="toolbar-customizer"] .config-item > .fn__space {
-        display: none !important;
-      }
-      [data-plugin-dialog="toolbar-customizer"] .config-item > .fn__flex-center:not(input),
-      [data-plugin-dialog="toolbar-customizer"] .config-item > .fn__flex-center.fn__size200:not(input) {
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 0 !important;
-        justify-content: flex-start !important;
-        align-items: stretch !important;
-        margin-top: 8px;
-      }
-      /* 例外①：裸开关保持横向一行（不覆写宽度，让 b3-switch 原生样式生效） */
-      [data-plugin-dialog="toolbar-customizer"] .config-item:has(> input.b3-switch) {
-        flex-direction: row !important;
-        align-items: center !important;
-      }
-      [data-plugin-dialog="toolbar-customizer"] .config-item:has(> input.b3-switch) > .fn__space {
-        display: block !important;
-        flex: none !important;
-        width: 12px !important;
-        min-width: 12px !important;
-      }
-	      /* 例外②：标记项保持横向一行 */
-	      [data-plugin-dialog="toolbar-customizer"] .config-item:has(.whale-row-layout) {
-	        flex-direction: row !important;
-	        align-items: center !important;
-	      }
-	      [data-plugin-dialog="toolbar-customizer"] .config-item:has(.whale-row-layout) > .fn__space {
-	        display: block !important;
-	      }
-	      [data-plugin-dialog="toolbar-customizer"] .config-item:has(.whale-row-layout) > .fn__flex-center,
-	      [data-plugin-dialog="toolbar-customizer"] .config-item:has(.whale-row-layout) > .fn__flex-center.fn__size200 {
-	        width: auto !important;
-	        margin-top: 0 !important;
-	      }
-	    `
+	    style.textContent = t("settings.mobile.90", undefined, "\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .b3-dialog__container {\n\t        max-width: 100% !important;\n\t      }\n      /* 默认全部纵向堆叠（裸 input 除外，如 b3-switch 保持原生外观） */\n      [data-plugin-dialog=\"toolbar-customizer\"] .config-item {\n        flex-direction: column !important;\n        align-items: stretch !important;\n      }\n      [data-plugin-dialog=\"toolbar-customizer\"] .config-item > .fn__flex-1 {\n        width: 100% !important;\n        flex: none !important;\n      }\n      [data-plugin-dialog=\"toolbar-customizer\"] .config-item > .fn__space {\n        display: none !important;\n      }\n      [data-plugin-dialog=\"toolbar-customizer\"] .config-item > .fn__flex-center:not(input),\n      [data-plugin-dialog=\"toolbar-customizer\"] .config-item > .fn__flex-center.fn__size200:not(input) {\n        width: 100% !important;\n        max-width: 100% !important;\n        min-width: 0 !important;\n        justify-content: flex-start !important;\n        align-items: stretch !important;\n        margin-top: 8px;\n      }\n      /* 例外①：裸开关保持横向一行（不覆写宽度，让 b3-switch 原生样式生效） */\n      [data-plugin-dialog=\"toolbar-customizer\"] .config-item:has(> input.b3-switch) {\n        flex-direction: row !important;\n        align-items: center !important;\n      }\n      [data-plugin-dialog=\"toolbar-customizer\"] .config-item:has(> input.b3-switch) > .fn__space {\n        display: block !important;\n        flex: none !important;\n        width: 12px !important;\n        min-width: 12px !important;\n      }\n\t      /* 例外②：标记项保持横向一行 */\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config-item:has(.whale-row-layout) {\n\t        flex-direction: row !important;\n\t        align-items: center !important;\n\t      }\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config-item:has(.whale-row-layout) > .fn__space {\n\t        display: block !important;\n\t      }\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config-item:has(.whale-row-layout) > .fn__flex-center,\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config-item:has(.whale-row-layout) > .fn__flex-center.fn__size200 {\n\t        width: auto !important;\n\t        margin-top: 0 !important;\n\t      }\n\t    ")
 	    document.head.appendChild(style)
 	  }
 
@@ -1040,7 +998,7 @@ export function createMobileSettingLayout(
 	          try {
 	            await onSave(currentValue);
 	          } catch (e) {
-	            console.warn('[Slider] onSave failed:', e);
+	            logger.warn('[Slider] onSave failed:', e);
 	          }
 	        }
 	        _activeSliderDrags.delete(upHandler)
@@ -1198,7 +1156,7 @@ export function createMobileSettingLayout(
           try {
             await onSave(currentValue);
           } catch (e) {
-            console.warn('[Slider] onSave failed:', e);
+            logger.warn('[Slider] onSave failed:', e);
           }
         }
         _activeSliderDrags.delete(upHandler)
@@ -1314,7 +1272,7 @@ export function createMobileSettingLayout(
   }
 
   // === 自定义按钮 ===
-  createGroupTitle('📱','手机端自定义按钮')
+  createGroupTitle('📱',t("settings.mobile.91", undefined, "手机端自定义按钮"))
 
   // 说明文字
   setting.addItem({
@@ -1337,7 +1295,7 @@ export function createMobileSettingLayout(
         color: var(--b3-theme-on-surface);
         line-height: 1.5;
       `
-      container.innerHTML = '💡使用说明:<br>①点击+添加新按钮<br>②在按钮内选择6种功能<br>③点击右下角保存到工具栏<br>④按钮列表（长按拖动排序）'
+      container.innerHTML = t("settings.mobile.92", undefined, "💡使用说明:<br>①点击+添加新按钮<br>②在按钮内选择6种功能<br>③点击右下角保存到工具栏<br>④按钮列表（长按拖动排序）")
       wrapper.appendChild(container)
       return wrapper
     }
@@ -1354,7 +1312,7 @@ export function createMobileSettingLayout(
       const countHint = document.createElement('div')
       countHint.style.cssText = 'font-size:12px;color:var(--b3-theme-on-surface-light);margin-bottom:8px;'
       const updateCountHint = () => {
-        countHint.textContent = `已配置 ${context.buttonConfigs.length} 个按钮，点击展开编辑`
+        countHint.textContent = t("settings.common.configuredButtons", { count: context.buttonConfigs.length }, "已配置 {count} 个按钮，点击展开编辑")
       }
       updateCountHint()
 
@@ -1368,7 +1326,7 @@ export function createMobileSettingLayout(
         font-size: 14px;
         border-radius: 6px;
       `
-      addBtn.textContent = '+ 添加新按钮'
+      addBtn.textContent = t("settings.mobile.93", undefined, "+ 添加新按钮")
 
       const listContainer = document.createElement('div')
       listContainer.style.cssText = 'display: flex; flex-direction: column; gap: 10px;'
@@ -1458,7 +1416,7 @@ export function createMobileSettingLayout(
         const newButtonIndex = context.buttonConfigs.length + 1
         const newButton: ButtonConfig = {
           id: `button_${Date.now()}`,
-          name: `新按钮${newButtonIndex}`,
+          name: t("settings.common.newButton", { index: newButtonIndex }, "新按钮{index}"),
           type: 'builtin',
           builtinId: 'menuSearch',
           icon: '♥️',
@@ -1516,10 +1474,10 @@ export function createMobileSettingLayout(
         })
         mobilePreviewEl = previewEl
       } catch (e) {
-        console.error('[MobilePreview] 创建预览失败:', e)
+        logger.error('[MobilePreview] 创建预览失败:', e)
         const errEl = document.createElement('div')
         errEl.style.cssText = 'color:var(--b3-card-error-color);font-size:12px;padding:8px;'
-        errEl.textContent = '⚠️ 工具栏预览加载失败，请检查控制台错误'
+        errEl.textContent = t("settings.mobile.94", undefined, "⚠️ 工具栏预览加载失败，请检查控制台错误")
         container.appendChild(errEl)
       }
 
@@ -1538,7 +1496,7 @@ export function createMobileSettingLayout(
   })
 
   // === 手机端全局按钮配置 ===
-  createGroupTitle('1️⃣ ','全局按钮配置')
+  createGroupTitle('1️⃣ ',t("settings.mobile.95", undefined, "全局按钮配置"))
 
   // 存储所有配置项的 input 元素，用于统一控制禁用状态
   const mobileConfigInputs: HTMLInputElement[] = []
@@ -1558,12 +1516,12 @@ export function createMobileSettingLayout(
   }
 
 // 说明文字
-  createNotice('📱手机端配置调整，修改后会批量应用到每个按钮配置值，单个按钮的独立配置优先级更高')
+  createNotice(t("settings.mobile.96", undefined, "📱手机端配置调整，修改后会批量应用到每个按钮配置值，单个按钮的独立配置优先级更高"))
 
   // 全局配置启用开关（放在最前面）
   setting.addItem({
-    title: '①启用全局按钮配置',
-    description: '💡 关闭后，修改全局配置不会影响已有按钮，仅作为新建按钮的默认值',
+    title: t("settings.mobile.97", undefined, "①启用全局按钮配置"),
+    description: t("settings.mobile.98", undefined, "💡 关闭后，修改全局配置不会影响已有按钮，仅作为新建按钮的默认值"),
     createActionElement: () => {
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
@@ -1597,8 +1555,8 @@ export function createMobileSettingLayout(
 
   // 图标大小
   setting.addItem({
-    title: '②图标大小 (px)',
-    description: '💡 所有按钮的图标大小，建议与【按钮宽度】设置相同',
+    title: t("settings.mobile.99", undefined, "②图标大小 (px)"),
+    description: t("settings.mobile.100", undefined, "💡 所有按钮的图标大小，建议与【按钮宽度】设置相同"),
     createActionElement: () => {
       const config = context.mobileGlobalButtonConfig;
       const currentValue = config.iconSize || 16;
@@ -1634,8 +1592,8 @@ export function createMobileSettingLayout(
 
   // 按钮宽度
   setting.addItem({
-    title: '③按钮宽度 (px)📏',
-    description: '💡 所有按钮的最小宽度，建议与【图标大小】设置相同，效果更好',
+    title: t("settings.mobile.101", undefined, "③按钮宽度 (px)📏"),
+    description: t("settings.mobile.102", undefined, "💡 所有按钮的最小宽度，建议与【图标大小】设置相同，效果更好"),
     createActionElement: () => {
       const config = context.mobileGlobalButtonConfig;
       const currentValue = config.minWidth || 32;
@@ -1671,8 +1629,8 @@ export function createMobileSettingLayout(
 
   // 右边距
   setting.addItem({
-    title: '④右边距 (px)➡️',
-    description: '💡 所有按钮的右侧边距',
+    title: t("settings.mobile.103", undefined, "④右边距 (px)➡️"),
+    description: t("settings.mobile.104", undefined, "💡 所有按钮的右侧边距"),
     createActionElement: () => {
       const config = context.mobileGlobalButtonConfig;
       const currentValue = config.marginRight || 8;
@@ -1708,8 +1666,8 @@ export function createMobileSettingLayout(
 
   // 右上角提示
   setting.addItem({
-    title: '⑤右上角提示📢',
-    description: '💡 所有按钮是否显示右上角提示',
+    title: t("settings.mobile.105", undefined, "⑤右上角提示📢"),
+    description: t("settings.mobile.106", undefined, "💡 所有按钮是否显示右上角提示"),
     createActionElement: () => {
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
@@ -1741,8 +1699,8 @@ export function createMobileSettingLayout(
 
   // 其他插件按钮预留宽度
   setting.addItem({
-    title: '⑥其他插件按钮预留宽度',
-    description: '💡 仅影响主工具栏溢出计算：额外预留右侧空间给其他插件按钮（扩展工具栏不受影响）',
+    title: t("settings.mobile.107", undefined, "⑥其他插件按钮预留宽度"),
+    description: t("settings.mobile.108", undefined, "💡 仅影响主工具栏溢出计算：额外预留右侧空间给其他插件按钮（扩展工具栏不受影响）"),
     createActionElement: () => {
       const config = context.mobileGlobalButtonConfig
       const currentValue = config.externalButtonsReserveWidth ?? 0
@@ -1773,15 +1731,15 @@ export function createMobileSettingLayout(
   // === 移动端工具栏设置 ===
 
   // === 全局工具栏配置 ===
-  createGroupTitle('2️⃣ ','全局工具栏配置')
+  createGroupTitle('2️⃣ ',t("settings.mobile.109", undefined, "全局工具栏配置"))
 
   // 说明文字
-  createNotice('📱手机端工具栏样式调整，推荐配置：40px高、分割线、跟随主题、100%')
+  createNotice(t("settings.mobile.110", undefined, "📱手机端工具栏样式调整，推荐配置：40px高、分割线、跟随主题、100%"))
 
   // 工具栏自身高度
   setting.addItem({
-    title: '①工具栏自身高度',
-    description: '💡设置工具栏自身的高度',
+    title: t("settings.mobile.111", undefined, "①工具栏自身高度"),
+    description: t("settings.mobile.112", undefined, "💡设置工具栏自身的高度"),
     createActionElement: () => {
       // 解析当前值，如果当前值不是数字则使用默认值
       const currentValue = parseLengthSliderInt(context.mobileConfig.toolbarHeight, 40)
@@ -1805,8 +1763,8 @@ export function createMobileSettingLayout(
 
   // 工具栏样式选择（分割线 × 毛玻璃 四宫格组合；底层仍存 toolbarStyle + glassEffect 两字段）
   setting.addItem({
-    title: '②工具栏样式选择',
-    description: '💡毛玻璃=半透明背景+背景模糊；分割线=按钮之间的间隔线；两者可任意组合（仅顶部/底部固定模式生效）',
+    title: t("settings.mobile.113", undefined, "②工具栏样式选择"),
+    description: t("settings.mobile.114", undefined, "💡毛玻璃=半透明背景+背景模糊；分割线=按钮之间的间隔线；两者可任意组合（仅顶部/底部固定模式生效）"),
     createActionElement: () => {
       const config = context.mobileFeatureConfig as any
       const currentStyle = config.toolbarStyle || 'divider'
@@ -1814,10 +1772,10 @@ export function createMobileSettingLayout(
 
       // 组合项：style/glass 为写入的两个底层字段，key 用于选中态判断
       const combos = [
-        { key: 'plain', label: '默认样式', desc: '实色背景', style: 'default', glass: false },
-        { key: 'glass', label: '毛玻璃样式', desc: '半透明磨砂', style: 'default', glass: true },
-        { key: 'divider', label: '默认+分割线', desc: '实色+间隔线', style: 'divider', glass: false },
-        { key: 'gdiv', label: '毛玻璃+分割线', desc: '磨砂+间隔线', style: 'divider', glass: true },
+        { key: 'plain', label: t("settings.mobile.115", undefined, "默认样式"), desc: t("settings.mobile.116", undefined, "实色背景"), style: 'default', glass: false },
+        { key: 'glass', label: t("settings.mobile.117", undefined, "毛玻璃样式"), desc: t("settings.mobile.118", undefined, "半透明磨砂"), style: 'default', glass: true },
+        { key: 'divider', label: t("settings.mobile.119", undefined, "默认+分割线"), desc: t("settings.mobile.120", undefined, "实色+间隔线"), style: 'divider', glass: false },
+        { key: 'gdiv', label: t("settings.mobile.121", undefined, "毛玻璃+分割线"), desc: t("settings.mobile.122", undefined, "磨砂+间隔线"), style: 'divider', glass: true },
       ]
 
       const container = document.createElement('div')
@@ -1890,8 +1848,8 @@ export function createMobileSettingLayout(
 
   // 工具栏背景颜色（明亮模式 + 黑暗模式）
   setting.addItem({
-    title: '③工具栏背景颜色',
-    description: '💡点击色块选择颜色，或直接输入颜色值，或跟随主题',
+    title: t("settings.mobile.123", undefined, "③工具栏背景颜色"),
+    description: t("settings.mobile.124", undefined, "💡点击色块选择颜色，或直接输入颜色值，或跟随主题"),
     createActionElement: () => {
       const container = document.createElement('div')
       container.style.cssText = 'display: flex; flex-direction: column; gap: 10px;'
@@ -1901,7 +1859,7 @@ export function createMobileSettingLayout(
       lightRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
 
       const lightLabel = document.createElement('span')
-      lightLabel.textContent = '☀️ 明亮模式：'
+      lightLabel.textContent = t("settings.mobile.125", undefined, "☀️ 明亮模式：")
       lightLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 85px;'
 
       // 明亮模式颜色选择器
@@ -1944,7 +1902,7 @@ export function createMobileSettingLayout(
       darkRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
 
       const darkLabel = document.createElement('span')
-      darkLabel.textContent = '🌙 黑暗模式：'
+      darkLabel.textContent = t("settings.mobile.126", undefined, "🌙 黑暗模式：")
       darkLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 85px;'
 
       // 黑暗模式颜色选择器
@@ -1995,7 +1953,7 @@ export function createMobileSettingLayout(
 
       // 主题色标签
       const themeLabel = document.createElement('span')
-      themeLabel.textContent = '🎨 跟随主题颜色（自动适应明暗模式）'
+      themeLabel.textContent = t("settings.mobile.127", undefined, "🎨 跟随主题颜色（自动适应明暗模式）")
       themeLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background);'
 
       // 更新禁用状态
@@ -2036,7 +1994,7 @@ export function createMobileSettingLayout(
       followCheckbox.style.cssText = 'transform: scale(0.8);'
 
       const followLabel = document.createElement('span')
-      followLabel.textContent = '⋯ 扩展工具栏样式跟随主工具栏'
+      followLabel.textContent = t("settings.mobile.128", undefined, "⋯ 扩展工具栏样式跟随主工具栏")
       followLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background);'
 
       followCheckbox.onchange = async () => {
@@ -2059,12 +2017,12 @@ export function createMobileSettingLayout(
 
   // 工具栏透明度
   setting.addItem({
-    title: '④工具栏透明度',
-    description: '💡(0=完全透明，100=完全不透明)',
+    title: t("settings.mobile.129", undefined, "④工具栏透明度"),
+    description: t("settings.mobile.130", undefined, "💡(0=完全透明，100=完全不透明)"),
     createActionElement: () => {
       const currentValue = Math.round((context.mobileConfig.toolbarOpacity ?? 1) * 100);
       return createCustomSlider(
-        '透明度：',
+        t("settings.mobile.131", undefined, "透明度："),
         currentValue,
         0,
         100,
@@ -2080,8 +2038,8 @@ export function createMobileSettingLayout(
 
   // 工具栏层级（共享配置）
   setting.addItem({
-    title: '⑤工具栏层级',
-    description: '💡值越大，越不容易被遮挡。默认5，显示在设置上层为512（顶部和底部通用）',
+    title: t("settings.mobile.132", undefined, "⑤工具栏层级"),
+    description: t("settings.mobile.133", undefined, "💡值越大，越不容易被遮挡。默认5，显示在设置上层为512（顶部和底部通用）"),
     createActionElement: () => {
       const currentValue = context.mobileConfig.toolbarZIndex ?? 5;
       
@@ -2102,10 +2060,10 @@ export function createMobileSettingLayout(
   })
 
   // === 工具栏位置配置（整合顶部和底部配置） ===
-  createGroupTitle('3️⃣ ','工具栏位置配置')
+  createGroupTitle('3️⃣ ',t("settings.mobile.134", undefined, "工具栏位置配置"))
 
   // 说明文字
-  createNotice('📍选择📱工具栏显示位置，下方会显示对应的配置选项；默认配置已经调好，若修改，请认真阅读和理解')
+  createNotice(t("settings.mobile.135", undefined, "📍选择📱工具栏显示位置，下方会显示对应的配置选项；默认配置已经调好，若修改，请认真阅读和理解"))
 
   setting.addItem({
     title: '',
@@ -2120,10 +2078,10 @@ export function createMobileSettingLayout(
       container.style.cssText = 'display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: center;'
 
       const options = [
-        { value: 'top', label: '顶部固定' },
-        { value: 'bottom', label: '底部固定' },
-        { value: 'floating', label: '底部胶囊' },
-        { value: 'side-floating', label: '侧边胶囊' }
+        { value: 'top', label: t("settings.mobile.136", undefined, "顶部固定") },
+        { value: 'bottom', label: t("settings.mobile.137", undefined, "底部固定") },
+        { value: 'floating', label: t("settings.mobile.138", undefined, "底部胶囊") },
+        { value: 'side-floating', label: t("settings.mobile.139", undefined, "侧边胶囊") }
       ]
 
       // 确定当前选中的值
@@ -2298,7 +2256,7 @@ export function createMobileSettingLayout(
 
   // === 随思源导航栏自动隐藏工具栏开关（对顶部固定/底部固定/底部胶囊均生效） ===
   setting.addItem({
-    title: '✅随思源导航栏自动隐藏工具栏',
+    title: t("settings.mobile.140", undefined, "✅随思源导航栏自动隐藏工具栏"),
     createActionElement: () => {
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
@@ -2321,14 +2279,14 @@ export function createMobileSettingLayout(
     createActionElement: () => {
       const div = document.createElement('div')
       div.className = 'top-toolbar-section'
-      div.innerHTML = '<span style="font-size: 14px; font-weight: 600; color: #3b82f6; display: flex; align-items: center; gap: 6px;"><span>⬆️</span><span>顶部工具栏配置</span></span>'
+      div.innerHTML = t("settings.mobile.141", undefined, "<span style=\"font-size: 14px; font-weight: 600; color: #3b82f6; display: flex; align-items: center; gap: 6px;\"><span>⬆️</span><span>顶部工具栏配置</span></span>")
       return div
     }
   })
 
   setting.addItem({
-    title: '①距离顶部高度',
-    description: '💡顶部工具栏距离屏幕顶部的距离（仅在顶部固定时有效）',
+    title: t("settings.mobile.142", undefined, "①距离顶部高度"),
+    description: t("settings.mobile.143", undefined, "💡顶部工具栏距离屏幕顶部的距离（仅在顶部固定时有效）"),
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValueStr = context.mobileConfig.topToolbarOffset ?? '45px';
@@ -2360,8 +2318,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '②扩展工具栏距离顶部工具栏',
-    description: '💡扩展工具栏第1层距离顶部主工具栏的距离（仅在顶部固定时有效）',
+    title: t("settings.mobile.144", undefined, "②扩展工具栏距离顶部工具栏"),
+    description: t("settings.mobile.145", undefined, "💡扩展工具栏第1层距离顶部主工具栏的距离（仅在顶部固定时有效）"),
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValueStr = context.mobileConfig.overflowToolbarDistanceTop ?? '8px';
@@ -2393,8 +2351,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '③扩展工具栏自身高度',
-    description: '💡顶部模式时扩展工具栏每一层的高度',
+    title: t("settings.mobile.146", undefined, "③扩展工具栏自身高度"),
+    description: t("settings.mobile.147", undefined, "💡顶部模式时扩展工具栏每一层的高度"),
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValueStr = context.mobileConfig.overflowToolbarHeightTop ?? '40px';
@@ -2426,8 +2384,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '④重试加载机制',
-    description: '💡防止加载失效，延迟后重试（0=无重试）',
+    title: t("settings.mobile.148", undefined, "④重试加载机制"),
+    description: t("settings.mobile.149", undefined, "💡防止加载失效，延迟后重试（0=无重试）"),
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValue = context.mobileConfig.topToolbarRetryDelay ?? 0;
@@ -2466,14 +2424,14 @@ export function createMobileSettingLayout(
     createActionElement: () => {
       const div = document.createElement('div')
       div.className = 'bottom-toolbar-section'
-      div.innerHTML = '<span style="font-size: 14px; font-weight: 600; color: #22c55e; display: flex; align-items: center; gap: 6px;"><span>⬇️</span><span>底部工具栏配置</span></span>'
+      div.innerHTML = t("settings.mobile.150", undefined, "<span style=\"font-size: 14px; font-weight: 600; color: #22c55e; display: flex; align-items: center; gap: 6px;\"><span>⬇️</span><span>底部工具栏配置</span></span>")
       return div
     }
   })
 
   setting.addItem({
-    title: '①输入法关闭时底部高度',
-    description: '💡输入法关闭时，工具栏距底部距离（仅在底部固定时有效）',
+    title: t("settings.mobile.151", undefined, "①输入法关闭时底部高度"),
+    description: t("settings.mobile.152", undefined, "💡输入法关闭时，工具栏距底部距离（仅在底部固定时有效）"),
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValueStr = context.mobileConfig.closeInputOffset ?? '0';
@@ -2507,8 +2465,8 @@ export function createMobileSettingLayout(
 
 
   setting.addItem({
-    title: '②输入法打开时底部高度',
-    description: '💡输入法弹出时，底部工具栏距底部距离（仅在底部固定时有效）',
+    title: t("settings.mobile.153", undefined, "②输入法打开时底部高度"),
+    description: t("settings.mobile.154", undefined, "💡输入法弹出时，底部工具栏距底部距离（仅在底部固定时有效）"),
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValueStr = context.mobileConfig.openInputOffset ?? '0';
@@ -2541,8 +2499,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '③输入法灵敏度检查',
-    description: '💡不建议修改：窗口高度变化超过此百分比触发：30-90（仅在底部固定时有效）',
+    title: t("settings.mobile.155", undefined, "③输入法灵敏度检查"),
+    description: t("settings.mobile.156", undefined, "💡不建议修改：窗口高度变化超过此百分比触发：30-90（仅在底部固定时有效）"),
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValue = context.mobileConfig.heightThreshold ?? 70;
@@ -2574,8 +2532,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '④扩展工具栏距离底部工具栏',
-    description: '💡扩展工具栏第 1 层距离底部主工具栏的距离（仅在底部固定时有效）',
+    title: t("settings.mobile.157", undefined, "④扩展工具栏距离底部工具栏"),
+    description: t("settings.mobile.158", undefined, "💡扩展工具栏第 1 层距离底部主工具栏的距离（仅在底部固定时有效）"),
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValueStr = context.mobileConfig.overflowToolbarDistanceBottom ?? '8px';
@@ -2607,8 +2565,8 @@ export function createMobileSettingLayout(
   })
   
   setting.addItem({
-    title: '⑤扩展工具栏自身高度',
-    description: '💡底部模式时扩展工具栏每一层的高度',
+    title: t("settings.mobile.159", undefined, "⑤扩展工具栏自身高度"),
+    description: t("settings.mobile.160", undefined, "💡底部模式时扩展工具栏每一层的高度"),
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValueStr = context.mobileConfig.overflowToolbarHeightBottom ?? '40px';
@@ -2640,8 +2598,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '⑥重试加载机制',
-    description: '💡防止加载失效，延迟后重试（0=无重试）',
+    title: t("settings.mobile.161", undefined, "⑥重试加载机制"),
+    description: t("settings.mobile.162", undefined, "💡防止加载失效，延迟后重试（0=无重试）"),
     createActionElement: () => {
       // 解析当前值，提取数字部分
       const currentValue = context.mobileConfig.bottomToolbarRetryDelay ?? 2000;
@@ -2673,8 +2631,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '⑦扩展栏打开时显示思源导航栏',
-    description: '💡开启后默认隐藏思源导航栏，点击扩展按钮展开扩展栏时显示在扩展栏上方（底部胶囊模式始终生效）',
+    title: t("settings.mobile.163", undefined, "⑦扩展栏打开时显示思源导航栏"),
+    description: t("settings.mobile.164", undefined, "💡开启后默认隐藏思源导航栏，点击扩展按钮展开扩展栏时显示在扩展栏上方（底部胶囊模式始终生效）"),
     createActionElement: () => {
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
@@ -2702,14 +2660,14 @@ export function createMobileSettingLayout(
     createActionElement: () => {
       const div = document.createElement('div')
       div.className = 'floating-toolbar-section'
-      div.innerHTML = '<span style="font-size: 14px; font-weight: 600; color: #a855f7; display: flex; align-items: center; gap: 6px;"><span>💊</span><span>底部胶囊配置</span></span>'
+      div.innerHTML = t("settings.mobile.165", undefined, "<span style=\"font-size: 14px; font-weight: 600; color: #a855f7; display: flex; align-items: center; gap: 6px;\"><span>💊</span><span>底部胶囊配置</span></span>")
       return div
     }
   })
 
   setting.addItem({
-    title: '①胶囊距底部距离',
-    description: '💡胶囊工具栏距离屏幕底部的间距',
+    title: t("settings.mobile.166", undefined, "①胶囊距底部距离"),
+    description: t("settings.mobile.167", undefined, "💡胶囊工具栏距离屏幕底部的间距"),
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.floatingToolbarMargin ?? '50px';
       const currentValue = parseLengthSliderInt(currentValueStr, 50);
@@ -2732,8 +2690,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '②胶囊自身高度',
-    description: '💡胶囊工具栏自身的高度',
+    title: t("settings.mobile.168", undefined, "②胶囊自身高度"),
+    description: t("settings.mobile.169", undefined, "💡胶囊工具栏自身的高度"),
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.floatingToolbarHeight ?? '40px';
       const currentValue = parseLengthSliderInt(currentValueStr, 40);
@@ -2756,8 +2714,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '③胶囊圆角大小',
-    description: '💡胶囊工具栏的圆角弧度，值越大越圆',
+    title: t("settings.mobile.170", undefined, "③胶囊圆角大小"),
+    description: t("settings.mobile.171", undefined, "💡胶囊工具栏的圆角弧度，值越大越圆"),
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.floatingToolbarBorderRadius ?? '24px';
       const currentValue = parseLengthSliderInt(currentValueStr, 24);
@@ -2780,8 +2738,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '④胶囊自身宽度',
-    description: '💡胶囊工具栏自身的固定宽度（0=自动适应按钮宽度）',
+    title: t("settings.mobile.172", undefined, "④胶囊自身宽度"),
+    description: t("settings.mobile.173", undefined, "💡胶囊工具栏自身的固定宽度（0=自动适应按钮宽度）"),
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.floatingToolbarWidth ?? '280';
       const currentValue = parseLengthSliderInt(currentValueStr, 0);
@@ -2804,8 +2762,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '⑤胶囊扩展栏间距',
-    description: '💡扩展工具栏与胶囊之间的间距',
+    title: t("settings.mobile.174", undefined, "⑤胶囊扩展栏间距"),
+    description: t("settings.mobile.175", undefined, "💡扩展工具栏与胶囊之间的间距"),
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.floatingToolbarOverflowDistance ?? '8';
       const currentValue = parseLengthSliderInt(currentValueStr, 8);
@@ -2828,8 +2786,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '⑥滚动隐藏',
-    description: '💡开启后向下滚动时胶囊自动隐藏，向上滚动时重新显示',
+    title: t("settings.mobile.176", undefined, "⑥滚动隐藏"),
+    description: t("settings.mobile.177", undefined, "💡开启后向下滚动时胶囊自动隐藏，向上滚动时重新显示"),
     createActionElement: () => {
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
@@ -2858,16 +2816,16 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '⑦胶囊样式',
-    description: '💡普通模式为当前样式，毛玻璃模式为半透明磨砂效果',
+    title: t("settings.mobile.178", undefined, "⑦胶囊样式"),
+    description: t("settings.mobile.179", undefined, "💡普通模式为当前样式，毛玻璃模式为半透明磨砂效果"),
     createActionElement: () => {
       const wrapper = document.createElement('div')
       wrapper.style.cssText = 'display: flex; gap: 12px; align-items: center;'
       wrapper.classList.add('floating-toolbar-setting')
 
 	      const styles = [
-        { value: 'normal', label: '普通模式' },
-        { value: 'glass', label: '毛玻璃' },
+        { value: 'normal', label: t("settings.mobile.180", undefined, "普通模式") },
+        { value: 'glass', label: t("settings.mobile.181", undefined, "毛玻璃") },
       ]
 
 	      styles.forEach(s => {
@@ -2915,23 +2873,23 @@ export function createMobileSettingLayout(
     createActionElement: () => {
       const div = document.createElement('div')
       div.className = 'side-floating-toolbar-section'
-      div.innerHTML = '<span style="font-size: 14px; font-weight: 600; color: #a855f7; display: flex; align-items: center; gap: 6px;"><span>💊</span><span>侧边胶囊配置</span></span>'
+      div.innerHTML = t("settings.mobile.182", undefined, "<span style=\"font-size: 14px; font-weight: 600; color: #a855f7; display: flex; align-items: center; gap: 6px;\"><span>💊</span><span>侧边胶囊配置</span></span>")
       return div
     }
   })
 
   // ① 微缩小胶囊吸附侧
   setting.addItem({
-    title: '①微缩小胶囊吸附侧',
-    description: '💡收起状态的 ⋮ 按钮吸附在屏幕的左侧还是右侧',
+    title: t("settings.mobile.183", undefined, "①微缩小胶囊吸附侧"),
+    description: t("settings.mobile.184", undefined, "💡收起状态的 ⋮ 按钮吸附在屏幕的左侧还是右侧"),
     createActionElement: () => {
       const wrapper = document.createElement('div')
       wrapper.style.cssText = 'display: flex; gap: 12px; align-items: center;'
       wrapper.classList.add('side-floating-toolbar-setting')
 
       const sides = [
-        { value: 'left', label: '左侧' },
-        { value: 'right', label: '右侧' },
+        { value: 'left', label: t("settings.mobile.185", undefined, "左侧") },
+        { value: 'right', label: t("settings.mobile.186", undefined, "右侧") },
       ]
 
       sides.forEach(s => {
@@ -2973,8 +2931,8 @@ export function createMobileSettingLayout(
 
   // ② 微缩小胶囊距离底部高度
   setting.addItem({
-    title: '②微缩小胶囊距离底部高度',
-    description: '💡收起状态的 ⋮ 按钮距离屏幕底部的间距',
+    title: t("settings.mobile.187", undefined, "②微缩小胶囊距离底部高度"),
+    description: t("settings.mobile.188", undefined, "💡收起状态的 ⋮ 按钮距离屏幕底部的间距"),
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.sideMiniBottom ?? '40px';
       const currentValue = parseLengthSliderInt(currentValueStr, 40);
@@ -2998,16 +2956,16 @@ export function createMobileSettingLayout(
 
   // ③ 展开胶囊吸附侧
   setting.addItem({
-    title: '③展开胶囊吸附侧',
-    description: '💡新版本展开工具栏已跟随微缩胶囊吸附侧（由①控制），本项不再生效',
+    title: t("settings.mobile.189", undefined, "③展开胶囊吸附侧"),
+    description: t("settings.mobile.190", undefined, "💡新版本展开工具栏已跟随微缩胶囊吸附侧（由①控制），本项不再生效"),
     createActionElement: () => {
       const wrapper = document.createElement('div')
       wrapper.style.cssText = 'display: flex; gap: 12px; align-items: center;'
       wrapper.classList.add('side-floating-toolbar-setting')
 
       const sides = [
-        { value: 'left', label: '左侧' },
-        { value: 'right', label: '右侧' },
+        { value: 'left', label: t("settings.mobile.191", undefined, "左侧") },
+        { value: 'right', label: t("settings.mobile.192", undefined, "右侧") },
       ]
 
       sides.forEach(s => {
@@ -3049,8 +3007,8 @@ export function createMobileSettingLayout(
 
   // ④ 展开胶囊距离底部高度
   setting.addItem({
-    title: '④展开胶囊距离底部高度',
-    description: '💡新版本展开工具栏已固定贴于微缩胶囊上方（由②推导），本项不再生效',
+    title: t("settings.mobile.193", undefined, "④展开胶囊距离底部高度"),
+    description: t("settings.mobile.194", undefined, "💡新版本展开工具栏已固定贴于微缩胶囊上方（由②推导），本项不再生效"),
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.sideFloatingBottom ?? '100px';
       const currentValue = parseLengthSliderInt(currentValueStr, 100);
@@ -3074,8 +3032,8 @@ export function createMobileSettingLayout(
 
   // ⑤ 展开胶囊边距
   setting.addItem({
-    title: '⑤展开胶囊边距',
-    description: '💡新版本展开工具栏已固定与微缩胶囊同距屏幕侧边，本项不再生效',
+    title: t("settings.mobile.195", undefined, "⑤展开胶囊边距"),
+    description: t("settings.mobile.196", undefined, "💡新版本展开工具栏已固定与微缩胶囊同距屏幕侧边，本项不再生效"),
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.sideFloatingMargin ?? '12px';
       const currentValue = parseLengthSliderInt(currentValueStr, 12);
@@ -3099,8 +3057,8 @@ export function createMobileSettingLayout(
 
   // ⑥ 展开胶囊圆角大小
   setting.addItem({
-    title: '⑥展开胶囊圆角大小',
-    description: '💡展开面板的圆角弧度，值越大越圆',
+    title: t("settings.mobile.197", undefined, "⑥展开胶囊圆角大小"),
+    description: t("settings.mobile.198", undefined, "💡展开面板的圆角弧度，值越大越圆"),
     createActionElement: () => {
       const currentValueStr = context.mobileConfig.sideFloatingRadius ?? '24px';
       const currentValue = parseLengthSliderInt(currentValueStr, 24);
@@ -3123,7 +3081,7 @@ export function createMobileSettingLayout(
   })
 
   // === 一键记事弹窗 ===
-  createGroupTitle('4️⃣ ','一键记事弹窗', 'quick-note-settings-section')
+  createGroupTitle('4️⃣ ',t("settings.mobile.199", undefined, "一键记事弹窗"), 'quick-note-settings-section')
   
   // 总引导说明
   setting.addItem({
@@ -3147,7 +3105,7 @@ export function createMobileSettingLayout(
         color: #b71c1c;
       `;
       
-      container.textContent = '📝 请先选择触发方式，再配置笔记本或文档 ID，选择插入位置，进行弹窗细化设置。';
+      container.textContent = t("settings.mobile.200", undefined, "📝 请先选择触发方式，再配置笔记本或文档 ID，选择插入位置，进行弹窗细化设置。");
       wrapper.appendChild(container);
       return wrapper;
     }
@@ -3176,18 +3134,14 @@ export function createMobileSettingLayout(
       // 添加触发方式说明
       const triggerInfo = document.createElement('div');
       triggerInfo.style.cssText = 'padding: 12px; background: #e3f2fd; border: 1px solid #bbdefb; border-radius: 6px; margin-bottom: 16px; font-size: 14px; line-height: 1.5;';
-      triggerInfo.innerHTML = `
-        <div style="font-weight: 600; margin-bottom: 8px; color: #1976d2;">💡触发方式说明：</div>
-        <div style="margin-bottom: 6px;">📱 方式一：按钮触发，请到顶部添加新按钮，选择功能④一键记事弹窗【简单】⏫</div>
-        <div>📱 方式二：自动触发：后台切前台⬇️</div>
-      `;
+      triggerInfo.innerHTML = t("settings.mobile.201", undefined, "\n        <div style=\"font-weight: 600; margin-bottom: 8px; color: #1976d2;\">💡触发方式说明：</div>\n        <div style=\"margin-bottom: 6px;\">📱 方式一：按钮触发，请到顶部添加新按钮，选择功能④一键记事弹窗【简单】⏫</div>\n        <div>📱 方式二：自动触发：后台切前台⬇️</div>\n      ");
       container.appendChild(triggerInfo);
       
       const options = [
-        { type: 'description', content: '请设置方式二：自动触发记事功能的条件' },
-        { value: 'disabled', label: '①关闭自启动', description: '完全关闭自启动记事功能' },
-        { value: 'smallWindowOnly', label: '②只在小窗模式下启用自启动', description: '仅当检测到小窗模式时自动触发记事' },
-        { value: 'bothModes', label: '③小窗和全屏模式都启用自启动', description: '无论全屏还是小窗模式都自动触发记事' }
+        { type: 'description', content: t("settings.mobile.202", undefined, "请设置方式二：自动触发记事功能的条件") },
+        { value: 'disabled', label: t("settings.mobile.203", undefined, "①关闭自启动"), description: t("settings.mobile.204", undefined, "完全关闭自启动记事功能") },
+        { value: 'smallWindowOnly', label: t("settings.mobile.205", undefined, "②只在小窗模式下启用自启动"), description: t("settings.mobile.206", undefined, "仅当检测到小窗模式时自动触发记事") },
+        { value: 'bothModes', label: t("settings.mobile.207", undefined, "③小窗和全屏模式都启用自启动"), description: t("settings.mobile.208", undefined, "无论全屏还是小窗模式都自动触发记事") }
       ]
   
       options.forEach(option => {
@@ -3266,24 +3220,24 @@ export function createMobileSettingLayout(
 
       const imTitle = document.createElement('div');
       imTitle.style.cssText = 'font-size: 14px; font-weight: 600; margin-bottom: 12px;';
-      imTitle.textContent = '⌨️ 输入法自动弹出';
+      imTitle.textContent = t("settings.mobile.209", undefined, "⌨️ 输入法自动弹出");
       container.appendChild(imTitle);
 
       const imItems = [
         {
           key: 'quickNoteAutoFocusButton',
-          label: '按钮触发时',
-          desc: '点击工具栏按钮打开弹窗后，自动聚焦并弹出键盘',
+          label: t("settings.mobile.210", undefined, "按钮触发时"),
+          desc: t("settings.mobile.211", undefined, "点击工具栏按钮打开弹窗后，自动聚焦并弹出键盘"),
         },
         {
           key: 'quickNoteAutoFocusFirstPopup',
-          label: '自启动弹出时',
-          desc: '切后台自动触发弹窗后，切回思源时自动聚焦并弹出键盘',
+          label: t("settings.mobile.212", undefined, "自启动弹出时"),
+          desc: t("settings.mobile.213", undefined, "切后台自动触发弹窗后，切回思源时自动聚焦并弹出键盘"),
         },
         {
           key: 'quickNoteAutoFocusRestore',
-          label: '中途切后台再切回来时',
-          desc: '打字中途切后台再切回来，自动恢复键盘',
+          label: t("settings.mobile.214", undefined, "中途切后台再切回来时"),
+          desc: t("settings.mobile.215", undefined, "打字中途切后台再切回来，自动恢复键盘"),
         },
       ];
 
@@ -3345,13 +3299,13 @@ export function createMobileSettingLayout(
       
       // 标题
       const titleDiv = document.createElement('div');
-      titleDiv.textContent = '①一键记事保存配置';
+      titleDiv.textContent = t("settings.mobile.216", undefined, "①一键记事保存配置");
       titleDiv.style.cssText = 'font-size: 16px; font-weight: 600; color: var(--b3-theme-on-background);';
       container.appendChild(titleDiv);
       
       // 描述
       const descDiv = document.createElement('div');
-      descDiv.textContent = '💡 选择保存方式配置对应的目标ID，实时联动更新';
+      descDiv.textContent = t("settings.mobile.217", undefined, "💡 选择保存方式配置对应的目标ID，实时联动更新");
       descDiv.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); margin-bottom: 8px;';
       container.appendChild(descDiv);
   
@@ -3360,7 +3314,7 @@ export function createMobileSettingLayout(
   
       // 保存方式选择
       const saveTypeLabel = document.createElement('label');
-      saveTypeLabel.textContent = '选择保存方式：';
+      saveTypeLabel.textContent = t("settings.mobile.218", undefined, "选择保存方式：");
       saveTypeLabel.style.cssText = 'font-size: 13px; font-weight: 500;';
       container.appendChild(saveTypeLabel);
   
@@ -3369,8 +3323,8 @@ export function createMobileSettingLayout(
       radioContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px; margin-top: 4px;';
   
       const options = [
-        { value: 'daily', label: '📘 保存到笔记本日记', description: '内容保存到指定笔记本的当日日记' },
-        { value: 'document', label: '📄 追加到指定文档', description: '内容直接追加到指定文档底部或顶部' }
+        { value: 'daily', label: t("settings.mobile.219", undefined, "📘 保存到笔记本日记"), description: t("settings.mobile.220", undefined, "内容保存到指定笔记本的当日日记") },
+        { value: 'document', label: t("settings.mobile.221", undefined, "📄 追加到指定文档"), description: t("settings.mobile.222", undefined, "内容直接追加到指定文档底部或顶部") }
       ];
   
       options.forEach(option => {
@@ -3473,15 +3427,15 @@ export function createMobileSettingLayout(
         }
 
         if (saveType === 'document') {
-          labelEl.textContent = '📄 目标文档ID';
-          inputEl.placeholder = '请输入文档ID，如：20250101000000-aaaaaa';
+          labelEl.textContent = t("settings.mobile.223", undefined, "📄 目标文档ID");
+          inputEl.placeholder = t("settings.mobile.224", undefined, "请输入文档ID，如：20250101000000-aaaaaa");
           inputEl.value = config.quickNoteDocumentId || '';
-          hintEl.textContent = '💡 内容将直接追加到该文档底部或顶部';
+          hintEl.textContent = t("settings.mobile.225", undefined, "💡 内容将直接追加到该文档底部或顶部");
         } else {
-          labelEl.textContent = '📘 目标笔记本ID';
-          inputEl.placeholder = '请粘贴DailyNote所在笔记本ID';
+          labelEl.textContent = t("settings.mobile.226", undefined, "📘 目标笔记本ID");
+          inputEl.placeholder = t("settings.mobile.227", undefined, "请粘贴DailyNote所在笔记本ID");
           inputEl.value = config.quickNoteNotebookId || '';
-          hintEl.textContent = '💡 内容将保存到该笔记本的当日日记中';
+          hintEl.textContent = t("settings.mobile.228", undefined, "💡 内容将保存到该笔记本的当日日记中");
         }
       }
 
@@ -3517,8 +3471,8 @@ export function createMobileSettingLayout(
 
   // ===插入位置选择 ===
   setting.addItem({
-    title: '②位置选择',
-    description: '💡 选择一键记事内容插入到文档的位置',
+    title: t("settings.mobile.229", undefined, "②位置选择"),
+    description: t("settings.mobile.230", undefined, "💡 选择一键记事内容插入到文档的位置"),
     createActionElement: () => {
       const wrapper = document.createElement('div');
       wrapper.style.cssText = `
@@ -3535,13 +3489,13 @@ export function createMobileSettingLayout(
       const options = [
         {
           value: 'top',
-          label: '①插入到文档顶部',
-          description: '最新内容显示在最上面，适合日记、每日清单等'
+          label: t("settings.mobile.231", undefined, "①插入到文档顶部"),
+          description: t("settings.mobile.232", undefined, "最新内容显示在最上面，适合日记、每日清单等")
         },
         {
           value: 'bottom',
-          label: '②插入到文档底部',
-          description: '按时间顺序记录，适合常规笔记'
+          label: t("settings.mobile.233", undefined, "②插入到文档底部"),
+          description: t("settings.mobile.234", undefined, "按时间顺序记录，适合常规笔记")
         }
       ]
 
@@ -3639,14 +3593,14 @@ export function createMobileSettingLayout(
 
   // ===弹窗输入框字体大小 ===
   setting.addItem({
-    title: '④弹窗输入框字体大小',
-    description: '💡 调节一键记事弹窗中输入框的字体大小',
+    title: t("settings.mobile.235", undefined, "④弹窗输入框字体大小"),
+    description: t("settings.mobile.236", undefined, "💡 调节一键记事弹窗中输入框的字体大小"),
     createActionElement: () => {
       const config = context.mobileFeatureConfig as any;
       const currentFontSize = config.quickNoteFontSize || 18;
 
       return createCustomSlider(
-        '字体大小：',
+        t("settings.mobile.237", undefined, "字体大小："),
         currentFontSize,
         12,
         30,
@@ -3661,8 +3615,8 @@ export function createMobileSettingLayout(
 
   //弹编辑器样式选择
   setting.addItem({
-    title: '⑤弹窗编辑器样式选择',
-    description: '选择一键记事弹窗的UI风格',
+    title: t("settings.mobile.238", undefined, "⑤弹窗编辑器样式选择"),
+    description: t("settings.mobile.239", undefined, "选择一键记事弹窗的UI风格"),
     createActionElement: () => {
       const wrapper = document.createElement('div');
       wrapper.style.cssText = `
@@ -3677,8 +3631,8 @@ export function createMobileSettingLayout(
       const currentStyle = config.quickNoteStyle || 'apple';
 
       const options = [
-        { value: 'default', label: '① 默认风格' },
-        { value: 'apple', label: '② 苹果风格' }
+        { value: 'default', label: t("settings.mobile.240", undefined, "① 默认风格") },
+        { value: 'apple', label: t("settings.mobile.241", undefined, "② 苹果风格") }
       ];
 
       options.forEach(option => {
@@ -3737,8 +3691,8 @@ export function createMobileSettingLayout(
 
   // === 弹窗空输入框内容展示 ===
   setting.addItem({
-    title: '⑥弹窗空输入框内容展示',
-    description: '💡 弹窗空输入时，随机展示指定文档中的块段落。留空关闭此功能',
+    title: t("settings.mobile.242", undefined, "⑥弹窗空输入框内容展示"),
+    description: t("settings.mobile.243", undefined, "💡 弹窗空输入时，随机展示指定文档中的块段落。留空关闭此功能"),
     createActionElement: () => {
       const wrapper = document.createElement('div');
       wrapper.style.cssText = `
@@ -3752,14 +3706,14 @@ export function createMobileSettingLayout(
       const config = context.mobileFeatureConfig as any;
 
       const label = document.createElement('label');
-      label.textContent = '📄 文档 ID';
+      label.textContent = t("settings.mobile.244", undefined, "📄 文档 ID");
       label.style.cssText = 'font-size: 13px; font-weight: 500;';
       container.appendChild(label);
 
       const input = document.createElement('input');
       input.type = 'text';
       input.className = 'b3-text-field';
-      input.placeholder = '请输入文档 ID，如：20250101000000-aaaaaa';
+      input.placeholder = t("settings.mobile.245", undefined, "请输入文档 ID，如：20250101000000-aaaaaa");
       input.value = config.quickNoteQuoteDocId || '';
       input.style.cssText = 'font-size: 14px; padding: 8px; width: 100%;';
       container.appendChild(input);
@@ -3772,7 +3726,7 @@ export function createMobileSettingLayout(
       // 字体大小滑杆
       const currentFontSize = config.quickNoteQuoteFontSize || 22;
       const slider = createCustomSlider(
-        '字体大小：',
+        t("settings.mobile.246", undefined, "字体大小："),
         currentFontSize,
         14,
         32,
@@ -3787,11 +3741,11 @@ export function createMobileSettingLayout(
       // 显示行数滑杆
       const currentMaxLines = config.quickNoteQuoteMaxLines || 5;
       const lineSlider = createCustomSlider(
-        '显示行数：',
+        t("settings.mobile.247", undefined, "显示行数："),
         currentMaxLines,
         1,
         10,
-        '行',
+        t("settings.mobile.248", undefined, "行"),
         async (value) => {
           config.quickNoteQuoteMaxLines = value;
           await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
@@ -3805,7 +3759,7 @@ export function createMobileSettingLayout(
       container.appendChild(separator);
 
       const colorTitle = document.createElement('div');
-      colorTitle.textContent = '🎨 字体颜色';
+      colorTitle.textContent = t("settings.mobile.249", undefined, "🎨 字体颜色");
       colorTitle.style.cssText = 'font-size: 13px; font-weight: 500; margin-bottom: 4px;';
       container.appendChild(colorTitle);
 
@@ -3814,7 +3768,7 @@ export function createMobileSettingLayout(
       lightRow.style.cssText = 'display: flex; align-items: center; gap: 8px;';
 
       const lightLabel = document.createElement('span');
-      lightLabel.textContent = '☀️ 明亮模式：';
+      lightLabel.textContent = t("settings.mobile.250", undefined, "☀️ 明亮模式：");
       lightLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 85px;';
 
       const lightColorPicker = document.createElement('input');
@@ -3854,7 +3808,7 @@ export function createMobileSettingLayout(
       darkRow.style.cssText = 'display: flex; align-items: center; gap: 8px;';
 
       const darkLabel = document.createElement('span');
-      darkLabel.textContent = '🌙 暗黑模式：';
+      darkLabel.textContent = t("settings.mobile.251", undefined, "🌙 暗黑模式：");
       darkLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-background); min-width: 85px;';
 
       const darkColorPicker = document.createElement('input');
@@ -3896,8 +3850,8 @@ export function createMobileSettingLayout(
 
   // ===弹窗按钮排序方法 ===
   setting.addItem({
-    title: '⑦弹窗按钮排序方法',
-    description: '💡 选择一键记事弹窗中工具栏按钮的排列方式',
+    title: t("settings.mobile.252", undefined, "⑦弹窗按钮排序方法"),
+    description: t("settings.mobile.253", undefined, "💡 选择一键记事弹窗中工具栏按钮的排列方式"),
     createActionElement: () => {
       const wrapper = document.createElement('div');
       wrapper.style.cssText = `
@@ -3914,15 +3868,15 @@ export function createMobileSettingLayout(
 
       // 创建选项按钮
       const options = [
-        { 
-          value: 'topToolbar', 
-          label: '①顶部工具栏排序', 
-          description: '从右往左排列，不满行时居中。适合习惯顶部工具栏的用户' 
+        {
+          value: 'topToolbar',
+          label: t("settings.mobile.254", undefined, "①顶部工具栏排序"),
+          description: t("settings.mobile.255", undefined, "从右往左排列，不满行时居中。适合习惯顶部工具栏的用户")
         },
-        { 
-          value: 'bottomToolbar', 
-          label: '②底部工具栏排序', 
-          description: '从左往右排列，不满行时靠左。适合习惯底部工具栏的用户' 
+        {
+          value: 'bottomToolbar',
+          label: t("settings.mobile.256", undefined, "②底部工具栏排序"),
+          description: t("settings.mobile.257", undefined, "从左往右排列，不满行时靠左。适合习惯底部工具栏的用户")
         }
       ]
 
@@ -3993,8 +3947,8 @@ export function createMobileSettingLayout(
 
   // 按钮样式配置模式切换
   setting.addItem({
-    title: '⑧弹窗按钮大小配置',
-    description: '💡 选择使用默认配置或自定义配置按钮样式',
+    title: t("settings.mobile.258", undefined, "⑧弹窗按钮大小配置"),
+    description: t("settings.mobile.259", undefined, "💡 选择使用默认配置或自定义配置按钮样式"),
     createActionElement: () => {
       const wrapper = document.createElement('div');
       wrapper.style.cssText = `
@@ -4023,7 +3977,7 @@ export function createMobileSettingLayout(
       defaultRadio.style.cssText = 'transform: scale(1.2);';
 
       const defaultLabel = document.createElement('span');
-      defaultLabel.textContent = '使用默认配置';
+      defaultLabel.textContent = t("settings.mobile.260", undefined, "使用默认配置");
       defaultLabel.style.cssText = 'font-size: 14px;';
 
       defaultOption.appendChild(defaultRadio);
@@ -4040,7 +3994,7 @@ export function createMobileSettingLayout(
       customRadio.style.cssText = 'transform: scale(1.2);';
 
       const customLabel = document.createElement('span');
-      customLabel.textContent = '使用自定义配置';
+      customLabel.textContent = t("settings.mobile.261", undefined, "使用自定义配置");
       customLabel.style.cssText = 'font-size: 14px;';
 
       customOption.appendChild(customRadio);
@@ -4162,27 +4116,27 @@ export function createMobileSettingLayout(
     window.addEventListener('quicknote-button-style-changed', styleHandler)
 
     // 使用自定义滑杆组件
-    wrapper.appendChild(createCustomSlider('按钮高度:', config.quickNoteButtonHeight || 40, 24, 66, 'px', async (value) => {
+    wrapper.appendChild(createCustomSlider(t("settings.mobile.262", undefined, "按钮高度:"), config.quickNoteButtonHeight || 40, 24, 66, 'px', async (value) => {
       config.quickNoteButtonHeight = value;
       await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
     }));
 
-    wrapper.appendChild(createCustomSlider('按钮宽度:', config.quickNoteButtonMinWidth || 36, 20, 60, 'px', async (value) => {
+    wrapper.appendChild(createCustomSlider(t("settings.mobile.263", undefined, "按钮宽度:"), config.quickNoteButtonMinWidth || 36, 20, 60, 'px', async (value) => {
       config.quickNoteButtonMinWidth = value;
       await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
     }));
 
-    wrapper.appendChild(createCustomSlider('外边距:', config.quickNoteButtonMargin || 2, 0, 10, 'px', async (value) => {
+    wrapper.appendChild(createCustomSlider(t("settings.mobile.264", undefined, "外边距:"), config.quickNoteButtonMargin || 2, 0, 10, 'px', async (value) => {
       config.quickNoteButtonMargin = value;
       await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
     }));
 
-    wrapper.appendChild(createCustomSlider('内边距:', config.quickNoteButtonPadding || 8, 0, 20, 'px', async (value) => {
+    wrapper.appendChild(createCustomSlider(t("settings.mobile.265", undefined, "内边距:"), config.quickNoteButtonPadding || 8, 0, 20, 'px', async (value) => {
       config.quickNoteButtonPadding = value;
       await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
     }));
 
-    wrapper.appendChild(createCustomSlider('按钮间距:', config.quickNoteButtonGap || 6, 0, 20, 'px', async (value) => {
+    wrapper.appendChild(createCustomSlider(t("settings.mobile.266", undefined, "按钮间距:"), config.quickNoteButtonGap || 6, 0, 20, 'px', async (value) => {
       config.quickNoteButtonGap = value;
       await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
     }));
@@ -4192,8 +4146,8 @@ export function createMobileSettingLayout(
 
   // ===弹窗按钮选择 ===
   setting.addItem({
-    title: '⑨弹窗按钮显示选择',
-    description: '💡 选择哪些按钮显示在一键记事弹窗中（不选则显示全部）',
+    title: t("settings.mobile.267", undefined, "⑨弹窗按钮显示选择"),
+    description: t("settings.mobile.268", undefined, "💡 选择哪些按钮显示在一键记事弹窗中（不选则显示全部）"),
     createActionElement: () => {
       const wrapper = document.createElement('div');
       wrapper.style.cssText = `
@@ -4213,7 +4167,7 @@ export function createMobileSettingLayout(
 
       if (allButtons.length === 0) {
         const emptyMsg = document.createElement('div');
-        emptyMsg.textContent = '暂无可选按钮，请先在「②手机端按钮」中添加按钮';
+        emptyMsg.textContent = t("settings.mobile.269", undefined, "暂无可选按钮，请先在「②手机端按钮」中添加按钮");
         emptyMsg.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface-light); text-align: center; padding: 16px;';
         container.appendChild(emptyMsg);
         wrapper.appendChild(container);
@@ -4225,7 +4179,7 @@ export function createMobileSettingLayout(
       toggleRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--b3-theme-primary-lightest, rgba(59,130,246,0.08)); border-radius: 6px; margin-bottom: 4px;';
 
       const toggleLabel = document.createElement('span');
-      toggleLabel.textContent = `全部按钮（${allButtons.length} 个）`;
+      toggleLabel.textContent = t('settings.mobile.allButtonsCount', { count: allButtons.length }, '全部按钮（{count} 个）');
       toggleLabel.style.cssText = 'font-size: 14px; font-weight: 500;';
 
       const toggleBtn = document.createElement('button');
@@ -4233,7 +4187,7 @@ export function createMobileSettingLayout(
       toggleBtn.style.cssText = 'font-size: 13px; padding: 4px 12px;';
 
       const isAllSelected = currentIds.length === 0 || currentIds.length === allButtons.length;
-      toggleBtn.textContent = isAllSelected ? '取消全选' : '全选';
+      toggleBtn.textContent = isAllSelected ? t("settings.mobile.270", undefined, "取消全选") : t("settings.mobile.271", undefined, "全选");
 
       toggleRow.appendChild(toggleLabel);
       toggleRow.appendChild(toggleBtn);
@@ -4291,7 +4245,7 @@ export function createMobileSettingLayout(
 
         // 名称
         const nameSpan = document.createElement('span');
-        nameSpan.textContent = btn.name || btn.id;
+        nameSpan.textContent = getButtonDisplayName(btn);
         nameSpan.style.cssText = 'font-size: 14px; flex: 1;';
 
         row.appendChild(checkbox);
@@ -4332,7 +4286,7 @@ export function createMobileSettingLayout(
         }
 
         // 更新切换按钮文本
-        toggleBtn.textContent = selectedIds.length === allButtons.length ? '取消全选' : '全选';
+        toggleBtn.textContent = selectedIds.length === allButtons.length ? t("settings.mobile.272", undefined, "取消全选") : t("settings.mobile.273", undefined, "全选");
 
         await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig);
       };
@@ -4350,10 +4304,10 @@ export function createMobileSettingLayout(
   })
 
   // === 小功能选择 ===
-  createGroupTitle('5️⃣ ','小功能选择')
+  createGroupTitle('5️⃣ ',t("settings.mobile.274", undefined, "小功能选择"))
 
   // 说明文字
-  createNotice('⚙️调整手机端的图标隐藏设置：①面包屑按钮默认隐藏，需要时关闭①即可显示并弹出路径菜单；打开扩展工具栏会强制隐藏②③④原生按钮')
+  createNotice(t("settings.mobile.275", undefined, "⚙️调整手机端的图标隐藏设置：①面包屑按钮默认隐藏，需要时关闭①即可显示并弹出路径菜单；打开扩展工具栏会强制隐藏②③④原生按钮"))
 
   // 检查扩展工具栏按钮是否启用
   const isOverflowButtonEnabled = () => {
@@ -4363,8 +4317,8 @@ export function createMobileSettingLayout(
 
 
   setting.addItem({
-    title: '①面包屑按钮隐藏',
-    description: '💡开启后隐藏手机端「面包屑」按钮（关闭后可在工具栏显示，点击弹出思源原生路径菜单）',
+    title: t("settings.mobile.276", undefined, "①面包屑按钮隐藏"),
+    description: t("settings.mobile.277", undefined, "💡开启后隐藏手机端「面包屑」按钮（关闭后可在工具栏显示，点击弹出思源原生路径菜单）"),
     createActionElement: () => {
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
@@ -4382,8 +4336,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '②锁定编辑按钮隐藏',
-    description: '💡隐藏工具栏的锁定编辑按钮',
+    title: t("settings.mobile.278", undefined, "②锁定编辑按钮隐藏"),
+    description: t("settings.mobile.279", undefined, "💡隐藏工具栏的锁定编辑按钮"),
     createActionElement: () => {
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
@@ -4405,8 +4359,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '③文档菜单按钮隐藏',
-    description: '💡隐藏工具栏的文档菜单按钮',
+    title: t("settings.mobile.280", undefined, "③文档菜单按钮隐藏"),
+    description: t("settings.mobile.281", undefined, "💡隐藏工具栏的文档菜单按钮"),
     createActionElement: () => {
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
@@ -4428,8 +4382,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '④更多按钮隐藏',
-    description: '💡隐藏工具栏的更多按钮',
+    title: t("settings.mobile.282", undefined, "④更多按钮隐藏"),
+    description: t("settings.mobile.283", undefined, "💡隐藏工具栏的更多按钮"),
     createActionElement: () => {
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
@@ -4451,8 +4405,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '⑤换行按钮',
-    description: '💡在顶部工具栏原云同步位置左侧显示 H，并隐藏云同步图标；点击 H 在正文中分段换行（与编辑区内按 Enter 相同）',
+    title: t("settings.mobile.284", undefined, "⑤换行按钮"),
+    description: t("settings.mobile.285", undefined, "💡在顶部工具栏原云同步位置左侧显示 H，并隐藏云同步图标；点击 H 在正文中分段换行（与编辑区内按 Enter 相同）"),
     createActionElement: () => {
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
@@ -4469,8 +4423,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '⑥手机端状态条隐藏',
-    description: '💡隐藏手机端底部的状态条（含同步状态、字数统计等）。默认开启。',
+    title: t("settings.mobile.286", undefined, "⑥手机端状态条隐藏"),
+    description: t("settings.mobile.287", undefined, "💡隐藏手机端底部的状态条（含同步状态、字数统计等）。默认开启。"),
     createActionElement: () => {
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
@@ -4487,8 +4441,8 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: '⑦不隐藏顶栏标题',
-    description: '💡开启后，滚动沉浸时顶部标题栏保持显示（不随导航栏一起隐藏），可点击编辑标题。默认关闭。',
+    title: t("settings.mobile.288", undefined, "⑦不隐藏顶栏标题"),
+    description: t("settings.mobile.289", undefined, "💡开启后，滚动沉浸时顶部标题栏保持显示（不随导航栏一起隐藏），可点击编辑标题。默认关闭。"),
     createActionElement: () => {
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
@@ -4505,7 +4459,7 @@ export function createMobileSettingLayout(
   })
 
   // === 使用帮助 ===
-  createGroupTitle('6️⃣ ','手机端关闭与激活码')
+  createGroupTitle('6️⃣ ',t("settings.mobile.290", undefined, "手机端关闭与激活码"))
 
   // 说明文字（已移除）
 
@@ -4533,7 +4487,7 @@ export function createMobileSettingLayout(
 
       const titleEl = document.createElement('label')
       titleEl.style.cssText = 'font-size: 15px; font-weight: 700; color: #ff4d4d;'
-      titleEl.textContent = '⚠️ 手机端完全恢复思源原始状态'
+      titleEl.textContent = t("settings.mobile.291", undefined, "⚠️ 手机端完全恢复思源原始状态")
 
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
@@ -4557,7 +4511,7 @@ export function createMobileSettingLayout(
 
       const descEl = document.createElement('div')
       descEl.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-      descEl.textContent = '💡 开启后：隐藏所有自定义按钮 + 取消所有工具栏样式修改，让思源恢复到未安装插件时的原始状态'
+      descEl.textContent = t("settings.mobile.292", undefined, "💡 开启后：隐藏所有自定义按钮 + 取消所有工具栏样式修改，让思源恢复到未安装插件时的原始状态")
       container.appendChild(descEl)
 
       return container
@@ -4588,11 +4542,11 @@ export function createMobileSettingLayout(
 
       const titleEl = document.createElement('label')
       titleEl.style.cssText = 'font-size: 15px; font-weight: 700; color: #f59e0b;'
-      titleEl.textContent = '⚠️ 恢复默认出厂配置'
+      titleEl.textContent = t("settings.mobile.293", undefined, "⚠️ 恢复默认出厂配置")
 
       const resetBtn = document.createElement('button')
       resetBtn.className = 'b3-button b3-button--outline'
-      resetBtn.textContent = '恢复'
+      resetBtn.textContent = t("settings.mobile.294", undefined, "恢复")
       resetBtn.style.cssText = 'flex-shrink: 0; padding: 6px 16px; border-color: #f59e0b; color: #f59e0b; cursor: pointer;'
       resetBtn.onclick = async () => {
         // 导出当前配置（电脑端+手机端全量），导出成功后才放行「确认恢复」
@@ -4615,7 +4569,7 @@ export function createMobileSettingLayout(
           // 手机端 WebView 不支持 a[download]，用剪贴板导出
           if (navigator.clipboard?.writeText) {
             await navigator.clipboard.writeText(text)
-            showMessage('✅ 配置已复制到剪贴板，请粘贴到笔记/文件保存后，再确认恢复', 5000, 'info')
+            showMessage(t("settings.mobile.295", undefined, "✅ 配置已复制到剪贴板，请粘贴到笔记/文件保存后，再确认恢复"), 5000, 'info')
           } else {
             // 兜底：隐藏 textarea + execCommand 复制
             const ta = document.createElement('textarea')
@@ -4625,23 +4579,23 @@ export function createMobileSettingLayout(
             ta.select()
             document.execCommand('copy')
             document.body.removeChild(ta)
-            showMessage('✅ 配置已复制到剪贴板，请粘贴到笔记/文件保存后，再确认恢复', 5000, 'info')
+            showMessage(t("settings.mobile.296", undefined, "✅ 配置已复制到剪贴板，请粘贴到笔记/文件保存后，再确认恢复"), 5000, 'info')
           }
         }
 
         const ok = await showConfirmDialog({
-          title: '恢复默认出厂配置',
-          message: '将恢复为插件首次安装时的出厂默认配置（按钮、小功能、工具栏位置、全局配置等），当前所有自定义配置将被替换。\n建议先导出当前配置备份（电脑端+手机端），导出完成后再确认恢复。',
-          hint: '恢复后：出厂默认按钮（更多/打开菜单/锁住文档/…）+ 小功能开关 + 工具栏位置 + 全局按钮配置全部回到默认；激活码与授权信息保留',
-          confirmText: '确认恢复',
-          cancelText: '取消',
+          title: t("settings.mobile.297", undefined, "恢复默认出厂配置"),
+          message: t("settings.mobile.298", undefined, "将恢复为插件首次安装时的出厂默认配置（按钮、小功能、工具栏位置、全局配置等），当前所有自定义配置将被替换。\n建议先导出当前配置备份（电脑端+手机端），导出完成后再确认恢复。"),
+          hint: t("settings.mobile.299", undefined, "恢复后：出厂默认按钮（更多/打开菜单/锁住文档/…）+ 小功能开关 + 工具栏位置 + 全局按钮配置全部回到默认；激活码与授权信息保留"),
+          confirmText: t("settings.mobile.300", undefined, "确认恢复"),
+          cancelText: t("settings.mobile.301", undefined, "取消"),
           confirmInitiallyDisabled: true,
-          extraButton: { text: '📤 导出配置文件', onClick: exportConfig },
+          extraButton: { text: t("settings.mobile.302", undefined, "📤 导出配置文件"), onClick: exportConfig },
         })
         if (!ok) return
         // 全量恢复出厂默认（仅保留激活/授权字段）
         await resetAllConfigsToFactoryDefaults(context as any)
-        showMessage('✅ 已恢复默认出厂配置，正在刷新界面...', 3000, 'info')
+        showMessage(t("settings.mobile.303", undefined, "✅ 已恢复默认出厂配置，正在刷新界面..."), 3000, 'info')
         await fetchSyncPost('/api/ui/reloadUI', {})
       }
 
@@ -4651,7 +4605,7 @@ export function createMobileSettingLayout(
 
       const resetDesc = document.createElement('div')
       resetDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-      resetDesc.textContent = '💡 将插件所有配置恢复为首次安装时的出厂默认（按钮/小功能/工具栏位置/全局配置），激活码与授权信息保留，当前自定义配置会被替换'
+      resetDesc.textContent = t("settings.mobile.304", undefined, "💡 将插件所有配置恢复为首次安装时的出厂默认（按钮/小功能/工具栏位置/全局配置），激活码与授权信息保留，当前自定义配置会被替换")
       container.appendChild(resetDesc)
 
       return container
@@ -4684,7 +4638,7 @@ export function createMobileSettingLayout(
 
       const titleEl = document.createElement('label')
       titleEl.style.cssText = 'font-size: 15px; font-weight: 700; color: #8b5cf6;'
-      titleEl.textContent = '🔐 鲸鱼定制工具箱:永久激活'
+      titleEl.textContent = t("settings.mobile.305", undefined, "🔐 鲸鱼定制工具箱:永久激活")
 
       // 激活状态显示
       const statusEl = document.createElement('span')
@@ -4706,7 +4660,7 @@ export function createMobileSettingLayout(
         statusEl.textContent = '❌ ' + licenseStatus.statusText
       } else {
         statusEl.style.cssText += ' background: rgba(255, 77, 77, 0.2); color: #ff4d4d;'
-        statusEl.textContent = '✗ 未激活'
+        statusEl.textContent = t("settings.mobile.306", undefined, "✗ 未激活")
       }
 
       headerRow.appendChild(titleEl)
@@ -4716,7 +4670,7 @@ export function createMobileSettingLayout(
       // 说明文字
       const descEl = document.createElement('div')
       descEl.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-      descEl.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型。激活码获取：请进QQ群1018010924咨询群主！'
+      descEl.textContent = t("settings.mobile.307", undefined, "💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型。激活码获取：请进QQ群1018010924咨询群主！")
       container.appendChild(descEl)
 
       // 输入框和按钮容器
@@ -4726,13 +4680,13 @@ export function createMobileSettingLayout(
       const input = document.createElement('input')
       input.type = 'text'
       input.className = 'b3-text-field'
-      input.placeholder = '请输入激活码'
+      input.placeholder = t("settings.mobile.308", undefined, "请输入激活码")
       input.value = context.mobileFeatureConfig.authorCode ?? ''
       input.style.cssText = 'flex: 1; max-width: 200px;'
 
       const btn = document.createElement('button')
       btn.className = 'b3-button b3-button--text'
-      btn.textContent = '验证激活'
+      btn.textContent = t("settings.mobile.309", undefined, "验证激活")
       btn.onclick = async () => {
         const code = input.value.trim()
 
@@ -4743,13 +4697,13 @@ export function createMobileSettingLayout(
 
         // 前置检查：必须登录思源账号
         if (!userName) {
-          showMessage('未检测到思源账号，请先在思源登录账号后再激活', 3000, 'error')
+          showMessage(t("settings.mobile.310", undefined, "未检测到思源账号，请先在思源登录账号后再激活"), 3000, 'error')
           return
         }
 
         // 禁用按钮防重复点击
         btn.disabled = true
-        btn.textContent = '验证中...'
+        btn.textContent = t("settings.mobile.311", undefined, "验证中...")
         try {
           const result = validateActivationCode(code, userName)
           if (result.ok) {
@@ -4772,10 +4726,10 @@ export function createMobileSettingLayout(
             await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
             await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
             statusEl.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px; background: rgba(34, 197, 94, 0.2); color: #22c55e;'
-            statusEl.textContent = '✓ 已激活'
+            statusEl.textContent = t("settings.mobile.312", undefined, "✓ 已激活")
             // 套餐文案
-            const planText = planLower === 'trial' ? '免费试用' : planLower === 'm30' ? '月卡' : '永久'
-            const daysText = result.expiryDate === 'PERM' ? '永久' : '30 天内'
+            const planText = planLower === 'trial' ? t("settings.mobile.313", undefined, "免费试用") : planLower === 'm30' ? t("settings.mobile.314", undefined, "月卡") : t("settings.mobile.315", undefined, "永久")
+            const daysText = result.expiryDate === 'PERM' ? t("settings.mobile.316", undefined, "永久") : t("settings.mobile.317", undefined, "30 天内")
             Notify.showLicenseActivated(planText, daysText)
             if (planLower === 'trial') {
               Notify.showTrialStarted(3)
@@ -4788,12 +4742,12 @@ export function createMobileSettingLayout(
             Notify.showErrorActivationCodeInvalid(result.reason)
           }
         } catch (err) {
-          console.error('[MobileActivation] 验证失败:', err)
+          logger.error('[MobileActivation] 验证失败:', err)
           Notify.showErrorActivationCodeInvalid()
         } finally {
           // 恢复按钮可点击状态（激活成功的情况下页面会刷新，不影响）
           btn.disabled = false
-          btn.textContent = '验证激活'
+          btn.textContent = t("settings.mobile.318", undefined, "验证激活")
         }
       }
 
@@ -4818,7 +4772,7 @@ export function createMobileSettingLayout(
         const reActivateBtn = document.createElement('button')
         reActivateBtn.className = 'b3-button b3-button--info'
         reActivateBtn.style.cssText = 'flex: 1;'
-        reActivateBtn.textContent = '重新激活'
+        reActivateBtn.textContent = t("settings.mobile.319", undefined, "重新激活")
         reActivateBtn.onclick = () => {
           // 显示输入框和验证按钮
           inputRow.style.display = 'flex'
@@ -4832,12 +4786,12 @@ export function createMobileSettingLayout(
         const clearBtn = document.createElement('button')
         clearBtn.className = 'b3-button b3-button--danger'
         clearBtn.style.cssText = 'flex: 1;'
-        clearBtn.textContent = '清除激活'
+        clearBtn.textContent = t("settings.mobile.320", undefined, "清除激活")
         clearBtn.onclick = async () => {
-          if (!window.confirm('确定要清除激活状态吗？\n\n此操作会立即清空当前激活码与账号绑定，所有付费功能将无法使用，需要重新输入有效激活码才能恢复。')) return
+          if (!window.confirm(t("settings.mobile.321", undefined, "确定要清除激活状态吗？\n\n此操作会立即清空当前激活码与账号绑定，所有付费功能将无法使用，需要重新输入有效激活码才能恢复。"))) return
           try {
             clearBtn.disabled = true
-            clearBtn.textContent = '清除中...'
+            clearBtn.textContent = t("settings.mobile.322", undefined, "清除中...")
             context.mobileFeatureConfig.authorActivated = false
             context.mobileFeatureConfig.authorCode = ''
             context.mobileFeatureConfig.authorAccount = ''
@@ -4854,13 +4808,13 @@ export function createMobileSettingLayout(
             clearTrial()
             await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
             await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
-            showMessage('激活状态已清除，正在重载...', 2000, 'info')
+            showMessage(t("settings.mobile.323", undefined, "激活状态已清除，正在重载..."), 2000, 'info')
             setTimeout(() => window.location.reload(), 1000)
           } catch (err) {
-            console.error('[ClearActivation] 清除失败:', err)
-            showMessage('清除失败，请重试', 3000, 'error')
+            logger.error('[ClearActivation] 清除失败:', err)
+            showMessage(t("settings.mobile.324", undefined, "清除失败，请重试"), 3000, 'error')
             clearBtn.disabled = false
-            clearBtn.textContent = '清除激活'
+            clearBtn.textContent = t("settings.mobile.325", undefined, "清除激活")
           }
         }
         btnContainer.appendChild(clearBtn)
@@ -4875,7 +4829,7 @@ export function createMobileSettingLayout(
       const infoBtn = document.createElement('button')
       infoBtn.className = 'b3-button b3-button--text'
       infoBtn.style.cssText = 'width: 100%; margin-top: 4px; padding: 8px; border: 1px solid #722ed1; border-radius: 6px; background: rgba(114, 46, 209, 0.08); color: #722ed1; font-weight: 600;'
-      infoBtn.textContent = '📘 查看激活方式'
+      infoBtn.textContent = t("settings.mobile.326", undefined, "📘 查看激活方式")
       infoBtn.onclick = () => showActivationInfoModal(
         context.isAuthorToolActivated(),
         () => {
@@ -4904,10 +4858,7 @@ export function createMobileSettingLayout(
         border-radius: 8px;
         box-sizing: border-box;
       `
-      container.innerHTML = `
-        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（17项）</div>
-        <div style="font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>
-      `
+      container.innerHTML = t("settings.mobile.327", undefined, "\n        <div style=\"font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;\">🐋 鲸鱼定制工具箱功能列表（17项）</div>\n        <div style=\"font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;\">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>\n      ")
 
 	      const rowTr = (num: string, name: string, desc: string): string => `<tr>
           <td style="padding:10px;font-weight:500;"><span style="color:var(--b3-theme-primary);margin-right:4px;">${num}</span>${name}</td>
@@ -4915,33 +4866,33 @@ export function createMobileSettingLayout(
         </tr>`
 
       const __allRows = [
-        rowTr('⓪', '一键记事弹窗块格式', '一键记事弹窗支持思源块格式输入，富文本编辑，插入标题、列表、代码块等' +
-          '<a href="javascript:void(0)" onclick="(function(){var el=document.getElementById(\'quick-note-format-section\');if(!el)return;el.scrollIntoView({behavior:\'smooth\',block:\'center\'});el.classList.remove(\'jump-highlight\');void el.offsetWidth;el.classList.add(\'jump-highlight\');setTimeout(function(){el.classList.remove(\'jump-highlight\')},2000)})()" style="color:var(--b3-theme-primary);font-size:12px;text-decoration:underline;margin-left:8px;">👉设置</a>'),
-        rowTr('①', '连续点击自定义按钮', '一键自动执行多个按钮操作，告别重复点击，工作流自动化'),
-        rowTr('②', '打开指定ID块', '精准跳转到任意文档任意位置，省时省力'),
-        rowTr('③', '数据库悬浮弹窗', '悬浮窗口快速查看数据库，无需切换页面，数据触手可及'),
-        rowTr('④', '日记底部', '一键直达日记末尾，快速追加内容，记录生活点滴'),
-        rowTr('⑤', '叶归LifeLog适配', '与LifeLog插件深度整合，时间记录更智能，生活管理更高效'),
-        rowTr('⑥', '弹窗框模板选择', '弹出式模板选择器，快速插入常用内容，写作效率倍增'),
-        rowTr('⑦', '滚动文档顶部或底部', '一键直达文档首尾，长文档浏览更轻松'),
-        rowTr('⑧', '图片快捷导入', '一键选择图片导入笔记。若开启思源块编辑模式，可插入记事弹窗编辑器光标处'),
-        rowTr('⑨', '手机端悬浮标签页Tab', '手机端多文档快速切换，苹果风格悬浮Tab栏，自动管理，告别反复返回'),
-        rowTr('⑩', '手机端悬浮大纲', '左侧悬浮大纲面板，标题快速跳转，实时跟踪当前位置，阅读长文必备'),
-        rowTr('⑪', '手机端前一篇/后一篇文档', '底部悬浮导航栏，按文件树顺序浏览文档，前后翻页，阅读更流畅'),
-		        rowTr('⑫', '滑动快速批注<br><span style="color:#10b981;font-size:11px;">免费</span>', '完美联动「鲸鱼快速批注」插件（独立插件），请先在电脑端插件市场搜索「鲸鱼快速批注」进行下载，安装后同步到手机端'),
-        rowTr('⑬', '文档朗读', '使用浏览器语音合成朗读当前文档，支持语速调节、段落高亮'),
-        rowTr('⑭', '一键清理空块', '自动扫描并删除文档中空块（无文本段落/标题/列表项），预览确认后批量删除'),
-        rowTr('⑮', '沉浸阅读模式<br><span style="color:#10b981;font-size:11px;">免费</span>', '🔒一键锁定文档防误编辑，锁定/解锁图标可自定义'),
-        rowTr('⑯', '快速添加附件', '📎选择任意文件上传，可自定义名称，图片支持压缩；有光标插光标处，无光标追加日记（记事弹窗中不生效）'),
+        rowTr('⓪', t("settings.mobile.328", undefined, "一键记事弹窗块格式"), t("settings.mobile.329", undefined, "一键记事弹窗支持思源块格式输入，富文本编辑，插入标题、列表、代码块等") +
+          t("settings.mobile.330", undefined, "<a href=\"javascript:void(0)\" onclick=\"(function(){var el=document.getElementById('quick-note-format-section');if(!el)return;el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('jump-highlight');void el.offsetWidth;el.classList.add('jump-highlight');setTimeout(function(){el.classList.remove('jump-highlight')},2000)})()\" style=\"color:var(--b3-theme-primary);font-size:12px;text-decoration:underline;margin-left:8px;\">👉设置</a>")),
+        rowTr('①', t("settings.mobile.331", undefined, "连续点击自定义按钮"), t("settings.mobile.332", undefined, "一键自动执行多个按钮操作，告别重复点击，工作流自动化")),
+        rowTr('②', t("settings.mobile.333", undefined, "打开指定ID块"), t("settings.mobile.334", undefined, "精准跳转到任意文档任意位置，省时省力")),
+        rowTr('③', t("settings.mobile.335", undefined, "数据库悬浮弹窗"), t("settings.mobile.336", undefined, "悬浮窗口快速查看数据库，无需切换页面，数据触手可及")),
+        rowTr('④', t("settings.mobile.337", undefined, "日记底部"), t("settings.mobile.338", undefined, "一键直达日记末尾，快速追加内容，记录生活点滴")),
+        rowTr('⑤', t("settings.mobile.339", undefined, "叶归LifeLog适配"), t("settings.mobile.340", undefined, "与LifeLog插件深度整合，时间记录更智能，生活管理更高效")),
+        rowTr('⑥', t("settings.mobile.341", undefined, "弹窗框模板选择"), t("settings.mobile.342", undefined, "弹出式模板选择器，快速插入常用内容，写作效率倍增")),
+        rowTr('⑦', t("settings.mobile.343", undefined, "滚动文档顶部或底部"), t("settings.mobile.344", undefined, "一键直达文档首尾，长文档浏览更轻松")),
+        rowTr('⑧', t("settings.mobile.345", undefined, "图片快捷导入"), t("settings.mobile.346", undefined, "一键选择图片导入笔记。若开启思源块编辑模式，可插入记事弹窗编辑器光标处")),
+        rowTr('⑨', t("settings.mobile.347", undefined, "手机端悬浮标签页Tab"), t("settings.mobile.348", undefined, "手机端多文档快速切换，苹果风格悬浮Tab栏，自动管理，告别反复返回")),
+        rowTr('⑩', t("settings.mobile.349", undefined, "手机端悬浮大纲"), t("settings.mobile.350", undefined, "左侧悬浮大纲面板，标题快速跳转，实时跟踪当前位置，阅读长文必备")),
+        rowTr('⑪', t("settings.mobile.351", undefined, "手机端前一篇/后一篇文档"), t("settings.mobile.352", undefined, "底部悬浮导航栏，按文件树顺序浏览文档，前后翻页，阅读更流畅")),
+		        rowTr('⑫', t("settings.mobile.353", undefined, "滑动快速批注<br><span style=\"color:#10b981;font-size:11px;\">免费</span>"), t("settings.mobile.354", undefined, "完美联动「鲸鱼快速批注」插件（独立插件），请先在电脑端插件市场搜索「鲸鱼快速批注」进行下载，安装后同步到手机端")),
+        rowTr('⑬', t("settings.mobile.355", undefined, "文档朗读"), t("settings.mobile.356", undefined, "使用浏览器语音合成朗读当前文档，支持语速调节、段落高亮")),
+        rowTr('⑭', t("settings.mobile.357", undefined, "一键清理空块"), t("settings.mobile.358", undefined, "自动扫描并删除文档中空块（无文本段落/标题/列表项），预览确认后批量删除")),
+        rowTr('⑮', t("settings.mobile.359", undefined, "沉浸阅读模式<br><span style=\"color:#10b981;font-size:11px;\">免费</span>"), t("settings.mobile.360", undefined, "🔒一键锁定文档防误编辑，锁定/解锁图标可自定义")),
+        rowTr('⑯', t("settings.mobile.361", undefined, "快速添加附件"), t("settings.mobile.362", undefined, "📎选择任意文件上传，可自定义名称，图片支持压缩；有光标插光标处，无光标追加日记（记事弹窗中不生效）")),
       ]
 
       interface __TabData { key: string; label: string; sub: string; icon: string; rows: string[] }
       const __tabs: __TabData[] = [
-        { key: 'all', label: '全部功能', sub: '17项', icon: '📋', rows: __allRows },
-        { key: 'reading', label: '批注阅读', sub: '6项', icon: '📖', rows: [__allRows[9], __allRows[10], __allRows[11], __allRows[13], __allRows[15], __allRows[12]] },
-        { key: 'notes', label: '笔记与日记', sub: '5项', icon: '✍️', rows: [__allRows[0], __allRows[4], __allRows[5], __allRows[8], __allRows[16]] },
-        { key: 'edit', label: '编辑提效', sub: '3项', icon: '⚡', rows: [__allRows[1], __allRows[6], __allRows[14]] },
-        { key: 'nav', label: '导航与浏览', sub: '3项', icon: '🧭', rows: [__allRows[2], __allRows[3], __allRows[7]] },
+        { key: 'all', label: t("settings.mobile.363", undefined, "全部功能"), sub: t("settings.mobile.364", undefined, "17项"), icon: '📋', rows: __allRows },
+        { key: 'reading', label: t("settings.mobile.365", undefined, "批注阅读"), sub: t("settings.mobile.366", undefined, "6项"), icon: '📖', rows: [__allRows[9], __allRows[10], __allRows[11], __allRows[13], __allRows[15], __allRows[12]] },
+        { key: 'notes', label: t("settings.mobile.367", undefined, "笔记与日记"), sub: t("settings.mobile.368", undefined, "5项"), icon: '✍️', rows: [__allRows[0], __allRows[4], __allRows[5], __allRows[8], __allRows[16]] },
+        { key: 'edit', label: t("settings.mobile.369", undefined, "编辑提效"), sub: t("settings.mobile.370", undefined, "3项"), icon: '⚡', rows: [__allRows[1], __allRows[6], __allRows[14]] },
+        { key: 'nav', label: t("settings.mobile.371", undefined, "导航与浏览"), sub: t("settings.mobile.372", undefined, "3项"), icon: '🧭', rows: [__allRows[2], __allRows[3], __allRows[7]] },
       ]
 
       const __tabBar = document.createElement('div')
@@ -4949,10 +4900,10 @@ export function createMobileSettingLayout(
       container.appendChild(__tabBar)
 
       const __containers: Record<string, HTMLElement> = {}
-      __tabs.forEach(t => {
+      __tabs.forEach(tab => {
         const btn = document.createElement('button')
         btn.style.cssText = 'display:flex;align-items:center;gap:4px;padding:7px 14px;border-radius:8px;border:1px solid var(--b3-border-color);background:var(--b3-theme-surface);color:var(--b3-theme-on-surface);cursor:pointer;font-size:13px;outline:none;white-space:nowrap;transition:all 0.15s;'
-        btn.innerHTML = `${t.icon} ${t.label} <span style="font-size:11px;opacity:0.6;">${t.sub}</span>`
+        btn.innerHTML = `${tab.icon} ${tab.label} <span style="font-size:11px;opacity:0.6;">${tab.sub}</span>`
         __tabBar.appendChild(btn)
 
         const wrap = document.createElement('div')
@@ -4961,16 +4912,16 @@ export function createMobileSettingLayout(
           <table style="width:100%;font-size:13px;border-collapse:collapse;margin-top:8px;">
             <thead>
               <tr style="background:var(--b3-theme-primary-lightest);">
-                <th style="padding:10px;text-align:left;">功能名称</th>
-                <th style="padding:10px;text-align:left;">功能说明</th>
+                <th style="padding:10px;text-align:left;">${t("settings.common.featureName", undefined, "功能名称")}</th>
+                <th style="padding:10px;text-align:left;">${t("settings.common.featureDescription", undefined, "功能说明")}</th>
               </tr>
             </thead>
-            <tbody>${t.rows.join('')}</tbody>
+            <tbody>${tab.rows.join('')}</tbody>
           </table>
-          <div style="padding:12px;text-align:center;color:var(--b3-theme-primary);font-style:italic;font-size:13px;">持续更新中~</div>
+          <div style="padding:12px;text-align:center;color:var(--b3-theme-primary);font-style:italic;font-size:13px;">${t("settings.common.moreComing", undefined, "持续更新中~")}</div>
         `
         container.appendChild(wrap)
-        __containers[t.key] = wrap
+        __containers[tab.key] = wrap
 
         btn.onclick = () => {
           Object.values(__containers).forEach(c => c.style.display = 'none')

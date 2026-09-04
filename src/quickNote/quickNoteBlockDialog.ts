@@ -2,6 +2,8 @@
  * 桌面端块格式一键记事 — Dialog + Protyle（同进程，秒开）
  * 有内容时才创建 Protyle，避免 blockId:'' 导致内部状态异常
  */
+import { logger } from '@/utils/logger'
+import { t } from '../i18n/runtime'
 import { Dialog, Protyle, ProtyleMethod, showMessage, fetchSyncPost } from 'siyuan'
 import type { QuickNoteSaveTarget } from './kernelBlock'
 import { createQuickNoteDraftBlock, deleteQuickNoteDraftBlock } from './kernelBlock'
@@ -12,7 +14,7 @@ let protyle: Protyle | null = null
 const TAG = '[QN-BlockDialog]'
 
 function log(msg: string, ...args: any[]): void {
-  console.log(`${TAG} ${msg}`, ...args)
+  logger.log(`${TAG} ${msg}`, ...args)
 }
 
 function time(msg: string): { end: () => void } {
@@ -27,7 +29,7 @@ function ensureDialog(): boolean {
   if (dialog) return true
 
   dialog = new Dialog({
-    title: '⚡ 快捷记事（块格式）',
+    title: t('quickNote.block.dialogTitle', undefined, '⚡ 快捷记事（块格式）'),
     content: '<div class="quicknote-editor" style="height: 400px;"></div>',
     width: window.innerWidth < 768 ? '100%' : '600px',
     height: window.innerWidth < 768 ? '100%' : '500px',
@@ -67,11 +69,11 @@ async function open(app: any, target: QuickNoteSaveTarget): Promise<boolean> {
 
   if (!protyle) {
     log('🆕 首次打开，创建 draft 块 + Protyle...')
-    const t = time('draft + Protyle 创建')
+    const timer = time('draft + Protyle 创建')
 
     const blockId = await createQuickNoteDraftBlock(target)
     if (!blockId) {
-      showMessage('创建编辑块失败，请检查日记/文档配置', 3000, 'error')
+      showMessage(t('quickNote.block.createFailedCheckDailyConfig', undefined, '创建编辑块失败，请检查日记/文档配置'), 3000, 'error')
       return false
     }
     log(`   draft blockId: ${blockId}`)
@@ -81,12 +83,12 @@ async function open(app: any, target: QuickNoteSaveTarget): Promise<boolean> {
     const html = resp?.data?.[blockId] || (typeof resp?.data === 'string' ? resp.data : '')
     if (!html && resp?.code !== 0) {
       await deleteQuickNoteDraftBlock(blockId).catch(() => {})
-      showMessage('加载编辑块失败', 3000, 'error')
+      showMessage(t('quickNote.block.loadFailed', undefined, '加载编辑块失败'), 3000, 'error')
       return false
     }
 
     createProtyle(app, blockId, html)
-    t.end()
+    timer.end()
   } else {
     log('♻️ 复用已有 Protyle，跳过重建')
   }

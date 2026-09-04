@@ -4,6 +4,8 @@
  * 设计风格：与手机端标签页Tab/悬浮大纲保持一致的苹果风格
  */
 
+import { logger } from '@/utils/logger'
+import { t } from '../i18n/runtime'
 import { fetchSyncPost, openMobileFileById, showMessage } from "siyuan";
 import { isMobileDevice, pluginInstance } from "../toolbarManager";
 import type { ButtonConfig } from "../toolbarManager";
@@ -293,7 +295,7 @@ function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): T &
 }
 
 function truncateTitle(title: string, maxLen = 14): string {
-  if (!title) return '未命名'
+  if (!title) return t('navigation.common.untitled', undefined, '未命名')
   if (title.length <= maxLen) return title
   return title.slice(0, maxLen) + '…'
 }
@@ -303,7 +305,7 @@ function truncateTitle(title: string, maxLen = 14): string {
  */
 async function fetchDocInfo(): Promise<{ notebookId: string; parentPath: string } | null> {
   if (!currentDocId) {
-    console.warn('[文档导航] currentDocId 为空')
+    logger.warn('[文档导航] currentDocId 为空')
     return null
   }
   try {
@@ -320,10 +322,10 @@ async function fetchDocInfo(): Promise<{ notebookId: string; parentPath: string 
 
       return { notebookId: box, parentPath }
     } else {
-      console.warn('[文档导航] getBlockInfo 返回错误:', response?.msg || '未知错误')
+      logger.warn('[文档导航] getBlockInfo 返回错误:', response?.msg || '未知错误')
     }
   } catch (err) {
-    console.warn('[文档导航] 获取文档信息失败:', err)
+    logger.warn('[文档导航] 获取文档信息失败:', err)
   }
   return null
 }
@@ -353,7 +355,7 @@ async function fetchAdjacentDocsByFiletree(
       const idx = files.findIndex(f => f.id === docId)
 
       if (idx === -1) {
-        console.warn('[文档导航] 当前文档不在目录列表中，docId:', docId)
+        logger.warn('[文档导航] 当前文档不在目录列表中，docId:', docId)
         return { prev: null, next: null }
       }
 
@@ -364,16 +366,16 @@ async function fetchAdjacentDocsByFiletree(
 	      const nextFile = idx < files.length - 1 ? files[idx + 1] : null
 
       const result = {
-        prev: prevFile ? { id: prevFile.id, title: prevFile.name || '未命名' } : null,
-        next: nextFile ? { id: nextFile.id, title: nextFile.name || '未命名' } : null
+        prev: prevFile ? { id: prevFile.id, title: prevFile.name || t('navigation.common.untitled', undefined, '未命名') } : null,
+        next: nextFile ? { id: nextFile.id, title: nextFile.name || t('navigation.common.untitled', undefined, '未命名') } : null
       }
 
       return result
     } else {
-      console.warn('[文档导航] listDocsByPath 返回错误:', response?.msg || '未知错误')
+      logger.warn('[文档导航] listDocsByPath 返回错误:', response?.msg || '未知错误')
     }
   } catch (err) {
-    console.warn('[文档导航] listDocsByPath 失败:', err)
+    logger.warn('[文档导航] listDocsByPath 失败:', err)
   }
   return { prev: null, next: null }
 }
@@ -412,7 +414,7 @@ async function refreshAdjacentDocs(): Promise<void> {
     }
   }
   if (!currentDocId) {
-    console.warn('[文档导航] 跳过: currentDocId 为空')
+    logger.warn('[文档导航] 跳过: currentDocId 为空')
     return
   }
 
@@ -422,7 +424,7 @@ async function refreshAdjacentDocs(): Promise<void> {
   const docInfo = await fetchDocInfo()
   if (reqId !== refreshRequestId) { isLoading = false; return }
   if (!docInfo?.notebookId) {
-    console.warn('[文档导航] 无法获取文档信息')
+    logger.warn('[文档导航] 无法获取文档信息')
     isLoading = false
     updateNavButtons()
     return
@@ -468,8 +470,8 @@ async function navigateTo(direction: 'prev' | 'next'): Promise<boolean> {
     }, 200)
     return true
   } catch (err) {
-    console.error('[文档导航] 打开文档失败:', err)
-    showMessage('打开文档失败', 3000, 'error')
+    logger.error('[文档导航] 打开文档失败:', err)
+    showMessage(t('navigation.common.openDocumentFailed', undefined, '打开文档失败'), 3000, 'error')
     // 恢复 prev/next，避免按钮永久禁用
     prevDoc = savedPrev
     nextDoc = savedNext
@@ -651,7 +653,7 @@ async function loadState(): Promise<void> {
       state = { isVisible: saved.isVisible ?? false }
     }
   } catch (err) {
-    console.warn('[文档导航] 加载状态失败:', err)
+    logger.warn('[文档导航] 加载状态失败:', err)
   }
 }
 
@@ -732,7 +734,7 @@ export async function init(context: DocNavContext): Promise<void> {
 
 export function toggleVisibility(config: ButtonConfig): void {
   if (!isMobileDevice()) {
-    showMessage('此功能仅支持手机端', 2000, 'info')
+    showMessage(t('navigation.common.mobileOnly', undefined, '此功能仅支持手机端'), 2000, 'info')
     return
   }
 
@@ -766,7 +768,7 @@ export function toggleVisibility(config: ButtonConfig): void {
       attachKeyboardListeners()
     }
 
-    if (config.showNotification !== false) showMessage('文档导航已显示', 1500, 'info')
+    if (config.showNotification !== false) showMessage(t('navigation.docNav.shown', undefined, '文档导航已显示'), 1500, 'info')
   } else {
     removeNavBar()
 
@@ -806,7 +808,7 @@ export function toggleVisibility(config: ButtonConfig): void {
     currentFloatOpacityForAutoHide = undefined
     lastAutoHideToggleAt = 0
 
-    if (config.showNotification !== false) showMessage('文档导航已隐藏', 1500, 'info')
+    if (config.showNotification !== false) showMessage(t('navigation.docNav.hidden', undefined, '文档导航已隐藏'), 1500, 'info')
   }
 
   debouncedPersist()

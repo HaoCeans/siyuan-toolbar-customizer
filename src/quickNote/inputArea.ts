@@ -1,3 +1,4 @@
+import { logger } from '@/utils/logger'
 import { Constants, Protyle, ProtyleMethod } from 'siyuan'
 import { pluginInstance } from '../toolbarManager'
 import { createBlockInputHandle, insertTextIntoBlockEditor } from './blockInput'
@@ -177,7 +178,7 @@ export async function createQuickNoteInputArea(
   if (options.format === 'block') {
     const app = pluginInstance?.app
     if (!app) {
-      console.warn('[QuickNote] 无法获取 app，块格式回落纯文本')
+      logger.warn('[QuickNote] 无法获取 app，块格式回落纯文本')
       return createPlainInputHandle(options)
     }
     return createBlockInputHandle(app, options)

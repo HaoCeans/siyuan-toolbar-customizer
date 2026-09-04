@@ -18,6 +18,8 @@
  * 但所有引用 toolbarManager 的代码仅在运行时函数体内执行，ESM 的 live binding 可以正确解析。
  */
 
+import { t } from '../i18n/runtime'
+
 // ===== 常量 =====
 
 /** 试用期天数（不含宽限期） */
@@ -229,7 +231,7 @@ export function getLicenseStatus(): LicenseStatus {
       inGracePeriod: false,
       expired: false,
       daysLeft: Infinity,
-      statusText: '永久激活',
+      statusText: t('license.status.permanent', undefined, '永久激活'),
     }
   }
 
@@ -264,7 +266,7 @@ export function getLicenseStatus(): LicenseStatus {
     inGracePeriod: false,
     expired: false,
     daysLeft: 0,
-    statusText: '未激活',
+    statusText: t('license.status.inactive', undefined, '未激活'),
   }
 }
 
@@ -275,7 +277,11 @@ function buildTimeBasedStatus(plan: 'm30' | 'trial', expiry: string, graceEnd: s
 
   if (daysToExpiry >= 0) {
     // 有效期内
-    const planLabel = plan === 'm30' ? '月卡' : '试用'
+    const planLabel = t(
+      plan === 'm30' ? 'license.plan.monthly' : 'license.plan.trial',
+      undefined,
+      plan === 'm30' ? '月卡' : '试用'
+    )
     return {
       active: true,
       plan,
@@ -284,13 +290,21 @@ function buildTimeBasedStatus(plan: 'm30' | 'trial', expiry: string, graceEnd: s
       inGracePeriod: false,
       expired: false,
       daysLeft: daysToExpiry,
-      statusText: `${planLabel}（剩 ${daysToExpiry} 天）`,
+      statusText: t(
+        'license.status.daysRemaining',
+        { plan: planLabel, days: daysToExpiry },
+        `${planLabel}（剩 ${daysToExpiry} 天）`
+      ),
     }
   }
 
   if (daysToGraceEnd >= 0) {
     // 宽限期内（仍可用，但提示即将到期）
-    const planLabel = plan === 'm30' ? '月卡' : '试用'
+    const planLabel = t(
+      plan === 'm30' ? 'license.plan.monthly' : 'license.plan.trial',
+      undefined,
+      plan === 'm30' ? '月卡' : '试用'
+    )
     return {
       active: true,
       plan,
@@ -299,12 +313,20 @@ function buildTimeBasedStatus(plan: 'm30' | 'trial', expiry: string, graceEnd: s
       inGracePeriod: true,
       expired: false,
       daysLeft: daysToGraceEnd,
-      statusText: `${planLabel}（宽限期剩 ${daysToGraceEnd} 天）`,
+      statusText: t(
+        'license.status.graceDaysRemaining',
+        { plan: planLabel, days: daysToGraceEnd },
+        `${planLabel}（宽限期剩 ${daysToGraceEnd} 天）`
+      ),
     }
   }
 
   // 已彻底过期
-  const planLabel = plan === 'm30' ? '月卡' : '试用'
+  const planLabel = t(
+    plan === 'm30' ? 'license.plan.monthly' : 'license.plan.trial',
+    undefined,
+    plan === 'm30' ? '月卡' : '试用'
+  )
   return {
     active: false,
     plan,
@@ -313,7 +335,11 @@ function buildTimeBasedStatus(plan: 'm30' | 'trial', expiry: string, graceEnd: s
     inGracePeriod: false,
     expired: true,
     daysLeft: 0,
-    statusText: `${planLabel}已过期`,
+    statusText: t(
+      'license.status.expired',
+      { plan: planLabel },
+      `${planLabel}已过期`
+    ),
   }
 }
 

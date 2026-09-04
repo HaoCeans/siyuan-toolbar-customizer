@@ -1,3 +1,4 @@
+import { logger } from '@/utils/logger'
 import { Plugin } from "siyuan";
 import { createApp } from 'vue'
 import App from './App.vue'
@@ -10,7 +11,7 @@ export function usePlugin(pluginProps?: Plugin): Plugin | null {
   }
   
   if (!plugin && !pluginProps) {
-    console.error('需要先调用 init(plugin) 初始化插件')
+    logger.error('需要先调用 init(plugin) 初始化插件')
   }
   
   return plugin;

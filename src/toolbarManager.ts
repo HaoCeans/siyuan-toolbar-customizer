@@ -32,6 +32,8 @@ import { uploadImageFile, insertProtyleImageAtCaret } from "./quickNote/imageIns
 import { lucideToSvg } from "./utils/lucideHelper";
 import * as licenseManager from "./utils/licenseManager";
 import { insertMultiLineText } from "./utils/protyleEnter";
+import { logger, setLoggingEnabled } from "./utils/logger"
+import { getLocale, t } from "./i18n/runtime";
 
 // ===== 插件实例（用于需要 app 参数的 API 调用） =====
 export let pluginInstance: any = null;
@@ -100,6 +102,7 @@ export interface MobileToolbarConfig {
 export interface ButtonConfig {
   id: string;                 // 唯一标识
   name: string;              // 按钮名称
+  nameKey?: string;           // 内置默认名称的翻译键（不持久化翻译结果）
   type: 'builtin' | 'builtin-refresh' | 'template' | 'click-sequence' | 'shortcut' | 'author-tool' | 'quick-note' | 'popup-select'; // 功能类型
   builtinId?: string;        // 思源功能ID（如：menuSearch）
   builtinRefreshType?: 'refresh' | 'reload' | 'fullscreen' | 'doc-fullscreen'; // 思源功能类型：刷新、重载、全屏、文档全屏
@@ -257,6 +260,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
   {
     id: 'overflow-button-desktop',
     name: '扩展工具栏',
+    nameKey: 'button.default.overflow',
     type: 'builtin',
     builtinId: 'overflow',
     icon: '⋯',
@@ -275,6 +279,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
   {
     id: 'more-desktop',
     name: '更多',
+    nameKey: 'button.default.more',
     type: 'click-sequence',
     clickSequence: ['more'],
     icon: 'lucide:Menu',
@@ -288,6 +293,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
   {
     id: 'doc-desktop',
     name: '打开菜单',
+    nameKey: 'button.default.menu',
     type: 'click-sequence',
     clickSequence: ['doc'],
     icon: 'lucide:Blocks',
@@ -301,6 +307,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
 	  {
 	    id: 'readonly-desktop',
 	    name: '锁住文档',
+	    nameKey: 'button.default.lock',
 	    type: 'author-tool',
 	    authorToolSubtype: 'toggle-lock',
 	    lockIcon: 'lucide:Lock',
@@ -315,8 +322,9 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
   {
     id: 'plugin-settings-desktop',
     name: '插件设置',
+    nameKey: 'button.default.pluginSettings',
     type: 'click-sequence',
-    clickSequence: ['barPlugins', 'text:思源手机端增强'],
+    clickSequence: ['barPlugins', 'text:zh-CN=思源手机端增强|en=SiYuan Mobile Enhancer'],
     icon: 'lucide:Settings',
     iconSize: 18,
     minWidth: 32,
@@ -328,6 +336,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
   {
     id: 'open-diary-desktop',
     name: '打开日记',
+    nameKey: 'button.default.dailyNote',
     type: 'shortcut',
     shortcutKey: 'Alt+5',
     icon: 'lucide:CalendarDays',
@@ -341,6 +350,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
   {
     id: 'template-time-desktop',
     name: '插入时间',
+    nameKey: 'button.default.insertTime',
     type: 'template',
     template: '{{hour}}时{{minute}}分',
     icon: 'lucide:TimerReset',
@@ -354,8 +364,9 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
   {
     id: 'open-browser-desktop',
     name: '伺服浏览器',
+    nameKey: 'button.default.openBrowser',
     type: 'click-sequence',
-    clickSequence: ['barWorkspace', 'config', 'text:鉴权', 'text:打开浏览器'],
+    clickSequence: ['barWorkspace', 'config', 'text:zh-CN=鉴权|en=Authentication', 'text:zh-CN=打开浏览器|en=Open browser'],
     icon: 'lucide:Link',
     iconSize: 18,
     minWidth: 32,
@@ -367,6 +378,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
   {
     id: 'recent-docs-desktop',
     name: '最近文档',
+    nameKey: 'button.default.recent',
     type: 'shortcut',
     shortcutKey: 'Ctrl+E',
     icon: 'lucide:BookText',
@@ -380,6 +392,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
   {
     id: 'slide-comment-desktop',
     name: '鲸鱼快速批注',
+    nameKey: 'button.default.authorTool',
     type: 'author-tool',
     authorToolSubtype: 'slide-comment',
     icon: 'lucide:FormInput',
@@ -397,6 +410,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
   {
     id: 'overflow-button-mobile',
     name: '扩展工具栏',
+    nameKey: 'button.default.overflow',
     type: 'builtin',
     builtinId: 'overflow',
     icon: '⋯',
@@ -411,6 +425,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
   {
     id: 'more-mobile',
     name: '更多',
+    nameKey: 'button.default.more',
     type: 'builtin',
     builtinId: 'more',
     icon: 'lucide:Menu',
@@ -424,6 +439,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
   {
     id: 'doc-mobile',
     name: '打开菜单',
+    nameKey: 'button.default.menu',
     type: 'builtin',
     builtinId: 'doc',
     icon: 'lucide:Blocks',
@@ -437,6 +453,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
 	  {
 		    id: 'readonly-mobile',
 		    name: '锁住文档',
+		    nameKey: 'button.default.lock',
 		    type: 'author-tool',
 		    authorToolSubtype: 'toggle-lock',
 		    lockIcon: 'lucide:Lock',
@@ -451,8 +468,9 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
   {
     id: 'plugin-settings-mobile',
     name: '插件设置',
+    nameKey: 'button.default.pluginSettings',
     type: 'click-sequence',
-    clickSequence: ['toolbarMore', 'menuPlugin', 'text:思源手机端增强'],
+    clickSequence: ['toolbarMore', 'text:zh-CN=插件|en=Plugin', 'text:zh-CN=思源手机端增强|en=SiYuan Mobile Enhancer'],
     icon: 'lucide:Settings',
     iconSize: 23,
     minWidth: 23,
@@ -464,6 +482,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
   {
     id: 'open-diary-mobile',
     name: '打开日记',
+    nameKey: 'button.default.dailyNote',
     type: 'shortcut',
     shortcutKey: 'Alt+5',
     icon: 'lucide:CalendarDays',
@@ -477,6 +496,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
   {
     id: 'template-time-mobile',
     name: '插入时间',
+    nameKey: 'button.default.insertTime',
     type: 'template',
     template: '{{hour}}时{{minute}}分',
     icon: 'lucide:TimerReset',
@@ -490,6 +510,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
   {
     id: 'search-mobile',
     name: '搜索',
+    nameKey: 'button.default.search',
     type: 'builtin',
     builtinId: 'menuSearch',
     icon: 'lucide:Search',
@@ -503,6 +524,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
   {
     id: 'recent-docs-mobile',
     name: '最近文档',
+    nameKey: 'button.default.recent',
     type: 'builtin',
     builtinId: 'menuRecent',
     icon: 'lucide:BookText',
@@ -516,6 +538,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
   {
     id: 'slide-comment-mobile',
     name: '鲸鱼快速批注',
+    nameKey: 'button.default.authorTool',
     type: 'author-tool',
     authorToolSubtype: 'slide-comment',
     icon: 'lucide:FormInput',
@@ -545,6 +568,7 @@ export async function resetAllConfigsToFactoryDefaults(ctx: {
   mobileConfig: MobileToolbarConfig
   saveData: (key: string, value: unknown) => Promise<void>
   removeData: (key: string) => Promise<void>
+  resetLogging?: () => Promise<void>
 }): Promise<void> {
   // 按钮 → 出厂默认（深拷贝，避免共享引用）
   ctx.desktopButtonConfigs.splice(0, ctx.desktopButtonConfigs.length, ...DEFAULT_DESKTOP_BUTTONS.map(b => ({ ...b })))
@@ -588,6 +612,12 @@ export async function resetAllConfigsToFactoryDefaults(ctx: {
   // key 与 src/tts/httpTtsEngine.ts 中的常量保持一致
   await ctx.removeData('siyuan-tc-tts-settings')
   await ctx.removeData('siyuan-tc-sf-api')
+  if (ctx.resetLogging) {
+    await ctx.resetLogging()
+  } else {
+    await ctx.removeData('loggingConfig')
+    setLoggingEnabled(false)
+  }
 }
 
 // ===== 扩展工具栏辅助常量 =====
@@ -2420,12 +2450,29 @@ function getButtonBaseStyle(config: ButtonConfig): string {
   `
 }
 
+const DEFAULT_NAME_BY_ID: Record<string, { key: string; legacy: string[] }> = {
+  'overflow-button-desktop': { key: 'button.default.overflow', legacy: ['扩展工具栏'] }, 'overflow-button-mobile': { key: 'button.default.overflow', legacy: ['扩展工具栏'] },
+  'more-desktop': { key: 'button.default.more', legacy: ['更多'] }, 'more-mobile': { key: 'button.default.more', legacy: ['更多'] },
+  'doc-desktop': { key: 'button.default.menu', legacy: ['打开菜单'] }, 'doc-mobile': { key: 'button.default.menu', legacy: ['打开菜单'] },
+  'readonly-desktop': { key: 'button.default.lock', legacy: ['锁住文档'] }, 'readonly-mobile': { key: 'button.default.lock', legacy: ['锁住文档'] },
+  'plugin-settings-desktop': { key: 'button.default.pluginSettings', legacy: ['插件设置'] }, 'plugin-settings-mobile': { key: 'button.default.pluginSettings', legacy: ['插件设置'] },
+  'open-diary-desktop': { key: 'button.default.dailyNote', legacy: ['打开日记'] }, 'open-diary-mobile': { key: 'button.default.dailyNote', legacy: ['打开日记'] },
+  'template-time-desktop': { key: 'button.default.insertTime', legacy: ['插入时间'] }, 'template-time-mobile': { key: 'button.default.insertTime', legacy: ['插入时间'] },
+  'open-browser-desktop': { key: 'button.default.openBrowser', legacy: ['伺服浏览器'] }, 'recent-docs-desktop': { key: 'button.default.recent', legacy: ['最近文档'] }, 'recent-docs-mobile': { key: 'button.default.recent', legacy: ['最近文档'] },
+  'slide-comment-desktop': { key: 'button.default.authorTool', legacy: ['鲸鱼快速批注'] }, 'slide-comment-mobile': { key: 'button.default.authorTool', legacy: ['鲸鱼快速批注'] }, 'search-mobile': { key: 'button.default.search', legacy: ['搜索'] },
+}
+export function getButtonDisplayName(config: Pick<ButtonConfig, 'id' | 'name' | 'nameKey'>): string {
+  const entry = DEFAULT_NAME_BY_ID[config.id]
+  if (!entry || (config.nameKey && config.nameKey !== entry.key)) return config.name
+  return entry.legacy.includes(config.name) ? t(entry.key, undefined, config.name) : config.name
+}
+
 function createButtonElement(config: ButtonConfig): HTMLElement {
   const button = document.createElement('button')
   button.dataset.customButton = config.id
   // 保留必要的功能性类，移除 block__icon（避免思源样式干扰）
   button.className = 'fn__flex-center ariaLabel'
-  button.setAttribute('aria-label', config.name)
+  button.setAttribute('aria-label', getButtonDisplayName(config))
 
   // 扩展工具栏按钮：设置 tabindex="-1" 阻止通过 Tab 键获得焦点
   if (isOverflowButton(config.id)) {
@@ -2501,9 +2548,10 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
 
   // 如果开启显示名称，显示文字代替图标
   if (config.showName) {
-    const nameLength = config.name?.length || 0
+    const displayNameBase = getButtonDisplayName(config)
+    const nameLength = displayNameBase.length
     // 最多显示4个字，超过则截取前4个字
-    const displayName = nameLength > 4 ? config.name?.slice(0, 4) : config.name
+    const displayName = nameLength > 4 ? displayNameBase.slice(0, 4) : displayNameBase
     button.innerHTML = ''
     const nameSpan = document.createElement('span')
     nameSpan.textContent = displayName
@@ -3084,7 +3132,7 @@ function showOverflowToolbar(config: ButtonConfig) {
       // 使用与主工具栏相同的样式函数，确保完全一致
       layerBtn.className = 'fn__flex-center ariaLabel'
       layerBtn.style.cssText = getButtonBaseStyle(adjustedBtn)
-      layerBtn.setAttribute('aria-label', btn.name)
+      layerBtn.setAttribute('aria-label', getButtonDisplayName(btn))
       layerBtn.dataset.customButton = btn.id  // 添加 data-custom-button 属性，使按钮可被查找
 
       // 清空按钮内容
@@ -3142,9 +3190,9 @@ function showOverflowToolbar(config: ButtonConfig) {
 
 	      // 如果开启显示名称，显示文字代替图标
 	      if (btn.showName) {
-	        const nameLength = btn.name?.length || 0
+	        const displayNameBase = getButtonDisplayName(btn)
 	        // 最多显示4个字，超过则截取前4个字
-	        const displayName = nameLength > 4 ? btn.name?.slice(0, 4) : btn.name
+	        const displayName = displayNameBase.length > 4 ? displayNameBase.slice(0, 4) : displayNameBase
 	        layerBtn.innerHTML = ''
 	        const nameSpan = document.createElement('span')
 	        nameSpan.textContent = displayName
@@ -3505,7 +3553,7 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
       const layerBtn = document.createElement('button')
       layerBtn.className = 'fn__flex-center ariaLabel'
       layerBtn.style.cssText = getButtonBaseStyle(btn)
-      layerBtn.setAttribute('aria-label', btn.name)
+      layerBtn.setAttribute('aria-label', getButtonDisplayName(btn))
       layerBtn.dataset.customButton = btn.id
 
       // 渲染图标（与主工具栏保持一致的完整分支）
@@ -3554,7 +3602,8 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
 
       // 显示名称
       if (btn.showName) {
-        const displayName = btn.name?.length > 4 ? btn.name.slice(0, 4) : btn.name
+        const displayNameBase = getButtonDisplayName(btn)
+        const displayName = displayNameBase.length > 4 ? displayNameBase.slice(0, 4) : displayNameBase
         layerBtn.innerHTML = ''
         const nameSpan = document.createElement('span')
         nameSpan.textContent = displayName
@@ -3628,7 +3677,7 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
     if (breadcrumb) breadcrumb.style.removeProperty('overflow')
     clickedButton.classList.remove('overflow-active')
     clickedButton.style.removeProperty('background-color')
-    showMessage('扩展工具栏中没有按钮，请在设置中调整「每层按钮数量」配置', 3000, 'info')
+    showMessage(t('toolbarManager.1', undefined, '扩展工具栏中没有按钮，请在设置中调整「每层按钮数量」配置'), 3000, 'info')
     return
   }
 
@@ -3657,7 +3706,7 @@ async function handleButtonClick(
 ) {
   // 如果开启了右上角提示，显示消息
   const notificationEnabled = config.showNotification !== false
-  Notify.showButtonExecNotification(config.name, notificationEnabled)
+  Notify.showButtonExecNotification(getButtonDisplayName(config), notificationEnabled)
 
   // 执行功能
   if (config.type === 'builtin') {
@@ -3696,7 +3745,7 @@ async function handleButtonClick(
 
 function executeBuiltinFunction(config: ButtonConfig) {
   if (!config.builtinId) {
-    Notify.showErrorButtonNotConfigured(config.name)
+    Notify.showErrorButtonNotConfigured(getButtonDisplayName(config))
     return
   }
 
@@ -3880,7 +3929,7 @@ function executeBuiltinRefreshFunction(config: ButtonConfig) {
           }
         }
       } catch (error) {
-        console.warn('刷新文档失败:', error)
+        logger.warn('刷新文档失败:', error)
         
         // 备用方法：尝试使用F5快捷键
         try {
@@ -3902,7 +3951,7 @@ function executeBuiltinRefreshFunction(config: ButtonConfig) {
           const eventDown = new KeyboardEvent('keydown', keyEvent);
           window.dispatchEvent(eventDown);
         } catch (e) {
-          console.warn('F5快捷键方法也失败:', e)
+          logger.warn('F5快捷键方法也失败:', e)
         }
       }
       
@@ -3926,7 +3975,7 @@ function executeBuiltinRefreshFunction(config: ButtonConfig) {
         const eventDown = new KeyboardEvent('keydown', keyEvent);
         window.dispatchEvent(eventDown);
       } catch (e) {
-        console.warn('F5快捷键补充方案失败:', e)
+        logger.warn('F5快捷键补充方案失败:', e)
       }
       break
       
@@ -3941,7 +3990,7 @@ function executeBuiltinRefreshFunction(config: ButtonConfig) {
           location.reload()
         }
       } catch (error) {
-        console.warn('重载思源失败:', error)
+        logger.warn('重载思源失败:', error)
         // 如果JavaScript方法失败，尝试刷新页面
         location.reload()
       }
@@ -3971,7 +4020,7 @@ function executeBuiltinRefreshFunction(config: ButtonConfig) {
           }
         }
       } catch (error) {
-        console.warn('全屏切换失败:', error)
+        logger.warn('全屏切换失败:', error)
       }
       break
       
@@ -4012,7 +4061,7 @@ function executeBuiltinRefreshFunction(config: ButtonConfig) {
           window.dispatchEvent(eventDown);
         }
       } catch (error) {
-        console.error('文档全屏切换失败:', error);
+        logger.error('文档全屏切换失败:', error);
         
         // 备用方案：在 document 上触发
         try {
@@ -4034,19 +4083,19 @@ function executeBuiltinRefreshFunction(config: ButtonConfig) {
           const eventDown = new KeyboardEvent('keydown', keyEvent);
           document.dispatchEvent(eventDown);
         } catch (e) {
-          console.error('备用方案也失败:', e);
+          logger.error('备用方案也失败:', e);
         }
       }
       break
       
     default:
-      console.warn('未知的刷新功能类型:', config.builtinRefreshType)
+      logger.warn('未知的刷新功能类型:', config.builtinRefreshType)
   }
 }
 
 export function insertTemplate(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
   if (!config.template) {
-    Notify.showErrorTemplateNotConfigured(config.name)
+    Notify.showErrorTemplateNotConfigured(getButtonDisplayName(config))
     return
   }
 
@@ -4070,12 +4119,12 @@ export function insertTemplate(config: ButtonConfig, savedSelection: Range | nul
             Notify.showInfoCopySuccess()
           }
         } else {
-          console.warn('[模板插入] 追加到每日笔记失败:', response.msg)
+          logger.warn('[模板插入] 追加到每日笔记失败:', response.msg)
           // 尝试替代方案
           await appendToDailyNoteAlternative(notebookId, processedTemplate, config.showNotification)
         }
       } catch (error) {
-        console.warn('[模板插入] appendDailyNoteBlock API调用失败，尝试替代方案:', error)
+        logger.warn('[模板插入] appendDailyNoteBlock API调用失败，尝试替代方案:', error)
         await appendToDailyNoteAlternative(notebookId, processedTemplate, config.showNotification)
       }
     })()
@@ -4239,7 +4288,7 @@ export function showTemplateContextMenu(e: MouseEvent, textarea: HTMLTextAreaEle
       gap: 8px;
       white-space: nowrap;
     `
-    item.textContent = btn.name || '模板插入'
+    item.textContent = getButtonDisplayName(btn) || t('toolbarManager.2', undefined, '模板插入')
     item.addEventListener('mouseenter', () => {
       item.style.background = 'var(--b3-list-hover, #f0f0f0)'
     })
@@ -4289,7 +4338,7 @@ export function showTemplateContextMenu(e: MouseEvent, textarea: HTMLTextAreaEle
  */
 async function executeClickSequence(config: ButtonConfig, clickedButton?: HTMLElement | null) {
   if (!config.clickSequence || config.clickSequence.length === 0) {
-    Notify.showErrorClickSequenceNotConfigured(config.name)
+    Notify.showErrorClickSequenceNotConfigured(getButtonDisplayName(config))
     return
   }
 
@@ -4615,15 +4664,24 @@ async function executeButtonSequence(config: ButtonConfig) {
   const steps = config.buttonSequenceSteps
 
   if (!steps || steps.length === 0) {
-    Notify.showErrorClickSequenceNotConfigured(config.name)
+    Notify.showErrorClickSequenceNotConfigured(getButtonDisplayName(config))
     return
   }
 
-  // 过滤掉空的步骤（按钮ID为空的）
-  const validSteps = steps.filter(step => step.buttonId && step.buttonId.trim())
+  // 兼容旧版仅保存 buttonName 的步骤，执行前即时补齐稳定 ID。
+  // 设置页未打开时也必须能够执行升级前保存的连续点击配置。
+  const normalizedSteps = steps.map(step => {
+    if (step.buttonId && step.buttonId.trim()) return step
+    const legacyName = typeof step.buttonName === 'string' ? step.buttonName.trim() : ''
+    const matchedButton = legacyName ? findButtonConfigByName(legacyName) : null
+    return matchedButton ? { ...step, buttonId: matchedButton.id } : step
+  })
+
+  // 过滤掉无法解析的步骤。
+  const validSteps = normalizedSteps.filter(step => step.buttonId && step.buttonId.trim())
 
   if (validSteps.length === 0) {
-    Notify.showErrorClickSequenceNotConfigured(config.name)
+    Notify.showErrorClickSequenceNotConfigured(getButtonDisplayName(config))
     return
   }
 
@@ -4641,13 +4699,16 @@ async function executeButtonSequence(config: ButtonConfig) {
 
     if (!buttonConfig) {
       // 找不到按钮配置，停止整个序列
-      Notify.showErrorClickSequenceStepFailed(i + 1, `按钮ID"${buttonId}"`)
+      Notify.showErrorClickSequenceStepFailed(
+        i + 1,
+        t('toolbarManager.buttonIdDescriptor', { buttonId }, `按钮ID"${buttonId}"`)
+      )
       return
     }
 
     // 防止死循环：如果目标按钮也是连续点击类型，则跳过
     if (buttonConfig.type === 'author-tool' && buttonConfig.authorToolSubtype === 'button-sequence') {
-      console.warn(`[连续点击] 跳过步骤 ${i + 1}：按钮"${buttonConfig.name}"是连续点击类型，避免循环调用`)
+      logger.warn(`[连续点击] 跳过步骤 ${i + 1}：按钮"${buttonConfig.name}"是连续点击类型，避免循环调用`)
       continue
     }
 
@@ -4655,7 +4716,11 @@ async function executeButtonSequence(config: ButtonConfig) {
     try {
       await handleButtonClick(buttonConfig, savedSelection, lastActiveElement)
     } catch (error) {
-      Notify.showErrorClickSequenceStepFailed(i + 1, `按钮"${buttonConfig.name}"`)
+      const buttonName = getButtonDisplayName(buttonConfig)
+      Notify.showErrorClickSequenceStepFailed(
+        i + 1,
+        t('toolbarManager.buttonDescriptor', { buttonName }, `按钮"${buttonName}"`)
+      )
       return
     }
 
@@ -4732,14 +4797,44 @@ function findCustomButtonByName(buttonName: string): HTMLElement | null {
  * @param timeout 超时时间（毫秒）
  * @returns Promise<HTMLElement | null>
  */
+function parseTextSelector(selector: string): string[] {
+  const payload = selector.substring(5).trim()
+  if (!payload) return []
+
+  // Keep the original text:xxx syntax unchanged unless the payload is a candidate list.
+  if (!payload.includes('|') || !/(?:^|\|)(?:zh-CN|zh|en)=/u.test(payload)) return [payload]
+
+  const candidates = payload.split('|').map(part => {
+    const separator = part.indexOf('=')
+    if (separator <= 0) return null
+    const locale = part.substring(0, separator).trim()
+    const text = part.substring(separator + 1).trim()
+    if (!['zh', 'zh-CN', 'en'].includes(locale) || !text) return null
+    return { locale, text }
+  })
+  if (candidates.some(candidate => candidate === null)) return []
+
+  const currentLocale = getLocale()
+  return (candidates as Array<{ locale: string; text: string }>)
+    .sort((a, b) => {
+      const aPriority = a.locale === currentLocale || (currentLocale === 'zh-CN' && a.locale === 'zh') ? 0 : 1
+      const bPriority = b.locale === currentLocale || (currentLocale === 'zh-CN' && b.locale === 'zh') ? 0 : 1
+      return aPriority - bPriority
+    })
+    .map(candidate => candidate.text)
+}
+
 function waitForElement(selector: string, timeout: number = 5000): Promise<HTMLElement | null> {
   return new Promise((resolve) => {
     // 智能查找元素（支持8种方式）
     const findElement = (): HTMLElement | null => {
       // 检查是否是文本查询模式 (text:xxx)
       if (selector.startsWith('text:')) {
-        const searchText = selector.substring(5).trim()
-        return findElementByText(searchText)
+        const searchTexts = parseTextSelector(selector)
+        logger.log('[连续点击] 文本选择器解析:', { selector, locale: getLocale(), candidates: JSON.stringify(searchTexts) })
+        const result = findElementByText(searchTexts)
+        logger.log('[连续点击] 文本选择器首次查找:', { selector, found: !!result, text: result?.textContent?.trim() })
+        return result
       }
 
       // 如果包含 CSS 选择器特殊字符，直接使用标准查询
@@ -4808,6 +4903,7 @@ function waitForElement(selector: string, timeout: number = 5000): Promise<HTMLE
     // 先检查元素是否已存在
     const element = findElement()
     if (element) {
+      logger.log('[连续点击] 元素已找到:', { selector, text: element.textContent?.trim(), tag: element.tagName, className: element.className })
       resolve(element)
       return
     }
@@ -4837,6 +4933,7 @@ function waitForElement(selector: string, timeout: number = 5000): Promise<HTMLE
     const timerId = safeSetTimeout(() => {
       observer.disconnect()
       activeObservers.delete(observer)
+      logger.warn('[连续点击] 文本/元素等待超时:', { selector, timeout })
       resolve(null)
     }, timeout)
   })
@@ -4881,7 +4978,23 @@ async function waitForElementSettled(element: HTMLElement, timeout = 2000): Prom
  * @param searchText 要搜索的文本内容
  * @returns 找到的元素或null
  */
-function findElementByText(searchText: string): HTMLElement | null {
+function textMatchesCandidate(actualText: string, candidates: string[]): boolean {
+  const normalizedText = actualText.trim()
+  return candidates.some(candidate => {
+    const normalizedCandidate = candidate.trim()
+    if (!normalizedCandidate) return false
+    if (normalizedText === normalizedCandidate) return true
+    // SiYuan plugin menu labels may append the installed plugin version.
+    return new RegExp(`^${escapeRegExp(normalizedCandidate)}\\s+v\\d+(?:\\.\\d+)*$`, 'u').test(normalizedText)
+  })
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function findElementByText(searchTexts: string[]): HTMLElement | null {
+  if (searchTexts.length === 0) return null
   // 使用 TreeWalker 遍历文本节点，性能优于 querySelectorAll('*')
   const walker = document.createTreeWalker(
     document.body,
@@ -4892,8 +5005,9 @@ function findElementByText(searchText: string): HTMLElement | null {
         if (node.textContent?.trim() === '') {
           return NodeFilter.FILTER_SKIP
         }
-        // 检查文本是否匹配
-        if (node.textContent?.trim() === searchText) {
+        // 检查文本是否匹配任一语言候选
+        if (textMatchesCandidate(node.textContent ?? '', searchTexts)) {
+          logger.log('[连续点击] 找到文本节点:', { actualText: node.textContent?.trim(), candidates: searchTexts })
           return NodeFilter.FILTER_ACCEPT
         }
         return NodeFilter.FILTER_SKIP
@@ -5200,7 +5314,7 @@ async function executeDiary(config: ButtonConfig) {
               })
             }
           } catch (openError) {
-            console.warn('[日记功能] 打开文档失败:', openError)
+            logger.warn('[日记功能] 打开文档失败:', openError)
           }
 
           // 根据位置模式，等待文档加载后滚动
@@ -5219,11 +5333,11 @@ async function executeDiary(config: ButtonConfig) {
           }
           return
         } else {
-          console.warn('[日记功能] API调用失败:', response.msg)
+          logger.warn('[日记功能] API调用失败:', response.msg)
           // API失败，回退到快捷键方式
         }
       } catch (apiError) {
-        console.warn('[日记功能] API调用异常:', apiError)
+        logger.warn('[日记功能] API调用异常:', apiError)
         // API异常，回退到快捷键方式
       }
     }
@@ -5347,7 +5461,7 @@ async function executeDiary(config: ButtonConfig) {
     }, 3000)
 
   } catch (error) {
-    console.error('日记功能失败:', error)
+    logger.error('日记功能失败:', error)
     Notify.showErrorDiaryFailed(error)
   }
 }
@@ -5446,7 +5560,7 @@ function updateNativeReadonlyBtn(readonlyBtn: Element | null, locked: boolean): 
 async function executeToggleLock(config: ButtonConfig): Promise<void> {
   const protyle = getActiveProtyle()
   if (!protyle?.block?.rootID) {
-    showMessage('未找到当前文档', 2000, 'info')
+    showMessage(t('toolbarManager.3', undefined, '未找到当前文档'), 2000, 'info')
     return
   }
   const docId = protyle.block.rootID
@@ -5510,7 +5624,7 @@ async function executeToggleLock(config: ButtonConfig): Promise<void> {
     refreshToggleLockIcons()
 
     if (config.showNotification !== false) {
-      showMessage(newLocked ? '🔒 文档已锁定' : '🔓 文档已解锁', 1500, 'info')
+      showMessage(newLocked ? t('toolbarManager.4', undefined, '🔒 文档已锁定') : t('toolbarManager.5', undefined, '🔓 文档已解锁'), 1500, 'info')
     }
     refreshToolbarAutoHide()
   } catch (e) {
@@ -5522,8 +5636,8 @@ async function executeToggleLock(config: ButtonConfig): Promise<void> {
     try {
       protyle.wysiwyg.element.setAttribute('custom-sy-readonly', isLocked ? 'true' : 'false')
     } catch { /* ignore */ }
-    console.warn('[toggle-lock] 切换失败:', e)
-    showMessage('切换锁状态失败', 2000, 'error')
+    logger.warn('[toggle-lock] 切换失败:', e)
+    showMessage(t('toolbarManager.6', undefined, '切换锁状态失败'), 2000, 'error')
   } finally {
     resolve!()
   }
@@ -6538,17 +6652,17 @@ async function executeClearEmptyBlocks(): Promise<void> {
 
   // 4. 无空块
   if (emptyBlockIds.length === 0) {
-    Notify.showSuccess('当前文档没有空块')
+    Notify.showSuccess(t('toolbarManager.clearEmptyBlocks.none', undefined, '当前文档没有空块'))
     return
   }
 
   // 5. 确认删除
   const confirmed = await showConfirmDialog({
-    title: '清理空块',
-    message: `发现 ${emptyBlockIds.length} 个空块，是否删除？`,
-    hint: '删除后不可撤销，建议先保存快照',
-    confirmText: '删除',
-    cancelText: '取消',
+    title: t('toolbarManager.clearEmptyBlocks.title', undefined, '清理空块'),
+    message: t('toolbarManager.clearEmptyBlocks.confirm', { count: emptyBlockIds.length }, '发现 {count} 个空块，是否删除？'),
+    hint: t('toolbarManager.clearEmptyBlocks.warning', undefined, '删除后不可撤销，建议先保存快照'),
+    confirmText: t('toolbarManager.clearEmptyBlocks.delete', undefined, '删除'),
+    cancelText: t('toolbarManager.clearEmptyBlocks.cancel', undefined, '取消'),
   })
   if (!confirmed) return
 
@@ -6560,17 +6674,17 @@ async function executeClearEmptyBlocks(): Promise<void> {
       const result = await deleteBlock(id)
       if (result !== null) successCount++
     } catch (e) {
-      console.warn('[清理空块] 删除异常:', id, e)
+      logger.warn('[清理空块] 删除异常:', id, e)
     }
   }
 
   // 6. 显示结果
   if (successCount === 0) {
-    Notify.showErrorCommandCannotExecute('清理空块失败')
+    Notify.showErrorCommandCannotExecute(t('toolbarManager.clearEmptyBlocks.failed', undefined, '清理空块失败'))
   } else if (successCount < emptyBlockIds.length) {
-    Notify.showSuccess(`已删除 ${successCount}/${emptyBlockIds.length} 个空块`)
+    Notify.showSuccess(t('toolbarManager.clearEmptyBlocks.partialSuccess', { successCount, totalCount: emptyBlockIds.length }, '已删除 {successCount}/{totalCount} 个空块'))
   } else {
-    Notify.showSuccess(`已删除 ${successCount} 个空块`)
+    Notify.showSuccess(t('toolbarManager.clearEmptyBlocks.success', { count: successCount }, '已删除 {count} 个空块'))
   }
 }
 
@@ -6659,7 +6773,7 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
         const notebookId = config.lifeLogNotebookId
 
         if (!notebookId) {
-          Notify.showErrorCommandCannotExecute('请先配置笔记本ID')
+          Notify.showErrorCommandCannotExecute(t('toolbarManager.configureNotebook', undefined, '请先配置笔记本ID'))
           return
         }
 
@@ -6680,8 +6794,8 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
         }
       }
     } catch (error) {
-      console.warn('[叶归LifeLog适配] 执行失败:', error)
-      Notify.showErrorCommandCannotExecute('叶归LifeLog适配')
+      logger.warn('[叶归LifeLog适配] 执行失败:', error)
+      Notify.showErrorCommandCannotExecute(t('toolbarManager.lifeLogIntegration', undefined, '叶归LifeLog适配'))
     }
 	    return
 	  }
@@ -6738,10 +6852,14 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
       if (commentPlugin) {
         const isActive = (commentPlugin as any).toggleSlideCommentMode()
         if (config.showNotification) {
-          showMessage(isActive ? '✅ 滑动快速批注已开启' : '❌ 滑动快速批注已关闭')
+          showMessage(isActive ? t('toolbarManager.7', undefined, '✅ 滑动快速批注已开启') : t('toolbarManager.8', undefined, '❌ 滑动快速批注已关闭'))
         }
       } else {
-        Notify.showErrorCommandCannotExecute('未找到鲸鱼快速批注插件，请先安装并启用')
+        Notify.showErrorCommandCannotExecute(t(
+          'toolbarManager.slideCommentPluginMissing',
+          undefined,
+          '未找到鲸鱼快速批注插件，请先安装并启用'
+        ))
       }
     }
     return
@@ -6773,7 +6891,7 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
   const targetId = isMobile ? config.mobileTargetDocId : config.targetDocId
 
   if (!targetId) {
-    Notify.showErrorCommandCannotExecute('未配置目标块ID')
+    Notify.showErrorCommandCannotExecute(t('toolbarManager.targetBlockNotConfigured', undefined, '未配置目标块ID'))
     return
   }
 
@@ -6782,7 +6900,11 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
     const blockInfo = await fetchSyncPost('/api/block/getBlockInfo', { id: targetId })
 
     if (blockInfo.code !== 0 || !blockInfo.data) {
-      Notify.showErrorCommandCannotExecute(`获取块信息: ${targetId}`)
+      Notify.showErrorCommandCannotExecute(t(
+        'toolbarManager.getBlockInfoFailed',
+        { targetId },
+        `获取块信息: ${targetId}`
+      ))
       return
     }
 
@@ -6814,8 +6936,12 @@ async function executeAuthorTool(config: ButtonConfig, savedSelection: Range | n
     }, 500)
 
   } catch (error) {
-    console.warn('[打开指定ID块] 打开失败:', error)
-    Notify.showErrorCommandCannotExecute(`打开块: ${targetId}`)
+    logger.warn('[打开指定ID块] 打开失败:', error)
+    Notify.showErrorCommandCannotExecute(t(
+      'toolbarManager.openBlockFailed',
+      { targetId },
+      `打开块: ${targetId}`
+    ))
   }
 }
 
@@ -6861,7 +6987,7 @@ function minutesToHHMM(minutes: number): string {
 async function appendToDailyNote(config: ButtonConfig, uploadedPath: string): Promise<void> {
   const notebookId = config.imageUploadNotebookId
   if (!notebookId) {
-    Notify.showErrorCommandCannotExecute('请先配置笔记本ID')
+    Notify.showErrorCommandCannotExecute(t('toolbarManager.configureNotebook', undefined, '请先配置笔记本ID'))
     return
   }
 
@@ -6882,7 +7008,11 @@ async function appendToDailyNote(config: ButtonConfig, uploadedPath: string): Pr
       Notify.showInfoCopySuccess()
     }
   } else {
-    Notify.showErrorCommandCannotExecute('追加到日记失败: ' + (appendResult.msg || ''))
+    Notify.showErrorCommandCannotExecute(t(
+      'toolbarManager.appendDailyNoteFailed',
+      { error: appendResult.msg || '' },
+      `追加到日记失败: ${appendResult.msg || ''}`
+    ))
   }
 }
 
@@ -6964,7 +7094,7 @@ async function executeImageUpload(config: ButtonConfig, preSavedRange: Range | n
 	            Notify.showInfoCopySuccess()
 	          }
 	        } catch (e) {
-	          console.warn('[图片快捷导入] 光标插入失败，回退日记追加:', e)
+	          logger.warn('[图片快捷导入] 光标插入失败，回退日记追加:', e)
 	          for (let i = 0; i < files.length; i++) {
 	            const path = await uploadImageFile(files[i])
 	            await appendToDailyNote(config, path)
@@ -6978,8 +7108,8 @@ async function executeImageUpload(config: ButtonConfig, preSavedRange: Range | n
 	        }
 	      }
 	    } catch (error) {
-	      console.warn('[图片快捷导入] 执行失败:', error)
-	      Notify.showErrorCommandCannotExecute('图片导入失败')
+	      logger.warn('[图片快捷导入] 执行失败:', error)
+	      Notify.showErrorCommandCannotExecute(t('toolbarManager.imageImportFailed', undefined, '图片导入失败'))
 	    }
 	  }
 
@@ -7007,14 +7137,14 @@ function showCloseConfirmDialog(): Promise<boolean> {
     overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);'
     const box = document.createElement('div')
     box.style.cssText = 'background:var(--b3-theme-background);border-radius:14px;padding:24px;min-width:280px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.25);'
-    box.innerHTML = '<div style="font-size:16px;font-weight:600;margin-bottom:8px;color:var(--b3-theme-on-background)">关闭 LifeLog？</div><div style="font-size:13px;color:var(--b3-theme-on-surface-light);margin-bottom:20px">输入框内有未保存的内容，确定要关闭吗？</div>'
+    box.innerHTML = `<div style="font-size:16px;font-weight:600;margin-bottom:8px;color:var(--b3-theme-on-background)">${t('toolbarManager.lifeLog.closeConfirmTitle', undefined, '关闭 LifeLog？')}</div><div style="font-size:13px;color:var(--b3-theme-on-surface-light);margin-bottom:20px">${t('toolbarManager.lifeLog.closeConfirmBody', undefined, '输入框内有未保存的内容，确定要关闭吗？')}</div>`
     const btnRow = document.createElement('div')
     btnRow.style.cssText = 'display:flex;gap:10px;justify-content:center;'
     const cancelBtn = document.createElement('button')
-    cancelBtn.textContent = '取消'
+    cancelBtn.textContent = t('toolbarManager.9', undefined, '取消')
     cancelBtn.style.cssText = 'padding:8px 24px;border-radius:8px;border:1px solid var(--b3-border-color);background:var(--b3-theme-surface);color:var(--b3-theme-on-surface);cursor:pointer;font-size:14px;outline:none;'
     const okBtn = document.createElement('button')
-    okBtn.textContent = '关闭'
+    okBtn.textContent = t('toolbarManager.10', undefined, '关闭')
     okBtn.style.cssText = 'padding:8px 24px;border-radius:8px;border:none;background:var(--b3-theme-primary);color:#fff;cursor:pointer;font-size:14px;outline:none;'
     btnRow.appendChild(cancelBtn)
     btnRow.appendChild(okBtn)
@@ -7113,7 +7243,7 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
 
     // 输入框（弹性伸缩，小窗口收缩、大窗口扩展）
     const input = document.createElement('textarea');
-    input.placeholder = '例如：写插件';
+    input.placeholder = t('toolbarManager.11', undefined, '例如：写插件');
     input.style.cssText = `
       margin: 0 16px 12px; padding: 10px 12px;
       border: 1px solid var(--b3-border-color); border-radius: 8px;
@@ -7261,7 +7391,7 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
     btnRow.style.cssText = `display: flex; gap: 8px; padding: 4px 16px 16px; flex: 0 1 auto; min-height: 0; overflow: hidden;`;
 
     const cancelBtn = document.createElement('button');
-    cancelBtn.textContent = '取消';
+    cancelBtn.textContent = t('toolbarManager.12', undefined, '取消');
     cancelBtn.style.cssText = `
       flex: 1; padding: 10px 0; font-size: 17px; background: transparent;
       color: var(--b3-theme-on-background); border: none; cursor: pointer;
@@ -7271,7 +7401,7 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
     btnRow.appendChild(cancelBtn);
 
     const confirmBtn = document.createElement('button');
-    confirmBtn.textContent = '发送';
+    confirmBtn.textContent = t('toolbarManager.13', undefined, '发送');
     confirmBtn.style.cssText = `
       flex: 1; padding: 10px 0; font-size: 17px; background: transparent;
       color: var(--b3-theme-primary); border: none; cursor: pointer;
@@ -7411,7 +7541,11 @@ export async function triggerDesktopLifelogGlobalCapture(): Promise<void> {
     // 检查是否存在 life-log 按钮但未开启快捷键
     const hasLifeLogButton = desktopConfigs.some((btn: ButtonConfig) => btn.authorToolSubtype === 'life-log')
     if (hasLifeLogButton) {
-      Notify.showErrorCommandCannotExecute('请在叶归LifeLog按钮设置中开启「全局快捷键」开关')
+      Notify.showErrorCommandCannotExecute(t(
+        'toolbarManager.lifeLogEnableGlobalShortcut',
+        undefined,
+        '请在叶归LifeLog按钮设置中开启「全局快捷键」开关'
+      ))
     }
     return
   }
@@ -7437,7 +7571,11 @@ export async function triggerDesktopLifelogGlobalCapture(): Promise<void> {
     const formattedContent = `${hours}:${minutes} ${category}：${inputContent}\n`
 
     if (!notebookId) {
-      Notify.showErrorCommandCannotExecute('请先在叶归LifeLog按钮中配置笔记本ID')
+      Notify.showErrorCommandCannotExecute(t(
+        'toolbarManager.lifeLogConfigureNotebook',
+        undefined,
+        '请先在叶归LifeLog按钮中配置笔记本ID'
+      ))
       return
     }
 
@@ -7456,8 +7594,8 @@ export async function triggerDesktopLifelogGlobalCapture(): Promise<void> {
       await appendToDailyNoteAlternative(notebookId, formattedContent, true)
     }
   } catch (error) {
-    console.warn('[叶归LifeLog全局] 执行失败:', error)
-    Notify.showErrorCommandCannotExecute('叶归LifeLog')
+    logger.warn('[叶归LifeLog全局] 执行失败:', error)
+    Notify.showErrorCommandCannotExecute(t('toolbarManager.lifeLog', undefined, '叶归LifeLog'))
   }
 }
 
@@ -7506,7 +7644,7 @@ async function showCategorySelectionDialog(categories: string[], options?: { res
 
     // 添加标题
     const title = document.createElement('div')
-    title.textContent = '请选择分类'
+    title.textContent = t('toolbarManager.14', undefined, '请选择分类')
     title.style.cssText = `
       font-size: 16px;
       font-weight: 600;
@@ -7551,7 +7689,7 @@ async function showCategorySelectionDialog(categories: string[], options?: { res
 
     // 添加取消按钮
     const cancelButton = document.createElement('button')
-    cancelButton.textContent = '取消'
+    cancelButton.textContent = t('toolbarManager.15', undefined, '取消')
     cancelButton.style.cssText = `
       padding: 12px 16px;
       border: 1px solid var(--b3-border-color);
@@ -7712,7 +7850,7 @@ async function showTextInputDialog(prompt: string, placeholder?: string): Promis
 
     // 取消按钮
     const cancelButton = document.createElement('button');
-    cancelButton.textContent = '取消';
+    cancelButton.textContent = t('toolbarManager.16', undefined, '取消');
     cancelButton.style.cssText = `
       flex: 1;
       padding: 10px 16px;
@@ -7741,7 +7879,7 @@ async function showTextInputDialog(prompt: string, placeholder?: string): Promis
 
     // 确认按钮
     const confirmButton = document.createElement('button');
-    confirmButton.textContent = '确认';
+    confirmButton.textContent = t('toolbarManager.17', undefined, '确认');
     confirmButton.style.cssText = `
       flex: 1;
       padding: 10px 16px;
@@ -7834,7 +7972,7 @@ async function appendToDailyNoteAlternative(notebookId: string, content: string,
           Notify.showInfoCopySuccess();
         }
       } else {
-        console.warn('[叶归LifeLog适配] 替代方案追加失败:', appendResponse.msg);
+        logger.warn('[叶归LifeLog适配] 替代方案追加失败:', appendResponse.msg);
         // 如果追加失败，回退到插入到当前编辑器
         await insertContentToEditor(content);
       }
@@ -7865,18 +8003,18 @@ async function appendToDailyNoteAlternative(notebookId: string, content: string,
             Notify.showInfoCopySuccess();
           }
         } else {
-          console.warn('[叶归LifeLog适配] 创建后追加失败:', appendResponse.msg);
+          logger.warn('[叶归LifeLog适配] 创建后追加失败:', appendResponse.msg);
           // 如果追加失败，回退到插入到当前编辑器
           await insertContentToEditor(content);
         }
       } else {
-        console.warn('[叶归LifeLog适配] 创建每日笔记失败:', createResponse.msg);
+        logger.warn('[叶归LifeLog适配] 创建每日笔记失败:', createResponse.msg);
         // 如果创建失败，回退到插入到当前编辑器
         await insertContentToEditor(content);
       }
     }
   } catch (error) {
-    console.warn('[叶归LifeLog适配] 替代方案执行失败:', error);
+    logger.warn('[叶归LifeLog适配] 替代方案执行失败:', error);
     // 如果所有方法都失败，回退到插入到当前编辑器
     await insertContentToEditor(content);
   }
@@ -7911,7 +8049,7 @@ async function insertContentToEditor(content: string): Promise<void> {
   }
 
   // 如果仍然找不到编辑器，尝试通过思源API插入
-  console.warn('未找到编辑器，无法插入内容')
+  logger.warn('未找到编辑器，无法插入内容')
 }
 
 /**
@@ -7965,7 +8103,7 @@ async function insertToSpecificProtyle(protyle: HTMLElement, content: string): P
       // 使用document.execCommand插入内容
       document.execCommand('insertText', false, content)
     } catch (e) {
-      console.warn('使用execCommand插入失败:', e)
+      logger.warn('使用execCommand插入失败:', e)
       // 备用方法：直接在DOM中插入
       try {
         const selection = window.getSelection();
@@ -7979,7 +8117,7 @@ async function insertToSpecificProtyle(protyle: HTMLElement, content: string): P
           contentElement.textContent += content;
         }
       } catch (domError) {
-        console.warn('DOM插入方法也失败:', domError);
+        logger.warn('DOM插入方法也失败:', domError);
       }
     }
   }
@@ -7994,7 +8132,11 @@ function formatTimeRange(startMinutes: number, endMinutes: number): string {
 
   // 计算是否跨天
   if (endMinutes < startMinutes) {
-    return `⏳${startTime} - ${endTime}（次日）`
+    return t(
+      'toolbarManager.databasePopup.nextDayTimeRange',
+      { startTime, endTime },
+      `⏳${startTime} - ${endTime}（次日）`
+    )
   }
   return `⏳${startTime} - ${endTime}`
 }
@@ -8169,7 +8311,7 @@ async function executeDatabaseQuery(config: ButtonConfig) {
     showDatabasePopup(processedRows, config, primaryKeyColumn, timeRangeColumnName, displayMode, showColumns, attributeView.name)
 
   } catch (error: any) {
-    console.error('数据库悬浮弹窗失败:', error)
+    logger.error('数据库悬浮弹窗失败:', error)
     Notify.showErrorQueryFailed(error)
   }
 }
@@ -8184,7 +8326,7 @@ function showDatabasePopup(
   timeRangeColumnName: string,
   displayMode: string,
   showColumns: string[],
-  dbName: string = '查询结果'
+  dbName: string = t('toolbarManager.databasePopup.defaultTitle', undefined, '查询结果')
 ) {
   const rowCount = rows.length
 
@@ -8319,11 +8461,11 @@ function showDatabasePopup(
   }
 
   // 构建说明文字
-  const noteHtml = '<div style="margin-top: 14px; font-size: 11px; color: #8E8E93; text-align: center;">双击关闭 | 点击紫色文字可跳转</div>'
+  const noteHtml = `<div style="margin-top: 14px; font-size: 11px; color: #8E8E93; text-align: center;">${t('toolbarManager.databasePopup.bottomHint', undefined, '双击关闭 | 点击紫色文字可跳转')}</div>`
 
   // 创建 Dialog，使用数据库名称作为标题
   const dialog = new Dialog({
-    title: dbName || '查询结果',
+    title: dbName || t('toolbarManager.databasePopup.defaultTitle', undefined, '查询结果'),
     content: `
       <div class="b3-dialog__content" style="padding: ${displayMode === 'table' ? '0' : '12px'};">
         ${contentHtml}
@@ -8394,7 +8536,7 @@ function showDatabasePopup(
       const response = await fetchSyncPost('/api/block/getBlockInfo', { id: blockId })
 
       if (response.code !== 0 || !response.data) {
-        console.warn('[数据库弹窗] 获取块信息失败:', response)
+        logger.warn('[数据库弹窗] 获取块信息失败:', response)
         return
       }
 
@@ -8438,7 +8580,7 @@ function showDatabasePopup(
         }, 500)
       }
     } catch (err) {
-      console.warn('[数据库弹窗] 打开块失败:', err)
+      logger.warn('[数据库弹窗] 打开块失败:', err)
     }
   })
 }
@@ -9014,7 +9156,7 @@ async function copyToClipboard(text: string): Promise<boolean> {
     document.body.removeChild(textArea)
     return successful
   } catch (err) {
-    console.error('复制失败:', err)
+    logger.error('复制失败:', err)
     return false
   }
 }
@@ -9198,7 +9340,7 @@ function executeSiyuanCommand(command: string, protyle?: any) {
  */
 function executeShortcut(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
   if (!config.shortcutKey) {
-    Notify.showErrorShortcutNotConfigured(config.name)
+    Notify.showErrorShortcutNotConfigured(getButtonDisplayName(config))
     return
   }
 
@@ -9297,7 +9439,7 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
           }
         }
       } catch (e) {
-        console.warn('⌘/ 块菜单执行失败:', e)
+        logger.warn('⌘/ 块菜单执行失败:', e)
       }
       return
     }
@@ -9340,7 +9482,7 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
                   cmd.callback()
                 }
               } catch (e) {
-                console.warn('插件命令 editorCallback 执行失败:', e)
+                logger.warn('插件命令 editorCallback 执行失败:', e)
               }
             }, 50)
             return
@@ -9363,7 +9505,7 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
             cmd.globalCallback()
           }
         } catch (e) {
-          console.warn('插件命令回调执行失败:', e)
+          logger.warn('插件命令回调执行失败:', e)
         }
         return
       }
@@ -9492,7 +9634,7 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
                 }
                 return
               } catch (e) {
-                console.error('protyle 方法执行失败:', e)
+                logger.error('protyle 方法执行失败:', e)
               }
             }
 
@@ -9550,7 +9692,7 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
                   editArea.dispatchEvent(eventDown)
                 } catch (e) {
                   // 部分思源快捷键（如 Ctrl+/ 块菜单）依赖内部选区状态，无法通过模拟键盘事件触发
-                  console.warn('快捷键模拟执行失败:', config.shortcutKey, e)
+                  logger.warn('快捷键模拟执行失败:', config.shortcutKey, e)
                 }
               }, 50)
               return
@@ -9591,7 +9733,7 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
           }
         } catch (e) {
           // 思源内部处理此快捷键时出错（可能不是有效快捷键）
-          console.warn('思源处理此快捷键时出错:', e)
+          logger.warn('思源处理此快捷键时出错:', e)
           Notify.showWarningShortcutMaybeInvalid(config.shortcutKey)
         }
       } else {
@@ -9600,7 +9742,7 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
     }
 
   } catch (error) {
-    console.error('执行快捷键失败:', error)
+    logger.error('执行快捷键失败:', error)
     Notify.showErrorShortcutFailed(config.shortcutKey, error)
   }
 }
@@ -9632,8 +9774,8 @@ async function executeQuickNote(_config: ButtonConfig) {
     await showSmallWindowTipFromDetector();
 
   } catch (error) {
-    console.error('一键记事执行失败:', error);
-    const message = `按钮 "${_config.name}" 的一键记事功能执行失败`;
+    logger.error('一键记事执行失败:', error);
+    const message = t('toolbarManager.quickNote.executionFailed', { buttonName: getButtonDisplayName(_config) }, '按钮 "{buttonName}" 的一键记事功能执行失败');
     showMessage(message, 3000, 'error');
   } finally {
     // 恢复原始的 __pluginInstance（非桌面 return 分支也要恢复）
@@ -9653,7 +9795,7 @@ async function executePopupSelect(config: ButtonConfig, savedSelection: Range | 
   const templates = config.popupSelectTemplates || []
   
   if (templates.length === 0) {
-    showMessage(`按钮 "${config.name}" 未配置模板列表`, 3000, 'error')
+    showMessage(t('toolbarManager.popupSelect.templatesMissing', { buttonName: getButtonDisplayName(config) }, '按钮 "{buttonName}" 未配置模板列表'), 3000, 'error')
     return
   }
   
@@ -9768,7 +9910,7 @@ export async function showPopupSelectDialog(templates: { name: string; content: 
 
     // 添加标题
     const title = document.createElement('div')
-    title.textContent = '请选择模板'
+    title.textContent = t('toolbarManager.18', undefined, '请选择模板')
     title.style.cssText = `
       font-size: 17px;
       font-weight: 600;
@@ -9902,7 +10044,7 @@ export async function showPopupSelectDialog(templates: { name: string; content: 
     // 添加取消按钮（底部固定）
     const cancelButton = document.createElement('button')
     cancelButton.tabIndex = -1;
-    cancelButton.textContent = '取消'
+    cancelButton.textContent = t('toolbarManager.19', undefined, '取消')
     cancelButton.style.cssText = `
       padding: 12px 16px;
       border: none;

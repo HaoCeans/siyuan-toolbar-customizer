@@ -9,6 +9,7 @@
  * 选完/上传完成后在标记位置**前面**逐个插入图片，最后移除标记。
  */
 
+import { logger } from '@/utils/logger'
 import { getActiveQuickNoteInput } from './session'
 import type { QuickNoteInputHandle } from './inputArea'
 
@@ -473,7 +474,7 @@ async function doPickAndInsertImages(): Promise<boolean> {
           finish(ok)
         }
       } catch (err: any) {
-        console.warn('[图片插入] 上传失败:', err)
+        logger.warn('[图片插入] 上传失败:', err)
         if (isPlain && textarea) clearTextareaAnchor(textarea)
         else clearBlockAnchor(handle.element)
         finish(false)
@@ -571,7 +572,7 @@ export async function handleImagePaste(e: ClipboardEvent): Promise<boolean> {
       return ok
     }
   } catch (err: any) {
-    console.warn('[图片粘贴] 失败:', err)
+    logger.warn('[图片粘贴] 失败:', err)
     if (isPlain && textarea) clearTextareaAnchor(textarea)
     else clearBlockAnchor(handle.element)
     return false

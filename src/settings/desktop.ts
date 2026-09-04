@@ -3,6 +3,7 @@
  * 处理电脑端思源手机端增强的设置界面
  */
 
+import { t } from '../i18n/runtime'
 import { validateActivationCode } from '../utils/activationCodeValidator'
 import type { LicenseStatus } from '../utils/licenseManager'
 import { TRIAL_CODE, clearTrial } from '../utils/licenseManager'
@@ -18,6 +19,7 @@ import * as Notify from '../notification'
 import { showButtonSelector } from '../ui/buttonSelector'
 import { showConfirmDialog } from '../ui/dialog'
 import { createDesktopQuickNoteSettingsSection } from '../ui/desktopQuickNoteSettings'
+import { logger } from '../utils/logger'
 
 /**
  * 创建电脑端全局按钮配置
@@ -56,7 +58,7 @@ export function createDesktopGlobalButtonConfig(
     border-bottom: 1px solid var(--b3-border-color);
     margin-bottom: 4px;
   `
-  moduleTitle.textContent = '全局按钮配置'
+  moduleTitle.textContent = t("settings.desktop.1", undefined, "全局按钮配置")
   moduleBox.appendChild(moduleTitle)
 
   const createRow = (
@@ -93,7 +95,7 @@ export function createDesktopGlobalButtonConfig(
 
   // 图标大小
   const { row: iconSizeRow, input: iconSizeInput } = createRow(
-    '图标大小 (px)',
+    t("settings.desktop.2", undefined, "图标大小 (px)"),
     config.iconSize,
     'number',
     async (input) => {
@@ -105,7 +107,7 @@ export function createDesktopGlobalButtonConfig(
 
   // 按钮宽度
   const { row: widthRow, input: widthInput } = createRow(
-    '按钮宽度 (px)',
+    t("settings.desktop.3", undefined, "按钮宽度 (px)"),
     config.minWidth,
     'number',
     async (input) => {
@@ -117,7 +119,7 @@ export function createDesktopGlobalButtonConfig(
 
   // 右边距
   const { row: marginRow, input: marginInput } = createRow(
-    '右边距 (px)',
+    t("settings.desktop.4", undefined, "右边距 (px)"),
     config.marginRight,
     'number',
     async (input) => {
@@ -129,7 +131,7 @@ export function createDesktopGlobalButtonConfig(
 
   // 右上角提示
   const { row: notifyRow, input: notifyToggle } = createRow(
-    '右上角提示',
+    t("settings.desktop.5", undefined, "右上角提示"),
     config.showNotification,
     'checkbox',
     async (input) => {
@@ -141,7 +143,7 @@ export function createDesktopGlobalButtonConfig(
   // 说明文字
   const hint = document.createElement('div')
   hint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light); margin-top: 8px; padding: 8px; background: var(--b3-theme-background); border-radius: 4px;'
-  hint.innerHTML = '💡 修改后会批量应用到所有按钮单个按钮的独立配置优先级更高'
+  hint.innerHTML = t("settings.desktop.6", undefined, "💡 修改后会批量应用到所有按钮单个按钮的独立配置优先级更高")
   moduleBox.appendChild(hint)
 
   container.appendChild(moduleBox)
@@ -234,7 +236,7 @@ export function createDesktopFeatureConfig(
 
   const heightLabel = document.createElement('label')
   heightLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
-  heightLabel.textContent = '工具栏高度'
+  heightLabel.textContent = t("settings.desktop.7", undefined, "工具栏高度")
 
   const heightInput = document.createElement('input')
   heightInput.type = 'number'
@@ -250,26 +252,26 @@ export function createDesktopFeatureConfig(
 
   const heightDesc = document.createElement('div')
   heightDesc.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface-light); padding-left: 4px;'
-  heightDesc.textContent = '💡 调整工具栏的整体高度（仅桌面端）'
+  heightDesc.textContent = t("settings.desktop.8", undefined, "💡 调整工具栏的整体高度（仅桌面端）")
 
   heightItem.appendChild(heightRow)
   heightItem.appendChild(heightDesc)
   container.appendChild(heightItem)
 
   // 各项开关
-  container.appendChild(createSwitchItem('面包屑图标隐藏', config.hideBreadcrumbIcon, (v) => {
+  container.appendChild(createSwitchItem(t("settings.desktop.9", undefined, "面包屑图标隐藏"), config.hideBreadcrumbIcon, (v) => {
     onConfigChange({ ...config, hideBreadcrumbIcon: v })
   }))
 
-  container.appendChild(createSwitchItem('锁定编辑按钮隐藏', config.hideReadonlyButton, (v) => {
+  container.appendChild(createSwitchItem(t("settings.desktop.10", undefined, "锁定编辑按钮隐藏"), config.hideReadonlyButton, (v) => {
     onConfigChange({ ...config, hideReadonlyButton: v })
   }))
 
-  container.appendChild(createSwitchItem('文档菜单按钮隐藏', config.hideDocMenuButton, (v) => {
+  container.appendChild(createSwitchItem(t("settings.desktop.11", undefined, "文档菜单按钮隐藏"), config.hideDocMenuButton, (v) => {
     onConfigChange({ ...config, hideDocMenuButton: v })
   }))
 
-  container.appendChild(createSwitchItem('更多按钮隐藏', config.hideMoreButton, (v) => {
+  container.appendChild(createSwitchItem(t("settings.desktop.12", undefined, "更多按钮隐藏"), config.hideMoreButton, (v) => {
     onConfigChange({ ...config, hideMoreButton: v })
   }))
 
@@ -291,7 +293,7 @@ export function createDesktopFeatureConfig(
 
   const dangerLabel = document.createElement('label')
   dangerLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #ff4d4d; min-width: 180px;'
-  dangerLabel.textContent = '⚠️ 电脑端完全恢复思源原始状态'
+  dangerLabel.textContent = t("settings.desktop.13", undefined, "⚠️ 电脑端完全恢复思源原始状态")
 
   const dangerSwitch = document.createElement('input')
   dangerSwitch.type = 'checkbox'
@@ -306,7 +308,7 @@ export function createDesktopFeatureConfig(
 
   const dangerDesc = document.createElement('div')
   dangerDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-  dangerDesc.textContent = '💡 开启后：隐藏所有自定义按钮 + 取消所有工具栏样式修改（按钮宽度、工具栏高度、隐藏原生按钮等），让思源恢复到未安装插件时的原始状态'
+  dangerDesc.textContent = t("settings.desktop.14", undefined, "💡 开启后：隐藏所有自定义按钮 + 取消所有工具栏样式修改（按钮宽度、工具栏高度、隐藏原生按钮等），让思源恢复到未安装插件时的原始状态")
 
   dangerItem.appendChild(dangerHeader)
   dangerItem.appendChild(dangerDesc)
@@ -330,16 +332,16 @@ export function createDesktopFeatureConfig(
 
   const activationLabel = document.createElement('label')
   activationLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #8b5cf6; min-width: 180px;'
-  activationLabel.textContent = '🔐 鲸鱼定制工具箱激活'
+  activationLabel.textContent = t("settings.desktop.15", undefined, "🔐 鲸鱼定制工具箱激活")
 
   const activationStatus = document.createElement('span')
   activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px;'
   if (isAuthorToolActivated()) {
     activationStatus.style.cssText += ' background: rgba(34, 197, 94, 0.2); color: #22c55e;'
-    activationStatus.textContent = '✓ 已激活'
+    activationStatus.textContent = t("settings.desktop.16", undefined, "✓ 已激活")
   } else {
     activationStatus.style.cssText += ' background: rgba(255, 77, 77, 0.2); color: #ff4d4d;'
-    activationStatus.textContent = '✗ 未激活'
+    activationStatus.textContent = t("settings.desktop.17", undefined, "✗ 未激活")
   }
 
   activationHeader.appendChild(activationLabel)
@@ -347,7 +349,7 @@ export function createDesktopFeatureConfig(
 
   const activationDesc = document.createElement('div')
   activationDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-  activationDesc.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型。激活码获取：请进QQ群1018010924咨询群主！'
+  activationDesc.textContent = t("settings.desktop.18", undefined, "💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型。激活码获取：请进QQ群1018010924咨询群主！")
 
   const activationInputRow = document.createElement('div')
   activationInputRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-top: 4px;'
@@ -355,13 +357,13 @@ export function createDesktopFeatureConfig(
   const activationInput = document.createElement('input')
   activationInput.type = 'text'
   activationInput.className = 'b3-text-field'
-  activationInput.placeholder = '请输入激活码'
+  activationInput.placeholder = t("settings.desktop.19", undefined, "请输入激活码")
   activationInput.value = config.authorCode || ''
   activationInput.style.cssText = 'flex: 1; max-width: 200px;'
 
   const activationBtn = document.createElement('button')
   activationBtn.className = 'b3-button b3-button--text'
-  activationBtn.textContent = '验证激活'
+  activationBtn.textContent = t("settings.desktop.20", undefined, "验证激活")
   activationBtn.onclick = () => {
     onAuthorActivate(activationInput.value.trim())
   }
@@ -395,6 +397,7 @@ export interface DesktopSettingsContext {
   desktopFeatureConfig: FeatureConfig
   mobileFeatureConfig: FeatureConfig
   mobileConfig: any
+  loggingEnabled: boolean
   version?: string
   isAuthorToolActivated: () => boolean
   getLicenseStatus: () => LicenseStatus
@@ -402,6 +405,8 @@ export interface DesktopSettingsContext {
   showIconPicker: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void
   saveData: (key: string, value: any) => Promise<void>
   removeData: (key: string) => Promise<void>
+  setLoggingEnabled: (enabled: boolean) => Promise<void>
+  resetLogging: () => Promise<void>
   applyFeatures: () => void
   applyDesktopToolbarPosition: () => void
   refreshButtons: () => void
@@ -436,8 +441,8 @@ export function createDesktopSettingLayout(
 
 	  // 数据迁移
 	  setting.addItem({
-	    title: '📋 数据迁移',
-	    description: '查看版本更新，导入/导出插件配置',
+	    title: t("settings.desktop.21", undefined, "📋 数据迁移"),
+	    description: t("settings.desktop.22", undefined, "查看版本更新，导入/导出插件配置"),
     createActionElement: () => {
       const container = document.createElement('div')
       container.id = 'version-update-section'
@@ -515,7 +520,7 @@ export function createDesktopSettingLayout(
       versionText.style.cssText = 'display: flex; align-items: center; gap: 4px;'
       
       const versionPrefix = document.createElement('span')
-      versionPrefix.textContent = '当前版本：V'
+      versionPrefix.textContent = t("settings.desktop.23", undefined, "当前版本：V")
       versionPrefix.style.cssText = 'color: #1890ff; font-weight: bold;'
       
       const versionNumber = document.createElement('strong')
@@ -539,7 +544,7 @@ export function createDesktopSettingLayout(
       updateIcon.style.cssText = 'font-size: 18px;'
       
       const updateText = document.createElement('span')
-      updateText.textContent = '检查更新'
+      updateText.textContent = t("settings.desktop.24", undefined, "检查更新")
       
       updateLink.appendChild(updateIcon)
       updateLink.appendChild(updateText)
@@ -550,7 +555,7 @@ export function createDesktopSettingLayout(
         try {
           // 显示检查中提示
           const checkingMsg = document.createElement('div');
-          checkingMsg.textContent = '正在检查更新...';
+          checkingMsg.textContent = t("settings.desktop.25", undefined, "正在检查更新...");
           checkingMsg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 12px 24px; background: var(--b3-menu-background); color: var(--b3-menu-item--hover); border: 1px solid var(--b3-border-color); border-radius: 4px; z-index: 9999;';
           document.body.appendChild(checkingMsg);
           
@@ -569,7 +574,7 @@ export function createDesktopSettingLayout(
             if (compareVersions(currentVersion, latestVersion)) {
               // 当前已是最新版本
               const latestMsg = document.createElement('div');
-              latestMsg.innerHTML = `✅ 已是最新版本 v${currentVersion}`;
+              latestMsg.innerHTML = t("settings.desktop.latestVersion", { version: currentVersion }, "✅ 已是最新版本 v{version}");
               latestMsg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 24px 32px; background: var(--b3-menu-background); color: var(--b3-success-text); border: 2px solid var(--b3-border-color); border-radius: 8px; z-index: 9999; box-shadow: 0 8px 24px rgba(0,0,0,0.2); font-size: 18px; min-width: 300px; text-align: center;';
               document.body.appendChild(latestMsg);
               
@@ -585,18 +590,18 @@ export function createDesktopSettingLayout(
               updateMsg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 32px; background: var(--b3-menu-background); border: 3px solid var(--b3-theme-primary); border-radius: 16px; z-index: 9999; box-shadow: 0 12px 40px rgba(0,0,0,0.3); min-width: 500px; font-size: 18px;';
               
               const msgText = document.createElement('div');
-              msgText.textContent = `发现新版本 v${latestVersion}，是否前往下载？`;
+              msgText.textContent = t("settings.desktop.newVersionFound", { version: latestVersion }, "发现新版本 v{version}，是否前往下载？");
               msgText.style.cssText = 'margin-bottom: 20px; font-size: 18px; font-weight: bold;';
               
               const instructionText = document.createElement('div');
-              instructionText.innerHTML = '<strong style="color: var(--b3-theme-primary);">更新流程：</strong><br/>1. 点击下载<strong style="color: #ff6b35;">package.zip</strong>包<br/>2. 解压后，替换<strong style="color: #ff6b35;">插件文件夹</strong><br/><br/><strong style="color: var(--b3-theme-primary);">如何找到插件文件夹：</strong><br/>①打开插件市场   ②找到《手机端增强》插件   ③右边文件夹图标   ④点击打开';
+              instructionText.innerHTML = t("settings.desktop.26", undefined, "<strong style=\"color: var(--b3-theme-primary);\">更新流程：</strong><br/>1. 点击下载<strong style=\"color: #ff6b35;\">package.zip</strong>包<br/>2. 解压后，替换<strong style=\"color: #ff6b35;\">插件文件夹</strong><br/><br/><strong style=\"color: var(--b3-theme-primary);\">如何找到插件文件夹：</strong><br/>①打开插件市场   ②找到《手机端增强》插件   ③右边文件夹图标   ④点击打开");
               instructionText.style.cssText = 'margin-bottom: 20px; font-size: 16px; color: var(--b3-font-color-secondary); line-height: 1.6; padding: 12px; background-color: var(--b3-list-background); border-radius: 6px; border-left: 4px solid var(--b3-theme-primary); border: 1px solid var(--b3-border-color);';
               
               const buttonContainer = document.createElement('div');
               buttonContainer.style.cssText = 'display: flex; gap: 12px; justify-content: flex-end;';
               
               const confirmBtn = document.createElement('button');
-              confirmBtn.textContent = '前往下载';
+              confirmBtn.textContent = t("settings.desktop.27", undefined, "前往下载");
               confirmBtn.className = 'b3-button b3-button--outline';
               confirmBtn.style.cssText = 'padding: 6px 12px; font-size: 13px;';
               confirmBtn.onclick = () => {
@@ -605,7 +610,7 @@ export function createDesktopSettingLayout(
               };
               
               const cancelBtn = document.createElement('button');
-              cancelBtn.textContent = '取消';
+              cancelBtn.textContent = t("settings.desktop.28", undefined, "取消");
               cancelBtn.className = 'b3-button b3-button--outline';
               cancelBtn.style.cssText = 'padding: 6px 12px; font-size: 13px;';
               cancelBtn.onclick = () => {
@@ -623,7 +628,7 @@ export function createDesktopSettingLayout(
           } else {
             // 获取版本信息失败
             const errorMsg = document.createElement('div');
-            errorMsg.textContent = '获取版本信息失败';
+            errorMsg.textContent = t("settings.desktop.29", undefined, "获取版本信息失败");
             errorMsg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 12px 24px; background: var(--b3-menu-background); color: #ff6b6b; border: 1px solid var(--b3-border-color); border-radius: 4px; z-index: 9999;';
             document.body.appendChild(errorMsg);
             
@@ -637,14 +642,14 @@ export function createDesktopSettingLayout(
           // 移除检查提示（如果还存在）
           const checkingMsgs = document.querySelectorAll('div');
           checkingMsgs.forEach(el => {
-            if (el.textContent === '正在检查更新...') {
+            if (el.textContent === t("settings.desktop.30", undefined, "正在检查更新...")) {
               document.body.removeChild(el);
             }
           });
           
           // 显示错误信息
           const errorMsg = document.createElement('div');
-          errorMsg.textContent = '网络错误，无法检查更新';
+          errorMsg.textContent = t("settings.desktop.31", undefined, "网络错误，无法检查更新");
           errorMsg.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 12px 24px; background: var(--b3-menu-background); color: #ff6b6b; border: 1px solid var(--b3-border-color); border-radius: 4px; z-index: 9999;';
           document.body.appendChild(errorMsg);
           
@@ -671,11 +676,11 @@ export function createDesktopSettingLayout(
       transferLabel.style.cssText = 'font-size: 14px; font-weight: 700; white-space: nowrap; flex: 1; min-width: 0;'
 
       const transferTitle = document.createElement('span')
-      transferTitle.textContent = '数据迁移：'
+      transferTitle.textContent = t("settings.desktop.32", undefined, "数据迁移：")
       transferTitle.style.cssText = 'color: var(--b3-theme-on-surface-light);'
 
       const transferWarn = document.createElement('span')
-      transferWarn.textContent = '导入数据时，原始数据会覆盖，请先导出！'
+      transferWarn.textContent = t("settings.desktop.33", undefined, "导入数据时，原始数据会覆盖，请先导出！")
       transferWarn.style.cssText = 'color: #ff4d4d; margin-left: 6px;'
 
       transferLabel.appendChild(transferTitle)
@@ -683,7 +688,7 @@ export function createDesktopSettingLayout(
 
       const exportBtn = document.createElement('button')
       exportBtn.className = 'b3-button b3-button--outline'
-      exportBtn.textContent = '导出数据'
+      exportBtn.textContent = t("settings.desktop.34", undefined, "导出数据")
       exportBtn.style.cssText = 'padding: 6px 12px; font-size: 13px; margin-left: auto; border-color: var(--b3-theme-primary); color: var(--b3-theme-primary);'
       exportBtn.classList.add('toolbar-customizer-transfer-btn', 'toolbar-customizer-transfer-export')
       exportBtn.onclick = () => {
@@ -713,16 +718,16 @@ export function createDesktopSettingLayout(
           a.click()
           a.remove()
           URL.revokeObjectURL(url)
-          showMessage('已导出配置文件', 2000, 'info')
+          showMessage(t("settings.desktop.35", undefined, "已导出配置文件"), 2000, 'info')
         } catch (e) {
-          console.warn('[导出配置] 失败:', e)
-          showMessage('导出失败', 3000, 'error')
+          logger.warn('[导出配置] 失败:', e)
+          showMessage(t("settings.desktop.36", undefined, "导出失败"), 3000, 'error')
         }
       }
 
       const importBtn = document.createElement('button')
       importBtn.className = 'b3-button b3-button--outline'
-      importBtn.textContent = '导入数据'
+      importBtn.textContent = t("settings.desktop.37", undefined, "导入数据")
       importBtn.style.cssText = 'padding: 6px 12px; font-size: 13px; border: 1px solid #ff4d4d !important; border-color: #ff4d4d !important; color: #ff4d4d !important; outline: none !important; box-shadow: none !important; background: transparent;'
       importBtn.classList.add('toolbar-customizer-transfer-btn', 'toolbar-customizer-transfer-import')
 
@@ -767,12 +772,12 @@ export function createDesktopSettingLayout(
           await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
           await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
         } catch (e) {
-          console.warn('[导入配置] 保存失败:', e)
-          showMessage('导入保存时部分失败，建议重载后检查配置', 3000, 'error')
+          logger.warn('[导入配置] 保存失败:', e)
+          showMessage(t("settings.desktop.38", undefined, "导入保存时部分失败，建议重载后检查配置"), 3000, 'error')
           return
         }
 
-        showMessage('导入成功，正在重载...', 2000, 'info')
+        showMessage(t("settings.desktop.39", undefined, "导入成功，正在重载..."), 2000, 'info')
         await fetchSyncPost('/api/ui/reloadUI', {})
       }
 
@@ -781,7 +786,7 @@ export function createDesktopSettingLayout(
         fileInput.value = ''
         if (!file) return
 
-        const ok = await context.showConfirmDialog('导入将覆盖当前所有配置，是否继续？')
+        const ok = await context.showConfirmDialog(t("settings.desktop.40", undefined, "导入将覆盖当前所有配置，是否继续？"))
         if (!ok) return
 
         try {
@@ -790,8 +795,8 @@ export function createDesktopSettingLayout(
           const data = json?.data ?? json
           await applyImported(data)
         } catch (e) {
-          console.warn('[导入配置] 失败:', e)
-          showMessage('导入失败：文件格式不正确', 3000, 'error')
+          logger.warn('[导入配置] 失败:', e)
+          showMessage(t("settings.desktop.41", undefined, "导入失败：文件格式不正确"), 3000, 'error')
         }
       }
 
@@ -817,7 +822,7 @@ export function createDesktopSettingLayout(
       contactText.style.cssText = 'display: flex; align-items: center; gap: 4px;'
       
       const contactPrefix = document.createElement('span')
-      contactPrefix.textContent = '问题反馈：QQ群 '
+      contactPrefix.textContent = t("settings.desktop.42", undefined, "问题反馈：QQ群 ")
       contactPrefix.style.cssText = 'color: #ff6b35; font-weight: bold;'
       
       const qqNumber = document.createElement('strong')
@@ -825,7 +830,7 @@ export function createDesktopSettingLayout(
       qqNumber.style.cssText = 'color: var(--b3-theme-primary); font-size: 15px; font-weight: bold;'
       
       const contactSuffix = document.createElement('span')
-      contactSuffix.textContent = ' （若右边链接无效，请搜索群添加）'
+      contactSuffix.textContent = t("settings.desktop.43", undefined, " （若右边链接无效，请搜索群添加）")
       
       contactText.appendChild(contactPrefix)
       contactText.appendChild(qqNumber)
@@ -841,7 +846,7 @@ export function createDesktopSettingLayout(
       qqIcon.style.cssText = 'font-size: 18px;'
       
       const qqText = document.createElement('span')
-      qqText.textContent = '点击加群'
+      qqText.textContent = t("settings.desktop.44", undefined, "点击加群")
       
       qqLink.appendChild(qqIcon)
       qqLink.appendChild(qqText)
@@ -858,11 +863,11 @@ export function createDesktopSettingLayout(
             
       const donationTitle = document.createElement('div')
       donationTitle.style.cssText = 'font-size: 20px; font-weight: bold; color: var(--b3-theme-on-background); text-align: center; margin-bottom: 12px;'
-      donationTitle.textContent = '🧧 打赏支持'
+      donationTitle.textContent = t("settings.desktop.45", undefined, "🧧 打赏支持")
             
       const donationText = document.createElement('div')
       donationText.style.cssText = 'font-size: 18px; color: var(--b3-theme-on-background); text-align: center; margin-bottom: 16px;'
-      donationText.textContent = '感谢您的支持与反馈，这将鼓励作者持续开发'
+      donationText.textContent = t("settings.desktop.46", undefined, "感谢您的支持与反馈，这将鼓励作者持续开发")
             
       // 二维码容器 - 横向排列
       const qrContainer = document.createElement('div')
@@ -871,12 +876,12 @@ export function createDesktopSettingLayout(
       // 二维码图片
       const qrImg1 = document.createElement('img')
       qrImg1.src = 'https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment2.png'
-      qrImg1.alt = '打赏二维码'
+      qrImg1.alt = t("settings.desktop.47", undefined, "打赏二维码")
       qrImg1.style.cssText = 'width: 300px; height: 300px; object-fit: contain; border-radius: 4px;'
             
       const qrImg2 = document.createElement('img')
       qrImg2.src = 'https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment1.png'
-      qrImg2.alt = '打赏二维码'
+      qrImg2.alt = t("settings.desktop.48", undefined, "打赏二维码")
       qrImg2.style.cssText = 'width: 300px; height: 300px; object-fit: contain; border-radius: 4px;'
             
       qrContainer.appendChild(qrImg1)
@@ -894,8 +899,8 @@ export function createDesktopSettingLayout(
 
   // 激活与权益
   setting.addItem({
-    title: '🔐 激活与权益',
-    description: '激活码输入、功能列表、打赏支持',
+    title: t("settings.desktop.49", undefined, "🔐 激活与权益"),
+    description: t("settings.desktop.50", undefined, "激活码输入、功能列表、打赏支持"),
     createActionElement: () => {
       const container = document.createElement('div')
       container.className = 'toolbar-customizer-content'
@@ -935,7 +940,7 @@ export function createDesktopSettingLayout(
             
       const activationLabel = document.createElement('label')
       activationLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #8b5cf6; min-width: 180px;'
-      activationLabel.textContent = '🔐 鲸鱼定制工具箱激活'
+      activationLabel.textContent = t("settings.desktop.51", undefined, "🔐 鲸鱼定制工具箱激活")
             
       const statusContainer = document.createElement('div')
       statusContainer.style.cssText = 'display: flex; align-items: center; gap: 8px;'
@@ -964,14 +969,14 @@ export function createDesktopSettingLayout(
         activationStatus.textContent = '❌ ' + licenseStatus.statusText
       } else {
         activationStatus.style.cssText += ' background: rgba(255, 77, 77, 0.2); color: #ff4d4d;'
-        activationStatus.textContent = '✗ 未激活'
+        activationStatus.textContent = t("settings.desktop.52", undefined, "✗ 未激活")
       }
       
       // 添加重新激活按钮到状态容器中
       if (context.isAuthorToolActivated()) {
         const reActivateBtn = document.createElement('button')
         reActivateBtn.className = 'b3-button b3-button--info'
-        reActivateBtn.textContent = '重新激活'
+        reActivateBtn.textContent = t("settings.desktop.53", undefined, "重新激活")
         reActivateBtn.style.cssText = 'padding: 2px 8px; font-size: 12px; height: 24px;'
         reActivateBtn.onclick = () => {
           // 显示输入框和验证按钮
@@ -984,13 +989,13 @@ export function createDesktopSettingLayout(
         // 「清除激活」按钮：真正撤销激活状态（临时调试/特殊场景用，不可逆）
         const clearBtn = document.createElement('button')
         clearBtn.className = 'b3-button b3-button--danger'
-        clearBtn.textContent = '清除激活'
+        clearBtn.textContent = t("settings.desktop.54", undefined, "清除激活")
         clearBtn.style.cssText = 'padding: 2px 8px; font-size: 12px; height: 24px; margin-left: 4px;'
 	        clearBtn.onclick = async () => {
-	          if (!window.confirm('确定要清除激活状态吗？\n\n此操作会立即清空当前激活码与账号绑定，所有付费功能将无法使用，需要重新输入有效激活码才能恢复。')) return
+	          if (!window.confirm(t("settings.desktop.55", undefined, "确定要清除激活状态吗？\n\n此操作会立即清空当前激活码与账号绑定，所有付费功能将无法使用，需要重新输入有效激活码才能恢复。"))) return
 	          try {
 	            clearBtn.disabled = true
-	            clearBtn.textContent = '清除中...'
+	            clearBtn.textContent = t("settings.desktop.56", undefined, "清除中...")
 	            context.desktopFeatureConfig.authorActivated = false
 	            context.desktopFeatureConfig.authorCode = ''
 	            context.desktopFeatureConfig.authorAccount = ''
@@ -1007,13 +1012,13 @@ export function createDesktopSettingLayout(
             clearTrial()
 	            await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
 	            await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
-            showMessage('激活状态已清除，正在重载...', 2000, 'info')
+            showMessage(t("settings.desktop.57", undefined, "激活状态已清除，正在重载..."), 2000, 'info')
             setTimeout(() => window.location.reload(), 1000)
           } catch (err) {
-            console.error('[ClearActivation] 清除失败:', err)
-            showMessage('清除失败，请重试', 3000, 'error')
+            logger.error('[ClearActivation] 清除失败:', err)
+            showMessage(t("settings.desktop.58", undefined, "清除失败，请重试"), 3000, 'error')
             clearBtn.disabled = false
-            clearBtn.textContent = '清除激活'
+            clearBtn.textContent = t("settings.desktop.59", undefined, "清除激活")
           }
         }
         statusContainer.appendChild(clearBtn)
@@ -1026,7 +1031,7 @@ export function createDesktopSettingLayout(
             
       const activationDesc = document.createElement('div')
       activationDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-      activationDesc.textContent = '💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型。若想获得激活码，请点击下方「📘 查看激活方式」按钮查看方案与定价。'
+      activationDesc.textContent = t("settings.desktop.60", undefined, "💡 输入激活码后可解锁「⑥鲸鱼定制工具箱」功能类型。若想获得激活码，请点击下方「📘 查看激活方式」按钮查看方案与定价。")
             
       const activationInputRow = document.createElement('div')
       activationInputRow.style.cssText = 'display: flex; align-items: center; gap: 8px; margin-top: 4px;'
@@ -1034,13 +1039,13 @@ export function createDesktopSettingLayout(
       const activationInput = document.createElement('input')
       activationInput.type = 'text'
       activationInput.className = 'b3-text-field'
-      activationInput.placeholder = '请输入激活码'
+      activationInput.placeholder = t("settings.desktop.61", undefined, "请输入激活码")
       activationInput.value = context.desktopFeatureConfig.authorCode || ''
       activationInput.style.cssText = 'flex: 1; max-width: 200px;'
             
       const activationBtn = document.createElement('button')
       activationBtn.className = 'b3-button b3-button--text'
-      activationBtn.textContent = '验证激活'
+      activationBtn.textContent = t("settings.desktop.62", undefined, "验证激活")
       activationBtn.onclick = async () => {
         const code = activationInput.value.trim()
         if (!code || activationBtn.disabled) return
@@ -1048,12 +1053,12 @@ export function createDesktopSettingLayout(
         const u = (window as any).siyuan?.user
         const userName = (u && typeof u.userName === 'string' && u.userName) || ''
         if (!userName) {
-          showMessage('未检测到思源账号，请先在思源登录账号后再激活', 3000, 'error')
+          showMessage(t("settings.desktop.63", undefined, "未检测到思源账号，请先在思源登录账号后再激活"), 3000, 'error')
           return
         }
         // 禁用按钮防重复点击
         activationBtn.disabled = true
-        activationBtn.textContent = '验证中...'
+        activationBtn.textContent = t("settings.desktop.64", undefined, "验证中...")
         try {
           const result = validateActivationCode(code, userName)
           if (result.ok) {
@@ -1076,11 +1081,11 @@ export function createDesktopSettingLayout(
             await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
             await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
             activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px; background: rgba(34, 197, 94, 0.2); color: #22c55e;'
-            activationStatus.textContent = '✓ 已激活'
+            activationStatus.textContent = t("settings.desktop.65", undefined, "✓ 已激活")
             // 套餐文案
-            const planText = planLower === 'trial' ? '免费试用' : planLower === 'm30' ? '月卡' : '永久'
-            const daysText = result.expiryDate === 'PERM' ? '永久' : (result as any).expiryDate
-            Notify.showLicenseActivated(planText, result.expiryDate === 'PERM' ? '永久' : '30 天内')
+            const planText = planLower === 'trial' ? t("settings.desktop.66", undefined, "免费试用") : planLower === 'm30' ? t("settings.desktop.67", undefined, "月卡") : t("settings.desktop.68", undefined, "永久")
+            const daysText = result.expiryDate === 'PERM' ? t("settings.desktop.69", undefined, "永久") : (result as any).expiryDate
+            Notify.showLicenseActivated(planText, result.expiryDate === 'PERM' ? t("settings.desktop.70", undefined, "永久") : t("settings.desktop.71", undefined, "30 天内"))
             // 试用期单独提示剩余天数
             if (planLower === 'trial') {
               Notify.showTrialStarted(3)
@@ -1094,7 +1099,7 @@ export function createDesktopSettingLayout(
           }
         } finally {
           activationBtn.disabled = false
-          activationBtn.textContent = '验证激活'
+          activationBtn.textContent = t("settings.desktop.72", undefined, "验证激活")
         }
       }
             
@@ -1117,7 +1122,7 @@ export function createDesktopSettingLayout(
       const infoBtn = document.createElement('button')
       infoBtn.className = 'b3-button b3-button--text'
       infoBtn.style.cssText = 'width: 100%; margin-top: 8px; padding: 8px; border: 1px solid #722ed1; border-radius: 6px; background: rgba(114, 46, 209, 0.08); color: #722ed1; font-weight: 600;'
-      infoBtn.textContent = '📘 查看激活方式'
+      infoBtn.textContent = t("settings.desktop.73", undefined, "📘 查看激活方式")
       infoBtn.onclick = () => showActivationInfoModal(
         context.isAuthorToolActivated(),
         () => {
@@ -1138,31 +1143,28 @@ export function createDesktopSettingLayout(
         border-radius: 8px;
         box-sizing: border-box;
       `
-      whaleFunctionListContainer.innerHTML = `
-        <div style="font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;">🐋 鲸鱼定制工具箱功能列表（17项）</div>
-        <div style="font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>
-      `
+      whaleFunctionListContainer.innerHTML = t("settings.desktop.74", undefined, "\n        <div style=\"font-size: 14px; color: var(--b3-theme-primary); margin-bottom: 12px; font-weight: 600;\">🐋 鲸鱼定制工具箱功能列表（17项）</div>\n        <div style=\"font-size: 12px; color: var(--b3-theme-on-surface); margin-bottom: 12px; line-height: 1.6;\">激活后即可使用以下高级功能，让你的思源笔记效率翻倍：</div>\n      ")
 
 	      interface __TabData { key: string; label: string; sub: string; icon: string; rows: string[] }
 	      const __allRows = [
-        rowTr('⓪', '一键记事弹窗块格式', '一键记事弹窗支持思源块格式输入，富文本编辑，插入标题、列表、代码块等' +
-          '<a href="javascript:void(0)" onclick="(function(){var b=document.querySelector(\'button[data-tab=desktop]\');b&&b.click();setTimeout(function(){var el=document.getElementById(\'quick-note-format-section-desktop\');if(!el)return;el.scrollIntoView({behavior:\'smooth\',block:\'center\'});el.classList.remove(\'jump-highlight\');void el.offsetWidth;el.classList.add(\'jump-highlight\');setTimeout(function(){el.classList.remove(\'jump-highlight\')},2000)},300)})()" style="color:var(--b3-theme-primary);font-size:12px;text-decoration:underline;margin-left:8px;">👉设置</a>'),
-        rowTr('①', '连续点击自定义按钮', '一键自动执行多个按钮操作，告别重复点击，工作流自动化'),
-        rowTr('②', '打开指定ID块', '精准跳转到任意文档任意位置，省时省力'),
-        rowTr('③', '数据库悬浮弹窗', '悬浮窗口快速查看数据库，无需切换页面，数据触手可及'),
-        rowTr('④', '日记底部', '一键直达日记末尾，快速追加内容，记录生活点滴'),
-        rowTr('⑤', '叶归LifeLog适配', '与LifeLog插件深度整合，时间记录更智能，生活管理更高效'),
-        rowTr('⑥', '弹窗框模板选择', '弹出式模板选择器，快速插入常用内容，写作效率倍增'),
-        rowTr('⑦', '滚动文档顶部或底部', '一键直达文档首尾，长文档浏览更轻松'),
-        rowTr('⑧', '图片快捷导入', '一键选择图片导入笔记。若开启思源块编辑模式，可插入记事弹窗编辑器光标处'),
-        rowTr('⑨', '悬浮标签页Tab', '多文档快速切换，悬浮Tab栏，自动管理'),
-        rowTr('⑩', '悬浮大纲', '左侧悬浮大纲面板，标题快速跳转，阅读长文必备'),
-        rowTr('⑪', '前一篇/后一篇文档', '底部悬浮导航栏，按文件树顺序浏览文档'),
-		        rowTr('⑫', '滑动快速批注<br><span style="color:#10b981;font-size:11px;">免费</span>', '完美联动「鲸鱼快速批注」插件（独立插件），在插件市场搜索「鲸鱼快速批注」即可安装使用'),
-        rowTr('⑬', '文档朗读', '使用浏览器语音合成朗读当前文档，支持语速调节、段落高亮'),
-        rowTr('⑭', '一键清理空块', '自动扫描并删除文档中空块（无文本段落/标题/列表项），预览确认后批量删除'),
-        rowTr('⑮', '沉浸阅读模式<br><span style="color:#10b981;font-size:11px;">免费</span>', '🔒一键锁定文档防误编辑，锁定/解锁图标可自定义'),
-        rowTr('⑯', '快速添加附件', '📎选择任意文件上传，可自定义名称，图片支持压缩；有光标插光标处，无光标追加日记（记事弹窗中不生效）'),
+        rowTr('⓪', t("settings.desktop.75", undefined, "一键记事弹窗块格式"), t("settings.desktop.76", undefined, "一键记事弹窗支持思源块格式输入，富文本编辑，插入标题、列表、代码块等") +
+          t("settings.desktop.77", undefined, "<a href=\"javascript:void(0)\" onclick=\"(function(){var b=document.querySelector('button[data-tab=desktop]');b&&b.click();setTimeout(function(){var el=document.getElementById('quick-note-format-section-desktop');if(!el)return;el.scrollIntoView({behavior:'smooth',block:'center'});el.classList.remove('jump-highlight');void el.offsetWidth;el.classList.add('jump-highlight');setTimeout(function(){el.classList.remove('jump-highlight')},2000)},300)})()\" style=\"color:var(--b3-theme-primary);font-size:12px;text-decoration:underline;margin-left:8px;\">👉设置</a>")),
+        rowTr('①', t("settings.desktop.78", undefined, "连续点击自定义按钮"), t("settings.desktop.79", undefined, "一键自动执行多个按钮操作，告别重复点击，工作流自动化")),
+        rowTr('②', t("settings.desktop.80", undefined, "打开指定ID块"), t("settings.desktop.81", undefined, "精准跳转到任意文档任意位置，省时省力")),
+        rowTr('③', t("settings.desktop.82", undefined, "数据库悬浮弹窗"), t("settings.desktop.83", undefined, "悬浮窗口快速查看数据库，无需切换页面，数据触手可及")),
+        rowTr('④', t("settings.desktop.84", undefined, "日记底部"), t("settings.desktop.85", undefined, "一键直达日记末尾，快速追加内容，记录生活点滴")),
+        rowTr('⑤', t("settings.desktop.86", undefined, "叶归LifeLog适配"), t("settings.desktop.87", undefined, "与LifeLog插件深度整合，时间记录更智能，生活管理更高效")),
+        rowTr('⑥', t("settings.desktop.88", undefined, "弹窗框模板选择"), t("settings.desktop.89", undefined, "弹出式模板选择器，快速插入常用内容，写作效率倍增")),
+        rowTr('⑦', t("settings.desktop.90", undefined, "滚动文档顶部或底部"), t("settings.desktop.91", undefined, "一键直达文档首尾，长文档浏览更轻松")),
+        rowTr('⑧', t("settings.desktop.92", undefined, "图片快捷导入"), t("settings.desktop.93", undefined, "一键选择图片导入笔记。若开启思源块编辑模式，可插入记事弹窗编辑器光标处")),
+        rowTr('⑨', t("settings.desktop.94", undefined, "悬浮标签页Tab"), t("settings.desktop.95", undefined, "多文档快速切换，悬浮Tab栏，自动管理")),
+        rowTr('⑩', t("settings.desktop.96", undefined, "悬浮大纲"), t("settings.desktop.97", undefined, "左侧悬浮大纲面板，标题快速跳转，阅读长文必备")),
+        rowTr('⑪', t("settings.desktop.98", undefined, "前一篇/后一篇文档"), t("settings.desktop.99", undefined, "底部悬浮导航栏，按文件树顺序浏览文档")),
+		        rowTr('⑫', t("settings.desktop.100", undefined, "滑动快速批注<br><span style=\"color:#10b981;font-size:11px;\">免费</span>"), t("settings.desktop.101", undefined, "完美联动「鲸鱼快速批注」插件（独立插件），在插件市场搜索「鲸鱼快速批注」即可安装使用")),
+        rowTr('⑬', t("settings.desktop.102", undefined, "文档朗读"), t("settings.desktop.103", undefined, "使用浏览器语音合成朗读当前文档，支持语速调节、段落高亮")),
+        rowTr('⑭', t("settings.desktop.104", undefined, "一键清理空块"), t("settings.desktop.105", undefined, "自动扫描并删除文档中空块（无文本段落/标题/列表项），预览确认后批量删除")),
+        rowTr('⑮', t("settings.desktop.106", undefined, "沉浸阅读模式<br><span style=\"color:#10b981;font-size:11px;\">免费</span>"), t("settings.desktop.107", undefined, "🔒一键锁定文档防误编辑，锁定/解锁图标可自定义")),
+        rowTr('⑯', t("settings.desktop.108", undefined, "快速添加附件"), t("settings.desktop.109", undefined, "📎选择任意文件上传，可自定义名称，图片支持压缩；有光标插光标处，无光标追加日记（记事弹窗中不生效）")),
       ]
 
       function rowTr(num: string, name: string, desc: string): string {
@@ -1174,11 +1176,11 @@ export function createDesktopSettingLayout(
       }
 
       const __tabs: __TabData[] = [
-        { key: 'all', label: '全部功能', sub: '17项', icon: '📋', rows: __allRows },
-        { key: 'reading', label: '批注阅读', sub: '6项', icon: '📖', rows: [__allRows[9], __allRows[10], __allRows[11], __allRows[13], __allRows[15], __allRows[12]] },
-        { key: 'notes', label: '笔记与日记', sub: '5项', icon: '✍️', rows: [__allRows[0], __allRows[4], __allRows[5], __allRows[8], __allRows[16]] },
-        { key: 'edit', label: '编辑提效', sub: '3项', icon: '⚡', rows: [__allRows[1], __allRows[6], __allRows[14]] },
-        { key: 'nav', label: '导航与浏览', sub: '3项', icon: '🧭', rows: [__allRows[2], __allRows[3], __allRows[7]] },
+        { key: 'all', label: t("settings.desktop.110", undefined, "全部功能"), sub: t("settings.desktop.111", undefined, "17项"), icon: '📋', rows: __allRows },
+        { key: 'reading', label: t("settings.desktop.112", undefined, "批注阅读"), sub: t("settings.desktop.113", undefined, "6项"), icon: '📖', rows: [__allRows[9], __allRows[10], __allRows[11], __allRows[13], __allRows[15], __allRows[12]] },
+        { key: 'notes', label: t("settings.desktop.114", undefined, "笔记与日记"), sub: t("settings.desktop.115", undefined, "5项"), icon: '✍️', rows: [__allRows[0], __allRows[4], __allRows[5], __allRows[8], __allRows[16]] },
+        { key: 'edit', label: t("settings.desktop.116", undefined, "编辑提效"), sub: t("settings.desktop.117", undefined, "3项"), icon: '⚡', rows: [__allRows[1], __allRows[6], __allRows[14]] },
+        { key: 'nav', label: t("settings.desktop.118", undefined, "导航与浏览"), sub: t("settings.desktop.119", undefined, "3项"), icon: '🧭', rows: [__allRows[2], __allRows[3], __allRows[7]] },
       ]
 
       const __tabBar = document.createElement('div')
@@ -1186,10 +1188,10 @@ export function createDesktopSettingLayout(
       whaleFunctionListContainer.appendChild(__tabBar)
 
       const __containers: Record<string, HTMLElement> = {}
-      __tabs.forEach(t => {
+      __tabs.forEach(tab => {
         const btn = document.createElement('button')
         btn.style.cssText = 'display:flex;align-items:center;gap:4px;padding:7px 14px;border-radius:8px;border:1px solid var(--b3-border-color);background:var(--b3-theme-surface);color:var(--b3-theme-on-surface);cursor:pointer;font-size:13px;outline:none;white-space:nowrap;transition:all 0.15s;'
-        btn.innerHTML = `${t.icon} ${t.label} <span style="font-size:11px;opacity:0.6;">${t.sub}</span>`
+        btn.innerHTML = `${tab.icon} ${tab.label} <span style="font-size:11px;opacity:0.6;">${tab.sub}</span>`
         __tabBar.appendChild(btn)
 
         const wrap = document.createElement('div')
@@ -1198,17 +1200,17 @@ export function createDesktopSettingLayout(
           <table style="width:100%;font-size:13px;border-collapse:collapse;margin-top:8px;">
             <thead>
               <tr style="background:var(--b3-theme-primary-lightest);">
-                <th style="padding:10px;text-align:center;width:36px;">序号</th>
-                <th style="padding:10px;text-align:left;">功能名称</th>
-                <th style="padding:10px;text-align:left;">功能说明</th>
+                <th style="padding:10px;text-align:center;width:36px;">${t("settings.common.sequence", undefined, "序号")}</th>
+                <th style="padding:10px;text-align:left;">${t("settings.common.featureName", undefined, "功能名称")}</th>
+                <th style="padding:10px;text-align:left;">${t("settings.common.featureDescription", undefined, "功能说明")}</th>
               </tr>
             </thead>
-            <tbody>${t.rows.join('')}</tbody>
+            <tbody>${tab.rows.join('')}</tbody>
           </table>
-          <div style="padding:12px;text-align:center;color:var(--b3-theme-primary);font-style:italic;font-size:13px;">持续更新中~</div>
+          <div style="padding:12px;text-align:center;color:var(--b3-theme-primary);font-style:italic;font-size:13px;">${t("settings.common.moreComing", undefined, "持续更新中~")}</div>
         `
         whaleFunctionListContainer.appendChild(wrap)
-        __containers[t.key] = wrap
+        __containers[tab.key] = wrap
 
         btn.onclick = () => {
           Object.values(__containers).forEach(c => c.style.display = 'none')
@@ -1315,7 +1317,7 @@ export function createDesktopSettingLayout(
 
         const qrImg = document.createElement('img')
         qrImg.className = 'toolbar-customizer-pay-qr'
-        qrImg.alt = '收款码'
+        qrImg.alt = t("settings.desktop.120", undefined, "收款码")
         qrCurrent.appendChild(qrImg)
 
         // Tab 切换（微信/支付宝）
@@ -1324,11 +1326,11 @@ export function createDesktopSettingLayout(
 
         const wechatTab = document.createElement('button')
         wechatTab.className = 'toolbar-customizer-pay-tab active'
-        wechatTab.textContent = '微信'
+        wechatTab.textContent = t("settings.desktop.121", undefined, "微信")
 
         const alipayTab = document.createElement('button')
         alipayTab.className = 'toolbar-customizer-pay-tab'
-        alipayTab.textContent = '支付宝'
+        alipayTab.textContent = t("settings.desktop.122", undefined, "支付宝")
 
         // 加载收款码（清除旧内容后重新加载）
       const loadQr = (tab: 'wechat' | 'alipay') => {
@@ -1340,7 +1342,7 @@ export function createDesktopSettingLayout(
 
         const img = document.createElement('img')
         img.className = 'toolbar-customizer-pay-qr'
-        img.alt = '收款码'
+        img.alt = t("settings.desktop.123", undefined, "收款码")
         img.onload = () => {
           qrCurrent.appendChild(img)
         }
@@ -1348,7 +1350,7 @@ export function createDesktopSettingLayout(
           // 图片加载失败，显示占位文字
           const placeholder = document.createElement('div')
           placeholder.className = 'toolbar-customizer-pay-qr'
-          placeholder.textContent = '收款码占位'
+          placeholder.textContent = t("settings.desktop.124", undefined, "收款码占位")
           qrCurrent.appendChild(placeholder)
         }
         img.src = url
@@ -1372,9 +1374,13 @@ export function createDesktopSettingLayout(
       // 底部提示
       const tip = document.createElement('div')
       tip.className = 'toolbar-customizer-pay-tip'
-      tip.innerHTML = `
-        付款后请将用户名${currentUserName() ? '<strong>' + currentUserName() + '</strong>' : '（你的思源账号）'}和付款截图发至 1711455244@qq.com 邮箱或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入QQ群</a>联系群主。
-      `
+      const userName = currentUserName()
+      const userNameHtml = userName ? `<strong>${userName}</strong>` : t("settings.desktop.125", undefined, "（你的思源账号）")
+      tip.innerHTML = t(
+        "settings.common.paymentInstructionsHtml",
+        { user: userNameHtml },
+        '付款后请将用户名{user}和付款截图发至 1711455244@qq.com 邮箱或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入QQ群</a>联系群主。'
+      )
 
       dialog.appendChild(closeBtn)
       dialog.appendChild(titleEl)
@@ -1424,7 +1430,7 @@ export function createDesktopSettingLayout(
         `
         const title = document.createElement('div')
         title.style.cssText = 'font-size: 16px; font-weight: 700; color: #722ed1;'
-        title.textContent = '🔐 激活方式说明'
+        title.textContent = t("settings.desktop.126", undefined, "🔐 激活方式说明")
         const closeBtn = document.createElement('button')
         closeBtn.className = 'b3-button b3-button--text'
         closeBtn.textContent = '✕'
@@ -1444,16 +1450,16 @@ export function createDesktopSettingLayout(
 
         const pricingTitle = document.createElement('div')
         pricingTitle.style.cssText = 'font-size: 14px; font-weight: bold; color: var(--b3-theme-on-background); margin-bottom: 10px;'
-        pricingTitle.textContent = '📐 激活方案定价原则'
+        pricingTitle.textContent = t("settings.desktop.127", undefined, "📐 激活方案定价原则")
         pricingBox.appendChild(pricingTitle)
 
         const principles = [
-          { text: '免费功能已经占据80%，通常免费功能已经可以满足需求', highlight: false },
-          { text: '鲸鱼定制工具箱功能均为定制，每项功能，作者均额外花费大量时间制作，并调整适配', highlight: false },
-          { text: '目前鲸鱼定制工具箱有17项定制功能，其中2项免费，共15项付费功能', highlight: false },
-          { text: '基于花费的时间和精力，以及前期的定制均为免费，作者决定每项定制定价为3元，进而决定永久价格', highlight: true },
-          { text: '后续将继续增加定制功能，价格也会适当上涨', highlight: false },
-          { text: '同时适当增加部分免费定制功能，不大幅调整价格', highlight: false },
+          { text: t("settings.desktop.128", undefined, "免费功能已经占据80%，通常免费功能已经可以满足需求"), highlight: false },
+          { text: t("settings.desktop.129", undefined, "鲸鱼定制工具箱功能均为定制，每项功能，作者均额外花费大量时间制作，并调整适配"), highlight: false },
+          { text: t("settings.desktop.130", undefined, "目前鲸鱼定制工具箱有17项定制功能，其中2项免费，共15项付费功能"), highlight: false },
+          { text: t("settings.desktop.131", undefined, "基于花费的时间和精力，以及前期的定制均为免费，作者决定每项定制定价为3元，进而决定永久价格"), highlight: true },
+          { text: t("settings.desktop.132", undefined, "后续将继续增加定制功能，价格也会适当上涨"), highlight: false },
+          { text: t("settings.desktop.133", undefined, "同时适当增加部分免费定制功能，不大幅调整价格"), highlight: false },
         ]
         principles.forEach((item, idx) => {
           const row = document.createElement('div')
@@ -1476,7 +1482,7 @@ export function createDesktopSettingLayout(
 
         const plansTitle = document.createElement('div')
         plansTitle.style.cssText = 'font-size: 16px; font-weight: bold; color: #722ed1; margin-bottom: 12px; text-align: center;'
-        plansTitle.textContent = '📦 激活码方案'
+        plansTitle.textContent = t("settings.desktop.134", undefined, "📦 激活码方案")
         plansBox.appendChild(plansTitle)
 
         // 电脑端 2×2 网格
@@ -1484,12 +1490,12 @@ export function createDesktopSettingLayout(
         plansWrapper.style.cssText = 'display: grid; grid-template-columns: 1fr 1fr; gap: 10px;'
 
         const planCards = [
-          { name: '免费试用', price: '0', unit: '元', duration: '3 天', badge: '免费', hot: false, isTrial: true, desc: '全部 15 项付费功能免费体验 3 天，每设备限一次', features: ['全功能体验', '无需付款', '每设备限一次'] },
-          { name: '月卡', price: '12', unit: '元', duration: '30 天', badge: '推荐', hot: true, desc: '30 天激活码（电脑+手机），适合短期高强度使用', features: ['30 天激活码（电脑+手机）', '15项付费功能全解锁', '含 5 天宽限期'] },
-          { name: '永久正价', price: '45', unit: '元', duration: '永久', badge: '', hot: false, desc: '鲸鱼定制工具箱永久激活码（电脑+手机），解锁全部15项付费功能', features: ['永久激活码（电脑+手机）', '15项付费功能全解锁'] },
-          { name: '普通优惠', price: '36', unit: '元', duration: '永久(8折)', badge: '', hot: false, desc: '鲸鱼定制工具箱永久激活码（电脑+手机），限时优惠 10 个，送完即止', features: ['永久激活码（电脑+手机）', '限时8折优惠'] },
-          { name: '学生优惠', price: '22.5', unit: '元', duration: '永久(5折)', badge: '', hot: false, desc: '需提供可证明在读学生身份的信息', features: ['永久激活码（电脑+手机）', '限时5折优惠', '需学生身份证明'] },
-          { name: '定制开发', price: '100', unit: '元起', duration: '手工费', badge: '', hot: false, desc: '有专门需求的可联系作者开发专属功能，只展示给你自己使用，也可决定是否纳入工具箱', features: ['专属功能定制', '仅自己可见/纳入工具箱', '作者评估实现'] },
+          { name: t("settings.desktop.135", undefined, "免费试用"), price: '0', unit: t("settings.desktop.136", undefined, "元"), duration: t("settings.desktop.137", undefined, "3 天"), badge: t("settings.desktop.138", undefined, "免费"), hot: false, isTrial: true, desc: t("settings.desktop.139", undefined, "全部 15 项付费功能免费体验 3 天，每设备限一次"), features: [t("settings.desktop.140", undefined, "全功能体验"), t("settings.desktop.141", undefined, "无需付款"), t("settings.desktop.142", undefined, "每设备限一次")] },
+          { name: t("settings.desktop.143", undefined, "月卡"), price: '12', unit: t("settings.desktop.144", undefined, "元"), duration: t("settings.desktop.145", undefined, "30 天"), badge: t("settings.desktop.146", undefined, "推荐"), hot: true, desc: t("settings.desktop.147", undefined, "30 天激活码（电脑+手机），适合短期高强度使用"), features: [t("settings.desktop.148", undefined, "30 天激活码（电脑+手机）"), t("settings.desktop.149", undefined, "15项付费功能全解锁"), t("settings.desktop.150", undefined, "含 5 天宽限期")] },
+          { name: t("settings.desktop.151", undefined, "永久正价"), price: '45', unit: t("settings.desktop.152", undefined, "元"), duration: t("settings.desktop.153", undefined, "永久"), badge: '', hot: false, desc: t("settings.desktop.154", undefined, "鲸鱼定制工具箱永久激活码（电脑+手机），解锁全部15项付费功能"), features: [t("settings.desktop.155", undefined, "永久激活码（电脑+手机）"), t("settings.desktop.156", undefined, "15项付费功能全解锁")] },
+          { name: t("settings.desktop.157", undefined, "普通优惠"), price: '36', unit: t("settings.desktop.158", undefined, "元"), duration: t("settings.desktop.159", undefined, "永久(8折)"), badge: '', hot: false, desc: t("settings.desktop.160", undefined, "鲸鱼定制工具箱永久激活码（电脑+手机），限时优惠 10 个，送完即止"), features: [t("settings.desktop.161", undefined, "永久激活码（电脑+手机）"), t("settings.desktop.162", undefined, "限时8折优惠")] },
+          { name: t("settings.desktop.163", undefined, "学生优惠"), price: '22.5', unit: t("settings.desktop.164", undefined, "元"), duration: t("settings.desktop.165", undefined, "永久(5折)"), badge: '', hot: false, desc: t("settings.desktop.166", undefined, "需提供可证明在读学生身份的信息"), features: [t("settings.desktop.167", undefined, "永久激活码（电脑+手机）"), t("settings.desktop.168", undefined, "限时5折优惠"), t("settings.desktop.169", undefined, "需学生身份证明")] },
+          { name: t("settings.desktop.170", undefined, "定制开发"), price: '100', unit: t("settings.desktop.171", undefined, "元起"), duration: t("settings.desktop.172", undefined, "手工费"), badge: '', hot: false, desc: t("settings.desktop.173", undefined, "有专门需求的可联系作者开发专属功能，只展示给你自己使用，也可决定是否纳入工具箱"), features: [t("settings.desktop.174", undefined, "专属功能定制"), t("settings.desktop.175", undefined, "仅自己可见/纳入工具箱"), t("settings.desktop.176", undefined, "作者评估实现")] },
         ]
 
         planCards.forEach(card => {
@@ -1548,7 +1554,7 @@ export function createDesktopSettingLayout(
           buyBtn.style.cssText = `margin-top: 8px; padding: 7px 0; font-size: 12px; cursor: pointer; background: ${btnBg}; color: ${btnClr}; border: 1px solid ${btnBdr}; border-radius: 6px;`
           if ((card as any).isTrial) {
             // 免费试用卡：直接回调 onStartTrial（填入试用码并验证）
-            buyBtn.textContent = '立即试用'
+            buyBtn.textContent = t("settings.desktop.177", undefined, "立即试用")
             buyBtn.onclick = () => {
               if (onStartTrial) {
                 onStartTrial()
@@ -1557,7 +1563,7 @@ export function createDesktopSettingLayout(
               }
             }
           } else {
-            buyBtn.textContent = '扫码购买'
+            buyBtn.textContent = t("settings.desktop.178", undefined, "扫码购买")
             // 电脑端：复用闭包内的 showPayModal（单参版，用户名走闭包）
             buyBtn.onclick = () => showPayModal(card.name)
           }
@@ -1575,24 +1581,24 @@ export function createDesktopSettingLayout(
 
         const accountHint = document.createElement('div')
         accountHint.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); margin-bottom: 6px;'
-        accountHint.textContent = '付款时请提供以下用户名'
+        accountHint.textContent = t("settings.desktop.179", undefined, "付款时请提供以下用户名")
         accountBox.appendChild(accountHint)
 
         const accountRow = document.createElement('div')
         accountRow.style.cssText = 'display: flex; align-items: center; gap: 8px;'
         const accountName = document.createElement('span')
         accountName.style.cssText = 'font-size: 15px; font-weight: 700; color: var(--b3-theme-on-background);'
-        accountName.textContent = currentUserName() || '未登录思源账号'
+        accountName.textContent = currentUserName() || t("settings.desktop.180", undefined, "未登录思源账号")
         accountRow.appendChild(accountName)
 
         const copyBtn = document.createElement('button')
         copyBtn.style.cssText = 'padding: 2px 10px; font-size: 12px; color: var(--b3-theme-primary); background: transparent; border: 1px solid var(--b3-theme-primary); border-radius: 4px; cursor: pointer;'
-        copyBtn.textContent = '复制'
+        copyBtn.textContent = t("settings.desktop.181", undefined, "复制")
         copyBtn.onclick = async () => {
           const name = currentUserName()
           if (!name) {
-            copyBtn.textContent = '未登录'
-            setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
+            copyBtn.textContent = t("settings.desktop.182", undefined, "未登录")
+            setTimeout(() => { copyBtn.textContent = t("settings.desktop.183", undefined, "复制") }, 2000)
             return
           }
           try {
@@ -1608,11 +1614,11 @@ export function createDesktopSettingLayout(
               document.execCommand('copy')
               document.body.removeChild(ta)
             }
-            copyBtn.textContent = '已复制！'
-            setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
+            copyBtn.textContent = t("settings.desktop.184", undefined, "已复制！")
+            setTimeout(() => { copyBtn.textContent = t("settings.desktop.185", undefined, "复制") }, 2000)
           } catch {
-            copyBtn.textContent = '复制失败'
-            setTimeout(() => { copyBtn.textContent = '复制' }, 2000)
+            copyBtn.textContent = t("settings.desktop.186", undefined, "复制失败")
+            setTimeout(() => { copyBtn.textContent = t("settings.desktop.187", undefined, "复制") }, 2000)
           }
         }
         accountRow.appendChild(copyBtn)
@@ -1620,12 +1626,12 @@ export function createDesktopSettingLayout(
 
         const accountNotice = document.createElement('div')
         accountNotice.style.cssText = 'font-size: 11px; color: #d4380d; margin-top: 6px; padding: 6px 8px; background: color-mix(in srgb, #ff4d4f 8%, transparent); border-radius: 4px; line-height: 1.5; font-weight: 500;'
-        accountNotice.textContent = '激活码将根据该用户名直接绑定你的思源账号，请务必发送'
+        accountNotice.textContent = t("settings.desktop.188", undefined, "激活码将根据该用户名直接绑定你的思源账号，请务必发送")
         accountBox.appendChild(accountNotice)
 
         const accountTip = document.createElement('div')
         accountTip.style.cssText = 'font-size: 11px; color: var(--b3-theme-on-surface); margin-top: 6px; line-height: 1.5;'
-        accountTip.innerHTML = '无法在付款备注提供时，可将用户名和付款截图发送至 1711455244@qq.com，或 <a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主。'
+        accountTip.innerHTML = t("settings.desktop.189", undefined, "无法在付款备注提供时，可将用户名和付款截图发送至 1711455244@qq.com，或 <a href=\"https://qm.qq.com/q/EzwqDQpYA0\" target=\"_blank\" style=\"color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);\">加入 QQ 群</a>联系群主。")
         accountBox.appendChild(accountTip)
         content.appendChild(accountBox)
 
@@ -1635,16 +1641,16 @@ export function createDesktopSettingLayout(
 
         const flowTitle = document.createElement('div')
         flowTitle.style.cssText = 'font-size: 15px; font-weight: bold; color: #722ed1; margin-bottom: 12px;'
-        flowTitle.textContent = '📋 付款发码流程'
+        flowTitle.textContent = t("settings.desktop.190", undefined, "📋 付款发码流程")
         flowBox.appendChild(flowTitle)
 
         const flowSteps = document.createElement('div')
         flowSteps.style.cssText = 'display: flex; flex-direction: column; gap: 10px;'
         const steps = [
-          { title: '选择方案', desc: '选择适合你的套餐方案，点击「扫码购买」' },
-          { title: '扫码转账', desc: '使用微信或支付宝扫码付款，付款备注请提供用户名「<strong>' + (currentUserName() || (isActivated ? '已激活用户' : '你的思源账号用户名')) + '</strong>」' },
-          { title: '提供信息', desc: '将付款截图和用户名<strong>' + (currentUserName() || '（你的思源账号）') + '</strong>发送至 1711455244@qq.com 邮箱，或<a href="https://qm.qq.com/q/EzwqDQpYA0" target="_blank" style="color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);">加入 QQ 群</a>联系群主' },
-          { title: '获取激活码', desc: '群主核实后发放激活码，回到本页粘贴激活即可解锁全部功能' },
+          { title: t("settings.desktop.191", undefined, "选择方案"), desc: t("settings.desktop.192", undefined, "选择适合你的套餐方案，点击「扫码购买」") },
+          { title: t("settings.desktop.193", undefined, "扫码转账"), desc: t("settings.desktop.194", undefined, "使用微信或支付宝扫码付款，付款备注请提供用户名「<strong>") + (currentUserName() || (isActivated ? t("settings.desktop.195", undefined, "已激活用户") : t("settings.desktop.196", undefined, "你的思源账号用户名"))) + '</strong>」' },
+          { title: t("settings.desktop.197", undefined, "提供信息"), desc: t("settings.desktop.198", undefined, "将付款截图和用户名<strong>") + (currentUserName() || t("settings.desktop.199", undefined, "（你的思源账号）")) + t("settings.desktop.200", undefined, "</strong>发送至 1711455244@qq.com 邮箱，或<a href=\"https://qm.qq.com/q/EzwqDQpYA0\" target=\"_blank\" style=\"color:var(--b3-theme-primary);text-decoration:none;border-bottom:1px dashed var(--b3-theme-primary);\">加入 QQ 群</a>联系群主") },
+          { title: t("settings.desktop.201", undefined, "获取激活码"), desc: t("settings.desktop.202", undefined, "群主核实后发放激活码，回到本页粘贴激活即可解锁全部功能") },
         ]
         steps.forEach((step, i) => {
           const stepRow = document.createElement('div')
@@ -1688,8 +1694,8 @@ export function createDesktopSettingLayout(
 
   // 电脑端自定义按钮
   setting.addItem({
-    title: '🖥️ 电脑端自定义按钮',
-    description: '管理电脑端工具栏自定义按钮（可拖动排序）',
+    title: t("settings.desktop.203", undefined, "🖥️ 电脑端自定义按钮"),
+    description: t("settings.desktop.204", undefined, "管理电脑端工具栏自定义按钮（可拖动排序）"),
     createActionElement: () => {
       const wrapper = document.createElement('div')
       wrapper.className = 'toolbar-customizer-content'
@@ -1736,12 +1742,12 @@ export function createDesktopSettingLayout(
       const addBtn = document.createElement('button')
       addBtn.className = 'b3-button b3-button--outline'
       addBtn.style.cssText = 'width: 100%; margin-bottom: 12px; padding: 10px; border-radius: 6px; font-size: 14px;'
-      addBtn.textContent = '+ 添加新按钮'
+      addBtn.textContent = t("settings.desktop.205", undefined, "+ 添加新按钮")
       addBtn.onclick = () => {
         const newButtonIndex = context.desktopButtonConfigs.length + 1
         const newButton: ButtonConfig = {
           id: `button_${Date.now()}`,
-          name: `新按钮${newButtonIndex}`,
+          name: t("settings.common.newButton", { index: newButtonIndex }, "新按钮{index}"),
           type: 'template',
           template: '',
           icon: '♥️',
@@ -1767,10 +1773,10 @@ export function createDesktopSettingLayout(
           onChanged: renderList,
         })
       } catch (e) {
-        console.error('[DesktopPreview] 创建预览失败:', e)
+        logger.error('[DesktopPreview] 创建预览失败:', e)
         const errEl = document.createElement('div')
         errEl.style.cssText = 'color:var(--b3-card-error-color);font-size:12px;padding:8px;'
-        errEl.textContent = '⚠️ 工具栏预览加载失败，请检查控制台错误'
+        errEl.textContent = t("settings.desktop.206", undefined, "⚠️ 工具栏预览加载失败，请检查控制台错误")
         wrapper.appendChild(errEl)
       }
 
@@ -1816,13 +1822,13 @@ export function createDesktopSettingLayout(
       margin-bottom: 4px;
       text-align: center;
     `
-    moduleTitle.textContent = '电脑端全局按钮配置🖥️'
+    moduleTitle.textContent = t("settings.desktop.207", undefined, "电脑端全局按钮配置🖥️")
     moduleBox.appendChild(moduleTitle)
 
     // 说明文字（放在开关上面）
     const hint = document.createElement('div')
     hint.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); padding: 10px 12px; background: var(--b3-theme-primary-lightest); border-radius: 6px; line-height: 1.5;'
-    hint.innerHTML = '💡 开启后会批量应用到所有按钮，单个按钮的独立配置优先级更高<br>⚠️建议：按钮图标大小与按钮宽度，设置数值相同，效果会更好'
+    hint.innerHTML = t("settings.desktop.208", undefined, "💡 开启后会批量应用到所有按钮，单个按钮的独立配置优先级更高<br>⚠️建议：按钮图标大小与按钮宽度，设置数值相同，效果会更好")
     moduleBox.appendChild(hint)
 
     const createRow = (label: string, inputValue: string | number | boolean, inputType: 'text' | 'number' | 'checkbox', onChange: (input: HTMLInputElement) => void) => {
@@ -1854,7 +1860,7 @@ export function createDesktopSettingLayout(
 
     // 全局配置启用开关（放在最前面）
     const { row: enabledRow, input: enabledToggle } = createRow(
-      '🔓启用电脑端全局按钮配置',
+      t("settings.desktop.209", undefined, "🔓启用电脑端全局按钮配置"),
       context.desktopGlobalButtonConfig.enabled ?? true,
       'checkbox',
       async (input) => {
@@ -1888,7 +1894,7 @@ export function createDesktopSettingLayout(
 
     // 图标大小
     const { row: iconSizeRow, input: iconSizeInput } = createRow(
-      '①电脑按钮图标大小 (px)',
+      t("settings.desktop.210", undefined, "①电脑按钮图标大小 (px)"),
       context.desktopGlobalButtonConfig.iconSize,
       'number',
       async (input) => {
@@ -1908,7 +1914,7 @@ export function createDesktopSettingLayout(
 
     // 按钮宽度
     const { row: widthRow, input: widthInput } = createRow(
-      '②电脑按钮宽度 (px)📏',
+      t("settings.desktop.211", undefined, "②电脑按钮宽度 (px)📏"),
       context.desktopGlobalButtonConfig.minWidth,
       'number',
       async (input) => {
@@ -1928,7 +1934,7 @@ export function createDesktopSettingLayout(
 
     // 右边距
     const { row: marginRow, input: marginInput } = createRow(
-      '③电脑按钮右边距 (px)➡️',
+      t("settings.desktop.212", undefined, "③电脑按钮右边距 (px)➡️"),
       context.desktopGlobalButtonConfig.marginRight,
       'number',
       async (input) => {
@@ -1948,7 +1954,7 @@ export function createDesktopSettingLayout(
 
     // 右上角提示
     const { row: notifyRow, input: notifyToggle } = createRow(
-      ' ④电脑按钮右上角提示📢',
+      t("settings.desktop.213", undefined, " ④电脑按钮右上角提示📢"),
       context.desktopGlobalButtonConfig.showNotification,
       'checkbox',
       async (input) => {
@@ -1992,16 +1998,16 @@ export function createDesktopSettingLayout(
   }
 
   setting.addItem({
-    title: '🔧 电脑端全局按钮配置',
-    description: '批量设置所有按钮的默认值（图标大小、宽度、边距、提示）',
+    title: t("settings.desktop.214", undefined, "🔧 电脑端全局按钮配置"),
+    description: t("settings.desktop.215", undefined, "批量设置所有按钮的默认值（图标大小、宽度、边距、提示）"),
     createActionElement: createDesktopGlobalButtonConfigElement
   })
 
 
   // 小功能选择
   setting.addItem({
-    title: '⚙️ 小功能选择',
-    description: '界面微调与体验优化',
+    title: t("settings.desktop.216", undefined, "⚙️ 小功能选择"),
+    description: t("settings.desktop.217", undefined, "界面微调与体验优化"),
     createActionElement: () => {
       const container = document.createElement('div')
       container.className = 'toolbar-customizer-content'
@@ -2054,13 +2060,13 @@ export function createDesktopSettingLayout(
         margin-bottom: 4px;
         text-align: center;
       `
-      toolbarTitle.textContent = '电脑端全局工具栏配置🖥️'
+      toolbarTitle.textContent = t("settings.desktop.218", undefined, "电脑端全局工具栏配置🖥️")
       toolbarBox.appendChild(toolbarTitle)
 
       // 说明文字
       const toolbarHint = document.createElement('div')
       toolbarHint.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); padding: 10px 12px; background: var(--b3-theme-primary-lightest); border-radius: 6px; line-height: 1.5;'
-      toolbarHint.innerHTML = '💡 调整电脑端顶部工具栏的整体样式和显示效果'
+      toolbarHint.innerHTML = t("settings.desktop.219", undefined, "💡 调整电脑端顶部工具栏的整体样式和显示效果")
       toolbarBox.appendChild(toolbarHint)
 
       // 工具栏高度
@@ -2072,7 +2078,7 @@ export function createDesktopSettingLayout(
 
       const heightLabel = document.createElement('label')
       heightLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 120px;'
-      heightLabel.textContent = '①电脑端工具栏高度'
+      heightLabel.textContent = t("settings.desktop.220", undefined, "①电脑端工具栏高度")
 
       const heightInput = document.createElement('input')
       heightInput.type = 'number'
@@ -2097,7 +2103,7 @@ export function createDesktopSettingLayout(
 
       const styleLabel = document.createElement('label')
       styleLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
-      styleLabel.textContent = '②电脑端工具栏样式选择'
+      styleLabel.textContent = t("settings.desktop.221", undefined, "②电脑端工具栏样式选择")
       styleItem.appendChild(styleLabel)
 
       const styleContainer = document.createElement('div')
@@ -2125,7 +2131,7 @@ export function createDesktopSettingLayout(
       defaultRadio.style.cssText = 'cursor: pointer;'
 
       const defaultLabel = document.createElement('span')
-      defaultLabel.textContent = '默认样式'
+      defaultLabel.textContent = t("settings.desktop.222", undefined, "默认样式")
       defaultLabel.style.cssText = 'font-size: 13px; flex: 1;'
 
       defaultOption.appendChild(defaultRadio)
@@ -2151,7 +2157,7 @@ export function createDesktopSettingLayout(
       dividerRadio.style.cssText = 'cursor: pointer;'
 
       const dividerLabel = document.createElement('span')
-      dividerLabel.textContent = '加分割线'
+      dividerLabel.textContent = t("settings.desktop.223", undefined, "加分割线")
       dividerLabel.style.cssText = 'font-size: 13px; flex: 1;'
 
       dividerOption.appendChild(dividerRadio)
@@ -2195,7 +2201,7 @@ export function createDesktopSettingLayout(
 
       const positionLabel = document.createElement('label')
       positionLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
-      positionLabel.textContent = '③工具栏位置选择'
+      positionLabel.textContent = t("settings.desktop.224", undefined, "③工具栏位置选择")
       positionItem.appendChild(positionLabel)
 
       const positionContainer = document.createElement('div')
@@ -2205,8 +2211,8 @@ export function createDesktopSettingLayout(
       const currentPosition = cfg.enableFloatingToolbar === true ? 'floating' : 'native'
 
       const positionOptions = [
-        { value: 'native', label: '原生顶部（思源默认）' },
-        { value: 'floating', label: '底部悬浮胶囊' },
+        { value: 'native', label: t("settings.desktop.225", undefined, "原生顶部（思源默认）") },
+        { value: 'floating', label: t("settings.desktop.226", undefined, "底部悬浮胶囊") },
       ]
 
       const positionRadios: HTMLInputElement[] = []
@@ -2285,7 +2291,7 @@ export function createDesktopSettingLayout(
       const floatingHint = document.createElement('div')
       floatingHint.id = 'desktop-floating-toolbar-hint'
       floatingHint.style.cssText = `display: ${currentPosition === 'floating' ? '' : 'none'}; font-size: 12px; color: var(--b3-theme-on-surface); padding: 6px 10px; background: var(--b3-theme-primary-lightest); border-radius: 4px; line-height: 1.5;`
-      floatingHint.textContent = '⚠️ 请注意：切换为悬浮胶囊后会自动隐藏文档面包屑（路径条），胶囊中只保留工具按钮。'
+      floatingHint.textContent = t("settings.desktop.227", undefined, "⚠️ 请注意：切换为悬浮胶囊后会自动隐藏文档面包屑（路径条），胶囊中只保留工具按钮。")
       positionItem.appendChild(floatingHint)
 
       toolbarBox.appendChild(positionItem)
@@ -2297,7 +2303,7 @@ export function createDesktopSettingLayout(
 
       const floatingSectionTitle = document.createElement('div')
       floatingSectionTitle.style.cssText = 'font-size: 13px; font-weight: 600; color: var(--b3-theme-primary);'
-      floatingSectionTitle.textContent = '💊 悬浮胶囊样式配置'
+      floatingSectionTitle.textContent = t("settings.desktop.228", undefined, "💊 悬浮胶囊样式配置")
       floatingSection.appendChild(floatingSectionTitle)
 
       // 通用：创建一个带 range 滑杆的配置行
@@ -2346,7 +2352,7 @@ export function createDesktopSettingLayout(
 
       // 距底部距离
       floatingSection.appendChild(createSliderRow(
-        '距底部距离',
+        t("settings.desktop.229", undefined, "距底部距离"),
         cfg.floatingToolbarMargin ?? 20, 0, 100, 'px',
         async (v) => {
           cfg.floatingToolbarMargin = v
@@ -2357,7 +2363,7 @@ export function createDesktopSettingLayout(
 
       // 圆角大小
       floatingSection.appendChild(createSliderRow(
-        '圆角大小',
+        t("settings.desktop.230", undefined, "圆角大小"),
         cfg.floatingToolbarBorderRadius ?? 24, 0, 50, 'px',
         async (v) => {
           cfg.floatingToolbarBorderRadius = v
@@ -2368,7 +2374,7 @@ export function createDesktopSettingLayout(
 
       // 胶囊高度
       floatingSection.appendChild(createSliderRow(
-        '胶囊高度',
+        t("settings.desktop.231", undefined, "胶囊高度"),
         cfg.floatingToolbarHeight ?? 40, 24, 80, 'px',
         async (v) => {
           cfg.floatingToolbarHeight = v
@@ -2379,7 +2385,7 @@ export function createDesktopSettingLayout(
 
       // 胶囊宽度（0=auto 自适应）
       floatingSection.appendChild(createSliderRow(
-        '胶囊宽度 (0=自适应)',
+        t("settings.desktop.232", undefined, "胶囊宽度 (0=自适应)"),
         cfg.floatingToolbarWidth ?? 0, 0, 1200, 'px',
         async (v) => {
           cfg.floatingToolbarWidth = v
@@ -2393,15 +2399,15 @@ export function createDesktopSettingLayout(
       styleModeRow.style.cssText = 'display: flex; flex-direction: column; gap: 6px;'
       const styleModeLabel = document.createElement('label')
       styleModeLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
-      styleModeLabel.textContent = '胶囊样式'
+      styleModeLabel.textContent = t("settings.desktop.233", undefined, "胶囊样式")
       styleModeRow.appendChild(styleModeLabel)
 
       const styleModeContainer = document.createElement('div')
       styleModeContainer.style.cssText = 'display: flex; gap: 8px;'
       const currentStyleMode = cfg.floatingToolbarStyle === 'solid' ? 'solid' : 'glass'
       const styleModeOptions = [
-        { value: 'glass', label: '毛玻璃（半透明）' },
-        { value: 'solid', label: '实心（跟随主题）' },
+        { value: 'glass', label: t("settings.desktop.234", undefined, "毛玻璃（半透明）") },
+        { value: 'solid', label: t("settings.desktop.235", undefined, "实心（跟随主题）") },
       ]
       const styleModeRadios: HTMLInputElement[] = []
       const styleModeOptionEls: HTMLElement[] = []
@@ -2449,7 +2455,7 @@ export function createDesktopSettingLayout(
 
       const scrollHideLabel = document.createElement('label')
       scrollHideLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); flex: 1;'
-      scrollHideLabel.textContent = '🔄 滚动隐藏（上滑隐藏，下滑显示）'
+      scrollHideLabel.textContent = t("settings.desktop.236", undefined, "🔄 滚动隐藏（上滑隐藏，下滑显示）")
 
       const scrollHideToggle = document.createElement('input')
       scrollHideToggle.type = 'checkbox'
@@ -2471,7 +2477,7 @@ export function createDesktopSettingLayout(
       qnHideRow.style.cssText = 'display: flex; align-items: center; gap: 8px; padding: 4px 0;'
       const qnHideLabel = document.createElement('label')
       qnHideLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); flex: 1;'
-      qnHideLabel.textContent = '📝 记事弹窗中隐藏底部胶囊'
+      qnHideLabel.textContent = t("settings.desktop.237", undefined, "📝 记事弹窗中隐藏底部胶囊")
       const qnHideToggle = document.createElement('input')
       qnHideToggle.type = 'checkbox'
       qnHideToggle.className = 'b3-switch'
@@ -2512,28 +2518,28 @@ export function createDesktopSettingLayout(
         margin-bottom: 4px;
         text-align: center;
       `
-      featureTitle.textContent = '电脑端小功能选择⚙️'
+      featureTitle.textContent = t("settings.desktop.238", undefined, "电脑端小功能选择⚙️")
       featureBox.appendChild(featureTitle)
 
       // 说明文字
       const featureHint = document.createElement('div')
       featureHint.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); padding: 10px 12px; background: var(--b3-theme-primary-lightest); border-radius: 6px; line-height: 1.5;'
-      featureHint.innerHTML = '💡 调整电脑端的图标隐藏设置'
+      featureHint.innerHTML = t("settings.desktop.239", undefined, "💡 调整电脑端的图标隐藏设置")
       featureBox.appendChild(featureHint)
 
-      featureBox.appendChild(createSwitchItem('①面包屑图标隐藏', context.desktopFeatureConfig.hideBreadcrumbIcon, (v) => {
+      featureBox.appendChild(createSwitchItem(t("settings.desktop.240", undefined, "①面包屑图标隐藏"), context.desktopFeatureConfig.hideBreadcrumbIcon, (v) => {
         context.desktopFeatureConfig.hideBreadcrumbIcon = v
       }))
 
-      featureBox.appendChild(createSwitchItem('②锁定编辑按钮隐藏', context.desktopFeatureConfig.hideReadonlyButton, (v) => {
+      featureBox.appendChild(createSwitchItem(t("settings.desktop.241", undefined, "②锁定编辑按钮隐藏"), context.desktopFeatureConfig.hideReadonlyButton, (v) => {
         context.desktopFeatureConfig.hideReadonlyButton = v
       }))
 
-      featureBox.appendChild(createSwitchItem('③文档菜单按钮隐藏', context.desktopFeatureConfig.hideDocMenuButton, (v) => {
+      featureBox.appendChild(createSwitchItem(t("settings.desktop.242", undefined, "③文档菜单按钮隐藏"), context.desktopFeatureConfig.hideDocMenuButton, (v) => {
         context.desktopFeatureConfig.hideDocMenuButton = v
       }))
 
-      featureBox.appendChild(createSwitchItem('④更多按钮隐藏', context.desktopFeatureConfig.hideMoreButton, (v) => {
+      featureBox.appendChild(createSwitchItem(t("settings.desktop.243", undefined, "④更多按钮隐藏"), context.desktopFeatureConfig.hideMoreButton, (v) => {
         context.desktopFeatureConfig.hideMoreButton = v
       }))
 
@@ -2566,7 +2572,7 @@ export function createDesktopSettingLayout(
 
       const dangerLabel = document.createElement('label')
       dangerLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #ff4d4d; min-width: 180px;'
-      dangerLabel.textContent = '⚠️ 电脑端完全恢复思源原始状态'
+      dangerLabel.textContent = t("settings.desktop.244", undefined, "⚠️ 电脑端完全恢复思源原始状态")
 
       const dangerSwitch = document.createElement('input')
       dangerSwitch.type = 'checkbox'
@@ -2584,7 +2590,7 @@ export function createDesktopSettingLayout(
 
       const dangerDesc = document.createElement('div')
       dangerDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-      dangerDesc.textContent = '💡 开启后：隐藏所有自定义按钮 + 取消所有工具栏样式修改（按钮宽度、工具栏高度、隐藏原生按钮等），让思源恢复到未安装插件时的原始状态'
+      dangerDesc.textContent = t("settings.desktop.245", undefined, "💡 开启后：隐藏所有自定义按钮 + 取消所有工具栏样式修改（按钮宽度、工具栏高度、隐藏原生按钮等），让思源恢复到未安装插件时的原始状态")
 
       dangerItem.appendChild(dangerHeader)
       dangerItem.appendChild(dangerDesc)
@@ -2609,11 +2615,11 @@ export function createDesktopSettingLayout(
 
       const resetLabel = document.createElement('label')
       resetLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: #f59e0b; min-width: 180px;'
-      resetLabel.textContent = '⚠️ 恢复默认出厂配置'
+      resetLabel.textContent = t("settings.desktop.246", undefined, "⚠️ 恢复默认出厂配置")
 
       const resetBtn = document.createElement('button')
       resetBtn.className = 'b3-button b3-button--outline'
-      resetBtn.textContent = '恢复'
+      resetBtn.textContent = t("settings.desktop.247", undefined, "恢复")
       resetBtn.style.cssText = 'flex-shrink: 0; padding: 6px 16px; border-color: #f59e0b; color: #f59e0b; cursor: pointer;'
       resetBtn.onclick = async () => {
         // 导出当前配置（电脑端+手机端全量），导出成功后才放行「确认恢复」
@@ -2643,22 +2649,22 @@ export function createDesktopSettingLayout(
           a.click()
           a.remove()
           URL.revokeObjectURL(url)
-          showMessage('✅ 已导出配置文件，确认无误后再恢复', 3000, 'info')
+          showMessage(t("settings.desktop.248", undefined, "✅ 已导出配置文件，确认无误后再恢复"), 3000, 'info')
         }
 
         const ok = await showConfirmDialog({
-          title: '恢复默认出厂配置',
-          message: '将恢复为插件首次安装时的出厂默认配置（按钮、小功能、工具栏位置、全局配置等），当前所有自定义配置将被替换。\n建议先导出当前配置备份（电脑端+手机端），导出完成后再确认恢复。',
-          hint: '恢复后：出厂默认按钮（更多/打开菜单/锁住文档/…）+ 小功能开关 + 工具栏位置 + 全局按钮配置全部回到默认；激活码与授权信息保留',
-          confirmText: '确认恢复',
-          cancelText: '取消',
+          title: t("settings.desktop.249", undefined, "恢复默认出厂配置"),
+          message: t("settings.desktop.250", undefined, "将恢复为插件首次安装时的出厂默认配置（按钮、小功能、工具栏位置、全局配置等），当前所有自定义配置将被替换。\n建议先导出当前配置备份（电脑端+手机端），导出完成后再确认恢复。"),
+          hint: t("settings.desktop.251", undefined, "恢复后：出厂默认按钮（更多/打开菜单/锁住文档/…）+ 小功能开关 + 工具栏位置 + 全局按钮配置全部回到默认；激活码与授权信息保留"),
+          confirmText: t("settings.desktop.252", undefined, "确认恢复"),
+          cancelText: t("settings.desktop.253", undefined, "取消"),
           confirmInitiallyDisabled: true,
-          extraButton: { text: '📤 导出配置文件', onClick: exportConfig },
+          extraButton: { text: t("settings.desktop.254", undefined, "📤 导出配置文件"), onClick: exportConfig },
         })
         if (!ok) return
         // 全量恢复出厂默认（仅保留激活/授权字段）
         await resetAllConfigsToFactoryDefaults(context as any)
-        showMessage('✅ 已恢复默认出厂配置，正在刷新界面...', 3000, 'info')
+        showMessage(t("settings.desktop.255", undefined, "✅ 已恢复默认出厂配置，正在刷新界面..."), 3000, 'info')
         await fetchSyncPost('/api/ui/reloadUI', {})
       }
 
@@ -2667,12 +2673,68 @@ export function createDesktopSettingLayout(
 
       const resetDesc = document.createElement('div')
       resetDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
-      resetDesc.textContent = '💡 将插件所有配置恢复为首次安装时的出厂默认（按钮/小功能/工具栏位置/全局配置），激活码与授权信息保留，当前自定义配置会被替换'
+      resetDesc.textContent = t("settings.desktop.256", undefined, "💡 将插件所有配置恢复为首次安装时的出厂默认（按钮/小功能/工具栏位置/全局配置），激活码与授权信息保留，当前自定义配置会被替换")
 
       resetItem.appendChild(resetHeader)
       resetItem.appendChild(resetDesc)
 
       container.appendChild(resetItem)
+
+      const logItem = document.createElement('div')
+      logItem.style.cssText = `
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        padding: 16px !important;
+        margin-top: 12px !important;
+        background: var(--b3-theme-surface) !important;
+        border: 2px solid var(--b3-border-color) !important;
+        border-radius: 8px !important;
+      `
+
+      const logHeader = document.createElement('div')
+      logHeader.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px;'
+
+      const logLabel = document.createElement('label')
+      logLabel.style.cssText = 'font-size: 15px; font-weight: 700; color: var(--b3-theme-on-surface); min-width: 180px;'
+
+      const logSwitch = document.createElement('input')
+      logSwitch.type = 'checkbox'
+      logSwitch.className = 'b3-switch'
+      logSwitch.checked = context.loggingEnabled === true
+
+      logLabel.textContent = t("settings.desktop.257", undefined, "📝 插件调试日志")
+
+      logSwitch.onchange = async () => {
+        logSwitch.disabled = true
+        try {
+          await context.setLoggingEnabled(logSwitch.checked)
+          context.loggingEnabled = logSwitch.checked
+          if (logSwitch.checked) {
+            logger.log('调试日志已开启')
+            showMessage(t("settings.desktop.258", undefined, "✅ 插件调试日志已开启，请在开发者工具控制台中查看"), 4000, 'info')
+          } else {
+            showMessage(t("settings.desktop.259", undefined, "插件调试日志已关闭"), 3000, 'info')
+          }
+        } catch (error) {
+          logSwitch.checked = context.loggingEnabled === true
+          logger.error('[日志设置] 保存失败:', error)
+          showMessage(t("settings.desktop.260", undefined, "日志设置保存失败"), 3000, 'error')
+        } finally {
+          logSwitch.disabled = false
+        }
+      }
+
+      logHeader.appendChild(logLabel)
+      logHeader.appendChild(logSwitch)
+
+      const logDesc = document.createElement('div')
+      logDesc.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); line-height: 1.5; opacity: 0.9;'
+      logDesc.textContent = t("settings.desktop.261", undefined, "💡 默认关闭。开启后请在开发者工具控制台查看以 [ToolbarCustomizer] 开头的日志；排查完成后建议关闭。不影响思源本体、其他插件和界面错误提示")
+
+      logItem.appendChild(logHeader)
+      logItem.appendChild(logDesc)
+      container.appendChild(logItem)
 
       return container
     }
@@ -2682,8 +2744,8 @@ export function createDesktopSettingLayout(
 
   // 手机端自定义按钮
   setting.addItem({
-    title: '手机端自定义按钮📱',
-    description: `已配置 ${context.mobileButtonConfigs.length} 个按钮，点击展开编辑`,
+    title: t("settings.desktop.262", undefined, "手机端自定义按钮📱"),
+    description: t("settings.common.configuredButtons", { count: context.mobileButtonConfigs.length }, "已配置 {count} 个按钮，点击展开编辑"),
     createActionElement: () => {
       const wrapper = document.createElement('div')
       wrapper.className = 'toolbar-customizer-content'
@@ -2697,7 +2759,7 @@ export function createDesktopSettingLayout(
 		        border: 1px solid color-mix(in srgb, #a855f7 20%, transparent); border-radius: 6px;
 		        padding: 10px 12px; text-align: center;
 		      `
-		      mobileNotice.textContent = '注意：电脑端和手机端完全独立、互不影响；此部分仅展示手机端20%的功能，请同步至手机端后，使用手机端插件设置的剩余80%功能：一键记事弹窗、朗读、批注等等'
+		      mobileNotice.textContent = t("settings.desktop.263", undefined, "注意：电脑端和手机端完全独立、互不影响；此部分仅展示手机端20%的功能，请同步至手机端后，使用手机端插件设置的剩余80%功能：一键记事弹窗、朗读、批注等等")
 	      wrapper.appendChild(mobileNotice)
 
       const listContainer = document.createElement('div')
@@ -2752,12 +2814,12 @@ export function createDesktopSettingLayout(
       const addBtn = document.createElement('button')
       addBtn.className = 'b3-button b3-button--outline'
       addBtn.style.cssText = 'width: 100%; margin-bottom: 12px; padding: 10px; border-radius: 6px; font-size: 14px;'
-      addBtn.textContent = '+ 添加新按钮'
+      addBtn.textContent = t("settings.desktop.264", undefined, "+ 添加新按钮")
       addBtn.onclick = () => {
         const newButtonIndex = context.mobileButtonConfigs.length + 1
         const newButton: ButtonConfig = {
           id: `button_${Date.now()}`,
-          name: `新按钮${newButtonIndex}`,
+          name: t('settings.common.newButton', { index: newButtonIndex }, '新按钮{index}'),
           type: 'builtin',
           builtinId: 'menuSearch',
           icon: '♥️',
@@ -2791,10 +2853,10 @@ export function createDesktopSettingLayout(
 	          onChanged: renderList,
 	        })
       } catch (e) {
-        console.error('[MobilePreview] 创建预览失败:', e)
+        logger.error('[MobilePreview] 创建预览失败:', e)
         const errEl = document.createElement('div')
         errEl.style.cssText = 'color:var(--b3-card-error-color);font-size:12px;padding:8px;'
-        errEl.textContent = '⚠️ 工具栏预览加载失败，请检查控制台错误'
+        errEl.textContent = t("settings.desktop.265", undefined, "⚠️ 工具栏预览加载失败，请检查控制台错误")
         wrapper.appendChild(errEl)
       }
 
@@ -2812,8 +2874,8 @@ export function createDesktopSettingLayout(
 
   // 底部工具栏配置
   setting.addItem({
-    title: '📱 底部工具栏配置',
-    description: '💡 开启后才能调整输入法位置相关设置',
+    title: t("settings.desktop.266", undefined, "📱 底部工具栏配置"),
+    description: t("settings.desktop.267", undefined, "💡 开启后才能调整输入法位置相关设置"),
     createActionElement: () => {
       const container = document.createElement('div')
       container.className = 'toolbar-customizer-content'
@@ -2834,7 +2896,7 @@ export function createDesktopSettingLayout(
       `
 
       const toggleLabel = document.createElement('span')
-      toggleLabel.textContent = '是否将工具栏置底'
+      toggleLabel.textContent = t("settings.desktop.268", undefined, "是否将工具栏置底")
       toggleLabel.style.cssText = 'font-size: 14px; color: var(--b3-theme-on-surface); font-weight: 500;'
 
       const toggle = document.createElement('input')

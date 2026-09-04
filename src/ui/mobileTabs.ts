@@ -3,6 +3,8 @@
  * 功能：在手机端右侧显示竖向悬浮Tab栏，支持多文档快速切换
  */
 
+import { logger } from '@/utils/logger'
+import { t } from '../i18n/runtime'
 import { fetchSyncPost, openMobileFileById, showMessage } from "siyuan";
 import { isMobileDevice, pluginInstance } from "../toolbarManager";
 import type { ButtonConfig } from "../toolbarManager";
@@ -159,7 +161,7 @@ async function navigateEditorToTab(tab: TabItem): Promise<void> {
     // 如果已有更新的请求，丢弃本次响应
     if (reqId !== navigateRequestId) return
     if (info?.code === 3 || !info?.data) {
-      showMessage(`文档已被删除，已移除该标签页`, 2500, 'info')
+      showMessage(t('navigation.tabs.deletedDocumentRemoved', undefined, '文档已被删除，已移除该标签页'), 2500, 'info')
       removeTab(tab.id)
       renderTabList()
       debouncedPersist()
@@ -177,8 +179,8 @@ async function navigateEditorToTab(tab: TabItem): Promise<void> {
   try {
     openMobileFileById(pluginInstance?.app, tab.docId)
   } catch (err) {
-    console.error('[手机端标签页Tab] 打开文档失败:', err)
-    showMessage('打开文档失败', 3000, 'error')
+    logger.error('[手机端标签页Tab] 打开文档失败:', err)
+    showMessage(t('navigation.common.openDocumentFailed', undefined, '打开文档失败'), 3000, 'error')
   }
   if (tab.scrollPosition > 0) {
     // 轮询等待文档内容加载完成后再恢复滚动位置（大文档加载可能超过 300ms）
@@ -379,7 +381,7 @@ function restoreAfterKeyboard(): void {
 const titleCache: Record<string, string> = {}
 
 async function getDocTitle(docId: string): Promise<string> {
-  if (!docId) return '未命名'
+  if (!docId) return t('navigation.common.untitled', undefined, '未命名')
 
   // 优先使用缓存
   if (titleCache[docId]) return titleCache[docId]
@@ -406,7 +408,7 @@ async function getDocTitle(docId: string): Promise<string> {
     }
   } catch {}
 
-  return '未命名'
+  return t('navigation.common.untitled', undefined, '未命名')
 }
 
 // 更新当前文档 Tab 的标题（从 DOM 或 API），同时清除缓存让非活动标签下次也能获取最新标题
@@ -475,7 +477,7 @@ function getTabColor(notebookId: string): string {
 }
 
 function truncateTitle(title: string, maxLen: number = 12): string {
-  if (!title) return '未命名'
+  if (!title) return t('navigation.common.untitled', undefined, '未命名')
   return title.length > maxLen ? title.substring(0, maxLen) + '...' : title
 }
 
@@ -527,12 +529,12 @@ function addTab(docId: string, title: string, notebookId: string, scrollPosition
       state.tabs = state.tabs.filter(t => t.id !== oldest.id)
     } else {
       // 全部都是活跃/钉住的 Tab，无法自动挤掉任何一个
-      showMessage('标签页已满：请先关闭未钉住的标签页，或取消钉住后再打开新文档', 2500, 'info')
+      showMessage(t('navigation.tabs.limitReachedMobile', undefined, '标签页已满：请先关闭未钉住的标签页，或取消钉住后再打开新文档'), 2500, 'info')
       const active = getActiveTab()
       return active || {
         id: 'mtab-blocked',
         docId,
-        title: title || '未命名',
+        title: title || t('navigation.common.untitled', undefined, '未命名'),
         notebookId,
         scrollPosition,
         isActive: false,
@@ -545,7 +547,7 @@ function addTab(docId: string, title: string, notebookId: string, scrollPosition
   const tab: TabItem = {
     id: generateId(),
     docId,
-    title: title || '未命名',
+    title: title || t('navigation.common.untitled', undefined, '未命名'),
     notebookId,
     scrollPosition,
     isActive: true,
@@ -605,7 +607,7 @@ function updatePinButtonUI(): void {
   const active = getActiveTab()
   const pinned = !!active?.isPinned
   pinBtnEl.classList.toggle('pinned', pinned)
-  pinBtnEl.textContent = pinned ? '已钉住' : '钉住'
+  pinBtnEl.textContent = pinned ? t('navigation.tabs.pinned', undefined, '已钉住') : t('navigation.tabs.pin', undefined, '钉住')
 }
 
 // ===== 持久化 =====
@@ -643,7 +645,7 @@ async function loadState(): Promise<void> {
       }
     }
   } catch (err) {
-    console.warn('[手机端标签页Tab] 加载状态失败:', err)
+    logger.warn('[手机端标签页Tab] 加载状态失败:', err)
   }
 }
 
@@ -675,9 +677,9 @@ async function switchToTab(tabId: string): Promise<void> {
   state.activeTabId = tabId
 
   // 如果标题是"加载中..."或"未命名"，异步获取真实标题
-  if (tab.title === '加载中...' || tab.title === '未命名') {
+  if (tab.title === t('navigation.common.loading', undefined, '加载中...') || tab.title === t('navigation.common.untitled', undefined, '未命名')) {
     getDocTitle(tab.docId).then(title => {
-      if (title !== '未命名') {
+      if (title !== t('navigation.common.untitled', undefined, '未命名')) {
         tab.title = title
         renderTabList()
       }
@@ -724,11 +726,11 @@ function handleSwitchProtyle(): void {
     }
     dirty = true // 活动标签变了，需要持久化
   } else {
-    addTab(docId, domTitle || '加载中...', notebookId, 0)
+    addTab(docId, domTitle || t('navigation.common.loading', undefined, '加载中...'), notebookId, 0)
     dirty = true
     if (!domTitle) {
       getDocTitle(docId).then(title => {
-        if (title !== '未命名' && title !== '加载中...') {
+        if (title !== t('navigation.common.untitled', undefined, '未命名') && title !== t('navigation.common.loading', undefined, '加载中...')) {
           const tab = findTabByDocId(docId)
           if (tab) {
             tab.title = title
@@ -1301,13 +1303,13 @@ function createTabBar(): void {
   pinBtn.addEventListener('click', () => {
     const active = getActiveTab()
     if (!active) {
-      showMessage('请先打开一个文档', 1200, 'info')
+      showMessage(t('navigation.common.openDocumentFirst', undefined, '请先打开一个文档'), 1200, 'info')
       return
     }
     togglePinTab(active.id)
     updatePinButtonUI()
     debouncedPersist()
-    showMessage(active.isPinned ? '已钉住该标签页（将置顶且不会被挤掉）' : '已取消钉住该标签页', 1200, 'info')
+    showMessage(active.isPinned ? t('navigation.tabs.pinnedNotice', undefined, '已钉住该标签页（将置顶且不会被挤掉）') : t('navigation.tabs.unpinnedNotice', undefined, '已取消钉住该标签页'), 1200, 'info')
   })
   tabBar.appendChild(pinBtn)
 
@@ -1319,7 +1321,7 @@ function createTabBar(): void {
   // 收缩按钮
   const collapseBtn = document.createElement('button')
   collapseBtn.className = 'mobile-tab-collapse'
-  collapseBtn.textContent = '收起'
+  collapseBtn.textContent = t('navigation.common.collapse', undefined, '收起')
   collapseBtn.addEventListener('click', () => {
     toggleExpand()
   })
@@ -1371,9 +1373,9 @@ function showContextMenu(tabId: string, anchorElement: HTMLElement): void {
   const rect = anchorElement.getBoundingClientRect()
 
   const items = [
-    { label: '关闭此标签', action: () => { removeTab(tabId); renderTabList(); debouncedPersist(); if (state.tabs.length === 0) { removeTabBar(); state.isVisible = false } } },
-    { label: '关闭其他标签', action: () => { closeOtherTabs(tabId); renderTabList(); debouncedPersist() } },
-    { label: '关闭所有标签', action: () => { closeAllTabs(); renderTabList(); debouncedPersist(); removeTabBar(); state.isVisible = false }, danger: true }
+    { label: t('navigation.tabs.closeCurrent', undefined, '关闭此标签'), action: () => { removeTab(tabId); renderTabList(); debouncedPersist(); if (state.tabs.length === 0) { removeTabBar(); state.isVisible = false } } },
+    { label: t('navigation.tabs.closeOthers', undefined, '关闭其他标签'), action: () => { closeOtherTabs(tabId); renderTabList(); debouncedPersist() } },
+    { label: t('navigation.tabs.closeAll', undefined, '关闭所有标签'), action: () => { closeAllTabs(); renderTabList(); debouncedPersist(); removeTabBar(); state.isVisible = false }, danger: true }
   ]
 
   items.forEach(item => {
@@ -1551,7 +1553,7 @@ export async function init(context: MobileTabsContext): Promise<void> {
 
 export function toggleVisibility(config: ButtonConfig): void {
   if (!isMobileDevice()) {
-    showMessage('此功能仅支持手机端', 2000, 'info')
+    showMessage(t('navigation.common.mobileOnly', undefined, '此功能仅支持手机端'), 2000, 'info')
     return
   }
 
@@ -1574,11 +1576,11 @@ export function toggleVisibility(config: ButtonConfig): void {
         const notebookId = protyle.notebookId || ''
         if (docId) {
           const domTitle = getProtyleTitle()
-          addTab(docId, domTitle || '加载中...', notebookId, 0)
+          addTab(docId, domTitle || t('navigation.common.loading', undefined, '加载中...'), notebookId, 0)
           if (!domTitle) {
             getDocTitle(docId).then(title => {
               const tab = findTabByDocId(docId)
-              if (tab && title !== '未命名') {
+              if (tab && title !== t('navigation.common.untitled', undefined, '未命名')) {
                 tab.title = title
                 renderTabList()
                 debouncedPersist()
@@ -1654,7 +1656,7 @@ export function toggleVisibility(config: ButtonConfig): void {
     }
 
     if (config.showNotification !== false) {
-      showMessage('标签页已显示', 1500, 'info')
+      showMessage(t('navigation.tabs.shown', undefined, '标签页已显示'), 1500, 'info')
     }
   } else {
     // 隐藏前保存滚动位置
@@ -1687,7 +1689,7 @@ export function toggleVisibility(config: ButtonConfig): void {
     }
 
     if (config.showNotification !== false) {
-      showMessage('标签页已隐藏', 1500, 'info')
+      showMessage(t('navigation.tabs.hidden', undefined, '标签页已隐藏'), 1500, 'info')
     }
 
     // 关闭滚动隐藏状态

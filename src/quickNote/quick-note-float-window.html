@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>快速记事</title>
+  <title></title>
   <meta name="quick-note-float" content="toolbar-customizer" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -185,17 +185,17 @@
   <div id="app">
 	    <div class="qnote-panel">
 	      <div class="qnote-header">
-        <div class="qnote-title" id="title">⚡ 记事</div>
-        <button class="qnote-close" id="closeBtn" title="关闭">×</button>
+        <div class="qnote-title" id="title"></div>
+        <button class="qnote-close" id="closeBtn" title="" aria-label="">×</button>
       </div>
       <div class="qnote-body">
 	        <textarea id="input" placeholder=""></textarea>
-        <div class="qnote-hint"><kbd>Shift+Enter</kbd> 发送 · <kbd>Esc</kbd> 取消</div>
+        <div class="qnote-hint" id="hint"></div>
       </div>
       <div class="status" id="status"></div>
       <div class="qnote-actions">
-        <button class="action btn-cancel" id="cancelBtn">取消</button>
-        <button class="action btn-save" id="saveBtn">发送</button>
+        <button class="action btn-cancel" id="cancelBtn"></button>
+        <button class="action btn-save" id="saveBtn"></button>
       </div>
     </div>
   </div>
@@ -208,6 +208,8 @@
       const saveBtn = document.getElementById('saveBtn');
       const cancelBtn = document.getElementById('cancelBtn');
       const closeBtn = document.getElementById('closeBtn');
+      const hintEl = document.getElementById('hint');
+      let ui = {};
       let floatSelfWindow = null;
 
       try {
@@ -224,6 +226,16 @@
       window.__setQuickNoteFloatState = function(payload) {
         if (!payload) return;
         if (typeof payload.isDark === 'boolean') setTheme(payload.isDark);
+        if (payload.locale) document.documentElement.lang = payload.locale;
+        if (payload.ui) {
+          ui = payload.ui;
+          document.title = ui.documentTitle || '';
+          closeBtn.title = ui.close || '';
+          closeBtn.setAttribute('aria-label', ui.close || '');
+          cancelBtn.textContent = ui.cancel || '';
+          saveBtn.textContent = ui.send || '';
+          hintEl.innerHTML = ui.keyboardHint || '';
+        }
         if (payload.title) titleEl.textContent = payload.title;
         if (payload.placeholder) inputEl.placeholder = payload.placeholder;
         if (typeof payload.fontSize === 'number' && payload.fontSize > 0) {
@@ -280,13 +292,13 @@
       saveBtn.addEventListener('click', function() {
         const text = (inputEl.value || '').trim();
         if (!text) {
-          statusEl.textContent = '请输入内容';
+          statusEl.textContent = ui.emptyContent || '';
           statusEl.className = 'status err';
           inputEl.focus();
           return;
         }
         saveBtn.disabled = true;
-        statusEl.textContent = '发送中…';
+        statusEl.textContent = ui.sending || '';
         statusEl.className = 'status';
         sendToMain('save', { text: text });
         window.setTimeout(function() { saveBtn.disabled = false; }, 800);

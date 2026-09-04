@@ -2,6 +2,7 @@
  * 电脑端设置底部 — 一键记事统一配置区
  */
 
+import { t } from '../i18n/runtime'
 import { createDesktopQuickNoteFormatField } from './quickNoteFormatField'
 
 export const DESKTOP_QUICK_NOTE_SECTION_ID = 'desktop-quick-note-settings-section'
@@ -9,7 +10,7 @@ export const DESKTOP_QUICK_NOTE_SECTION_ID = 'desktop-quick-note-settings-sectio
 export function scrollToDesktopQuickNoteSettings(): void {
   const target = document.getElementById(DESKTOP_QUICK_NOTE_SECTION_ID)
   if (!target) {
-    alert('未找到【电脑端一键记事】配置区域，请切换到电脑端设置并滚动到底部')
+    alert(t("settings.desktopQuickNoteSettings.1", undefined, "未找到【电脑端一键记事】配置区域，请切换到电脑端设置并滚动到底部"))
     return
   }
   target.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -28,12 +29,12 @@ export function createDesktopQuickNoteButtonHint(): HTMLElement {
 
   const desc = document.createElement('div')
   desc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface-light); line-height: 1.6;'
-  desc.textContent = '本按钮用于触发一键记事。输入格式、保存目标、全局快捷键等请在电脑端设置底部统一配置。'
+  desc.textContent = t("settings.desktopQuickNoteSettings.2", undefined, "本按钮用于触发一键记事。输入格式、保存目标、全局快捷键等请在电脑端设置底部统一配置。")
   container.appendChild(desc)
 
   const link = document.createElement('a')
   link.href = '#'
-  link.textContent = '👉 点击跳转到【电脑端一键记事】配置'
+  link.textContent = t("settings.desktopQuickNoteSettings.3", undefined, "👉 点击跳转到【电脑端一键记事】配置")
   link.style.cssText = 'color: #3b82f6; text-decoration: underline; cursor: pointer; font-size: 13px;'
   link.onclick = (e) => {
     e.preventDefault()
@@ -129,15 +130,15 @@ function createSaveConfigSection(context: DesktopQuickNoteSettingsContext): HTML
   const section = document.createElement('div')
   section.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
-  section.appendChild(createSubTitle('①保存配置'))
-  section.appendChild(createHint('选择保存方式并填写对应的目标 ID'))
+  section.appendChild(createSubTitle(t("settings.desktopQuickNoteSettings.4", undefined, "①保存配置")))
+  section.appendChild(createHint(t("settings.desktopQuickNoteSettings.5", undefined, "选择保存方式并填写对应的目标 ID")))
 
   const radioContainer = document.createElement('div')
   radioContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
   const saveOptions = [
-    { value: 'daily', label: '📘 保存到笔记本日记', description: '内容保存到指定笔记本的当日日记' },
-    { value: 'document', label: '📄 追加到指定文档', description: '内容直接追加到指定文档底部或顶部' },
+    { value: 'daily', label: t("settings.desktopQuickNoteSettings.6", undefined, "📘 保存到笔记本日记"), description: t("settings.desktopQuickNoteSettings.7", undefined, "内容保存到指定笔记本的当日日记") },
+    { value: 'document', label: t("settings.desktopQuickNoteSettings.8", undefined, "📄 追加到指定文档"), description: t("settings.desktopQuickNoteSettings.9", undefined, "内容直接追加到指定文档底部或顶部") },
   ]
 
   const idLabel = document.createElement('label')
@@ -154,15 +155,15 @@ function createSaveConfigSection(context: DesktopQuickNoteSettingsContext): HTML
   const updateIdFields = () => {
     const saveType = (config.quickNoteSaveType as string) || 'daily'
     if (saveType === 'document') {
-      idLabel.textContent = '📄 目标文档 ID'
-      idInput.placeholder = '请输入文档 ID，如：20250101000000-aaaaaa'
+      idLabel.textContent = t("settings.desktopQuickNoteSettings.10", undefined, "📄 目标文档 ID")
+      idInput.placeholder = t("settings.desktopQuickNoteSettings.11", undefined, "请输入文档 ID，如：20250101000000-aaaaaa")
       idInput.value = (config.quickNoteDocumentId as string) || ''
-      idHint.textContent = '💡 内容将直接追加到该文档'
+      idHint.textContent = t("settings.desktopQuickNoteSettings.12", undefined, "💡 内容将直接追加到该文档")
     } else {
-      idLabel.textContent = '📘 目标笔记本 ID'
-      idInput.placeholder = '请粘贴 DailyNote 所在笔记本 ID'
+      idLabel.textContent = t("settings.desktopQuickNoteSettings.13", undefined, "📘 目标笔记本 ID")
+      idInput.placeholder = t("settings.desktopQuickNoteSettings.14", undefined, "请粘贴 DailyNote 所在笔记本 ID")
       idInput.value = (config.quickNoteNotebookId as string) || ''
-      idHint.textContent = '💡 内容将保存到该笔记本的当日日记'
+      idHint.textContent = t("settings.desktopQuickNoteSettings.15", undefined, "💡 内容将保存到该笔记本的当日日记")
     }
   }
 
@@ -204,15 +205,15 @@ function createInsertPositionSection(context: DesktopQuickNoteSettingsContext): 
   const section = document.createElement('div')
   section.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
-  section.appendChild(createSubTitle('②插入位置'))
-  section.appendChild(createHint('追加到文档时，选择插入到顶部或底部'))
+  section.appendChild(createSubTitle(t("settings.desktopQuickNoteSettings.16", undefined, "②插入位置")))
+  section.appendChild(createHint(t("settings.desktopQuickNoteSettings.17", undefined, "追加到文档时，选择插入到顶部或底部")))
 
   const radioContainer = document.createElement('div')
   radioContainer.style.cssText = 'display: flex; flex-direction: column; gap: 8px;'
 
   const options = [
-    { value: 'top', label: '⬆️ 插入到顶部', description: '新内容出现在文档最前面' },
-    { value: 'bottom', label: '⬇️ 插入到底部', description: '新内容追加在文档末尾' },
+    { value: 'top', label: t("settings.desktopQuickNoteSettings.18", undefined, "⬆️ 插入到顶部"), description: t("settings.desktopQuickNoteSettings.19", undefined, "新内容出现在文档最前面") },
+    { value: 'bottom', label: t("settings.desktopQuickNoteSettings.20", undefined, "⬇️ 插入到底部"), description: t("settings.desktopQuickNoteSettings.21", undefined, "新内容追加在文档末尾") },
   ]
 
   options.forEach((option) => {
@@ -254,16 +255,16 @@ export function createDesktopQuickNoteSettingsSection(
     border-bottom: 1px solid rgba(59, 130, 246, 0.25);
     text-align: center;
   `
-  title.textContent = '⚡ 电脑端一键记事'
+  title.textContent = t("settings.desktopQuickNoteSettings.22", undefined, "⚡ 电脑端一键记事")
   box.appendChild(title)
 
   const intro = document.createElement('div')
   intro.style.cssText =
     'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.55; padding: 8px 10px; background: rgba(255,255,255,0.45); border-radius: 6px;'
   intro.innerHTML =
-    '工具栏按钮与全局快捷键共用以下配置。<br>' +
-    '<strong>纯文本</strong> → 独立轻量悬浮窗（Alt+Shift+N，不唤起思源主界面）。<br>' +
-    '<strong>块格式</strong> → 思源原生独立编辑窗（完整 Protyle，可置顶；编辑内容自动写入日记/文档）。'
+    t("settings.desktopQuickNoteSettings.23", undefined, "工具栏按钮与全局快捷键共用以下配置。<br>") +
+    t("settings.desktopQuickNoteSettings.24", undefined, "<strong>纯文本</strong> → 独立轻量悬浮窗（Alt+Shift+N，不唤起思源主界面）。<br>") +
+    t("settings.desktopQuickNoteSettings.25", undefined, "<strong>块格式</strong> → 思源原生独立编辑窗（完整 Protyle，可置顶；编辑内容自动写入日记/文档）。")
   box.appendChild(intro)
 
   box.appendChild(createSaveConfigSection(context))
@@ -281,9 +282,9 @@ export function createDesktopQuickNoteSettingsSection(
 
   const desktopCfg = context.desktopFeatureConfig
 
-  box.appendChild(createSubTitle('④记事弹窗扩展工具栏'))
+  box.appendChild(createSubTitle(t("settings.desktopQuickNoteSettings.26", undefined, "④记事弹窗扩展工具栏")))
   const overflowHint = createHint(
-    '开关工具栏：控制弹窗内是否显示面包屑导航。',
+    t("settings.desktopQuickNoteSettings.27", undefined, "开关工具栏：控制弹窗内是否显示面包屑导航。"),
   )
   overflowHint.style.padding = '8px 10px'
   overflowHint.style.background = 'rgba(255,255,255,0.35)'
@@ -291,16 +292,16 @@ export function createDesktopQuickNoteSettingsSection(
   box.appendChild(overflowHint)
   box.appendChild(
     context.createSwitchItem(
-      '开关工具栏',
+      t("settings.desktopQuickNoteSettings.28", undefined, "开关工具栏"),
       desktopCfg.quickNoteToolbarVisible !== false,
       (v) => { desktopCfg.quickNoteToolbarVisible = v },
     ),
   )
 
   // 块格式弹窗自动清理时间
-  box.appendChild(createSubTitle('⑤块格式弹窗自动清理'))
+  box.appendChild(createSubTitle(t("settings.desktopQuickNoteSettings.29", undefined, "⑤块格式弹窗自动清理")))
   const cleanupHint = createHint(
-    '快捷键隐藏块格式弹窗后，等待 X 秒自动删除草稿块并销毁窗口。设为 0 则不自动清理（隐藏后一直保留）。内容在编辑时已通过 WebSocket 实时写入，不用担心丢失。',
+    t("settings.desktopQuickNoteSettings.30", undefined, "快捷键隐藏块格式弹窗后，等待 X 秒自动删除草稿块并销毁窗口。设为 0 则不自动清理（隐藏后一直保留）。内容在编辑时已通过 WebSocket 实时写入，不用担心丢失。"),
   )
   cleanupHint.style.padding = '8px 10px'
   cleanupHint.style.background = 'rgba(255,255,255,0.35)'
@@ -310,7 +311,7 @@ export function createDesktopQuickNoteSettingsSection(
   const cleanupRow = document.createElement('div')
   cleanupRow.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 4px 0;'
   const cleanupLabel = document.createElement('span')
-  cleanupLabel.textContent = '自动清理时间：'
+  cleanupLabel.textContent = t("settings.desktopQuickNoteSettings.31", undefined, "自动清理时间：")
   cleanupLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface);'
   const cleanupInput = document.createElement('input')
   cleanupInput.type = 'number'
@@ -319,7 +320,7 @@ export function createDesktopQuickNoteSettingsSection(
   cleanupInput.value = String(desktopCfg.quickNoteBlockAutoCleanup ?? 5)
   cleanupInput.style.cssText = 'width: 60px; padding: 4px 8px; border: 1px solid var(--b3-border-color); border-radius: 4px; font-size: 13px; text-align: center;'
   const cleanupUnit = document.createElement('span')
-  cleanupUnit.textContent = '秒（0 = 不自动清理）'
+  cleanupUnit.textContent = t("settings.desktopQuickNoteSettings.32", undefined, "秒（0 = 不自动清理）")
   cleanupUnit.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light);'
   cleanupInput.onchange = async () => {
     const v = Math.max(0, Math.min(120, parseInt(cleanupInput.value) || 5))
@@ -336,9 +337,9 @@ export function createDesktopQuickNoteSettingsSection(
   divider.style.cssText = 'height: 1px; background: rgba(59, 130, 246, 0.2); margin: 4px 0;'
   box.appendChild(divider)
 
-  box.appendChild(createSubTitle('⑥全局快捷键（独立悬浮窗）'))
+  box.appendChild(createSubTitle(t("settings.desktopQuickNoteSettings.33", undefined, "⑥全局快捷键（独立悬浮窗）")))
   const captureHint = createHint(
-    '默认 Alt+Shift+N，可在思源「设置 → 快捷键 → 插件」修改；再按一次关闭。思源需保持运行（可最小化到托盘）。',
+    t("settings.desktopQuickNoteSettings.34", undefined, "默认 Alt+Shift+N，可在思源「设置 → 快捷键 → 插件」修改；再按一次关闭。思源需保持运行（可最小化到托盘）。"),
   )
   captureHint.style.padding = '8px 10px'
   captureHint.style.background = 'rgba(255,255,255,0.35)'
@@ -347,7 +348,7 @@ export function createDesktopQuickNoteSettingsSection(
 
   box.appendChild(
     context.createSwitchItem(
-      '启用全局快捷键捕获',
+      t("settings.desktopQuickNoteSettings.35", undefined, "启用全局快捷键捕获"),
       desktopCfg.quickNoteGlobalCaptureEnabled !== false,
       (v) => { desktopCfg.quickNoteGlobalCaptureEnabled = v },
     ),

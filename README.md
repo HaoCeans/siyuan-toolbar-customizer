@@ -1,7 +1,7 @@
-> **📢 声明：本插件参考叶归的一键记事，深度针对手机端适配；电脑端一键记事，强烈推荐叶归，可快捷键全局调用，纵享丝滑！**
+> **📢 Notice: This plugin is based on Yegui's one-click note-taking and deeply optimized for mobile; for desktop one-click note-taking, Yegui is strongly recommended, with global hotkey invocation for a smooth experience!**
 
 <div style="display: flex; gap: 20px; align-items: center; justify-content: flex-start; margin: 1.5em 0;">
-  <!-- 按钮1：蓝色 -->
+  <!-- Button 1: Blue -->
   <a href="https://ld246.com/article/1773594214158"
       style="display: inline-flex;
               align-items: center;
@@ -15,9 +15,9 @@
               box-shadow: 0 4px 6px rgba(45,140,240,0.1);
               border: 1px solid rgba(45,140,240,0.2);
               font-size: 17px;">
-      📖 详细使用教程
+      📖 Detailed User Guide
   </a>
-  <!-- 按钮2：绿色 -->
+  <!-- Button 2: Green -->
   <a href="https://qm.qq.com/q/Tm94tR1ys8"
       style="display: inline-flex;
               align-items: center;
@@ -31,9 +31,9 @@
               box-shadow: 0 4px 6px rgba(25,190,107,0.1);
               border: 1px solid rgba(25,190,107,0.2);
               font-size: 17px;">
-      💬 加入用户交流群
+      💬 Join the User Community
   </a>
-  <!-- 按钮3：橙色/琥珀色 -->
+  <!-- Button 3: Orange/Amber -->
   <a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/issues"
       style="display: inline-flex;
               align-items: center;
@@ -47,9 +47,9 @@
               box-shadow: 0 4px 6px rgba(255,153,0,0.1);
               border: 1px solid rgba(255,153,0,0.2);
               font-size: 17px;">
-      💌 插件建议反馈
+      💌 Plugin Suggestions & Feedback
   </a>
-  <!-- 按钮4：激活码方案与权益 -->
+  <!-- Button 4: Activation Code Plans & Benefits -->
   <a href="https://ld246.com/article/1773594214158#-%E6%B0%B8%E4%B9%85%E6%BF%80%E6%B4%BB%E7%A0%81-%E9%99%90%E6%97%B6%E4%BC%98%E6%83%A0"
       style="display: inline-flex;
               align-items: center;
@@ -63,9 +63,9 @@
               box-shadow: 0 4px 6px rgba(225,29,72,0.1);
               border: 1px solid rgba(225,29,72,0.2);
               font-size: 17px;">
-      🐋 激活码方案与权益
+      🐋 Activation Code Plans & Benefits
   </a>
-  <!-- 按钮5：打赏支持 -->
+  <!-- Button 5: Donation Support -->
   <a href="https://ld246.com/article/1773594214158#--%E6%89%93%E8%B5%8F%E6%94%AF%E6%8C%81"
       style="display: inline-flex;
               align-items: center;
@@ -79,122 +79,122 @@
               box-shadow: 0 4px 6px rgba(124,58,237,0.1);
               border: 1px solid rgba(124,58,237,0.2);
               font-size: 17px;">
-      ❤️ 打赏支持
+      ❤️ Support via Donation
   </a>
 </div>
 
-# ✨ 核心功能亮点
+# ✨ Core Features
 
-#### ⚙️ 设置功能
+#### ⚙️ Settings
 
-- ➕ **自定义按钮**：在工具栏添加个性化快捷按钮
-- 📂 **自定义工具栏**：顶部/底部位置随心切换
-- 📱 **扩展工具栏**：手机端多层扩展，智能溢出检测，自动收纳多余按钮
-- ⚖️ **双端独立配置**：电脑端和手机端分别设置，互不干扰
-- 🎨 **精美图标选择**：本体图标、思源图标、阿里巴巴图标，三类共1000种以上
+- ➕ **Custom Buttons**: Add personalized shortcut buttons to the toolbar
+- 📂 **Custom Toolbar**: Freely switch between top and bottom positions
+- 📱 **Extended Toolbar**: Multi-level mobile extension, smart overflow detection, and automatic collection of excess buttons
+- ⚖️ **Independent Dual-Platform Configuration**: Configure desktop and mobile separately, without interference
+- 🎨 **Beautiful Icon Selection**: Built-in, SiYuan, and Alibaba icons, with over 1,000 in total
 
-#### 💡 按钮功能（6 种类型）
+#### 💡 Button Functions (6 Types)
 
-- ① **思源内置功能选择**：一键触发思源笔记原生功能，如设置、搜索、文件树等
-- ② **手写模板插入编辑器**：一键插入时间、日期等预设文本，支持变量替换
-- ③ **电脑端快捷键使用**：执行常用快捷键，如打开日记、全局搜索
-- ④ **自动化模拟点击**：模拟多步点击操作，实现复杂功能
-- ⑤ **一键记事弹窗**：应用切回前台自动弹出，或点击按钮快速记录想法
-- ⑥ **鲸鱼定制工具箱**：高级定制功能，需激活码解锁；其中⑮沉浸阅读模式为免费功能
+- ① **SiYuan Built-in Function Selection**: Trigger native SiYuan functions with one click, such as settings, search, and the file tree
+- ② **Handwritten Template Insertion into the Editor**: Insert preset text such as time and date with one click; variable replacement is supported
+- ③ **Desktop Shortcut Use**: Execute common keyboard shortcuts, such as opening the diary and global search
+- ④ **Automated Simulated Clicks**: Simulate multi-step click operations to implement complex functions
+- ⑤ **One-Click Note Popup**: Automatically show the popup when the app returns to the foreground, or click a button to quickly record an idea
+- ⑥ **Whale Custom Toolbox**: Advanced customization features requiring an activation code; ⑮ Immersive Reading Mode is free
 
-#### 🐋 鲸鱼定制工具箱（17 项功能）
+#### 🐋 Whale Custom Toolbox (17 Features)
 
-- ⓪ **一键记事弹窗块格式**：弹窗内思源富文本编辑器，支持多段落、列表等（需激活码）
-- ① **连续点击按钮**：按名称遍历并自动点击多个自定义按钮，支持配置间隔时间
-- ② **打开指定 ID 块**：快速打开指定文档或块
-- ③ **数据库悬浮弹窗**：数据库内容悬浮展示，支持手机端
-- ④ **日记底部**：一键跳转日记底部，支持配置等待时间
-- ⑤ **叶归 LifeLog 适配**：深度适配叶归 LifeLog 插件
-- ⑥ **弹窗框模板选择**：弹窗内多模板快速选择，适配输入法避让
-- ⑦ **滚动文档顶部或底部**：一键跳转文档首尾
-- ⑧ **图片快捷导入**：一键选择图片导入笔记。开启块编辑模式可插入记事弹窗光标处
-- ⑨ **悬浮标签页Tab**：多文档快速切换，悬浮Tab栏自动管理
-- ⑩ **悬浮大纲**：左侧悬浮大纲面板，标题快速跳转
-- ⑪ **前一篇/后一篇文档**：底部悬浮导航栏，按文件树顺序浏览文档
-- ⑫ **滑动快速批注**：配合「鲸鱼快速批注」插件，手指滑动即可标注文字（已激活用户可一键下载）
-- ⑬ **文档朗读**：使用浏览器语音朗读文档，支持语速调节、段落高亮
-- ⑭ **一键清理空块**：自动扫描并删除当前文档中的空段落/标题/列表项
-- ⑮ **沉浸阅读模式（免费）**：🔒锁文档防误编辑 + 上滑自动隐藏工具栏
-- ⑯ **快速添加附件**：任意文件上传，可改名字，图片可压缩。⚠️记事弹窗中不生效
+- ⓪ **One-Click Note Popup Block Format**: A SiYuan rich-text editor in the popup, supporting multiple paragraphs, lists, and more (activation code required)
+- ① **Continuously Click Buttons**: Traverse and automatically click multiple custom buttons by name; supports a configurable interval
+- ② **Open a Specified ID Block**: Quickly open a specified document or block
+- ③ **Floating Database Popup**: Display database content in a floating view; mobile is supported
+- ④ **Diary Bottom**: Jump to the bottom of the diary with one click; supports a configurable wait time
+- ⑤ **Yegui LifeLog Adaptation**: Deep integration with the Yegui LifeLog plugin
+- ⑥ **Popup Template Selection**: Quickly select from multiple templates in the popup, with IME-aware positioning
+- ⑦ **Scroll to the Top or Bottom of a Document**: Jump to either end of a document with one click
+- ⑧ **Quick Image Import**: Select an image and import it into a note with one click. In block-editing mode, it can be inserted at the cursor in the note popup
+- ⑨ **Floating Tabs**: Quickly switch between documents; the floating tab bar is managed automatically
+- ⑩ **Floating Outline**: A floating outline panel on the left for quickly jumping to headings
+- ⑪ **Previous/Next Document**: Browse documents in file-tree order with a floating navigation bar at the bottom
+- ⑫ **Swipe Quick Annotation**: Annotate text with a finger swipe using the 「WhaleQuickannotation」 plugin (activated users can download it with one click)
+- ⑬ **Read Documents Aloud**: Use browser speech to read documents aloud; supports speed adjustment and paragraph highlighting
+- ⑭ **One-Click Empty Block Cleanup**: Automatically scan and delete empty paragraphs, headings, and list items in the current document
+- ⑮ **Immersive Reading Mode (Free)**: 🔒 Lock the document to prevent accidental edits and automatically hide the toolbar when swiping up
+- ⑯ **Quick Add Attachments**: Upload any file, rename it, and optionally compress images. ⚠️ Not effective in the note popup
 
 <details>
   <summary style="font-size: 26px; font-weight: 600; padding: 4px 0; cursor: pointer; color: #ff6b35;">
-    💰 激活码获取方式（限时优惠中）
+    💰 How to Get an Activation Code (Limited-Time Discounts)
   </summary>
 
-> **① 永久正价：45 元**
-> - 鲸鱼定制工具箱永久激活码（电脑+手机）
-> - 解锁全部 15 项付费功能
+> **① Permanent regular price: 45 yuan**
+> - Permanent Whale Custom Toolbox activation code (desktop + mobile)
+> - Unlocks all 15 paid features
 >
-> **② 普通优惠：36 元（8 折，限量 10 个，送完即止）🔥推荐**
-> - 鲸鱼定制工具箱永久激活码（电脑+手机）
-> - 限时 8 折优惠
+> **② Standard discount: 36 yuan (20% off, limited to 10, while supplies last) 🔥Recommended**
+> - Permanent Whale Custom Toolbox activation code (desktop + mobile)
+> - limited-time 8 off discount
 >
-> **③ 学生优惠：22.5 元（5 折）**
-> - 鲸鱼定制工具箱永久激活码（电脑+手机）
-> - 需提供可证明在读学生身份的信息
+> **③ Student discount: 22.5 yuan (50% off)**
+> - Permanent Whale Custom Toolbox activation code (desktop + mobile)
+> - Requires information proving current student status
 >
-> **④ 定制开发：100 元起**
-> - 专属功能定制，仅自己可见或纳入工具箱
-> - 作者评估实现
+> **④ Custom development: from 100 yuan**
+> - Custom features exclusively for you or included in the toolbox
+> - implementation assessed by the author
 
-进群咨询/获取：**QQ群 1018010924**
+Consult/join to obtain: **QQ Group 1018010924**
 
 </details>
 
 ---
 
-# 🔗 常用链接
+# 🔗 Common Links
 
-| 链接 | 说明 |
+| Link | Description |
 |------|------|
-| [V3.7.1 工具栏预览 + 底部悬浮工具栏 + Lucide 极简图标](https://ld246.com/article/1773594214158) | 工具栏所见即所得预览 / 底部悬浮工具栏模式 / Lucide极简图标（1908个） / 弹窗独立窗口 / 多项修复与优化 |
-| [V3.7.0 图片导入重构 + 附件管理 + 工具箱分类](https://ld246.com/article/1773594214158) | 图片导入重构：块模式插入 + 物理锚点 + execCommand / 新增附件管理 / 工具箱分类展示 / LifeLog多窗口适配 |
-| [V3.3.3 手机端：图片快速插入 - 悬浮大纲 - 悬浮 tab - 前后文档](https://ld246.com/article/1777382296918) | 手机端悬浮功能介绍 |
-| [V3.3.0《思源手机端增强》：移动端一键记事方案](https://ld246.com/article/1772466276457) | 一键记事弹窗 |
-| [V3.0.0《手机端强化插件》扩展工具栏](https://ld246.com/article/1769539683129) | 功能介绍 |
-| [V2.0.0《思源手机端增强》简化重构：小白易用](https://ld246.com/article/1768938149464) | 重构思路 / 新手向说明 |
-| [V1.0.0《思源手机端增强插件》手机端自动化！简化操作](https://ld246.com/article/1768670747491) | 开发心得+教学视频+更新说明图 |
-| [README_BUILTIN_IDS.md](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md) | 思源常用功能ID 速查表 |
-| [README_CLICK_SEQUENCE.md](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md) | 模拟点击序列使用说明 |
+| [V3.7.1 toolbar preview + bottom floating toolbar + minimalist Lucide icons](https://ld246.com/article/1773594214158) | WYSIWYG toolbar preview / bottom floating toolbar mode / minimalist Lucide icons (1,908) / standalone popup window / multiple fixes and optimizations |
+| [V3.7.0 image import refactor + attachment management + toolbox categories](https://ld246.com/article/1773594214158) | Image import refactor: block-mode insertion + physical anchor + execCommand / new attachment management / toolbox category display / LifeLog multi-window adaptation |
+| [V3.3.3 mobile: quick image insertion - floating outline - floating tabs - previous/next document](https://ld246.com/article/1777382296918) | Introduction to mobile floating features |
+| [V3.3.0 “SiYuan Mobile Enhancement”: mobile one-click note-taking solution](https://ld246.com/article/1772466276457) | One-Click Note Popup |
+| [V3.0.0 “Mobile Enhancement Plugin” Extended Toolbar](https://ld246.com/article/1769539683129) | Feature introduction |
+| [V2.0.0 “SiYuan Mobile Enhancement” simplified refactor: easy for beginners](https://ld246.com/article/1768938149464) | Refactoring approach / beginner-oriented description |
+| [V1.0.0 “SiYuan Mobile Enhancement Plugin” mobile automation and simplified operation](https://ld246.com/article/1768670747491) | Development notes + tutorial video + update description images |
+| [README_BUILTIN_IDS.md](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_BUILTIN_IDS.md) | Quick reference for common SiYuan function IDs |
+| [README_CLICK_SEQUENCE.md](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/README_CLICK_SEQUENCE.md) | Usage description for simulated click sequences |
 
 ---
 
 <details>
   <summary style="font-size: 24px; font-weight: 600; padding: 6px 0; cursor: pointer;">
-    🧩 功能特性
+    🧩 Features
   </summary>
-
-### 电脑端
-| 功能 | 说明 |
+### Desktop
+| Feature | Description |
+| function | Description |
 |------|------|
-| **自定义按钮** | 在顶部工具栏添加快捷按钮 |
-| **5种功能类型** | 思源内置、模板插入、快捷键、点击序列、鲸鱼定制工具 |
-| **图标自定义** | 支持思源图标、Lucide 图标、Emoji |
-| **按钮样式** | 可调图标大小、宽度、边距 |
-
-### 手机端
-| 功能 | 说明 |
+| **Custom Buttons** | Add shortcut buttons to the top toolbar |
+| **5 Function Types** | SiYuan built-in, template insertion, shortcuts, click sequences, and Whale custom tools |
+| **iconscustom** | SupportsSiYuan icons、Lucide icons、Emoji |
+| **Button Style** | Adjust icon size, width, and margins |
+### Mobile
+| Feature | Description |
+| function | Description |
 |------|------|
-| **扩展工具栏** | 支持多层扩展，智能溢出检测，自动收纳多余按钮 |
-| **工具栏置底** | 固定在屏幕底部，方便单手操作 |
-| **一键记事** | 应用切回前台自动弹出，或点击按钮快速记录 |
-| **输入法适配** | 键盘弹出时自动上移 |
-| **外观定制** | 背景颜色、透明度可调 |
-| **独立配置** | 与电脑端分别设置 |
+| **Extended Toolbar** | Supportsmulti-levelextended，smartoverflow detection，Automaticallycollect excessbutton |
+| **Bottom Toolbar** | Fixed at the bottom of the screen for convenient one-handed operation |
+| **One-Click Note-Taking** | Automatically opens when the app returns to the foreground, or opens on button click for quick recording |
+| **IME Adaptation** | Automatically moves up when the keyboard opens |
+| **appearance customization** | backgroundcolor、opacityadjustable |
+| **Independent Configuration** | Configured separately from desktop |
 
-### 通用
-| 功能 | 说明 |
+### General
+| Feature | Description |
 |------|------|
-| **隐藏内置按钮** | 隐藏不常用的思源原生按钮 |
-| **按钮拖拽排序** | 长按拖动调整顺序 |
-| **按钮开关** | 可临时禁用某个按钮 |
-| **双端独立配置** | 电脑端和手机端互不影响 |
+| **Hide Built-in Buttons** | Hide infrequently used native SiYuan buttons |
+| **Button Drag-and-Drop Sorting** | Long-press and drag to adjust the order |
+| **Button Toggle** | Temporarily disable a button |
+| **Independent Dual-Platform Configuration** | Desktop and mobile settings do not affect each other |
 
 </details>
 
@@ -202,27 +202,27 @@
 
 <details>
   <summary style="font-size: 24px; font-weight: 600; padding: 6px 0; cursor: pointer;">
-    📖 使用指南
+    📖 User Guide
   </summary>
 
-### 一、添加自定义按钮
+### I. Add Custom Buttons
 
-**路径**：设置 → 插件 → 思源手机端增强
+**Path**: Settings → Plugins → SiYuan Mobile Enhancement
 
-| 设置项 | 说明 |
+| Setting | Description |
 |--------|------|
-| **电脑端配置** | 电脑端工具栏按钮 |
-| **手机端配置** | 手机端工具栏按钮 |
+| **desktopconfiguration** | desktoptoolbarbutton |
+| **mobileconfiguration** | mobiletoolbarbutton |
 
-点击「添加新按钮」，可选择 6 种功能类型：
+Click “Add New Button” to choose from 6 function types:
 
-#### ① 思源内置功能【简单】
-点击「选择」按钮，从列表中选择思源内置功能（如设置、搜索、文件树等）
+#### ① SiYuan Built-in Functions [Easy]
+Click the “Select” button and choose a SiYuan built-in function from the list (such as settings, search, or file tree)
 
-#### ② 手写模板插入【简单】
-插入预设文本，支持变量：
+#### ② Handwritten Template Insertion [Easy]
+Insert preset text; variables are supported:
 
-| 变量 | 输出示例 |
+| Variable | Output Example |
 |------|----------|
 | `{{date}}` | 2026-01-21 |
 | `{{time}}` | 14:30:45 |
@@ -233,103 +233,104 @@
 | `{{timestamp}}` | 1786789000000 (Unix ms timestamp) |
 | `{{newline}}` | Line break (cleaner multi-line templates) |
 
-**Example**: `{{year}}年{{month}}月{{day}}日 {{hour}}:{{minute}}` → `2026年01月21日 14:30`
+**Example**: `{{year}}year{{month}}month{{day}}day {{hour}}:{{minute}}` → `2026year01month21day 14:30`
 **Example**: `first line{{newline}}second line` → inserts two lines (in block format, splits into two blocks)
 
-#### ③ 电脑端快捷键【简单】
-模拟键盘快捷键，如 `Alt+5`（打开日记）、`Ctrl+P`（全局搜索）
+#### ③ Desktop Shortcuts [Easy]
+Simulate keyboard shortcuts, such as `Alt+5` (open diary) and `Ctrl+P` (global search)
 
-#### ④ 自动化模拟点击【难】
-按顺序自动点击多个元素，实现复杂操作
+#### ④ Automated Simulated Clicks [Difficult]
+Automatically click multiple elements in sequence to implement complex operations
 
-**常用预设**（点击「选择」按钮快速填入）：
-- **电脑端**：
-  - 打开插件设置：`barPlugins → text:思源手机端增强`
-  - 打开伺服浏览器：`barWorkspace → config → → text:关于 → text:打开浏览器`
-- **手机端**：
-  - 打开插件设置：`toolbarMore → menuPlugin → text:思源手机端增强`
-  - 打开伺服浏览器：`toolbarMore → menuAbout`
+**Common Presets** (click the “Select” button to fill in quickly):
+- **Desktop**:
+  - Open plugin settings: `barPlugins → text:zh-CN=思源手机端增强|en=SiYuan Mobile Enhancer`
+  - Open the serving browser: `barWorkspace → config → text:zh-CN=鉴权|en=Authentication → text:zh-CN=打开浏览器|en=Open browser`
+- **Mobile**:
+  - Immediate sync: `toolbarMore → text:zh-CN=立即同步|en=Sync now`
+  - Open plugin settings: `toolbarMore → text:zh-CN=插件|en=Plugin → text:zh-CN=思源手机端增强|en=SiYuan Mobile Enhancer`
 
-**选择器语法**：
-- 简单 ID：`barSettings`
-- CSS 选择器：`#barSettings`
-- 文本匹配：`text:复制块引用`
+**Selector Syntax**:
+- Easy ID: `barSettings`
+- CSS selector: `#barSettings`
+- Text matching: `text:复制块引用` (legacy format, still supported)
+- Bilingual text matching: `text:zh-CN=中文文本|en=English text`
 
-#### ⑤ 一键记事【简单】
-快速记录想法，支持保存到当日日记或指定文档。详见「三、一键记事」章节。
+#### ⑤ One-Click Note-Taking [Easy]
+Quickly record ideas, with support for saving to today’s diary or a specified document. See “III. One-Click Note-Taking”.
 
-#### ⑥ 鲸鱼定制工具箱【难】
-高级定制功能，需激活码解锁。包含：
-- 打开指定ID块
-- 数据库悬浮弹窗
-- 日记底部
-- 叶归LifeLog适配
-- 连续点击自定义按钮
-- 弹窗框模板选择
-- 滚动文档顶部或底部
+#### ⑥ Whale Custom Toolbox [Difficult]
+Advanced customization requiring an activation code. Includes:
+- Open a specified ID block
+- floating databasepopup
+- diarybottom
+- YeguiLifeLogadaptation
+- Continuously click custom buttons
+- Popup template selection
+- Scroll to the top or bottom of a document
 
-### 二、移动端工具栏设置
+### II. Mobile Toolbar Settings
 
-将工具栏固定到屏幕底部，方便单手操作。
+Fix the toolbar to the bottom of the screen for convenient one-handed operation.
 
-| 设置项 | 说明 |
+| Setting | Description |
 |--------|------|
-| **工具栏置底** | 开启后工具栏固定在底部 |
-| **工具栏背景颜色** | 设置背景色（仅置底时可用） |
-| **工具栏透明度** | 调整透明度 0–100%（仅置底时可用） |
-| **输入法偏移** | 键盘打开时工具栏上移距离（如 `300px`） |
-| **隐藏思源内置按钮** | 隐藏只读模式按钮、隐藏文档按钮|
+| **Bottom Toolbar** | Enable to fix the toolbar at the bottom |
+| **Toolbar Background Color** | Set the background color (available only when bottom-fixed) |
+| **toolbaropacity** | Adjustopacity 0–100%（available only when bottom-fixed） |
+| **IME Offset** | Distance the toolbar moves up when the keyboard opens (such as `300px`) |
+| **Hide SiYuan Built-in Buttons** | Hide the read-only mode and document buttons |
 
-### 三、一键记事
+### III. One-Click Note-Taking
 
-快速记录想法，支持自动触发和手动触发两种方式。
+Quickly record ideas, supporting both automatic and manual triggering.
 
-#### 1. 自启动一键记事
+#### 1. Auto-Start One-Click Note-Taking
 
-应用从后台切回前台时，自动弹出记事弹窗。
+Automatically show the note popup when the app returns to the foreground from the background.
 
-| 设置项 | 说明 |
+| Setting | Description |
 |--------|------|
-| **触发模式** | ①关闭 ②仅小窗模式 ③小窗+全屏模式 |
-| **保存方式** | 保存到当日日记，或追加到指定文档 |
-| **笔记本/文档** | 选择目标笔记本或填写文档ID |
-| **输入框字体** | 调节字体大小（12-30px） |
-| **按钮排序** | 按顶部工具栏或底部工具栏顺序展示 |
-| **按钮高度** | 调节弹窗内按钮高度（24-66px） |
-| **初次配置导航提示** | 开启后弹窗内显示配置引导（仅手机端） |
+| **Trigger mode** | ① Disabled ② Small-window mode only ③ Small-window + full-screen modes |
+| **Save method** | Save to today’s diary or append to a specified document |
+| **Notebook/document** | Select a target notebook or enter a document ID |
+| **Input font** | adjust font size（12-30px） |
+| **Button sorting** | Display in top-toolbar or bottom-toolbar order |
+| **Button height** | Adjust popup button height (24–66px) |
+| **First-Time Setup Navigation Hint** | Show setup guidance in the popup when enabled (mobile only) |
 
-**智能关闭**：应用切到后台时，弹窗自动关闭，未保存内容不会丢失，下次打开时自动恢复。
+**Smart Close**: When the app goes into the background, the popup closes automatically; unsaved content is not lost and is automatically restored next time.
 
-**📝 初次配置导航提示**：
-- 首次使用时，弹窗内会显示便利贴式的配置引导
-- 淡黄色背景，包含详细的配置步骤说明
-- 配置完成后，可在「4️⃣一键记事弹窗」设置中关闭此提示，恢复简洁界面
+**📝 First-Time Setup Navigation Hint**:
+- During first use, a sticky-note-style setup guide appears in the popup
+- It has a pale-yellow background and detailed setup instructions
+- After setup, turn off this hint in the “4️⃣ One-Click Note Popup” settings to restore the clean interface
 
-#### 2. 按钮一键记事
+#### 2. Button One-Click Note-Taking
 
-在工具栏添加「一键记事」按钮，点击后手动触发。
+Add a “One-Click Note-Taking” button to the toolbar and click it to trigger manually.
 
-**添加方式**：
-1. 进入「手机端配置」→「添加新按钮」
-2. 功能类型选择「⑤一键记事」
-3. 配置保存方式和目标位置（可独立配置，不与自启动共享）
+**How to add it**:
+1. Go to 「mobile configuration」 → 「Add New Button」
+2. Select 「⑤ One-Click Note-Taking」 as the function type
+3. Configure the save method and target location (independently configurable and not shared with auto-start)
 
-### 四、常见问题
+### IV. FAQ
 
-**Q: 按钮没有显示？**
-A: 刷新页面或重启思源笔记
+**Q: The button is not displayed?**
+A: Refresh the page or restart SiYuan Note
 
-**Q: 点击序列不工作？**
-A: 检查选择器是否正确，尝试使用 `text:xxx` 文本匹配
+**Q: The click sequence does not work?**
+A: Check whether the selectors are correct; try text matching with `text:xxx`
 
-**Q: 手机端工具栏遮挡输入框？**
-A: 调整「输入法偏移」数值
+**Q: Does the mobile toolbar cover the input box?**
+A: Adjust the “IME Offset” value
 
-**Q: 如何关闭一键记事弹窗内的配置引导？**
-A: 进入「4️⃣一键记事弹窗」设置，关闭「💡 初次配置导航提示」开关即可
+**Q: How do I close the setup guide in the one-click note popup?**
+A: Open the “4️⃣ One-Click Note Popup” settings and turn off the “💡 First-Time Setup Navigation Hint” toggle
 
-**Q: 配置引导提示如何重新显示？**
-A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配置导航提示」开关
+**Q: How do I show the setup guide again?**
+A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4️⃣ One-Click Note Popup” settings
 
 </details>
 
@@ -568,46 +569,46 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 
 - ⑧ "Quick Image Import to Diary" renamed to "Quick Image Import"
 
-### v3.7.7 — 修了个误伤 🐛
+### v3.7.7 — Fixed an accidental regression 🐛
 
-> 💡 **如果你用「⑤自动化模拟点击」功能，建议升——v3.7.6 修 more/doc 的时候不小心连你也修了。**
+> 💡 **If you use the 「⑤Automated Simulated Click」 feature, upgrading is recommended—while fixing more/doc in v3.7.6, we accidentally fixed you too.**
 
-#### 🐛 修了啥
+#### 🐛 What was fixed
 
-**1. 模拟点击的 barPlugins 这些全局按钮点不了了**
-- 上回修 more/doc 的时候加了一段逻辑，本意是切文档时别找错按钮
-- 但这逻辑管得太宽，把 `barPlugins`、`text:思源手机端增强` 这些不在编辑器里的按钮也给拦住了
-- 现在改成白名单：**只有 `more` 和 `doc` 走新逻辑**，其他的爱点谁点谁
+**1. The global `barPlugins` buttons used by simulated clicks could no longer be clicked**
+- When fixing more/doc last time, logic was added so that switching documents would not find the wrong button
+- But the logic was too broad and also blocked buttons such as `barPlugins` and `text:思源手机端增强`, which are outside the editor
+- It now uses a whitelist: **only `more` and `doc` use the new logic**; everything else can click whatever it needs
 
-#### ⚡ 顺手优化的
+#### ⚡ Also optimized
 
-- **插件设置弹窗**：之前 50ms 轮询查一次 hash，太勤快了，改成 200ms，CPU 省了四分之三
-- **桌面端胶囊**：标签页切换轮询降到 3 秒一次，90 秒后自动收工，不空转
-- **滚动隐藏**：状态切换时少查几次 DOM，省点电
+- **Plugin settings dialog**: previously polled the hash every 50ms, which was too frequent; changed to 200ms, saving three quarters of the CPU usage
+- **Desktop capsule**: tab-switch polling reduced to once every 3 seconds, automatically stops after 90 seconds instead of spinning pointlessly
+- **Scroll hiding**: performs fewer DOM lookups during state changes to save power
 
-### v3.7.6 — 修复隐藏按钮后菜单跑偏 🎯
+### v3.7.6 — Fixed menus drifting after hiding buttons 🎯
 
-> 💡 **如果你开了「更多按钮隐藏」或「文档菜单按钮隐藏」，建议升。**
+> 💡 **If you have 「Hide More Buttons」 or 「Hide Document Menu Button」 enabled, upgrading is recommended.**
 
-#### 🐛 修了啥
+#### 🐛 What was fixed
 
-**1. 点了「更多」菜单却歪到一边去了**
-- 隐藏按钮其实是把按钮缩成看不见（但按钮本身还占着位置）
-- 默认的「更多」「打开菜单」按钮会去点那个被藏起来的按钮来弹出菜单
-- 但按钮都缩没了，思源算菜单位置的时候算错了，菜单就往左偏了
-- **修复**：点之前临时把按钮恢复原样，让思源算对位置，点完再藏回去
+**1. The 「More」 menu drifted to one side when clicked**
+- Hiding a button actually shrinks it until it is invisible (but the button itself still occupies space)
+- The default 「More」 and 「Open Menu」 buttons click the hidden button to open its menu
+- Once the button was shrunk away, SiYuan calculated the menu position incorrectly, so the menu shifted left
+- **Fix**: temporarily restore the button before clicking so SiYuan calculates the position correctly, then hide it again afterward
 
-**2. 底部胶囊模式下菜单跑到了右下角**
-- 底部胶囊为了让工具栏居中用了一些 CSS 偏移技巧
-- 但这个技巧有个副作用：被它包在里面的元素位置会算错
-- 之前想用别的办法去挪按钮位置，结果越挪越偏
-- **修复**：不去挪它，只恢复按钮大小——按钮本来就在工具栏里位置是对的
+**2. Menus appeared in the bottom-right corner in bottom capsule mode**
+- The bottom capsule uses some CSS offset techniques to center the toolbar
+- But this technique has a side effect: the positions of elements inside it are calculated incorrectly
+- An earlier attempt to move the buttons another way only made the drift worse
+- **Fix**: do not move it; only restore the button size—the button was already in the correct position inside the toolbar
 
-**3. 一切换文档菜单就跑到了左上角**
-- 切文档的时候旧编辑器只是隐藏了，没删掉
-- 查找按钮的时候可能先找到那个被隐藏的旧编辑器里的按钮
-- 被隐藏的按钮位置是 (0,0)，菜单就在左上角弹出来
-- **修复**：找到按钮后先确认它和点下去的按钮在同一个编辑器里，不是的话去对的地方重新找
+**3. Menus appeared in the top-left corner whenever switching documents**
+- When switching documents, the old editor was only hidden rather than removed
+- Button lookup could find the button in that hidden old editor first
+- A hidden button's position is (0,0), so the menu opened in the top-left corner
+- **Fix**: after finding a button, first confirm that it is in the same editor as the button being clicked; otherwise, look again in the correct place
 
 
 ### v3.7.5 — A few annoying bugs squashed 🐛
@@ -639,930 +640,931 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 - Overflow toolbar's click listener could leak if plugin was unloaded while it was open (close all overflow toolbars before cleanup)
 
 
-### v3.7.4 — 新增免费试用 + 月卡 30 天 + 过期拦截，授权体系大升级 🐋
+### v3.7.4 — Added a 3-day free trial + 30-day monthly plan + expiry blocking: major authorization upgrade 🐋
 
-> 💡 **这次更新改了很多底层的逻辑，如果遇到啥奇怪问题先重装一下试试。**
+> 💡 **This update changes a lot of underlying logic. If you encounter anything strange, try reinstalling first.**
 
-## ✨ 新增
+## ✨ New
 
-**1. 免费试用 3 天 🔥**
-- 输入激活码 `WHALE-FREE-TRIAL-6688` 就能免费用 3 天全部付费功能
-- 每台设备只能用一次（存在浏览器本地，清了缓存就没了……但咱也不说太细对吧）
-- 到期后有 5 天宽限，过了真要续费才能继续用
+**1. 3-day free trial 🔥**
+- Enter activation code `WHALE-FREE-TRIAL-6688` to use all paid features free for 3 days
+- Each device can use it only once (stored in the browser locally; clearing the cache removes it… but we won't go into too much detail, right?)
+- After expiry there is a 5-day grace period; after that, renewal is required to continue using it
 
-**2. 月卡 30 天（12 元）**
-- 不想一次性买断永久？来个月卡先爽 30 天
-- 一样是绑定思源账号的 Ed25519 激活码，安全性和永久码一样
-- 快到期前 3 天每次点按钮会提醒你续费
+**2. 30-day monthly plan (12 yuan)**
+- Don't want to buy a permanent license all at once? Try a monthly plan for 30 days
+- It also uses an Ed25519 activation code bound to the SiYuan account, with the same security as a permanent code
+- For the 3 days before expiry, each button click reminds you to renew
 
-**3. 过期自动拦截 + 弹窗引导 🔒**
-- 以前激活码过期了按钮照样能用（捂脸），现在不行了——过期了点击按钮会弹提示
-- 提示完不再自动跳转（之前跳了发现跳不过去），改用手动：去「插件设置 → 激活与权益」续费
+**3. Automatic expiry blocking + dialog guidance 🔒**
+- Previously, buttons still worked after an activation code expired (facepalm); now they do not—clicking a button after expiry shows a notice
+- After the notice it no longer redirects automatically (the previous redirect turned out not to work); instead, go manually to 「Plugin Settings → Activation & Benefits」 to renew
 
-**4. 激活状态动态显示**
-- 以前就俩字「已激活 / 未激活」，现在能看到具体信息了：
-  - ⏳ 试用中（剩 2 天）
-  - 📅 月卡（剩 15 天）  
-  - ✓ 永久激活
-  - ❌ 试用已过期
-- 手机端状态文字单独一行，不和按钮挤一起了
+**4. Dynamic activation status**
+- Previously it only showed 「Activated / Not activated」; now you can see specific information:
+  - ⏳ Trial active (2 days remaining)
+  - 📅 Monthly plan (15 days remaining)
+  - ✓ Permanently activated
+  - ❌ Trial expired
+- On mobile, the status text is on its own line instead of being squeezed next to the button
 
-## ✨ 优化
+## ✨ Optimizations
 
-**5. gen-code.mjs 支持生成月卡码**
-- 新增 `--plan M30` 参数，生成月卡 30 天激活码
-- 交互式菜单也能选套餐了（1.月卡 2.永久）
+**5. gen-code.mjs supports generating monthly codes**
+- Added the `--plan M30` parameter to generate 30-day monthly activation codes
+- The interactive menu can also select a plan (1. Monthly 2. Permanent)
 
-**6. 老用户自动迁移**
-- 以前已经激活永久码的老哥，升级后自动转为永久授权，啥也不用做
+**6. Automatic migration for existing users**
+- Users who had already activated a permanent code are automatically converted to a permanent license after upgrading; nothing else is required
 
-**7. 清除激活更彻底**
-- 以前清除激活只清了几个字段，试用标记和月卡信息没清干净，现在一把全清
+**7. More thorough activation clearing**
+- Previously, clearing activation only removed a few fields, leaving trial flags and monthly-plan information behind; now everything is cleared at once
 
-## 🐛 修复
+## 🐛 Fixes
 
-**8. 修复清除激活没清干净的问题**
-- licensePlan / licenseExpiry / licenseGraceEnd 这三个新增字段之前没清，现在一起清
-- localStorage 里的试用标记也清掉了
+**8. Fixed incomplete activation clearing**
+- The three newly added fields `licensePlan` / `licenseExpiry` / `licenseGraceEnd` were not previously cleared; they are cleared together now
+- The trial flag in localStorage is also removed
 
 
-### v3.7.3 — 桌面端悬浮胶囊多项修复
+### v3.7.3 — Several desktop floating capsule fixes
 
-> 💡 **主要修了桌面端悬浮胶囊的一些小毛病，用胶囊的建议升。**
+> 💡 **This mainly fixes minor issues with the desktop floating capsule; capsule users should upgrade.**
 
-## 🐛 修复
+## 🐛 Fixes
 
-**1. 滚动隐藏失效**
-- 胶囊的滚动隐藏绑定没同步到滚动容器，导致上滑不隐藏，重构了绑定逻辑
+**1. Scroll hiding did not work**
+- The capsule's scroll-hide binding was not synchronized with the scroll container, so it did not hide when scrolling upward; the binding logic was refactored
 
-**2. 空胶囊闪烁**
-- 刚打开文档时胶囊会闪一下，改成在 `data-input-method` 打上后立即注入按钮
+**2. Empty capsule flickered**
+- The capsule flashed briefly when opening a document; buttons are now injected immediately after `data-input-method` is set
 
-**3. 胶囊按钮从右往左滑**
-- 电脑端胶囊的 CSS transition 把 `transform` 也过渡了，导致 `translateX(-50%)` 居中定位抽搐
-- 修复：只保留 opacity 过渡，定位瞬间到位
+**3. Capsule buttons slid from right to left**
+- The desktop capsule's CSS transition also animated `transform`, causing the centering position `translateX(-50%)` to jitter
+- Fix: keep only the opacity transition so positioning takes effect instantly
 
-**4. 记事弹窗中隐藏胶囊**
-- 在「桌面④悬浮胶囊配置」里加了个开关：「记事弹窗中隐藏底部胶囊」
-- 打开后在块格式和纯文本弹窗里胶囊自动隐藏，不然弹窗和胶囊叠一起看着难受
+**4. Hide capsule in the quick note popup**
+- Added a switch 「Hide bottom capsule in quick note popup」 under 「Desktop ④ Floating Capsule Settings」
+- When enabled, the capsule is automatically hidden in block-format and plain-text popups; otherwise the popup and capsule overlap unpleasantly
 
 
-### v3.7.2 — 适配思源 v3.7 手机端菜单重构 + 修复手机端激活 + 修复杀后台冷启动工具栏消失 + 电脑端悬浮胶囊工具栏
+### v3.7.2 — Adapted to the SiYuan v3.7 mobile menu rewrite + fixed mobile activation + fixed toolbar disappearance after cold starts following background termination + desktop floating-capsule toolbar
 
-> 💡 **本版本主要修复思源 v3.7 升级导致的兼容性问题，建议所有用户升级。**
+> 💡 **This version mainly fixes compatibility issues caused by the SiYuan v3.7 upgrade. All users are recommended to upgrade.**
 
-## ✨ 新增
+## ✨ New
 
-**1. 电脑端工具栏位置选择：原生顶部 / 悬浮胶囊 🔥**
-- 电脑端"全局工具栏配置"新增位置选择：可在思源原生顶部与底部悬浮胶囊之间切换
-- 切换为悬浮胶囊后，工具栏会以圆角胶囊形态悬浮在窗口底部居中，不随编辑器滚动，常驻可见
-- 完整开放胶囊样式滑杆：距底部距离（默认40px）、圆角大小（默认20px）、胶囊高度、胶囊宽度（0=自适应）、毛玻璃/实心样式、滚动隐藏（默认开启）
-- 技术实现：复用思源原生外层 `.protyle-breadcrumb` 作为容器（自定义按钮均挂载于此），通过 `position:fixed` 重新定位，按钮注入逻辑完全不变，多标签页下每个编辑器都正确显示
+**1. Desktop toolbar position: native top / floating capsule 🔥**
+- Added a position selector to the desktop "Global Toolbar Settings": switch between SiYuan's native top toolbar and a bottom floating capsule
+- In floating-capsule mode, the toolbar floats centered at the bottom of the window in a rounded capsule shape, does not scroll with the editor, and remains visible
+- Fully exposed capsule-style sliders: distance from bottom (default 40px), corner radius (default 20px), capsule height, capsule width (0 = auto), frosted-glass/solid style, and scroll hiding (enabled by default)
+- Technical implementation: reuses SiYuan's native outer `.protyle-breadcrumb` as the container (all custom buttons are mounted there), repositions it with `position:fixed`; button injection logic is unchanged, and every editor displays correctly across multiple tabs
 
-**2. 电脑端悬浮胶囊滚动隐藏**
-- 上滑隐藏胶囊、下滑显示，与手机端体验一致
-- 使用活动 protyle 的 `.protyle-content` 作为滚动容器，多标签页切换时自动重绑
-- 切换文档/标签页时自动重置滚动基准并恢复可见状态
+**2. Desktop floating capsule scroll hiding**
+- Hide the capsule when scrolling up and show it when scrolling down, matching the mobile experience
+- Uses the active protyle's `.protyle-content` as the scroll container and automatically rebinds when switching tabs
+- Automatically resets the scroll baseline and restores visibility when switching documents/tabs
 
-**3. 手机端「查看激活方式」弹窗**
-- 在鲸鱼定制工具箱激活区域新增「查看激活方式」按钮（已激活/未激活态均可用）
-- 弹出完整激活说明：定价原则、激活码方案（4卡片，扫码购买可弹收款码）、付款账号（含复制）、付款发码流程
+**3. Mobile 「View Activation Methods」 dialog**
+- Added a 「View Activation Methods」 button in the Whale Custom Toolbox activation area (available in both activated and unactivated states)
+- Displays complete activation instructions: pricing principles, activation-code plans (4 cards; scanning to purchase opens a payment QR code), payment accounts (with copy support), and the payment/code-delivery process
 
-**4. 电脑端老用户升级提示**
-- 老用户升级后会在启动时居中提示「新增底部悬浮胶囊工具栏，可在插件设置中调整」
-- 仅提示一次，通过标记位控制
+**4. Upgrade notice for existing desktop users**
+- After upgrading, existing users see a centered startup notice: 「New bottom floating capsule toolbar; adjust it in plugin settings」
+- Shown only once, controlled by a marker flag
 
-## ✨ 优化
+## ✨ Optimizations
 
-**5. 手机端按钮选择器列表更新**
-- 按钮选择器列表更新为思源 v3.7 最新 ID（27 项），新增"密钥和变量"、"鉴权"、"应用"、"用户指南"等
-- 分类整理（顶部工具栏 / 常用功能 / 设置项 / 其他），更易查找
+**5. Updated mobile button selector list**
+- Updated the button selector list to SiYuan v3.7's latest IDs (27 items), adding "Keys and Variables", "Authentication", "Applications", "User Guide", and more
+- Organized into categories (top toolbar / common functions / settings / other) for easier lookup
 
-**6. 手机端界面识别增强**
-- 修复了 PC 浏览器预览 `/mobile/` 路径时手机端判断失效的问题
-- 新增 `menu*` 系列按钮的手机端兜底逻辑：找不到时自动先打开 `#toolbarMore` 菜单再点击
-
-**7. 手机端冷启动胶囊空白修复**
-- 冷启动时胶囊外壳就绪但自定义按钮未注入的问题（选中文本才显示）
-- 修复：在 `data-input-method` 属性打上的同一刻主动触发按钮注入，彻底消除竞态
-
-## 🐛 修复
-
-**8. 手机端"思源内置功能"按钮失效（严重）**
-- 思源 v3.7 重构了手机端设置菜单，按钮 ID 全部改名（如 `menuAccount` → `menuConfigSync`、`menuEditor` → `menuConfigEditor`）
-- 导致所有用旧 ID 配置的"内置功能"按钮报错"未找到功能"
-- **修复方案**：内置旧 ID → 新 ID 别名映射表，老用户配置无需任何改动自动兼容
-
-**9. 手机端激活码无法激活（严重）**
-- 手机端激活逻辑未传入思源账号，账号绑定校验失败
-- 激活成功后未保存 `authorAccount`，重启后激活态丢失
-- **修复方案**：与电脑端激活逻辑完全对齐（前置账号检查 / 防重复点击 / try-catch / 两端同步保存 authorAccount）
+**6. Enhanced mobile interface detection**
+- Fixed mobile detection failing when previewing the `/mobile/` path in a PC browser
+- Added mobile fallback logic for the `menu*` button series: when not found, automatically open the `#toolbarMore` menu first and then click
+
+**7. Fixed blank capsule on mobile cold start**
+- Fixed the issue where the capsule shell was ready but custom buttons were not injected during cold start (they appeared only after selecting text)
+- Fix: actively trigger button injection at the same moment the `data-input-method` attribute is set, completely eliminating the race condition
+
+## 🐛 Fixes
+
+**8. Mobile "SiYuan built-in function" buttons stopped working (serious)**
+- SiYuan v3.7 redesigned the mobile settings menu and renamed all button IDs (for example, `menuAccount` → `menuConfigSync`, `menuEditor` → `menuConfigEditor`)
+- This caused every "built-in function" button configured with old IDs to report "function not found"
+- **Solution**: add an old-ID → new-ID alias map for built-in functions; existing user configurations remain compatible without any changes
+
+**9. Mobile activation codes could not activate (serious)**
+- The mobile activation logic did not pass in the SiYuan account, so account-binding validation failed
+- `authorAccount` was not saved after successful activation, so the activated state was lost after restarting
+- **Solution**: fully align with desktop activation logic (preliminary account check / duplicate-click prevention / try-catch / synchronized `authorAccount` saving on both ends)
 
-**10. 手机端杀后台冷启动后底部胶囊/底部固定工具栏消失（严重）**
-- **现象**：把思源挂后台一段时间（系统杀后台）→ 重新打开 → 思源出现重新加载 → 插件底部胶囊（或底部固定）工具栏消失，且不会自动恢复
-- **根因**：插件没有任何"恢复可见时重建工具栏"的兜底机制。工具栏初始化依赖一个极窄的时间窗口——必须在 `.protyle-breadcrumb` 渲染出来附近触发 `setupToolbar`。冷启动慢机型上，原"2 秒后重试 1 次"经常错过窗口，且 `MutationObserver`、`loaded-protyle-*` 事件也可能在监听器注册前就已触发完，导致 `.protyle-breadcrumb` 永远没被打上 `data-input-method` 属性，胶囊 CSS 选择器不匹配 → 永久消失
-- **影响范围**：鸿蒙、安卓、iOS 走相同代码路径都会复现，只是鸿蒙/安卓杀后台更频繁、更容易触发
-- **修复方案**：加入四重协同兜底（任一成功即短路，互不冲突）
-  - ① **6 轮退避重试**：把"单次 2 秒重试"扩展为 2s/3s/4s/6s/8s/12s 共约 35 秒的退避窗口，覆盖慢机型冷启动
-  - ② **`onLayoutReady` 8 秒健康自检**：发现工具栏就绪信号丢失则重建
-  - ③ **切回前台自愈**：`visibilitychange` 切回前台时，检测到面包屑已出现但缺 `data-input-method` 属性，立即重建工具栏（仅在确实丢失时才动手，不属于已删除的"复杂检测逻辑"）
-  - ④ **rAF 空转上限**：工具栏初始化失败时不再无限重试空转
+**10. Bottom capsule/fixed toolbar disappeared after mobile background termination and cold start (serious)**
+- **Symptom**: leave SiYuan in the background for a while (system terminates it) → reopen it → SiYuan reloads → the plugin's bottom capsule (or fixed-bottom) toolbar disappears and does not recover automatically
+- **Root cause**: the plugin had no fallback mechanism to rebuild the toolbar when visibility returned. Toolbar initialization depended on a very narrow time window—it had to trigger `setupToolbar` near the time `.protyle-breadcrumb` was rendered. On slow devices during cold start, the old "retry once after 2 seconds" often missed the window; `MutationObserver` and `loaded-protyle-*` events could also finish before listeners were registered, leaving `.protyle-breadcrumb` without the `data-input-method` attribute forever, so the capsule CSS selector no longer matched and it permanently disappeared
+- **Affected scope**: HarmonyOS, Android, and iOS all use the same code path and can reproduce this; it is simply more frequent on HarmonyOS/Android because background termination happens more often
+- **Solution**: added four coordinated fallback mechanisms (success by any one short-circuits; they do not conflict)
+  - ① **6 rounds of backoff retries**: expand the single 2-second retry into a 2s/3s/4s/6s/8s/12s backoff window totaling about 35 seconds, covering cold starts on slow devices
+  - ② **`onLayoutReady` 8-second health check**: rebuilds the toolbar if its ready signal is missing
+  - ③ **Self-healing on foreground return**: when `visibilitychange` returns to the foreground, if the breadcrumb is present but lacks the `data-input-method` attribute, immediately rebuild the toolbar (only acts when it has actually been lost; this is not the removed "complex detection logic")
+  - ④ **rAF spin-loop limit**: no longer retries endlessly when toolbar initialization fails
 
-**11. 工具栏初始化失败时 `requestAnimationFrame` 无限空转耗电**
-- `setupEditorButtons` 等待 `data-input-method` 信号时，原本会以 60fps 无限自递归调用，浪费电量（杀后台频繁的鸿蒙/安卓尤为明显）
-- 修复：给自递归加上 60 帧（约 1 秒）上限，到达上限后停止空转，改由上述四重兜底接管
+**11. Infinite `requestAnimationFrame` spin loop consumed power when toolbar initialization failed**
+- While waiting for the `data-input-method` signal, `setupEditorButtons` and related code recursively called itself at 60fps forever, wasting power (especially noticeable on HarmonyOS/Android, where background termination is frequent)
+- Fix: cap the recursive calls at 60 frames (about 1 second); after the limit, stop spinning and let the four fallback mechanisms above take over
 
-## 🔧 兼容性
-
-- 保留 `bottomToolbarRetryDelay` 配置语义：设为 `0` 仍表示禁用重试，自定义正值仍按旧逻辑单次重试（向后兼容）
-- 顶部工具栏模式（纯 CSS 驱动）逻辑不变，本就在面包屑出现后自愈
-	- 一键记事弹窗的切前后台逻辑完全保留，不受影响
+## 🔧 Compatibility
+
+- Retains the `bottomToolbarRetryDelay` configuration semantics: setting it to `0` still disables retries, while a custom positive value still performs one retry under the old logic (backward compatible)
+- Top-toolbar mode (purely CSS-driven) is unchanged; it already self-heals after the breadcrumb appears
+	- The foreground/background handling for the one-click quick note popup is fully retained and unaffected
 
 
-### v3.7.1 — 工具栏预览 + 底部悬浮工具栏 + Lucide 极简图标 + 弹窗增强
+### v3.7.1 — Toolbar preview + bottom floating toolbar + minimalist Lucide icons + enhanced popups
 
-> 💡 **提示：「鲸鱼快速批注」与本插件（思源手机端增强）是两个完全独立的插件**，各自独立安装、独立使用。若同时安装，可免费联动实现滑动批注功能；单独安装任一插件均可正常运行，互不依赖。
+> 💡 **Note: 「鲸鱼快速批注」 and this plugin (SiYuan Mobile Enhancement) are two completely independent plugins**, installed and used separately. If both are installed, they can work together for free to provide slide annotation; either plugin also runs normally on its own, with no dependency on the other.
 
-> 💡 **v3.7.1 新增了多项实用功能与修复，建议升级。**
+> 💡 **v3.7.1 adds several practical features and fixes; upgrading is recommended.**
 
-## ✨ 新增
+## ✨ New
 
-**1. 工具栏所见即所得预览 🔥**
-- 设置面板中新增工具栏**预览区域**，实时模拟手机/电脑端按钮布局
-- 支持直接在预览条上**拖拽按钮重排序**，所见即所得
-- 电脑端/手机端分别独立预览，样式自适应
+**1. WYSIWYG toolbar preview 🔥**
+- Added a toolbar **preview area** to the settings panel, simulating mobile/desktop button layouts in real time
+- Buttons can be **dragged directly on the preview bar to reorder** them, providing a WYSIWYG experience
+- Desktop and mobile previews are independent, with adaptive styling
 
-**2. 极简图标 Lucide 集成（1908 个图标）**
-- 新增 Lucide 极简图标库分区（1908 个精选图标），告别图标不够用的烦恼
-- 图标选择器支持**关键词搜索** —— 思源图标按描述搜索，极简图标按英文名搜索
-- 弹窗固定最小高度，防止搜索结果变化时窗口抖动
-
-**3. 底部悬浮工具栏模式（全新）**
-- 工具栏可固定到屏幕**底部**，适合单手操作
-- 专属设置：距底部距离、圆角大小、底部胶囊样式
-- 支持滚动自动隐藏
-
-**4. 块格式记事弹窗增强**
-- 弹窗改用**独立无边框窗口**，支持拖拽手柄随意移动位置
-- **弹窗按钮选择器** —— 可自定义勾选弹窗中显示哪些按钮
-- **弹窗工具栏开关** —— 可选择隐藏/显示弹窗工具栏
-- **字体大小桌面端独立设置** —— 桌面端和手机端可分别调节
-- 图片插入增强：工具栏图片按钮支持**光标插入**（有光标插光标处，无光标追加日记）
-- 移除了冗余设置项（粘贴剪贴板、发送后最小化思源）
+**2. Minimalist Lucide icon integration (1,908 icons)**
+- Added a minimalist Lucide icon library section (1,908 selected icons), ending the worry about not having enough icons
+- The icon picker supports **keyword search** — search SiYuan icons by description and minimalist icons by English name
+- The dialog has a fixed minimum height to prevent it from jumping as search results change
+
+**3. Bottom floating toolbar mode (new)**
+- The toolbar can be fixed to the **bottom** of the screen for comfortable one-handed operation
+- Dedicated settings: distance from bottom, corner radius, and bottom capsule style
+- Supports automatic hiding on scroll
+
+**4. Enhanced block-format quick note popup**
+- The popup now uses an **independent borderless window**, with a drag handle for free positioning
+- **Popup button selector** — customize which buttons appear in the popup
+- **Popup toolbar switch** — choose whether to hide or show the popup toolbar
+- **Independent desktop font-size setting** — adjust desktop and mobile separately
+- Enhanced image insertion: the toolbar image button supports **cursor insertion** (inserts at the cursor when there is one, otherwise appends to the diary)
+- Removed redundant settings (paste clipboard, minimize SiYuan after sending)
 
-**5. 其他新增**
-- 新增 #status 隐藏开关
-
-## 🔧 修复
+**5. Other additions**
+- Added a #status visibility switch
+
+## 🔧 Fixes
 
-**⑤前一篇/后一篇文档导航**
-- 修复按钮方向反了的问题（点←跳到文件树下方的文档）
-- 修复 isLoading 卡死（一次异常后永远不再刷新）
-- 修复插件重载后 handler 闭包泄漏（eventBus 监听器越堆越多）
-- 修复电脑端隐藏状态下切换文档，事件监听未注册
+**⑤ Previous/Next Document Navigation**
+- Fixed reversed button direction (clicking ← jumped to the document below the file tree)
+- Fixed `isLoading` getting stuck (it would never refresh again after one exception)
+- Fixed handler closure leaks after plugin reload (eventBus listeners kept accumulating)
+- Fixed event listeners not being registered when switching documents while desktop hiding was active
 
-**电脑端块格式记事弹窗**
-- 修复弹窗开着时，主窗口点日记文档被弹窗抢焦点
-- 修复插件重载或关闭思源后，弹窗位置回到默认、不记住上次拖的位置
-- 修复旧弹窗未被销毁导致主窗口打不开日记文档
-- 修复块模式保存前检测块存在性
-- 修复弹窗按钮选择器取消全选不生效
+**Desktop block-format quick note popup**
+- Fixed the popup stealing focus when clicking a diary document in the main window while the popup was open
+- Fixed the popup position reverting to default after plugin reload or closing SiYuan instead of remembering the last dragged position
+- Fixed old popups not being destroyed, preventing the main window from opening diary documents
+- Added a block-existence check before saving in block mode
+- Fixed deselect-all in the popup button selector not taking effect
 
-**其他修复**
-- 内核内存泄漏修复
-- 监听器清理优化
-- 修复 toggle-lock 竞态条件
-- LifeLog 弹窗多窗口自适应 + 快捷键单窗口响应
-- 修复缺失的 else 大括号编译错误
+**Other fixes**
+- Fixed kernel memory leaks
+- Optimized listener cleanup
+- Fixed the toggle-lock race condition
+- LifeLog popup now adapts to multiple windows, with shortcuts responding only in the active window
+- Fixed a compilation error caused by a missing else brace
 
-## 🚀 优化
+## 🚀 Optimizations
 
-- 前一篇/后一篇：切换文档后主动刷新相邻按钮，不依赖事件
-- 前一篇/后一篇：按钮点击后立刻置灰防连点，失败后能恢复
-- 手机端抽取公共函数（消除重复代码 80 行）
-- 清空空块时自动跳过记事弹窗正在编辑的块，避免误删导致崩溃
-- 删除多处死变量，清理冗余代码
-- 手机端设置列表改为只有 ⋮⋮ 手柄可拖拽排序（点击卡片其他位置不触发）
-- 移动端图标选择器弹窗不再自动弹出输入法
-- 分区标签支持 flex-wrap 适配手机屏幕
-- 隐藏弹窗时不再把最小化的主窗口强行拉到前台
-- 弹窗被其他软件挡住时，按快捷键不再隐藏而是拉到前台
+- Previous/Next: actively refresh adjacent buttons after switching documents instead of relying on events
+- Previous/Next: immediately disable the button after clicking to prevent duplicate clicks, and restore it after failure
+- Mobile: extracted shared functions (removed 80 lines of duplicate code)
+- Automatically skip empty blocks currently being edited in the quick note popup when clearing empty blocks, preventing crashes from accidental deletion
+- Removed multiple dead variables and cleaned up redundant code
+- Mobile settings list now supports drag-and-drop sorting only via the ⋮⋮ handle (clicking elsewhere on a card does not trigger it)
+- The mobile icon picker dialog no longer automatically opens the IME
+- Section tabs support flex-wrap for mobile screens
+- Hiding a popup no longer forcibly brings a minimized main window to the foreground
+- When a popup is covered by another application, pressing the shortcut now brings it to the foreground instead of hiding it
 
-## 📄 文档
+## 📄 Documentation
 
-- DEV_NOTES 补充 hash 路由机制根因分析及试错记录
-- 激活码方案价格更新（正价 45 元 / 普通优惠 36 元 / 学生优惠 22.5 元）
+- DEV_NOTES expanded with root-cause analysis and trial-and-error records for the hash routing mechanism
+- Updated activation-code pricing (regular price 45 yuan / standard discount 36 yuan / student discount 22.5 yuan)
 
 
 
-### v3.7.0 — 图片导入重构 + 附件管理 + 工具箱分类（版本大更新）
+### v3.7.0 — Image import refactor + attachment management + toolbox categories (major version update)
 
-> ⚠️ **环境要求（重要）**
-> 从 v3.8.5 起，本插件要求 **思源笔记 v3.8.2 及以上**版本才能正常使用。
-> 若思源版本低于 v3.8.2，将无法安装或在插件市场显示不兼容，请先升级思源笔记。
-> （原因：插件已适配思源 v3.8 的语言标识规范，旧版本无法正确匹配插件信息。）
+> ⚠️ **Requirements (important)**
+> Starting with v3.8.5, this plugin requires **SiYuan Note v3.8.2 or later** to work properly.
+> If your SiYuan version is below v3.8.2, the plugin cannot be installed or will be shown as incompatible in the plugin marketplace; upgrade SiYuan Note first.
+> (Reason: the plugin now follows SiYuan v3.8's language identifier convention, which older versions cannot match correctly.)
 
-## 新增
+## New
 
-**⑥鲸鱼定制工具箱**
+**⑥Whale Custom Toolbox**
 
-- 新增⑨悬浮标签页Tab、⑩悬浮大纲 —— **折叠样式**选择：方案一收起显示预览小图标、方案二收起仅显示展开手柄
-- 新增⑨悬浮标签页Tab、⑩悬浮大纲 —— **弹窗位置**设置，支持顶部、中部、底部
-  - ⑨标签页Tab 重命名为⑨悬浮标签页Tab（全部统一）
-  - ⑨悬浮标签页Tab 点击标签切换文档后**自动收起面板**
-- 新增⑭一键清理空块 —— 自动扫描当前文档中的空段落/标题/列表项，预览确认后批量删除
-- 新增⑮文档锁定双图标（**免费**） —— 锁定和解锁可以分别选不同的图标，按钮会自己切换显示
-- **新增⑯快速添加附件** —— 可以选择任意文件上传，有光标时插入到编辑器，没光标时追加到日记底部。上传前会弹窗让你改名字，图片还可以选压缩（缩小到 1920×1920，质量 85%），处理过程中弹窗会显示"处理中..."。**注意：在记事弹窗里点击此按钮没反应**
+- Added ⑨Floating Tab and ⑩Floating Outline — **collapsed style** selection: option 1 shows a small preview icon when collapsed; option 2 shows only the expand handle when collapsed
+- Added ⑨Floating Tab and ⑩Floating Outline — **popup position** setting, supporting top, middle, and bottom
+  - Renamed ⑨Tab to ⑨Floating Tab (unified throughout)
+  - ⑨Floating Tab **automatically collapses the panel** after clicking a tab to switch documents
+- Added ⑭One-click Empty Block Cleanup — automatically scans empty paragraphs/headings/list items in the current document, then batch-deletes them after preview confirmation
+- Added ⑮dual icons for document locking (**free**) — locking and unlocking can use different icons, and the button switches its display automatically
+- **Added ⑯Quick Attachment Add** — choose any file to upload; with a cursor, insert it into the editor, and without one, append it to the bottom of the diary. Before uploading, a dialog lets you rename it; images can also be compressed (resize to 1920×1920, quality 85%), and the dialog displays "Processing..." during processing. **Note: clicking this button in the quick note popup has no effect**
 
-**记事弹窗 — 块格式输入**
+**Quick note popup — block-format input**
 
-- 记事弹窗支持思源块格式，可以直接用思源自己的编辑器，支持多段落、列表等（需激活码）
-- 块格式弹窗新增**缩进/反缩进按钮**（Tab/Shift+Tab），键盘弹出时自动显示，收起时自动隐藏
-- 隐藏了面包屑、工具栏等多余 UI，只保留纯净编辑区
+- The quick note popup supports SiYuan block format and can directly use SiYuan's own editor, including multiple paragraphs and lists (activation code required)
+- Block-format popups add **indent/outdent buttons** (Tab/Shift+Tab), shown automatically when the keyboard opens and hidden when it closes
+- Hides unnecessary UI such as the breadcrumb and toolbar, leaving only a clean editing area
 
-**记事弹窗 — 图片插入（块模式）**
+**Quick note popup — image insertion (block mode)**
 
-- 点击图片按钮时先在光标位置放个看不见的标记，选完文件后再找到标记插入图片。这样即使编辑器失焦了也没关系
-- 按钮按下去的第一时间（鼠标按下/触摸按下）就保存光标位置，比等到点击事件再保存更可靠
-- 编辑器里如果有多个块，能准确定位到光标在哪个块，不会每次都跑到第一个块去
-- 图片插入走思源自己的编辑管线，不会被它回退（之前的问题是图片闪一下就不见了）
-- 粘贴图片也能拦截上传并插入光标处
-- 工具栏上的图片按钮也支持有光标时插编辑器、没光标时追加日记
-- 工具栏支持多选图片上传
+- When the image button is clicked, first place an invisible marker at the cursor; after a file is selected, find the marker and insert the image there. This works even if the editor has lost focus
+- Save the cursor position at the first moment the button is pressed (mouse down/touch down), which is more reliable than waiting for the click event
+- When the editor contains multiple blocks, accurately locate the block containing the cursor instead of always using the first block
+- Image insertion uses SiYuan's own editing pipeline and is not rolled back by it (previously, the image flashed and disappeared)
+- Pasted images can also be intercepted, uploaded, and inserted at the cursor
+- The toolbar image button also inserts into the editor when there is a cursor and appends to the diary when there is none
+- The toolbar supports uploading multiple images
 
-**记事弹窗 — 电脑端增强**
+**Quick note popup — desktop enhancements**
 
-- 全局快捷键一键记事（Alt+Shift+N），思源在后台也能快速唤起
-- 悬浮窗快速记事，独立小窗口
-- 独立块编辑窗口
-- 捕获模式小弹窗，纯文本按钮触发时弹出紧凑居中小窗
-- 打开时支持自动粘贴剪贴板内容（可开关）
-- 发送后支持自动最小化思源窗口（可开关）
-- 已有弹窗时再次点击按钮或快捷键，可最小化/恢复弹窗
-- 统一设置面板
+- Global shortcut for one-click quick notes (Alt+Shift+N), which can quickly invoke it while SiYuan is in the background
+- Floating quick-note window, as an independent small window
+- Independent block editing window
+- Capture-mode small popup: a compact centered window appears when triggered by the plain-text button
+- Supports automatically pasting clipboard contents when opened (toggleable)
+- Supports automatically minimizing the SiYuan window after sending (toggleable)
+- Clicking the button or pressing the shortcut again when a popup already exists minimizes/restores the popup
+- Unified settings panel
 
-**记事弹窗 — 弹窗工具栏**
+**Quick note popup — popup toolbar**
 
-- 弹窗里显示插件扩展工具栏按钮
-- 手机端可以自由勾选显示哪些按钮
+- Displays plugin extension toolbar buttons in the popup
+- On mobile, freely select which buttons to display
 
-**记事弹窗 — 空输入金句占位**
+**Quick note popup — quote placeholder for empty input**
 
-- 弹窗空输入且输入法没打开时，显示一条金句作为装饰（微信读书风格）
-- 可配置文档 ID、字体大小、颜色
-- 输入法弹出或开始输入后金句消失，清空内容且关闭输入法后重新显示
-- 每次弹窗重新弹出自动换一条
+- When the popup input is empty and the IME is closed, displays a quote as decoration (WeChat Reading style)
+- Configurable document ID, font size, and color
+- The quote disappears when the IME opens or typing begins, and reappears when the content is cleared and the IME is closed
+- Automatically changes to another quote each time the popup is reopened
 
-**叶归 LifeLog**
+**Yegui LifeLog**
 
-- 桌面端对话框改为苹果风格：分类选择和内容输入合并为一步，键盘方向键选分类，Ctrl+Enter 发送
-- 输入框改为多行文本域，支持长文本换行和滚动条
-- **多窗口自适应** —— 弹窗改用 viewport 布局 + flex 弹性布局，窗口缩小时输入框先缩、然后是按钮和标题、最后是分类按钮，所有元素都有最低高度保底
-- **全局快捷键只在当前窗口响应** —— 多窗口环境下只有你正在操作的那个窗口会弹出弹窗
+- Desktop dialog now uses an Apple-style design: category selection and content entry are combined into one step; use keyboard arrow keys to select a category and Ctrl+Enter to send
+- Input box changed to a multiline text area, supporting long text, line breaks, and a scrollbar
+- **Multi-window adaptation** — popups use a viewport layout + flex layout; when the window shrinks, the input box shrinks first, followed by buttons and title, and finally category buttons; every element has a minimum height as a safeguard
+- **Global shortcut responds only in the current window** — in a multi-window environment, the popup appears only in the window you are actively using
 
-**默认按钮**
+**Default buttons**
 
-- 锁住文档按钮改为动态双图标（toggle-lock），图标随锁状态自动切换 🔒↔🔓
+- The lock-document button now uses dynamic dual icons (toggle-lock), automatically switching with the lock state 🔒↔🔓
 
-## 优化
+## Optimizations
 
-**记事弹窗 — 手机端输入法体验**
+**Quick note popup — mobile IME experience**
 
-- 按钮触发弹窗时自动弹出输入法
-- 自动触发弹窗首次显示时，切回思源也会自动弹出输入法
-- 切后台再切回来时，只有之前输入法是打开的才会恢复；手动关了输入法则不会再弹
-- 手机端设置新增输入格式选择（纯文本/思源块格式）
+- Automatically opens the IME when a button triggers the popup
+- When the popup is first shown automatically, switching back to SiYuan also opens the IME automatically
+- When returning from the background, restores the IME only if it was previously open; if you closed it manually, it will not open again
+- Mobile settings add an input format selector (plain text/SiYuan block format)
 
-**悬浮面板**
+**Floating panels**
 
-- 悬浮标签页Tab、悬浮大纲新增透明度滑杆
-- 悬浮标签页Tab、悬浮大纲新增滚动隐藏/显示开关（向上滚消失，下滚出现）
-- 悬浮大纲收起态不再显示「暂无大纲内容」
-- 悬浮标签页Tab 新增最大可见标签数设置（1~10），超出可滚动
-- 悬浮标签页Tab 新增钉住功能，钉住标签置顶且不会被自动挤掉
-- 弹窗底部位置与前一篇/后一篇文档对齐（80px）
+- Floating Tab and Floating Outline add an opacity slider
+- Floating Tab and Floating Outline add a scroll hide/show switch (disappears when scrolling up, appears when scrolling down)
+- The collapsed Floating Outline no longer displays 「No outline content」
+- Floating Tab adds a maximum visible tab count setting (1~10); excess tabs can be scrolled
+- Floating Tab adds a pin feature; pinned tabs stay at the top and are not automatically pushed out
+- Popup bottom position aligned with Previous/Next Document (80px)
 
-**锁文档按钮**
+**Lock-document button**
 
-- 未激活工具箱时，锁按钮显示「免费试用」标签，仅允许使用文档锁定双图标功能
-- 激活后标签消失
-- 切文档时、展开扩展工具栏时图标自动刷新
+- When the toolbox is not activated, the lock button displays a 「Free Trial」 label and only allows the dual-icon document-locking feature
+- The label disappears after activation
+- Icons automatically refresh when switching documents and expanding the extension toolbar
 
-**图片快捷导入**
+**Quick image import**
 
-- **纯文本模式回退** —— 弹窗里如果是纯文本模式，点击图片按钮就按原来的方式走（追加到日记底部 + 关掉弹窗）
-- **金句占位识别图片** —— 如果编辑器里只有图片没有文字，金句占位不会再挡在上面
-- **保存前检测块是否存在** —— 如果弹窗打开太久后台把草稿块清理了，发送时会自动重建再保存
-- **防重复点击** —— 快速双击图片按钮不会打开多个文件选择器
+- **Plain-text mode fallback** — in plain-text mode, clicking the image button follows the original behavior (append to the bottom of the diary + close the popup)
+- **Image recognition for quote placeholder** — when the editor contains only an image and no text, the quote placeholder no longer obscures it
+- **Check whether the block exists before saving** — if the background cleans up the draft block while the popup has been open for too long, it automatically rebuilds it before sending
+- **Duplicate-click prevention** — rapidly double-clicking the image button does not open multiple file pickers
 
-**叶归 LifeLog**
+**Yegui LifeLog**
 
-- **快捷键注册优化** —— 不再默认绑定快捷键，改为引导用户去思源设置里配一次，解决每次重载后快捷键失效的问题
+- **Shortcut registration optimization** — no longer binds a shortcut by default; instead guides users to configure one in SiYuan settings once, fixing shortcuts becoming invalid after every reload
 
-**其他**
+**Other**
 
-- ③电脑端快捷键支持自定义
-- 桌面端按钮编辑表单简化
-- 暗黑模式检测优化
-- **欢迎通知修复** —— 首次显示欢迎后立刻写入标记，不再每次启动都弹
-- **分屏滚动修复** —— 分屏时滚动文档只滚动当前正在看的面板，不会两边一起滚
-- **手机端状态条隐藏** —— 5️⃣小功能选择里新增 ⑦手机端状态条隐藏开关，默认开启，把底部的同步状态、字数统计那一条给隐藏掉
+- ③Desktop shortcut supports customization
+- Simplified the desktop button-editing form
+- Improved dark-mode detection
+- **Welcome notification fix** — writes the marker immediately after showing the welcome message for the first time, so it no longer appears on every startup
+- **Split-pane scrolling fix** — when panes are split, scrolling a document scrolls only the currently viewed pane instead of both panes
+- **Hide mobile status bar** — added a ⑦Hide Mobile Status Bar switch under ⑤Small Feature Selection, enabled by default, hiding the bottom sync status and word-count bar
 
-## 优化
+## Optimizations
 
-**记事弹窗 — 电脑端纯文本悬浮窗**
+**Quick note popup — desktop plain-text floating window**
 
-- 去掉了输入框里的占位文字（原来的"记一笔…"没了）
-- 窗口稍微放大了一点（200×168 变成 280×180）
-- 视觉美化：输入框圆角加大、按钮加了缩放反馈、关闭按钮改成圆形
-- 默认字体大小从 18px 调到 14px
+- Removed the placeholder text from the input box (the old "Write a note…" is gone)
+- Made the window slightly larger (200×168 changed to 280×180)
+- Visual improvements: larger input corner radius, scale feedback on buttons, and a circular close button
+- Default font size changed from 18px to 14px
 
-**性能**
+**Performance**
 
-- 块格式编辑器里有个监听器每隔 64ms 就请求一次后端，调成 300ms 一次，不会刷爆了
-- 手机端快速切标签页、切文档不会再堆一堆重复请求
-- 设置面板滑杆拖到一半卡住，不会再留一堆监听器吃内存
+- A listener in the block-format editor requested the backend every 64ms; changed to once every 300ms to avoid flooding it
+- Rapidly switching tabs and documents on mobile no longer piles up duplicate requests
+- If a settings slider got stuck halfway through dragging, it no longer leaves a pile of listeners consuming memory
 
-## 修复
+## Fixes
 
-- **手机端弹窗字体大小不生效** —— 滑杆调了手机端弹窗里的字还是没变，因为代码一直读的是电脑端配置，完全忽略了手机端的设置
-- **电脑端块格式弹窗反复开关内存一直涨** —— 窗口关了但后台草稿块没删干净，加上思源自己的关闭按钮可能没把窗口进程杀透。现在关窗会自动检查，空草稿直接删；窗口关闭按钮也被接管确保彻底销毁
-- 纯文本悬浮窗快捷键弹出时偶尔闪一下
-- 一些 style 元素、事件监听器在插件卸载时没清干净，补上了
-- 手机端顶部工具栏状态条跑了 —— 排查后发现是第三方主题的问题，切回默认主题就好
+- **Mobile popup font size had no effect** — changing the mobile popup slider did not change its text because the code always read the desktop configuration and completely ignored the mobile setting
+- **Desktop block-format popup memory kept growing after repeated open/close cycles** — closing the window did not fully remove the background draft block, and SiYuan's own close button might not completely terminate the window process. Closing now checks automatically and deletes empty drafts; the window close button is also taken over to ensure complete destruction
+- Occasional flicker when opening the plain-text floating window with its shortcut
+- Some style elements and event listeners were not fully cleaned up on plugin unload; this has been fixed
+- Mobile top-toolbar status bar shifted out of place — investigation found this was caused by a third-party theme; switch back to the default theme
 
 ---
 
-### v3.3.6 — 修复优化版本
+### v3.3.6 — Bug-fix and optimization release
 
-#### 🐛 问题修复
+#### 🐛 Bug fixes
 
-- 🔧 **修复手机端扩展工具栏距离底部工具栏的设置不生效的问题**
-- 🔧 **修复工具栏高度等设置保存后不生效的问题**（滑杆保存的值缺少 px 单位）
-- 🔧 **修复手机端扩展工具栏触摸外部区域无法关闭的问题**
-- 🔧 **修复电脑端扩展工具栏内 Lucide 图标、图片图标不显示的问题**
-- 🔧 **修复切换文档时按钮重复创建的问题**
-- 🔧 **修复图片上传选择文件后，部分设备上无法获取文件的问题**
-- 🔧 **修复其他插件按钮预留宽度设置后未立即生效的问题**
-- 🔧 **修复导入配置时中途失败导致数据不一致的问题**
-- 🔧 **修复插件卸载/重载后残留样式未清除的问题**
-- 🔧 **修复滑杆拖动时若保存失败导致页面卡死的问题**
+- 🔧 **Fixed mobile extension toolbar distance-from-bottom setting not taking effect**
+- 🔧 **Fixed toolbar height and other settings not taking effect after saving** (values saved by sliders lacked the px unit)
+- 🔧 **Fixed inability to close the mobile extension toolbar by touching outside it**
+- 🔧 **Fixed Lucide icons and image icons not displaying in the desktop extension toolbar**
+- 🔧 **Fixed duplicate button creation when switching documents**
+- 🔧 **Fixed inability to obtain selected files on some devices after image-upload file selection**
+- 🔧 **Fixed other-plugin button reserved-width setting not taking effect immediately**
+- 🔧 **Fixed inconsistent data caused by an import-config failure midway through**
+- 🔧 **Fixed leftover styles not being cleared after plugin uninstall/reload**
+- 🔧 **Fixed the page becoming stuck when saving failed during slider dragging**
 
-#### 🔧 稳定性优化
+#### 🔧 Stability optimizations
 
-- 💻 **电脑端扩展工具栏层级提升至 10000**，避免被其他元素遮挡
-- 💻 **电脑端扩展工具栏弹出动画简化**，移除弹簧动画改用平滑滑入
-- 🧹 **全面优化资源清理机制**
-  - 浮窗模块（标签页、大纲、文档导航）的 debounce 定时器在关闭时可正确取消
-  - 标签切换器的重试定时器在关闭时可正确取消
-  - 小窗检测器状态在清理时正确重置
-  - 数据库弹窗在插件卸载时正确移除
-
----
-
-### v3.3.5 — 修复优化版本
-
-#### ✨ 新增功能
-
-- 🐋 **⑥鲸鱼定制工具箱**
-  - ⑨手机端标签页Tab，新增最大可见标签页数设置
-
-#### 🐛 问题修复
-
-- 🐋 **修复⑥鲸鱼定制工具箱中以下问题：**
-  - ⑦滚动到文档顶部或底部，在手机端和电脑端失效的问题
-  - ⑨手机端标签页Tab，修改文档名时标签不更改、同步文档标签页仅剩一个等问题
-
-#### 🎨 美化
-
-- 📖 **README 按钮样式美化**
+- 💻 **Raised the desktop extension toolbar z-index to 10000**, preventing it from being covered by other elements
+- 💻 **Simplified the desktop extension toolbar popup animation**, removing the spring animation in favor of a smooth slide-in
+- 🧹 **Comprehensively optimized resource cleanup**
+  - Debounce timers for floating-window modules (tabs, outline, document navigation) can now be canceled correctly on close
+  - Retry timers for the tab switcher can now be canceled correctly on close
+  - Small-window detector state is correctly reset during cleanup
+  - Database dialogs are correctly removed when the plugin is uninstalled
 
 ---
 
-### v3.3.4 — 桌面端扩展工具栏与体验优化版本
+### v3.3.5 — Bug-fix and optimization release
 
-#### ✨ 新增功能
+#### ✨ New features
 
-- 💻 **电脑端扩展工具栏按钮**
-  - 沿用手机端扩展工具栏，最高 5 层
-  - 每层按钮数量可自定义
-  - 扩展工具栏高度、宽度可自定义
-- 🎛️ **新增设置：悬浮窗透明度调整；页面向上滚动隐藏、向下滚动显示**
-- 📑 **⑧手机端标签页Tab，可钉住**
-- 📋 **⑩手机端悬浮大纲**
-- 📄 **⑪手机端前一篇/后一篇文档**
-- 🔧 **手机端 5 小功能选择，⑥换行按钮 Enter**
+- 🐋 **⑥Whale Custom Toolbox**
+  - ⑨Mobile Tab adds a maximum visible-tab-count setting
 
-#### 🔧 功能优化
+#### 🐛 Bug fixes
 
-- 📝 **⑤自动化模拟点击【难】中，选择模板，手机端提供更多模板示例**
+- 🐋 **Fixed the following issues in ⑥Whale Custom Toolbox:**
+  - ⑦Scrolling to the top or bottom of a document failed on mobile and desktop
+  - ⑨Mobile Tab did not update when a document name was changed, and synchronized document tabs were reduced to one, among other issues
 
-#### 🐛 问题修复
+#### 🎨 Visual improvements
 
-- 🔧 **⑤自动化模拟点击【难】中，部分电脑快捷键无法使用的问题**
-- 🔧 **⑤自动化模拟点击【难】中，思源菜单鼠标悬浮自动打开，无法选中的问题**
-- 🔧 **修复记事弹窗按钮，点击没反应的问题（搜索）**
-- 🔧 **修复⑥鲸鱼定制工具箱中以下问题：**
-  - ⑨手机端标签页Tab，全部删除后只剩 1 个点击不生效，跳转不到对应页面的问题
-  - ⑩手机端悬浮大纲，打开滚动隐藏，每次隐藏重新出现后都会刷新闪烁的问题
-  - ⑨⑩⑪手机端标签页Tab、悬浮大纲、前一篇/后一篇文档，没有适应思源暗黑模式的问题
-  - ⑨⑩⑪打开滚动隐藏，每次重载后检测机制都会失效，需要重新关闭打开的问题
+- 📖 **Improved README button styling**
 
 ---
 
-### v3.3.3 — 新功能与体验优化版本
+### v3.3.4 — Desktop extension toolbar and experience optimization release
 
-#### ✨ 新增功能
+#### ✨ New features
 
-- 🐋 **鲸鱼定制工具箱新增**
-  - 🖼️ **⑦图片快捷导入** - 支持快速导入图片到每日日记
-  - 📑 **⑧手机端标签页Tab** - 新增手机端悬浮标签栏，支持钉住功能
-  - 📋 **⑨手机端悬浮大纲** - 新增手机端悬浮大纲面板，快速浏览文档结构
-  - 📄 **⑪手机端前一篇/后一篇文档** - 新增文档导航栏，快速切换上下一篇文档
-- 💾 **导出/导入配置数据** - 电脑端设置中新增配置导出和导入功能，方便备份和迁移
-- 📋 **右键菜单模板插入** - ②手写模板插入新增"显示在文本右键菜单"设置，模板按钮可直接在右键菜单中使用
-- 📏 **其他插件按钮预留宽度** - 手机端全局按钮配置新增⑥其他插件按钮预留宽度，为主工具栏左移腾出空间
+- 💻 **Desktop extension toolbar buttons**
+  - Reuses the mobile extension toolbar, with up to 5 levels
+  - Number of buttons per level can be customized
+  - Extension toolbar height and width can be customized
+- 🎛️ **Added settings for floating-window opacity and hiding on upward page scroll/showing on downward scroll**
+- 📑 **⑧Mobile Tab can be pinned**
+- 📋 **⑩Mobile Floating Outline**
+- 📄 **⑪Mobile Previous/Next Document**
+- 🔧 **Mobile 5 Small Feature Selection: ⑥Line-break button Enter**
 
-#### 🔧 功能优化
+#### 🔧 Feature optimizations
 
-- 🌙 **一键记事弹窗暗黑模式适配** - 弹窗自动检测思源主题色，适配暗黑模式
-- 🎨 **扩展工具栏背景色跟随** - 扩展工具栏背景色自动跟随工具栏背景色配置
-- ⚡ **设置保存优化** - 检查配置是否有更改，若无更改点击保存则不重载界面
-- 🔄 **手机端工具栏切换优化** - 解决文档切换时按钮闪烁问题
+- 📝 **⑤Automated Simulated Click [Difficult]: template selection now provides more examples on mobile**
 
-#### 🐛 问题修复
+#### 🐛 Bug fixes
 
-- 🔧 **修复闪卡时工具栏按钮闪烁问题**
-- 🔧 **修复部分快捷键手机端无法使用的问题**
-- 🔧 **修复电脑端配置手机端按钮导致不同步的问题**
-- 🔧 **修复鲸鱼定制工具箱⑤叶归LifeLog适配，填写确认后自动跳转到日记顶部和手机端再次弹出输入法的问题**
-- 🔧 **修复鲸鱼定制工具箱⑦滚动文档顶部或底部，遇到表格时失效的问题**
-- 🔧 **修复未选择文档内容时，点击按钮自动跳转到顶部的问题**
-
----
-
-### v3.3.2 — 功能增强与性能优化版本
-
-#### ✨ 新增功能
-
-- 📚 **插件使用图文说明** - 新增详细的使用指南，包含图文演示
-- 🧭 **导航图标分类** - 新增阿里图标「导航图标」子分类，包含 48 个常用导航和操作图标
-  - 方向控制：上、下、左、右、前、后等方向图标
-  - 基础操作：播放、菜单、相机、点赞、二维码、放大、缩小等
-  - 界面控制：全屏、退出全屏、列表、切换、图层等
-  - 编辑功能：添加、删除、修改、确认、收藏、搜索等
-- 🔄 **工具栏重试加载机制** - 新增顶部工具栏、底部工具栏重试加载功能
-  - 防止因设备卡顿导致工具栏加载不完整
-  - 自动检测并重试，确保工具栏正常显示
-- 🐋 **鲸鱼定制工具箱功能增强** - 优化多项功能
-  - **跳转激活功能** - 支持跳转到激活页面，提供完整的功能激活流程
-  - **日记插入位置选择** - 新增日记顶部或底部插入选项（④），可在设置中选择日记插入位置
-  - **数据库悬浮弹窗优化** - 优化③数据库悬浮弹窗的视觉呈现，改进弹窗布局和样式
-
-#### 🔧 功能优化
-
-- 🚀 **性能优化** - 全面优化插件运行性能
-  - 优化 MutationObserver 监听范围和触发频率
-  - 降低资源占用，提升响应速度
-  - 改进定时器管理，减少不必要的计算
-- 🎯 **数据库悬浮弹窗展示效果** - 优化鲸鱼定制工具箱③功能
-  - 改进弹窗布局和样式
-  - 提升用户体验和可读性
-- ⚡ **自启动一键记事弹窗逻辑优化** - 优化小窗模式判断逻辑
-  - 改进①关闭自启动的检测机制
-  - 降低③全模式的性能消耗
-  - 整体性能优化，减少资源占用
-- 💾 **按钮拖动排序稳定性** - 优化按钮拖动排序后的配置保存逻辑
-  - 排序结果更稳定可靠
-  - 配置文件写入更加健壮
-
-#### 🗑️ 功能移除
-
-- 📵 **移除初次配置导航提示** - 删除手机端一键记事弹窗的初次配置引导
-  - 简化输入界面，恢复简洁体验
-  - 用户可通过设置查看配置说明
+- 🔧 **⑤Automated Simulated Click [Difficult]: fixed some desktop shortcuts not working**
+- 🔧 **⑤Automated Simulated Click [Difficult]: fixed SiYuan menus opening automatically on mouse hover and becoming impossible to select**
+- 🔧 **Fixed quick note popup buttons not responding when clicked (search)**
+- 🔧 **Fixed the following issues in ⑥Whale Custom Toolbox:**
+  - ⑨Mobile Tab: after deleting all tabs, the remaining one could not be clicked and would not navigate to the corresponding page
+  - ⑩Mobile Floating Outline: with scroll hiding enabled, it flickered every time it reappeared after being hidden
+  - ⑨⑩⑪Mobile Tab, Floating Outline, and Previous/Next Document did not adapt to SiYuan dark mode
+  - ⑨⑩⑪Scroll hiding detection stopped working after every reload and had to be toggled off and on again
 
 ---
 
-### v3.3.1 — 一键记事弹窗触发逻辑优化版本
+### v3.3.3 — New features and experience optimization release
 
-#### 🔧 核心优化
+#### ✨ New features
 
-- ✨ **简化触发机制** - 切后台弹窗，切前台智能关闭
-- 🧹 **移除复杂检测逻辑** - 删除频繁切换、长后台、冻结恢复等检测
-- 🎯 **智能弹窗管理** - 全屏模式切前台时自动关闭空弹窗，保留有内容的弹窗
-- ⚡ **保持稳定性** - 保留 3 秒防抖机制，确保用户体验流畅
+- 🐋 **Whale Custom Toolbox additions**
+  - 🖼️ **⑦Quick Image Import** - quickly import images into the daily diary
+  - 📑 **⑧Mobile Tab** - added a floating mobile tab bar with pin support
+  - 📋 **⑨Mobile Floating Outline** - added a floating mobile outline panel for quickly browsing document structure
+  - 📄 **⑪Mobile Previous/Next Document** - added a document navigation bar for quickly switching to the previous or next document
+- 💾 **Export/Import Configuration Data** - added configuration export and import to desktop settings for convenient backup and migration
+- 📋 **Right-click Menu Template Insertion** - ②Handwritten Template Insertion adds a "Show in text context menu" setting, allowing template buttons to be used directly from the right-click menu
+- 📏 **Reserved Width for Other Plugin Buttons** - mobile global button settings add ⑥Reserved Width for Other Plugin Buttons, making room to shift the main toolbar left
 
-#### ✨ 新增功能
+#### 🔧 Feature optimizations
 
-- 📝 **初次配置导航提示** - 手机端一键记事弹窗新增配置引导功能
-  - 便利贴式设计，淡黄色背景，醒目且友好
-  - 首次使用时显示详细的配置步骤说明
-  - 可在「4️⃣一键记事弹窗」设置中开启/关闭此提示
-  - 默认开启，配置完成后建议关闭以恢复简洁的输入界面
+- 🌙 **One-click quick note popup dark-mode adaptation** - the popup automatically detects SiYuan's theme colors and adapts to dark mode
+- 🎨 **Extension toolbar background follows** - extension toolbar background color automatically follows the toolbar background-color setting
+- ⚡ **Settings-save optimization** - checks whether the configuration changed; clicking Save with no changes no longer reloads the interface
+- 🔄 **Mobile toolbar-switch optimization** - fixed button flickering when switching documents
 
----
+#### 🐛 Bug fixes
 
-### v3.3.0 — 功能增强与体验优化版本
-
-#### ✨ 新增功能
-
-- ➕ **电脑端刷新重载全屏** - 新增①基础功能类型「刷新重载全屏」，一键刷新当前页面
-- 📝 **一键记事插入位置选择** - 新增插入文档顶部、底部选项，满足不同记事习惯
-- 🎨 **阿里巴巴图标库扩展** - 新增 400+ 精美阿里巴巴图标，图标总数超过 1000 种
-- 🎛️ **设置编辑器美化** - 优化设置界面视觉体验，新增滑杆设置组件
-- 📜 **插件声明** - 增加参考叶归插件的声明，致敬开源社区
-
-#### 🔧 功能优化
-
-- 💻 **电脑端一键记事弹窗** - 优化弹窗交互体验，提升操作流畅度
-- 📐 **设置排版布局** - 优化电脑端、手机端设置页面排版，信息层级更清晰
-- 🎯 **自启动检测逻辑** - 优化一键记事自启动弹窗的全屏/小屏检测机制，触发更准确
-- ⚙️ **按钮默认值** - 调整自启动一键记事按钮的默认配置
-
-#### 🛠 修复与改进
-
-**1. 修复自启动一键记事弹窗输入法反复弹出**
-   - 后台启动时输入法不再反复弹出
-   - 输入法行为顺应浏览器与系统原生逻辑
-
-**2. 修复电脑端鲸鱼定制工具箱⑤叶归LifeLog适配**
-   - 修复输入完成后自动跳转到文档顶部的问题
-   - 修复点击非弹窗区域会自动关闭的问题
-
-**3. 修复电脑端①手写模板插入**
-   - 修复新建按钮时看不到模板内容和编辑器的问题
+- 🔧 **Fixed toolbar button flickering during flashcards**
+- 🔧 **Fixed some shortcuts not working on mobile**
+- 🔧 **Fixed desktop configuration of mobile buttons becoming unsynchronized**
+- 🔧 **Fixed Whale Custom Toolbox ⑤Yegui LifeLog adaptation: after confirmation, it automatically jumped to the top of the diary and opened the IME again on mobile**
+- 🔧 **Fixed Whale Custom Toolbox ⑦scrolling to the top or bottom of a document failing when encountering tables**
+- 🔧 **Fixed buttons automatically jumping to the top when no document content was selected**
+- 🔧 **Fixed the issue where clicking a button automatically jumped to the top when no document content was selected**
 
 ---
 
-#### 🎟️ 激活码方案与权益说明
+### v3.3.2 — Feature Enhancement and Performance Optimization
 
-**《鲸鱼定制工具箱》激活码方案全面升级！**
+#### ✨ New Features
 
-**1️⃣ 永久正价：45 元**
+- 📚 **Illustrated Plugin Usage Guide** - Added a detailed usage guide with illustrated demonstrations
+- 🧭 **Navigation Icon Category** - Added the Alibaba Icon «Navigation Icons» subcategory, containing 48 commonly used navigation and operation icons
+  - Direction control: up, down, left, right, forward, backward, and other direction icons
+  - Basic operations: play, menu, camera, like, QR code, zoom in, zoom out, and more
+  - Interface control: full screen, exit full screen, list, switch, layer, and more
+  - Editing functions: add, delete, modify, confirm, favorite, search, and more
+- 🔄 **Toolbar Retry Loading Mechanism** - Added retry loading for the top and bottom toolbars
+  - Prevents incomplete toolbar loading caused by device lag
+  - Automatically detects and retries to ensure that the toolbars display normally
+- 🐋 **Whale Custom Toolbox Enhancements** - Optimized multiple functions
+  - **Jump-to-Activation Function** - Supports jumping to the activation page and provides a complete feature activation flow
+  - **Diary Insertion Position Selection** - Added options to insert at the top or bottom of the diary (④); the diary insertion position can be selected in settings
+  - **Database Floating Popup Optimization** - Optimized the visual presentation of the ③ database floating popup and improved its layout and styling
 
-包含内容：
-- **永久激活码**（电脑、手机均可用）
-- **解锁全部 15 项付费功能**
+#### 🔧 Optimizations
 
-**2️⃣ 普通优惠：36 元（8 折，限量 10 个，送完即止）🔥推荐**
-- **永久激活码**（电脑、手机均可用）
-- **限时 8 折优惠**
+- 🚀 **Performance Optimization** - Comprehensively optimized plugin runtime performance
+  - Optimized the scope and trigger frequency of MutationObserver monitoring
+  - Reduced resource usage and improved response speed
+  - Improved timer management and reduced unnecessary calculations
+- 🎯 **Database Floating Popup Display** - Optimized the ③ feature of the Whale Custom Toolbox
+  - Improved popup layout and styling
+  - Improved user experience and readability
+- ⚡ **Auto-Start Quick Note Popup Logic** - Optimized small-window mode detection logic
+  - Improved the detection mechanism for ① disabling auto-start
+  - Reduced the performance cost of ③ full mode
+  - Optimized overall performance and reduced resource usage
+- 💾 **Button Drag-and-Drop Sorting Stability** - Optimized configuration saving after button drag-and-drop sorting
+  - Sorting results are more stable and reliable
+  - Configuration file writing is more robust
 
-**3️⃣ 学生优惠：22.5 元（5 折）**
-- **永久激活码**（电脑、手机均可用）
-- 需提供可证明在读学生身份的信息
+#### 🗑️ Removed Features
 
-**4️⃣ 定制开发：100 元起**
-- 专属功能定制，仅自己可见或纳入工具箱
-- 作者评估实现
+- 📵 **Removed the Initial Configuration Navigation Prompt** - Removed the initial setup guide from the mobile Quick Note popup
+  - Simplified the input interface and restored a clean experience
+  - Users can view configuration instructions through settings
 
-**📐 激活方案定价原则**
+---
 
-1. 免费功能已经占据 80%，通常免费功能已经可以满足需求
-2. 鲸鱼定制工具箱功能均为定制，每项功能作者均额外花费大量时间制作并调整适配
-3. 目前鲸鱼定制工具箱有 17 项定制功能，其中 2 项免费，共 15 项付费功能
-4. 基于花费的时间和精力，以及前期的定制均为免费，作者决定每项定制定价为 3 元，进而决定永久价格
-5. 后续将继续增加定制功能，价格也会适当上涨
-6. 同时适当增加部分免费定制功能，不大幅调整价格
+### v3.3.1 — Quick Note Popup Trigger Logic Optimization
 
-**📋 付款发码流程**
+#### 🔧 Core Optimizations
 
-1. **选择方案** - 选择适合你的套餐方案
-2. **扫码转账** - 使用微信或支付宝扫码付款，付款备注请提供用户名
-3. **提供信息** - 将付款截图和用户名发送至 1711455244@qq.com 邮箱，或加入 QQ 群联系群主
-4. **获取激活码** - 群主核实后发放激活码，粘贴激活即可解锁全部功能
+- ✨ **Simplified Trigger Mechanism** - Show the popup when switching to the background; intelligently close it when switching to the foreground
+- 🧹 **Removed Complex Detection Logic** - Removed detection for frequent switching, extended background operation, freeze recovery, and similar conditions
+- 🎯 **Smart Popup Management** - Automatically closes an empty popup when returning to the foreground in full-screen mode, while retaining popups containing content
+- ⚡ **Maintained Stability** - Retained the 3-second debounce mechanism to ensure a smooth user experience
 
-进群咨询/获取：**QQ群 1018010924**
+#### ✨ New Features
+
+- 📝 **Initial Configuration Navigation Prompt** - Added a configuration guide to the mobile Quick Note popup
+  - Sticky-note-style design with a pale yellow background that is noticeable and friendly
+  - Displays detailed configuration steps on first use
+  - Can be enabled/disabled in the «4️⃣ Quick Note Popup» settings
+  - Enabled by default; disabling it after configuration is recommended to restore a clean input interface
+
+---
+
+### v3.3.0 — Feature Enhancement and Experience Optimization
+
+#### ✨ New Features
+
+- ➕ **Desktop Refresh and Full-Screen Reload** - Added the ① basic feature type «Refresh and Reload Full Screen» to refresh the current page with one click
+- 📝 **Quick Note Insertion Position Selection** - Added options to insert at the top or bottom of a document to accommodate different note-taking habits
+- 🎨 **Alibaba Icon Library Expansion** - Added 400+ attractive Alibaba icons, bringing the total number of icons to over 1,000
+- 🎛️ **Settings Editor Visual Improvements** - Optimized the visual experience of the settings interface and added slider setting components
+- 📜 **Plugin Notice** - Added a notice referencing the 叶归 plugin as a tribute to the open-source community
+
+#### 🔧 Optimizations
+
+- 💻 **Desktop Quick Note Popup** - Optimized popup interaction and improved operational smoothness
+- 📐 **Settings Layout** - Optimized the layout of the desktop and mobile settings pages and clarified the information hierarchy
+- 🎯 **Auto-Start Detection Logic** - Optimized full-screen/small-screen detection for the Quick Note auto-start popup for more accurate triggering
+- ⚙️ **Button Defaults** - Adjusted the default configuration of the auto-start Quick Note button
+
+#### 🛠 Fixes and Improvements
+
+**1. Fixed the input method repeatedly popping up in the auto-start Quick Note popup**
+   - The input method no longer repeatedly pops up when starting in the background
+   - Input method behavior now follows the browser and system's native logic
+
+**2. Fixed desktop adaptation for the Whale Custom Toolbox ⑤ 叶归 LifeLog**
+   - Fixed the issue where completing input automatically jumped to the top of the document
+   - Fixed the issue where clicking outside the popup automatically closed it
+
+**3. Fixed desktop ① handwritten template insertion**
+   - Fixed the issue where the template content and editor were not visible when creating a new button
+
+---
+
+#### 🎟️ Activation Code Plans and Benefits
+
+**The 《Whale Custom Toolbox》 activation code plans have been comprehensively upgraded!**
+
+**1️⃣ Permanent Regular Price: 45 yuan**
+
+Includes:
+- **Permanent activation code** (usable on both desktop and mobile)
+- **Unlocks all 15 paid features**
+
+**2️⃣ Standard Discount: 36 yuan (20% off, limited to 10, while supplies last) 🔥Recommended**
+- **Permanent activation code** (usable on both desktop and mobile)
+- **Limited-time 20% discount**
+
+**3️⃣ Student Discount: 22.5 yuan (50% off)**
+- **Permanent activation code** (usable on both desktop and mobile)
+- Information proving current student status is required
+
+**4️⃣ Custom Development: from 100 yuan**
+- Custom features exclusively visible to you or included in the toolbox
+- Implementation assessed by the author
+
+**📐 Activation Plan Pricing Principles**
+
+1. Free features already account for 80%; in most cases, the free features can already meet users' needs
+2. All Whale Custom Toolbox features are customized; the author spends substantial additional time creating and adapting each feature
+3. The Whale Custom Toolbox currently has 17 customized features, 2 of which are free, leaving 15 paid features
+4. Based on the time and effort spent, and because the earlier customization work was free, the author decided to price each customized feature at 3 yuan, which determined the permanent price
+5. More customized features will continue to be added, and the price will increase appropriately
+6. Some additional free customized features will also be added without making a major price adjustment
+
+**📋 Payment and Code Delivery Process**
+
+1. **Choose a plan** - Choose the package plan that suits you
+2. **Scan to transfer payment** - Use WeChat or Alipay to scan and pay; include your username in the payment note
+3. **Provide information** - Send the payment screenshot and username to 1711455244@qq.com, or join the QQ group and contact the group owner
+4. **Receive the activation code** - After verification by the group owner, an activation code will be issued; paste it to unlock all features
+
+Join the group for consultation / access: **QQ Group 1018010924**
 
 
-### v3.2.1 — 稳定性修复版本
+### v3.2.1 — Stability Fixes
 
-### 🛠 修复与优化
+### 🛠 Fixes and Optimizations
 
-| 序号 | 修复内容 |
+| No. | Fix |
 | ------ | ---------- |
-| 1    | 修复电脑端工具栏加载频繁导致卡顿的问题 |
-| 2    | 修复电脑端鲸鱼定制工具箱，③数据库悬浮弹窗，链接失效问题 |
+| 1    | Fixed desktop toolbar lag caused by frequent loading |
+| 2    | Fixed the invalid link issue in the desktop Whale Custom Toolbox's ③ database floating popup |
 
 ---
 
-### v3.2.0 — 一键记事与工具箱增强版本
+### v3.2.0 — Quick Note and Toolbox Enhancement
 
-### ✨ 新增功能
+### ✨ New Features
 
-#### 一、自启动一键记事
+#### I. Auto-Start Quick Note
 
-应用从后台切回前台时自动弹出记事弹窗，快速记录想法。
+Automatically opens a note-taking popup when the app returns to the foreground from the background, allowing you to quickly record ideas.
 
-| 功能项 | 说明                                                                          |
+| Feature | Description                                                                          |
 | -------- | ------------------------------------------------------------------------------- |
-| **触发模式**       | 支持三种模式：①关闭 ②仅小窗模式 ③小窗+全屏模式                             |
-| **保存方式**       | 可选择保存到笔记本当日日记，或追加到指定文档                                  |
-| **智能关闭**       | 应用切到后台时自动关闭弹窗                                                    |
-| **弹窗布局**       | 上下分栏：上部输入框（最小保留一行），下部工具栏按钮（最大50%高度，超出滚动） |
-| **字体调节**       | 输入框字体大小支持 12-30px 调节                                               |
-| **按钮排序**       | 支持顶部工具栏排序（从右往左）或底部工具栏排序（从左往右）                    |
+| **Trigger mode**       | Supports three modes: ① Disabled ② Small-window mode only ③ Small-window + full-screen modes                             |
+| **Save method**       | Choose to save to the notebook's current-day diary or append to a specified document                                  |
+| **Smart close**       | Automatically closes the popup when the app switches to the background                                                    |
+| **Popup layout**       | Upper/lower split: upper input box (retains at least one line), lower toolbar buttons (maximum 50% height; scrolls when exceeded) |
+| **Font adjustment**       | Input box font size adjustable from 12-30px                                               |
+| **Button sorting**       | Supports top toolbar sorting (right to left) or bottom toolbar sorting (left to right)                    |
 
-#### 二、按钮一键记事
+#### II. Quick Note Button
 
-在工具栏添加「一键记事」按钮，点击后直接弹出记事编辑界面。
+Adds a «Quick Note» button to the toolbar; clicking it directly opens the note-taking editor.
 
-| 功能项 | 说明                               |
+| Feature | Description                               |
 | -------- | ------------------------------------ |
-| **按钮类型**       | 新增「⑤一键记事」功能类型         |
-| **独立配置**       | 每个按钮可单独配置保存方式和目标ID |
-| **快速触发**       | 点击按钮立即弹出记事弹窗，无需等待 |
+| **Button type**       | Added the «⑤ Quick Note» feature type         |
+| **Independent configuration**       | Each button can independently configure the save method and target ID |
+| **Quick trigger**       | Clicking the button immediately opens the note-taking popup without waiting |
 
-#### 三、一键记事弹窗按钮适配
+#### III. Quick Note Popup Button Adaptation
 
-弹窗内展示工具栏自定义按钮，实现快捷操作：
+Displays custom toolbar buttons inside the popup for quick operations:
 
-| 功能 | 说明                                                         |
+| Feature | Description                                                         |
 | ------ | -------------------------------------------------------------- |
-| **按钮展示**     | 弹窗内显示所有已配置的自定义按钮                             |
-| **排序方式**     | 支持顶部工具栏排序（从右往左）或底部工具栏排序（从左往右）   |
-| **高度调节**     | 按钮高度支持 24-66px 调节                                    |
-| **输入法保持**     | 点击按钮时不关闭输入法，可连续输入                           |
-| **功能支持**     | 支持模板插入、弹窗选择、思源内置功能、模拟点击等所有按钮类型 |
+| **Button display**     | Displays all configured custom buttons inside the popup                             |
+| **Sorting method**     | Supports top toolbar sorting (right to left) or bottom toolbar sorting (left to right)   |
+| **Height adjustment**     | Button height adjustable from 24-66px                                    |
+| **Input method retention**     | Clicking a button does not close the input method, allowing continuous input                           |
+| **Feature support**     | Supports template insertion, popup selection, SiYuan built-in functions, simulated clicks, and all other button types |
 
-#### 四、按钮功能增强
+#### IV. Button Feature Enhancements
 
-| 功能 | 说明                                             |
+| Feature | Description                                             |
 | ------ | -------------------------------------------------- |
-| **默认按钮新增**     | 首次安装插件电脑端、手机端新增默认按钮：最近文档 |
-| **新建按钮名称修改**     | 新增名称序号，便于区分                           |
-| **手写模板插入增强**     | 新增「追加到每日笔记末尾」选项                   |
-| **模拟点击社区**     | 新增《社区可用代码分享》帖子入口                 |
+| **New default button**     | On first plugin installation, adds a new default button on desktop and mobile: Recent Documents |
+| **New button name modification**     | Adds a name sequence number for easier distinction                           |
+| **Enhanced handwritten template insertion**     | Added the «Append to the end of the daily note» option                   |
+| **Simulated Community Click**     | Added an entry to the 《Community Available Code Sharing》 post                 |
 
-#### 五、美化插件
+#### V. Plugin Visual Improvements
 
-| 功能 | 说明 |
+| Feature | Description |
 | ------ | ------ |
-| **一键记事弹窗美化** | 优化弹窗视觉样式，提升使用体验 |
-| **新增思源图标** | 扩展图标库，支持更多思源内置图标选择 |
-| **新增阿里巴巴图标** | 新增 380 个精美阿里巴巴图标（7款风格） |
-| **新增显示名称** | 按钮支持显示文字名称，替代或配合图标展示 |
-| **工具栏样式选择** | 新增工具栏分割线样式选项 |
-| **设置分区优化** | 设置项分区分类并添加序号，结构更清晰 |
-| **布局优化** | 优化电脑端、手机端设置布局，增加功能说明 |
+| **Quick Note popup visual improvements** | Optimized popup visuals and improved the user experience |
+| **New SiYuan icons** | Expanded the icon library to support selecting more SiYuan built-in icons |
+| **New Alibaba icons** | Added 380 attractive Alibaba icons (7 styles) |
+| **New display name** | Buttons can display text names instead of or alongside icons |
+| **Toolbar style selection** | Added toolbar divider style options |
+| **Settings section optimization** | Grouped settings and added sequence numbers for a clearer structure |
+| **Layout optimization** | Optimized desktop and mobile settings layouts and added feature descriptions |
 
-#### 六、鲸鱼定制工具箱（需激活）
+#### VI. Whale Custom Toolbox (Activation Required)
 
-**新增功能：**
+**New features:**
 
-| 功能 | 说明                                                   |
+| Feature | Description                                                   |
 | ------ | -------------------------------------------------------- |
-| **① 连续点击自定义按钮**     | 按名称遍历并自动点击多个自定义按钮，支持配置间隔时间   |
-| **⑥ 弹窗框模板选择**     | 弹窗内多模板快速选择，适配输入法避让，支持一键记事弹窗 |
-| **⑦ 滚动文档顶部或底部**     | 一键跳转文档首尾                                       |
+| **① Continuously click custom buttons**     | Traverses and automatically clicks multiple custom buttons by name; supports configuring the interval   |
+| **⑥ Popup template selection**     | Quickly selects among multiple templates in the popup, accommodates the input method, and supports the Quick Note popup |
+| **⑦ Scroll to the top or bottom of the document**     | Jumps to the beginning or end of a document with one click                                       |
 
-**功能优化：**
+**Feature optimizations:**
 
-| 功能 | 说明                                    |
+| Feature | Description                                    |
 | ------ | ----------------------------------------- |
-| **② 打开指定ID块**     | 修复偶发失效问题，优化执行逻辑          |
-| **③ 数据库悬浮弹窗**     | 修复偶发失效问题                        |
-| **④ 日记底部**     | 增加日记本ID配置，支持跳过确认按钮      |
-| **⑤叶归 LifeLog 适配**     | 电脑端新增 Enter 确认、Esc 取消键盘适配 |
+| **② Open a specified ID block**     | Fixed an occasional failure and optimized the execution logic          |
+| **③ Database floating popup**     | Fixed an occasional failure                        |
+| **④ Bottom of diary**     | Added notebook ID configuration and support for skipping the confirmation button      |
+| **⑤ 叶归 LifeLog adaptation**     | Added Enter-to-confirm and Esc-to-cancel keyboard support on desktop |
 
-### 🛠 修复与优化
+### 🛠 Fixes and Optimizations
 
-| 序号 | 修复内容                                 |
+| No. | Fix                                 |
 | ------ | ------------------------------------------ |
-| 1    | 修复页面刷新时工具栏透明度规则失效的问题 |
-| 2    | 优化添加新按钮时的默认名称生成逻辑       |
-| 3    | 修复「打开指定ID块」功能偶发失效问题     |
-| 4    | 修复「数据库悬浮弹窗」功能偶发失效问题   |
-| 5    | 修复电脑端鼠标悬浮按钮出现双重提示的问题 |
-| 6    | 修复右上角提示消息按钮无效问题           |
-| 7    | 修复电脑端工具栏需要选中文档才出现的问题 |
+| 1    | Fixed toolbar opacity rules not taking effect when the page was refreshed |
+| 2    | Optimized default name generation when adding a new button       |
+| 3    | Fixed the occasional failure of «Open a specified ID block»     |
+| 4    | Fixed the occasional failure of «Database floating popup»   |
+| 5    | Fixed duplicate tooltips appearing when hovering over desktop toolbar buttons |
+| 6    | Fixed the top-right notification message button not working           |
+| 7    | Fixed desktop toolbars appearing only after a document was selected      |
 
 ---
 
-### v3.1.0 — 鲸鱼定制工具箱增强版本
+### v3.1.0 — Whale Custom Toolbox Enhancement
 
-> 🐋 **《鲸鱼定制工具箱》功能详解**：为满足用户个性化需求，我们新增了鲸鱼定制工具箱，包含高级定制功能
+> 🐋 **《Whale Custom Toolbox》 Feature Details**: To meet users' personalization needs, we added the Whale Custom Toolbox, which contains advanced customization features
 
-#### 🧰 《鲸鱼定制工具箱》说明
+#### 🧰 《Whale Custom Toolbox》 Description
 
-##### 1. 功能说明：
+##### 1. Feature description:
 
-   1. 所有作者、个人的定制化需求，均会加入到工具箱。
-   2. 核心功能：开箱即用！除基础配置外，无需折腾！
-   3. 本插件的免费功能，已经占据95%，如果您仍然需要单独定制功能，请私聊作者，为您私人定制！完成后，按钮将加入工具箱。
+   1. All customized requirements from the author and individuals will be added to the toolbox.
+   2. Core principle: ready to use out of the box! Apart from basic configuration, no tinkering is required!
+   3. The free features of this plugin already account for 95%. If you still need individually customized features, contact the author privately for a bespoke solution! Once completed, the button will be added to the toolbox.
 
-##### 2. 激活码获取：
+##### 2. Obtaining an activation code:
 
-   1. 如果您觉得这个插件好用，不妨支持一下作者，任意金额的打赏，都可以进群私聊群主获得激活码。
-   2. 如果您是学生，可进群私聊群主，简单发一下能证明学生的信息，我会免费给您激活码。
-   3. 如果您只是想进群交流、体验或观望，也欢迎进群沟通，我会不定期随缘赠送激活码
-   4. 后续，随着《鲸鱼定制工具箱》功能大幅增加，是否更改激活码获取规则？视情况而定。
+   1. If you find this plugin useful, consider supporting the author. A tip of any amount lets you join the group and privately contact the group owner to obtain an activation code.
+   2. If you are a student, join the group and privately contact the group owner; briefly provide information proving your student status, and I will activate it for you free of charge.
+   3. If you only want to join the group to chat, try it out, or look around, you are also welcome; I will occasionally give away activation codes at my discretion.
+   4. As the features of the 《Whale Custom Toolbox》 increase substantially, whether the activation code rules will change will be determined according to circumstances.
 
-#### ✨ 新增
+#### ✨ New
 
-- 新增全局配置批量应用开关
-- 新增"鲸鱼定制工具箱"中"打开指定ID块"功能
-- 新增"叶归LiefLog适配"功能，深度适配叶归
-- 新增"电脑端检查更新"功能
+- Added a global configuration batch-application switch
+- Added the «Open a specified ID block» feature to the "Whale Custom Toolbox"
+- Added the “叶归 LifeLog adaptation” feature for deep 叶归 integration
+- Added the "Check for updates on desktop" feature
 
-#### 🛠 修复
+#### 🛠 Fixes
 
-- 修复全局按钮配置与单独按钮配置冲突问题
-- 修复电脑端工具栏点击效果不会消失，一直保持"被按下"的视觉状态问题
-- 修复了电脑端工具栏，鼠标悬停按钮时的效果问题
-- 修复"鲸鱼定制工具箱"中"打开指定ID块"功能无法使用问题
-- 修复更新提示弹窗，点击弹窗外部区域关闭的问题
+- Fixed conflicts between global button configuration and individual button configuration
+- Fixed the issue where desktop toolbar click effects did not disappear and remained visually in a "pressed" state
+- Fixed the hover effect for desktop toolbar buttons
+- Fixed the issue preventing the "Open a specified ID block" feature in the "Whale Custom Toolbox" from being used
+- Fixed the issue where clicking outside the update notification popup closed it
 
-### v3.0.0 — 重大重构版本
+### v3.0.0 — Major Refactoring
 
-> ⚠️ **声明**：由于本版本进行了大量代码重构，不排除存在未知 Bug，欢迎进群反馈（QQ：1018010924）
+> ⚠️ **Notice**: As this version involved extensive code refactoring, unknown bugs may exist. Feedback is welcome in the group (QQ: 1018010924)
 
-#### ✨ 新增
+#### ✨ New
 
-**更新一：扩展工具栏**
+**Update 1: Extended Toolbar**
 
-*顶部扩展工具栏*
-- 支持多层扩展工具栏弹出（1-5层可配置）
-- 点击「⋯」按钮在底部工具栏上方弹出扩展工具栏
-- 再次点击关闭扩展工具栏
+*Top extended toolbar*
+- Supports multi-level extended toolbar popups (1-5 levels configurable)
+- Clicking the «⋯» button opens the extended toolbar above the bottom toolbar
+- Click again to close the extended toolbar
 
-*底部扩展工具栏*
-- 溢出自动检测：根据底部工具栏动态宽度，自动计算并溢出超宽按钮
-- 智能宽度计算：按钮宽度 = minWidth + padding + marginRight
-- 自动识别不同手机屏幕宽度，适配各种设备
+*Bottom extended toolbar*
+- Automatic overflow detection: dynamically calculates and overflows buttons that are too wide based on the bottom toolbar's dynamic width
+- Intelligent width calculation: button width = minWidth + padding + marginRight
+- Automatically recognizes different mobile screen widths and adapts to various devices
 
-*按钮层级与排序*
-- 底部工具栏（第0层）：可见按钮，升序排序（0在最右）
-- 扩展工具栏（第1、2...层）：溢出按钮，降序排序（视觉从右到左）
-- 扩展工具栏按钮固定 sort=0，始终在第一位，不可删除但可开关
+*Button levels and sorting*
+- Bottom toolbar (level 0): visible buttons, sorted in ascending order (0 is farthest right)
+- Extended toolbar (levels 1, 2...): overflow buttons, sorted in descending order (visually from right to left)
+- Extended toolbar buttons have a fixed sort=0 and always appear first; they cannot be deleted but can be toggled
 
-**更新二：工具栏背景颜色自适应**
-- 明亮模式与黑暗模式独立配置
-- 背景颜色同时应用到扩展工具栏
-- 透明度设置同步应用于所有工具栏
+**Update 2: Adaptive Toolbar Background Color**
+- Independent configuration for light and dark modes
+- Background color also applies to the extended toolbar
+- Opacity settings apply synchronously to all toolbars
 
-**更新三：全局按钮配置**
-- 图标大小：批量设置所有按钮默认值
-- 按钮宽度：批量设置所有按钮默认值
-- 右边距：批量设置所有按钮默认值
-- 右上角提示：一键开启/关闭所有按钮提示
+**Update 3: Global Button Configuration**
+- Icon size: batch-set the default value for all buttons
+- Button width: batch-set the default value for all buttons
+- Right margin: batch-set the default value for all buttons
+- Top-right tooltip: enable/disable all button tooltips with one click
 
-**更新四：顶部、底部工具栏配置**
-- 工具栏置底开关（手机端）
-- 工具栏高度调节（桌面端）
-- 输入法偏移距离（手机端）
-- 扩展按钮距离顶部/底部距离
+**Update 4: Top and Bottom Toolbar Configuration**
+- Toolbar anchoring switch (mobile)
+- Toolbar height adjustment (desktop)
+- Input method offset distance (mobile)
+- Extended button distance from the top/bottom
 
-**更新五：鲸鱼定制工具**
-- 标签紫色加粗显示，便于快速识别
-- 支持打开指定ID文档
-- 数据库悬浮弹窗（支持手机端）
-- 日记底部功能（可配置等待时间）
+**Update 5: Whale Custom Toolbox**
+- Labels displayed in bold purple for quick identification
+- Supports opening a specified ID document
+- Database floating popup (supports mobile)
+- Bottom-of-diary feature (configurable wait time)
 
-#### 🔧 技术改进
-- **深度适配思源源码**：通过阅读思源笔记源码，直接优化思源本体工具栏逻辑
-- **更加贴合思源本体**：更改后的工具栏与思源原生样式和交互无缝融合
-- **当前版本兼容**：在目前思源版本中经过充分测试，插件正常工作
-- **修复大量遗留 Bug**：优化代码质量，提升稳定性
+#### 🔧 Technical Improvements
+- **Deep SiYuan source adaptation**: By reading the SiYuan Notes source code, directly optimized the native SiYuan toolbar logic
+- **Closer to native SiYuan**: The modified toolbar seamlessly integrates with SiYuan's native styling and interactions
+- **Current-version compatibility**: Thoroughly tested on the current SiYuan version; the plugin works normally
+- **Fixed numerous legacy bugs**: Improved code quality and stability
 
-#### 🛠 修复
+#### 🛠 Fixes
 
-*交互优化*
-| 位置 | 按钮类型 | 输入法行为 |
+*Interaction optimization*
+| Location | Button type | Input method behavior |
 |------|----------|------------|
-| 主工具栏 | 思源内置功能 | 关闭 |
-| 主工具栏 | 其他类型 | 不关闭 |
-| 扩展工具栏按钮（⋯） | - | 不关闭 |
-| 扩展工具栏内 | 思源内置功能 | 关闭 |
-| 扩展工具栏内 | 其他类型 | 不关闭 |
+| Main toolbar | SiYuan built-in function | Closes |
+| Main toolbar | Other type | Does not close |
+| Extended toolbar button (⋯) | - | Does not close |
+| Inside extended toolbar | SiYuan built-in function | Closes |
+| Inside extended toolbar | Other type | Does not close |
 
-- 完全恢复思源原始状态功能生效，开启后隐藏所有自定义按钮
+- Fully restored SiYuan's original-state functionality: when enabled, hides all custom buttons
 
-#### 📝 文档更新
-- 新增名词统一表（底部工具栏、锁定按钮、扩展工具栏按钮、扩展工具栏、可见按钮、溢出按钮）
-- 常用ID链接移至「自动化模拟点击」说明中
+#### 📝 Documentation Updates
+- Added a glossary of standardized terms (bottom toolbar, locked button, extended toolbar button, extended toolbar, visible button, overflow button)
+- Moved frequently used ID links to the «Automated Simulated Click» instructions
 
-#### 🚀 代码重构
-- 拆分 UI / Settings / Components 模块
-- 主类职责单一化
-- 提高可维护性、可扩展性、可读性
-- 为后续功能扩展和测试奠定结构基础
+#### 🚀 Code Refactoring
+- Split the UI / Settings / Components modules
+- Made the main class single-purpose
+- Improved maintainability, extensibility, and readability
+- Established a structural foundation for future feature expansion and testing
 
 ### v2.5.1
 
-#### ✨ 新增
-- 桌面端，增加自行调节工具栏高度功能
-- 桌面端，增加完全恢复思源原始状态功能（禁用所有自定义按钮和样式修改）
-- 手机端，增加工具栏背景颜色配置（明亮模式 + 黑暗模式独立设置）
+#### ✨ New
+- Desktop: added the ability to adjust toolbar height
+- Desktop: added a complete restore of SiYuan's original state (disables all custom buttons and style modifications)
+- Mobile: added toolbar background color configuration (independent settings for light and dark modes)
 
 ### v2.4.7
 
-#### 🛠 修复
-- 修复 iOS 手机端底部白条问题（home indicator 遮挡工具栏）
+#### 🛠 Fixes
+- Fixed the bottom white bar on iOS mobile (home indicator covering the toolbar)
 
 ### v2.4.5
 
-#### 🛠 修复
-- 手机端设置工具栏高度设置问题
-- 鸿蒙手机端，无法修改工具栏颜色的问题
-- 鸿蒙手机端，在不打开底部工具栏时，底部仍然有白色占位的背景条问题
-- iOS 手机端，工具栏层级设置非常高，底部工具栏仍然被遮挡问题
-- 修复部分遗留 bug（内存泄漏、性能优化）
+#### 🛠 Fixes
+- Fixed the mobile toolbar height setting
+- Fixed the issue preventing toolbar color changes on HarmonyOS phones
+- Fixed the issue where a white placeholder background bar remained at the bottom on HarmonyOS phones when the bottom toolbar was not opened
+- Fixed the issue where the bottom toolbar remained obscured on iOS phones despite its very high z-index setting
+- Fixed some legacy bugs (memory leaks and performance issues)
 
-#### ✨ 新增
-- 新增全局工具栏配置
-- 增加颜色选择按钮：选择颜色 or 跟随主题色变化
-- 第一次安装，手机端、电脑端默认加 7 个按钮
-- 思源默认按钮：更多、打开菜单、锁住文档；替换为更好点的按钮
+#### ✨ New
+- Added global toolbar configuration
+- Added a color selection button: select a color or follow the theme color
+- On first installation, added 7 default buttons on mobile and desktop
+- Replaced SiYuan default buttons—More, Open Menu, and Lock Document—with better buttons
 
-### v2.0.0（重构、简化操作）
+### v2.0.0 (Refactoring and Simplified Operation)
 
-#### ✨ 新增
+#### ✨ New
 
-**增强兼容性**
-| 平台                              | 是否支持    |
+**Enhanced compatibility**
+| Platform                              | Supported    |
 | ----------------------------------- | ------------- |
-| 鸿蒙系统                          | ✅ 正常支持 |
-| Android                           | ✅ 支持     |
-| iOS                               | ✅ 支持     |
-| 桌面端（Windows / macOS / Linux） | ✅ 支持     |
-| WebView / 内嵌环境                | ✅ 稳定     |
+| HarmonyOS                          | ✅ Fully supported |
+| Android                           | ✅ Supported     |
+| iOS                               | ✅ Supported     |
+| Desktop (Windows / macOS / Linux) | ✅ Supported     |
+| WebView / Embedded environment                | ✅ Stable     |
 
-**简化操作**
-- 预设 **23 个**手机端思源内置按钮，供用户快速选择
-- 支持电脑端配置手机端按钮
+**Simplified operation**
+- Presets **23** SiYuan built-in mobile buttons for quick selection
+- Supports configuring mobile buttons on desktop
 
-**新增功能**
-- 电脑端打开手机伺服浏览器预览
-- 100 种按钮图标选择
-- 按钮开关功能（可临时禁用按钮）
-- 手写模板变量增强：小时、分钟、秒
-- 首次安装欢迎提示
-- 自动化模拟点击预设：打开插件设置、打开伺服浏览器
+**New features**
+- Open the mobile serving browser preview on desktop
+- 100 button icon choices
+- Button toggle (buttons can be temporarily disabled)
+- Enhanced handwritten template variables: hours, minutes, seconds
+- Welcome prompt on first installation
+- Preset automated simulated clicks: open plugin settings, open serving browser
 
-#### 🛠 修复
-- 鸿蒙系统适配问题
+#### 🛠 Fixes
+- Fixed HarmonyOS compatibility issues
 
 ### v1.1.2
-- 增加执行快捷键按钮
-- 栏内按钮均匀分布设置
+- Added an execute shortcut button
+- Added an even button distribution setting within the bar
 
 ### v1.0.6
-- 修复工具栏按钮全部删除后会重新出现的问题
+- Fixed the issue where all toolbar buttons reappeared after being deleted
 
 ### v1.0.5
-- 修复插件设置中"保存 / 取消"按钮位置异常
-- 修复工具栏按钮无法正常删除
-- 修复底部工具栏遮挡设置界面
-- 新增插入模板内容功能，支持自动填充时间、日期
-- 手机端新增工具栏高度设置
-- 手机端新增工具栏层级（z-index）设置
+- Fixed the abnormal position of the "Save / Cancel" buttons in plugin settings
+- Fixed the issue preventing toolbar buttons from being deleted normally
+- Fixed the bottom toolbar covering the settings interface
+- Added template content insertion with automatic time and date filling
+- Added toolbar height settings on mobile
+- Added toolbar z-index settings on mobile
 
 </details>
 
 ---
 
-# ❓问题反馈Q群
+# ❓ QQ Group for Feedback
 
-感谢您的支持与反馈，这将鼓励作者持续开发
+Thank you for your support and feedback; it encourages the author to continue development
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/preview2.png" alt="预览图" width="300">
+  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/preview2.png" alt="Preview image" width="300">
 </div>
 
-# 🧧 打赏支持
+# 🧧 Support the Project
 
-感谢您的支持与反馈，这将鼓励作者持续开发
+Thank you for your support and feedback; it encourages the author to continue development
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment2.png" alt="打赏二维码" width="300">
+  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment2.png" alt="Tip QR code" width="300">
 </div>
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment1.png" alt="打赏二维码" width="300">
+  <img src="https://raw.githubusercontent.com/HaoCeans/siyuan-toolbar-customizer/main/payment1.png" alt="Tip QR code" width="300">
 </div>
 
 ---
 
 <details>
   <summary style="font-size: 24px; font-weight: 600; padding: 6px 0; cursor: pointer;">
-    📦 插件说明总览
+    📦 Plugin Documentation Overview
   </summary>
 
-| 模块 | 子项 | 内容 |
+| Module | Sub-item | Content |
 |------|------|------|
-| 安装 | 从插件集市安装 | 1. 打开思源笔记<br>2. 设置 → 集市 → 插件<br>3. 搜索 **思源手机端增强**<br>4. 点击安装 |
-| 安装 | 手动安装 | 1. 从 [GitHub Releases](https://github.com/siyuan-note/siyuan-toolbar-customizer/releases) 下载最新版本<br>2. 解压 zip 文件<br>3. 复制到 `{工作空间}/data/plugins/`<br>4. 重启思源笔记<br>5. 设置 → 集市 → 已下载 中启用插件 |
-| 开发 | 从源码构建 | `git clone https://github.com/siyuan-note/siyuan-toolbar-customizer.git`<br>`cd siyuan-toolbar-customizer`<br>`npm install`<br>`npm run dev`<br>`npm run build` |
-| 开发 | 项目结构 | `src/index.ts` 主逻辑<br>`src/toolbarManager.ts` 工具栏管理<br>`src/App.vue` 设置界面<br>`src/index.scss` 样式<br>`public/` 静态资源<br>`plugin.json` 插件元数据 |
-| 文档 | 更新日志 | 查看版本历史：<br>[CHANGELOG.md](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/CHANGELOG.md) |
-| 协议 | 许可证 | MIT License（详见 LICENSE 文件） |
-| 社区 | 贡献 | 欢迎提交 Issue 与 Pull Request |
-| 支持 | 问题反馈 | GitHub Issues：<br>👉 https://github.com/siyuan-note/siyuan-toolbar-customizer/issues |
-| 支持 | 社区讨论 | 思源社区：<br>👉 https://ld246.com |
-| 致谢 | 基础 | 基于 [思源笔记插件系统](https://github.com/siyuan-note/siyuan) |
-| 致谢 | 图标 | 来自 [Lucide](https://lucide.dev/) |
-| 致谢 | 模板 | 基于 [Vite + Vue 插件模板](https://github.com/siyuan-note/siyuan-toolbar-customizer) |
+| Installation | Install from the plugin marketplace | 1. Open SiYuan Notes<br>2. Settings → Marketplace → Plugins<br>3. Search for **SiYuan Mobile Enhancement**<br>4. Click Install |
+| Installation | Manual installation | 1. Download the latest version from [GitHub Releases](https://github.com/siyuan-note/siyuan-toolbar-customizer/releases)<br>2. Extract the zip file<br>3. Copy it to `{workspace}/data/plugins/`<br>4. Restart SiYuan Notes<br>5. Enable the plugin in Settings → Marketplace → Downloaded |
+| Development | Build from source | `git clone https://github.com/siyuan-note/siyuan-toolbar-customizer.git`<br>`cd siyuan-toolbar-customizer`<br>`npm install`<br>`npm run dev`<br>`npm run build` |
+| Development | Project structure | `src/index.ts` Main logic<br>`src/toolbarManager.ts` Toolbar management<br>`src/App.vue` Settings interface<br>`src/index.scss` Styles<br>`public/` Static assets<br>`plugin.json` Plugin metadata |
+| Documentation | Changelog | View version history:<br>[CHANGELOG.md](https://github.com/HaoCeans/siyuan-toolbar-customizer/blob/main/CHANGELOG.md) |
+| License | License | MIT License (see the LICENSE file for details) |
+| Community | Contributions | Issues and Pull Requests are welcome |
+| Support | Feedback | GitHub Issues:<br>👉 https://github.com/siyuan-note/siyuan-toolbar-customizer/issues |
+| Support | Community discussion | SiYuan community:<br>👉 https://ld246.com |
+| Acknowledgments | Foundation | Based on the [SiYuan Notes plugin system](https://github.com/siyuan-note/siyuan) |
+| Acknowledgments | Icons | From [Lucide](https://lucide.dev/) |
+| Acknowledgments | Template | Based on the [Vite + Vue plugin template](https://github.com/siyuan-note/siyuan-toolbar-customizer) |
 
 </details>

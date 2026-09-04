@@ -4,6 +4,8 @@
  * 设计风格：与手机端标签页Tab保持一致的苹果风格
  */
 
+import { logger } from '@/utils/logger'
+import { t } from '../i18n/runtime'
 import { fetchSyncPost, openMobileFileById, showMessage } from "siyuan";
 import { isMobileDevice, pluginInstance } from "../toolbarManager";
 import type { ButtonConfig } from "../toolbarManager";
@@ -277,7 +279,7 @@ async function fetchOutline(docId: string): Promise<OutlineItem[] | null> {
       return parseOutlineData(response.data)
     }
   } catch (err) {
-    console.warn('[悬浮大纲] 获取大纲失败:', err)
+    logger.warn('[悬浮大纲] 获取大纲失败:', err)
   }
   return null
 }
@@ -401,7 +403,7 @@ function updateFocusHighlight(): void {
 // ===== 大纲渲染 =====
 function renderOutline(items: OutlineItem[]): string {
   if (!items || items.length === 0) {
-    return `<div style="text-align: center; padding: 24px 16px; color: var(--b3-theme-on-surface, #8e8e93); font-size: 14px;">暂无大纲内容</div>`
+    return `<div style="text-align: center; padding: 24px 16px; color: var(--b3-theme-on-surface, #8e8e93); font-size: 14px;">${t('navigation.outline.empty', undefined, '暂无大纲内容')}</div>`
   }
 
   let html = ''
@@ -429,7 +431,7 @@ function renderOutlinePanel(): void {
   if (!listEl) return
 
   if (!state.currentDocId) {
-    listEl.innerHTML = '<div style="text-align: center; padding: 24px 16px; color: var(--b3-theme-on-surface, #8e8e93); font-size: 14px;">请先打开文档</div>'
+    listEl.innerHTML = `<div style="text-align: center; padding: 24px 16px; color: var(--b3-theme-on-surface, #8e8e93); font-size: 14px;">${t('navigation.common.openDocumentFirst', undefined, '请先打开一个文档')}</div>`
     return
   }
 
@@ -841,7 +843,7 @@ function createPanel(): void {
   // 收起按钮
   const collapseBtn = document.createElement('button')
   collapseBtn.className = 'outline-collapse-btn'
-  collapseBtn.textContent = '收起'
+  collapseBtn.textContent = t('navigation.common.collapse', undefined, '收起')
   collapseBtn.addEventListener('click', () => toggleExpand())
   outlinePanel.appendChild(collapseBtn)
 
@@ -893,7 +895,7 @@ async function loadState(): Promise<void> {
       }
     }
   } catch (err) {
-    console.warn('[悬浮大纲] 加载状态失败:', err)
+    logger.warn('[悬浮大纲] 加载状态失败:', err)
   }
 }
 
@@ -1047,7 +1049,7 @@ export async function init(context: OutlineContext): Promise<void> {
 
 export function toggleVisibility(config: ButtonConfig): void {
   if (!isMobileDevice()) {
-    showMessage('此功能仅支持手机端', 2000, 'info')
+    showMessage(t('navigation.common.mobileOnly', undefined, '此功能仅支持手机端'), 2000, 'info')
     return
   }
 
@@ -1134,7 +1136,7 @@ export function toggleVisibility(config: ButtonConfig): void {
     }
 
     if (config.showNotification !== false) {
-      showMessage('大纲已显示', 1500, 'info')
+      showMessage(t('navigation.outline.shown', undefined, '大纲已显示'), 1500, 'info')
     }
   } else {
     removePanel()
@@ -1150,7 +1152,7 @@ export function toggleVisibility(config: ButtonConfig): void {
     detachInteractionListeners()
 
     if (config.showNotification !== false) {
-      showMessage('大纲已隐藏', 1500, 'info')
+      showMessage(t('navigation.outline.hidden', undefined, '大纲已隐藏'), 1500, 'info')
     }
   }
 

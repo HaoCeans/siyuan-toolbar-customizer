@@ -3,6 +3,8 @@
  * 功能：在桌面端显示悬浮Tab栏，支持多文档快速切换和拖拽
  */
 
+import { logger } from '@/utils/logger'
+import { t } from '../i18n/runtime'
 import { fetchSyncPost, showMessage, openTab as siyuanOpenTab } from "siyuan"
 import { pluginInstance, getActiveProtyle } from "../toolbarManager"
 import type { ButtonConfig } from "../toolbarManager"
@@ -75,7 +77,7 @@ function getTabColor(notebookId: string): string {
 }
 
 function truncateTitle(title: string, maxLen = 20): string {
-  if (!title) return '未命名'
+  if (!title) return t('navigation.common.untitled', undefined, '未命名')
   return title.length > maxLen ? title.substring(0, maxLen) + '...' : title
 }
 
@@ -136,12 +138,12 @@ function addTab(docId: string, title: string, notebookId: string): TabItem {
     if (oldest) {
       state.tabs = state.tabs.filter(t => t.id !== oldest.id)
     } else {
-      showMessage('标签页已满：请先关闭未钉住的标签页', 2500, 'info')
+      showMessage(t('navigation.tabs.limitReachedDesktop', undefined, '标签页已满：请先关闭未钉住的标签页'), 2500, 'info')
       const active = getActiveTab()
       return active || {
         id: 'dtab-blocked',
         docId,
-        title: title || '未命名',
+        title: title || t('navigation.common.untitled', undefined, '未命名'),
         notebookId,
         isActive: false,
         isPinned: false,
@@ -153,7 +155,7 @@ function addTab(docId: string, title: string, notebookId: string): TabItem {
   const tab: TabItem = {
     id: generateId(),
     docId,
-    title: title || '未命名',
+    title: title || t('navigation.common.untitled', undefined, '未命名'),
     notebookId,
     isActive: true,
     isPinned: false,
@@ -197,7 +199,7 @@ function updatePinButtonState(): void {
   if (!pinBtn) return
   const active = getActiveTab()
   pinBtn.classList.toggle('pinned', !!active?.isPinned)
-  pinBtn.textContent = active?.isPinned ? '已钉住' : '钉住'
+  pinBtn.textContent = active?.isPinned ? t('navigation.tabs.pinned', undefined, '已钉住') : t('navigation.tabs.pin', undefined, '钉住')
 }
 
 // ===== 文档切换 =====
@@ -214,8 +216,8 @@ async function switchToTab(tabId: string): Promise<void> {
       }
     })
   } catch (err) {
-    console.error('[DesktopTabs] 打开文档失败:', err)
-    showMessage('打开文档失败', 3000, 'error')
+    logger.error('[DesktopTabs] 打开文档失败:', err)
+    showMessage(t('navigation.common.openDocumentFailed', undefined, '打开文档失败'), 3000, 'error')
   }
 
   // 更新状态
@@ -247,7 +249,7 @@ function handleSwitchProtyle(): void {
     }
     dirty = true
   } else {
-    addTab(docId, domTitle || '加载中...', notebookId)
+    addTab(docId, domTitle || t('navigation.common.loading', undefined, '加载中...'), notebookId)
     dirty = true
   }
 
@@ -290,7 +292,7 @@ async function loadState(): Promise<void> {
       }
     }
   } catch (err) {
-    console.warn('[DesktopTabs] 加载状态失败:', err)
+    logger.warn('[DesktopTabs] 加载状态失败:', err)
   }
 }
 
@@ -592,7 +594,7 @@ function createTabBar(): void {
   pinBtn.addEventListener('click', () => {
     const tab = getActiveTab()
     if (!tab) {
-      showMessage('请先打开一个文档', 1200, 'info')
+      showMessage(t('navigation.common.openDocumentFirst', undefined, '请先打开一个文档'), 1200, 'info')
       return
     }
     togglePinTab(tab.id)
@@ -610,7 +612,7 @@ function createTabBar(): void {
   // 收缩按钮
   const collapseBtn = document.createElement('button')
   collapseBtn.className = 'desktop-tab-collapse'
-  collapseBtn.textContent = '收起'
+  collapseBtn.textContent = t('navigation.common.collapse', undefined, '收起')
   collapseBtn.addEventListener('click', () => {
     state.isExpanded = !state.isExpanded
     tabBar.className = (state.isExpanded ? 'expanded' : 'collapsed')
@@ -703,7 +705,7 @@ export function toggleVisibility(config: ButtonConfig): void {
   // 只在桌面端运行
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
   if (isMobile) {
-    showMessage('此功能仅支持桌面端', 1500, 'error')
+    showMessage(t('navigation.common.desktopOnly', undefined, '此功能仅支持桌面端'), 1500, 'error')
     return
   }
 
@@ -716,7 +718,7 @@ export function toggleVisibility(config: ButtonConfig): void {
       const notebookId = getCurrentNotebookId()
       const domTitle = getProtyleTitle()
       if (docId) {
-        addTab(docId, domTitle || '加载中...', notebookId)
+        addTab(docId, domTitle || t('navigation.common.loading', undefined, '加载中...'), notebookId)
       }
     }
 
@@ -724,13 +726,13 @@ export function toggleVisibility(config: ButtonConfig): void {
     applyFloatPanelBackground(tabBar, config.floatOpacity, 0.85)
 
     if (config.showNotification !== false) {
-      showMessage('标签页已显示', 1500, 'info')
+      showMessage(t('navigation.tabs.shown', undefined, '标签页已显示'), 1500, 'info')
     }
   } else {
     removeTabBar()
 
     if (config.showNotification !== false) {
-      showMessage('标签页已隐藏', 1500, 'info')
+      showMessage(t('navigation.tabs.hidden', undefined, '标签页已隐藏'), 1500, 'info')
     }
   }
 

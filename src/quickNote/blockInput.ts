@@ -4,6 +4,7 @@
  */
 
 import { Protyle, getFrontend } from 'siyuan'
+import type { App } from 'siyuan'
 import { t } from '../i18n/runtime'
 import type { QuickNoteInputAreaOptions, QuickNoteInputHandle } from './inputArea'
 import { destroyQuickNoteProtyle } from './protyleIsolate'
@@ -246,7 +247,7 @@ async function resetDraftBlock(
 }
 
 export async function createBlockInputHandle(
-  app: unknown,
+  app: App,
   options: QuickNoteInputAreaOptions,
 ): Promise<QuickNoteInputHandle> {
   const wrapper = document.createElement('div')
@@ -305,7 +306,7 @@ export async function createBlockInputHandle(
     editor,
     state,
     reloadBlock,
-    () => resetDraftBlock(editor, state, options),
+    () => { void resetDraftBlock(editor, state, options) },
   )
 
   const loaded = await loadSingleBlockIntoProtyle(editor, state)
@@ -411,7 +412,7 @@ export async function createBlockInputHandle(
   }
 }
 
-function buildFallbackHandle(wrapper: HTMLElement, loadingEl: HTMLElement): QuickNoteInputHandle {
+function buildFallbackHandle(wrapper: HTMLElement, _loadingEl: HTMLElement): QuickNoteInputHandle {
   return {
     element: wrapper,
     format: 'block',

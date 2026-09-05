@@ -700,7 +700,7 @@ let toggleLockWriteQueue: Promise<void> = Promise.resolve()
 // 导出工具栏管理器对象
 export const toolbarManager = {
   executeButton: async (config: ButtonConfig) => {
-    await handleButtonClick(config);
+    await handleButtonClick(config, null, null, null);
   }
 };
 
@@ -3088,7 +3088,7 @@ function showOverflowToolbar(config: ButtonConfig) {
         const isDark = document.documentElement.getAttribute('data-theme-mode') === 'dark'
         toolbar.style.background = isDark ? 'rgba(30, 30, 30, 0.3)' : 'rgba(255, 255, 255, 0.25)'
         toolbar.style.backdropFilter = 'blur(20px) saturate(180%)'
-        toolbar.style.webkitBackdropFilter = 'blur(20px) saturate(180%)'
+        ;(toolbar.style as CSSStyleDeclaration & { webkitBackdropFilter?: string }).webkitBackdropFilter = 'blur(20px) saturate(180%)'
         toolbar.style.opacity = mobileConfig.toolbarOpacity.toString()
       } else if (mobileConfig.useThemeColor) {
         // 使用主题颜色时，只需要调整透明度
@@ -3287,7 +3287,7 @@ function showOverflowToolbar(config: ButtonConfig) {
 	        }
 
 	        // 将保存的选区传递给处理函数（使用 await 保持 async 链条）
-	        await handleButtonClick(btn, savedSelection, lastActiveElement)
+	        await handleButtonClick(btn, savedSelection, lastActiveElement, layerBtn)
 
 	        // builtin 类型的按钮不恢复焦点，让输入法自然关闭
 	        // 其他类型恢复焦点，保持输入法打开（preventScroll 防止浏览器自动滚动到顶部）
@@ -3646,7 +3646,7 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
 	        // 关闭扩展工具栏
 	        closeDesktopOverflowToolbar(breadcrumbBar, clickedButton)
 
-	        await handleButtonClick(btn, savedSelection, lastActiveElement)
+	        await handleButtonClick(btn, savedSelection, lastActiveElement, null)
 	        
 	        if (btn.type !== 'builtin' && lastActiveElement && lastActiveElement !== document.activeElement) {
 	          ;(lastActiveElement as HTMLElement).focus({ preventScroll: true })
@@ -3808,7 +3808,7 @@ function executeBuiltinFunction(config: ButtonConfig) {
   // 手机端思源的"搜索/日记/命令面板..."等 menu 开头的按钮，
   // 都在右上角设置(☰)按钮 #toolbarMore 打开的 #menu 菜单内。
   // 菜单关闭时这些元素不存在，需要先点 toolbarMore 打开菜单，再延迟点击目标。
-  if (targetId.startsWith('menu') && isMobileUIContext()) {
+  if (targetId.startsWith('menu') && isMobileDevice()) {
     const toolbarMore = document.getElementById('toolbarMore') as HTMLElement
     if (toolbarMore) {
       clickElement(toolbarMore)
@@ -4714,7 +4714,7 @@ async function executeButtonSequence(config: ButtonConfig) {
 
     // 直接执行按钮功能（不通过 DOM 点击，无需弹出扩展工具栏）
     try {
-      await handleButtonClick(buttonConfig, savedSelection, lastActiveElement)
+      await handleButtonClick(buttonConfig, savedSelection, lastActiveElement, null)
     } catch (error) {
       const buttonName = getButtonDisplayName(buttonConfig)
       Notify.showErrorClickSequenceStepFailed(
@@ -6613,7 +6613,7 @@ async function executeClearEmptyBlocks(): Promise<void> {
 
   // 2. 扫描所有块，筛选空块
   const emptyBlockIds: string[] = []
-  const blockElements = wysiwyg.querySelectorAll<HTMLElement>('[data-node-id]')
+  const blockElements = wysiwyg.querySelectorAll('[data-node-id]') as NodeListOf<HTMLElement>
 
   for (const el of blockElements) {
     // 跳过隐藏块（如折叠标题下的子块）
@@ -9756,9 +9756,11 @@ import {
 
 // 一键记事执行函数
 async function executeQuickNote(_config: ButtonConfig) {
+  let originalPluginInstance: unknown;
+  let tempPlugin: unknown;
   try {
-    const originalPluginInstance = (window as any).__pluginInstance;
-    const tempPlugin = {
+    originalPluginInstance = (window as any).__pluginInstance;
+    tempPlugin = {
       mobileFeatureConfig: {
         ...(pluginInstance?.mobileFeatureConfig || {}),
         __quickNoteButtonTrigger: true,

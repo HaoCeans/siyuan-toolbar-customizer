@@ -163,7 +163,7 @@ export function installKernelProtyleGuards(
     void reloadBlock()
   }
 
-  editor.protyle.options.handleEmptyContent = () => {
+  ;(editor.protyle.options as typeof editor.protyle.options & { handleEmptyContent?: () => void }).handleEmptyContent = () => {
     recoverIfEmpty()
   }
 

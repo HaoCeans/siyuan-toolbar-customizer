@@ -27,6 +27,7 @@ export interface DesktopButtonContext {
   showConfirmDialog: (message: string) => Promise<boolean>
   showIconPicker: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void
   buttonConfigs: ButtonConfig[]
+  desktopButtonConfigs?: ButtonConfig[]
   saveData: (key: string, value: any) => Promise<void>
   recalculateOverflow: () => void
   updateDesktopToolbar?: () => void

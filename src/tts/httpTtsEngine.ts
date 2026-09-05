@@ -242,9 +242,10 @@ async function fetchSiliconFlowViaProxy(text: string, speed: number, apiKey: str
 
   logger.log(`[SiliconFlowTTS] forwardProxy请求: voice=${payload.voice}, speed=${payload.speed.toFixed(2)}`)
 
-  const result = await forwardProxy(SF_API_URL, 'POST', payload, [
-    { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-  ], 30000, 'application/json', 'base64')
+  const result = await forwardProxy(SF_API_URL, 'POST', payload, {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  }, 30000, 'application/json', 'base64')
 
   if (!result || result.status !== 200) {
     const errDetail = result?.body ? String(result.body).substring(0, 200) : '无响应'
@@ -530,30 +531,30 @@ export class HttpTTSEngine {
     // ① 百度翻译 TTS
     const safeSpeed = Math.max(1, Math.min(7, this.speed))
     const baiduFanyiUrl = `https://fanyi.baidu.com/gettts?lan=zh&text=${encodeURIComponent(chunk)}&spd=${safeSpeed}&source=web`
-    const audio0 = await this.tryProxy(baiduFanyiUrl, '百度翻译', [
-      { 'Referer': 'https://fanyi.baidu.com/' },
-    ])
+    const audio0 = await this.tryProxy(baiduFanyiUrl, '百度翻译', {
+      'Referer': 'https://fanyi.baidu.com/',
+    })
     if (audio0) return audio0
 
     // ② 百度 TTS
     const baiduUrl = `${BAIDU_TTS}?lan=zh&ie=UTF-8&spd=${this.speed}&pit=5&vol=5&per=${Number(this.speaker)}&ctp=1&cuid=siyuan_tts&tex=${encodeURIComponent(chunk)}`
-    const audio1 = await this.tryProxy(baiduUrl, '百度TTS', [
-      { 'Referer': 'https://fanyi.baidu.com/' },
-    ])
+    const audio1 = await this.tryProxy(baiduUrl, '百度TTS', {
+      'Referer': 'https://fanyi.baidu.com/',
+    })
     if (audio1) return audio1
 
     // ③ 有道 TTS
     const youdaoUrl = `${YOUDAO_TTS}?word=${encodeURIComponent(chunk)}&le=zh&keyfrom=speaker-target`
-    const audio2 = await this.tryProxy(youdaoUrl, '有道', [
-      { 'Referer': 'https://fanyi.youdao.com/' },
-    ])
+    const audio2 = await this.tryProxy(youdaoUrl, '有道', {
+      'Referer': 'https://fanyi.youdao.com/',
+    })
     if (audio2) return audio2
 
     throw new Error('所有 TTS 服务均不可用')
   }
 
   /** 通过 forwardProxy 获取音频 */
-  private async tryProxy(url: string, label: string, headers: any[] = []): Promise<ArrayBuffer | null> {
+  private async tryProxy(url: string, label: string, headers: Record<string, string> = {}): Promise<ArrayBuffer | null> {
     try {
       const result = await forwardProxy(url, 'GET', {}, headers, 15000, 'audio/mp3', 'base64')
       if (!result || result.status !== 200) {

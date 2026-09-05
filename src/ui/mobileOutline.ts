@@ -427,7 +427,7 @@ function renderOutline(items: OutlineItem[]): string {
 }
 
 function renderOutlinePanel(): void {
-  const listEl = outlinePanel?.querySelector('#mobile-outline-list')
+  const listEl = outlinePanel?.querySelector<HTMLElement>('#mobile-outline-list')
   if (!listEl) return
 
   if (!state.currentDocId) {

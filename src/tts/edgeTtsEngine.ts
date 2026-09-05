@@ -690,7 +690,7 @@ async function fetchGoogleTTS(text: string, lang: string = 'zh-CN'): Promise<Arr
       if (gotAudio) break
       try {
         logger.log(`[GoogleTTS] 请求段 ${i + 1}/${segments.length}, URL=${url.substring(0, 100)}...`)
-        const result = await forwardProxy(url, 'GET', {}, [], 15000, 'audio/mpeg', '')
+        const result = await forwardProxy(url, 'GET', {}, {}, 15000, 'audio/mpeg', '')
         logger.log(`[GoogleTTS] 响应: status=${result?.status}, hasBody=${!!result?.body}, bodyLen=${result?.body ? String(result.body).length : 0}, encoding=${result?.bodyEncoding}`)
 
         if (!result || result.status !== 200) {

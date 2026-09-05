@@ -340,7 +340,7 @@ async function renderOutlinePanel(): Promise<void> {
     })
   }
 
-  renderItems(outline, listEl)
+  renderItems(outline, listEl as HTMLElement)
 }
 
 function createPanel(): void {

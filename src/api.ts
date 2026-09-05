@@ -8,10 +8,13 @@
 
 import { fetchSyncPost, IWebSocketData } from "siyuan";
 
-async function request(url: string, data: any) {
-  let response: IWebSocketData = await fetchSyncPost(url, data);
-  let res = response.code === 0 ? response.data : null;
-  return res;
+type ApiPayload = Record<string, unknown> | FormData | string;
+
+type ApiResponse<T> = T | null;
+
+async function request<T>(url: string, data: ApiPayload): Promise<ApiResponse<T>> {
+  const response: IWebSocketData = await fetchSyncPost(url, data);
+  return response.code === 0 ? (response.data as T) : null;
 }
 
 // **************************************** Noteboook ****************************************
@@ -151,7 +154,7 @@ export async function getIDsByHPath(
 
 export async function upload(
   assetsDirPath: string,
-  files: any[]
+  files: File[]
 ): Promise<IResUpload> {
   let form = new FormData();
   form.append("assetsDirPath", assetsDirPath);
@@ -305,7 +308,7 @@ export async function getBlockAttrs(
 
 // **************************************** SQL ****************************************
 
-export async function sql(sql: string): Promise<any[]> {
+export async function sql(sql: string): Promise<unknown[]> {
   let sqldata = {
     stmt: sql,
   };
@@ -316,7 +319,7 @@ export async function sql(sql: string): Promise<any[]> {
 export async function getBlockByID(blockId: string): Promise<Block> {
   let sqlScript = `select * from blocks where id ='${blockId}'`;
   let data = await sql(sqlScript);
-  return data[0];
+  return data[0] as Block;
 }
 
 // **************************************** Template ****************************************
@@ -340,7 +343,7 @@ export async function renderSprig(template: string): Promise<string> {
 
 // **************************************** File ****************************************
 
-export async function getFile(path: string): Promise<any> {
+export async function getFile(path: string): Promise<IWebSocketData | null> {
   let data = {
     path: path,
   };
@@ -353,7 +356,7 @@ export async function getFile(path: string): Promise<any> {
   }
 }
 
-export async function putFile(path: string, isDir: boolean, file: any) {
+export async function putFile(path: string, isDir: boolean, file: Blob) {
   let form = new FormData();
   form.append("path", path);
   form.append("isDir", isDir.toString());
@@ -445,8 +448,8 @@ export async function pushErrMsg(msg: string, timeout: number = 7000) {
 export async function forwardProxy(
   url: string,
   method: string = "GET",
-  payload: any = {},
-  headers: any[] = [],
+  payload: Record<string, unknown> = {},
+  headers: Record<string, string> = {},
   timeout: number = 7000,
   contentType: string = "text/html",
   responseEncoding: string = ""

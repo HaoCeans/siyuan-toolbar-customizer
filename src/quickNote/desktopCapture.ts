@@ -28,17 +28,25 @@ export function minimizeSiyuanMainWindow(): void {
   }
 }
 
-export function getDesktopQuickNoteCaptureSettings(): {
+export interface DesktopQuickNoteCaptureSettings {
   globalCaptureEnabled: boolean
   overflowToolbarEnabled: boolean
-} {
+  pasteClipboardOnOpen: boolean
+  minimizeAfterSend: boolean
+}
+
+export function getDesktopQuickNoteCaptureSettings(): DesktopQuickNoteCaptureSettings {
   const cfg = pluginInstance?.desktopFeatureConfig as {
     quickNoteGlobalCaptureEnabled?: boolean
     quickNoteOverflowToolbarEnabled?: boolean
+    pasteClipboardOnOpen?: boolean
+    minimizeAfterSend?: boolean
   } | undefined
   return {
     globalCaptureEnabled: cfg?.quickNoteGlobalCaptureEnabled !== false,
     overflowToolbarEnabled: cfg?.quickNoteOverflowToolbarEnabled === true,
+    pasteClipboardOnOpen: cfg?.pasteClipboardOnOpen === true,
+    minimizeAfterSend: cfg?.minimizeAfterSend === true,
   }
 }
 

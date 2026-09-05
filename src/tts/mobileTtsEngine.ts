@@ -317,7 +317,7 @@ export class MobileTTSEngine {
       ttsUrl,
       'GET',
       {},
-      [],
+      {},
       15000,           // 超时 15s（TTS 合成可能较慢）
       'audio/mpeg',
       'base64'          // ★ 关键：要求内核返回 base64 编码的音频数据

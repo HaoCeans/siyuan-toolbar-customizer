@@ -94,7 +94,7 @@ export function createDesktopGlobalButtonConfig(
   }
 
   // 图标大小
-  const { row: iconSizeRow, input: iconSizeInput } = createRow(
+  const { row: iconSizeRow } = createRow(
     t("settings.desktop.2", undefined, "图标大小 (px)"),
     config.iconSize,
     'number',
@@ -106,7 +106,7 @@ export function createDesktopGlobalButtonConfig(
   moduleBox.appendChild(iconSizeRow)
 
   // 按钮宽度
-  const { row: widthRow, input: widthInput } = createRow(
+  const { row: widthRow } = createRow(
     t("settings.desktop.3", undefined, "按钮宽度 (px)"),
     config.minWidth,
     'number',
@@ -118,7 +118,7 @@ export function createDesktopGlobalButtonConfig(
   moduleBox.appendChild(widthRow)
 
   // 右边距
-  const { row: marginRow, input: marginInput } = createRow(
+  const { row: marginRow } = createRow(
     t("settings.desktop.4", undefined, "右边距 (px)"),
     config.marginRight,
     'number',
@@ -130,7 +130,7 @@ export function createDesktopGlobalButtonConfig(
   moduleBox.appendChild(marginRow)
 
   // 右上角提示
-  const { row: notifyRow, input: notifyToggle } = createRow(
+  const { row: notifyRow } = createRow(
     t("settings.desktop.5", undefined, "右上角提示"),
     config.showNotification,
     'checkbox',
@@ -171,6 +171,18 @@ export interface FeatureConfig {
   quickNoteGlobalCaptureEnabled?: boolean
   quickNoteOverflowToolbarEnabled?: boolean
   quickNoteToolbarVisible?: boolean
+  quickNoteInputFormat?: 'plain' | 'block'
+  pasteClipboardOnOpen?: boolean
+  minimizeAfterSend?: boolean
+  hasSeenDesktopFloatingNotice?: boolean
+  enableFloatingToolbar?: boolean
+  floatingToolbarMargin?: number
+  floatingToolbarBorderRadius?: number
+  floatingToolbarHeight?: number
+  floatingToolbarWidth?: number
+  floatingToolbarOverflowDistance?: number
+  floatingToolbarStyle?: 'glass' | 'solid'
+  floatingToolbarScrollHide?: boolean
   quickNoteFontSize?: number  // 电脑端弹窗字体大小（独立于手机端）
   quickNoteBlockWindowPersist?: boolean  // 块格式弹窗后台常驻
   quickNoteHideFloatingToolbar?: boolean  // 块格式弹窗中是否隐藏底部悬浮胶囊
@@ -1859,7 +1871,7 @@ export function createDesktopSettingLayout(
     }
 
     // 全局配置启用开关（放在最前面）
-    const { row: enabledRow, input: enabledToggle } = createRow(
+    const { row: enabledRow } = createRow(
       t("settings.desktop.209", undefined, "🔓启用电脑端全局按钮配置"),
       context.desktopGlobalButtonConfig.enabled ?? true,
       'checkbox',

@@ -26,6 +26,8 @@
     "release:minor": "node ./release.js --mode=minor",
     "release:major": "node ./release.js --mode=major",
     "build": "vite build",
+    "typecheck": "tsc --noEmit --pretty false",
+    "lint": "eslint src",
     "check:i18n": "node scripts/check-i18n.mjs",
     "keygen": "node scripts/gen-keypair.mjs",
     "gencode": "node scripts/gen-code.mjs",

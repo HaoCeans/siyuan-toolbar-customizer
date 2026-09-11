@@ -1203,6 +1203,12 @@ export function applyToolbarBackgroundColor(config: MobileToolbarConfig, disable
 
 // ===== 桌面端悬浮胶囊工具栏 =====
 /**
+ * 胶囊默认堆叠层级。必须是 50：这是加入可配置层级之前硬编码的值，
+ * 保持该值才能让未设置过此项的老用户升级后显示效果不变。
+ */
+export const DEFAULT_FLOATING_TOOLBAR_Z_INDEX = 50
+
+/**
  * 电脑端工具栏位置配置（从 desktopFeatureConfig 中读取的位置/胶囊相关字段）。
  * 与手机端 MobileToolbarConfig 解耦，独立维护。
  */
@@ -1212,6 +1218,7 @@ export interface DesktopFloatingToolbarConfig {
   floatingToolbarBorderRadius: number  // 圆角（px）
   floatingToolbarHeight: number        // 胶囊自身高度（px）
   floatingToolbarWidth: number         // 宽度（0=auto 自适应）
+  floatingToolbarZIndex: number        // 堆叠层级（z-index）
   floatingToolbarStyle: 'glass' | 'solid'
   floatingToolbarScrollHide: boolean   // 滚动隐藏：上滑隐藏、下滑显示
 }
@@ -1301,6 +1308,10 @@ export function applyDesktopFloatingToolbar(config: DesktopFloatingToolbarConfig
   const radius = config.floatingToolbarBorderRadius ?? 24
   const height = config.floatingToolbarHeight ?? 40
   const widthVal = config.floatingToolbarWidth ?? 0
+  const rawZIndex = config.floatingToolbarZIndex ?? DEFAULT_FLOATING_TOOLBAR_Z_INDEX
+  const zIndex = Number.isFinite(rawZIndex)
+    ? Math.min(2147483647, Math.max(0, Math.trunc(rawZIndex)))
+    : DEFAULT_FLOATING_TOOLBAR_Z_INDEX
   const widthCss = widthVal > 0 ? `${widthVal}px` : 'auto'
   const maxWidthCss = widthVal > 0 ? 'none' : '95vw'
   const isGlass = config.floatingToolbarStyle !== 'solid'  // 默认 glass
@@ -1326,7 +1337,7 @@ export function applyDesktopFloatingToolbar(config: DesktopFloatingToolbarConfig
       justify-content: center !important;
       align-items: center !important;
       gap: 2px !important;
-      z-index: 50 !important;
+      z-index: ${zIndex} !important;
       box-shadow: ${shadow} !important;
       backdrop-filter: ${blur};
       -webkit-backdrop-filter: ${blur};
@@ -2687,9 +2698,10 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
 
     // builtin 类型的按钮不恢复焦点，让输入法自然关闭
     // 其他类型恢复焦点（preventScroll 防止浏览器自动滚动到顶部）
-    // 记事弹窗内克隆按钮触发（qnotePopupTrigger）时不恢复：lastActiveElement 是弹窗编辑器，
-    // focus 它会弹出输入法，且与弹窗关闭（teardown 慢）形成竞态——弹窗还开着键盘就弹出来了
-    const skipFocusRestore = button.dataset.qnotePopupTrigger === 'true'
+    // 弹窗和移动端朗读面板不恢复编辑器焦点，避免面板关闭时重新弹出输入法
+    const skipFocusRestore =
+      button.dataset.qnotePopupTrigger === 'true'
+      || (config.type === 'author-tool' && config.authorToolSubtype === 'tts')
     delete button.dataset.qnotePopupTrigger
     if (config.type !== 'builtin' && !skipFocusRestore) {
       if (lastActiveElement && lastActiveElement !== document.activeElement) {
@@ -3289,9 +3301,9 @@ function showOverflowToolbar(config: ButtonConfig) {
 	        // 将保存的选区传递给处理函数（使用 await 保持 async 链条）
 	        await handleButtonClick(btn, savedSelection, lastActiveElement, layerBtn)
 
-	        // builtin 类型的按钮不恢复焦点，让输入法自然关闭
-	        // 其他类型恢复焦点，保持输入法打开（preventScroll 防止浏览器自动滚动到顶部）
-	        if (btn.type !== 'builtin') {
+	        // builtin 和移动端朗读按钮不恢复焦点，让输入法自然关闭
+	        const skipFocusRestore = btn.type === 'author-tool' && btn.authorToolSubtype === 'tts'
+	        if (btn.type !== 'builtin' && !skipFocusRestore) {
 	          if (lastActiveElement && lastActiveElement !== document.activeElement) {
 	            ;(lastActiveElement as HTMLElement).focus({ preventScroll: true })
 	          }

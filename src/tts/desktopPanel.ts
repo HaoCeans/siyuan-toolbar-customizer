@@ -1,7 +1,7 @@
 /**
  * 电脑端 TTS 面板 — Apple 风格
  *
- * 三种引擎模式：浏览器语音 / 百度免费 / 硅基流动 API
+ * 四种引擎模式：浏览器语音 / Edge 在线 / 百度免费 / 硅基流动 API
  * 阶段一：点击按钮后弹出选项面板（Tab 切换 + 各模式参数设置）— 底部弹出
  * 阶段二：确认后显示浮动播放控制条 — 底部固定
  */
@@ -19,6 +19,7 @@ import * as Notify from '../notification'
 import { pluginInstance } from '../toolbarManager'
 import { navigateToAdjacentDoc } from '../ui/desktopDocNav'
 import { showMessage } from 'siyuan'
+import { EDGE_TTS_VOICES, getEdgeTTSEngine, destroyEdgeTTSEngine, isSupportedEdgeVoice } from './edgeTtsEngine'
 
 // ─── 状态 ────────────────────────────────────────────────
 let optionsOverlay: HTMLElement | null = null
@@ -44,6 +45,7 @@ export function showTTSOptionsDesktop(): void {
   // 如果正在播放（任一引擎），先停止
   baseEngine.stop()
   getHttpTTSEngine().stop()
+  getEdgeTTSEngine().stop()
   removePlaybackBar()
 
   createOptionsPanel(total)
@@ -55,6 +57,7 @@ export function cleanupDesktopTTS(): void {
   removePlaybackBar()
   destroyTTSEngine()
   destroyHttpTTSEngine()
+  destroyEdgeTTSEngine()
   removeSliderStyles()
 }
 
@@ -118,6 +121,7 @@ function createOptionsPanel(total: number): void {
 
   const tabData = [
     { key: 'webspeech', label: t('tts.mode.browserSpeech', undefined, '浏览器语音') },
+    { key: 'edge', label: t('tts.mode.edge', undefined, 'Edge 在线') },
     { key: 'free', label: t('tts.mode.baiduFree', undefined, '百度免费') },
     { key: 'api', label: t('tts.mode.siliconFlow', undefined, '硅基流动') },
   ]
@@ -193,6 +197,7 @@ function createOptionsPanel(total: number): void {
     }
     content.innerHTML = ''
     if (mode === 'webspeech') renderWebSpeechContent(content, total, autoSel)
+    else if (mode === 'edge') renderEdgeContent(content, total, autoSel)
     else if (mode === 'free') renderFreeContent(content, total, autoSel)
     else renderApiContent(content, total, autoSel)
   }
@@ -307,7 +312,64 @@ function renderWebSpeechContent(container: HTMLElement, total: number, autoSel?:
   container.appendChild(btns.wrap)
 }
 
-// ─── 百度免费模式面板 ──────────────────────────────────────
+// ─── Edge 在线语音模式 ──────────────────────────────────────
+function renderEdgeContent(container: HTMLElement, total: number, autoSel?: HTMLSelectElement): void {
+  const settings = getTTSSettings()
+  const form = document.createElement('div')
+  form.style.cssText = 'display:flex;flex-direction:column;gap:14px;'
+
+  const startRow = createRow(t('tts.startParagraph', undefined, '起始段落'))
+  const startSelect = createParagraphSelect(total, 0)
+  startRow.appendChild(startSelect)
+  form.appendChild(startRow)
+
+  const endRow = createRow(t('tts.endParagraph', undefined, '结束段落'))
+  const endSelect = createParagraphSelect(total, total - 1, true)
+  endRow.appendChild(endSelect)
+  form.appendChild(endRow)
+
+  const rateRow = createRow(t('tts.rate', undefined, '语速'))
+  const rateValue = document.createElement('span')
+  const savedRate = settings.edgeRate ?? 1.0
+  rateValue.textContent = `${savedRate.toFixed(1)}x`
+  rateValue.style.cssText = 'min-width:36px;text-align:right;font-size:13px;font-weight:500;font-variant-numeric:tabular-nums;'
+  const rateSlider = createSlider('0.5', '2.0', '0.1', String(savedRate))
+  rateSlider.oninput = () => { rateValue.textContent = `${parseFloat(rateSlider.value).toFixed(1)}x` }
+  rateRow.appendChild(rateSlider)
+  rateRow.appendChild(rateValue)
+  form.appendChild(rateRow)
+
+  const voiceRow = createRow(t('tts.voice', undefined, '语音'))
+  const voiceSelect = createAppleSelect()
+  for (const voice of EDGE_TTS_VOICES) {
+    const option = document.createElement('option')
+    option.value = voice.name
+    option.textContent = voice.displayName
+    voiceSelect.appendChild(option)
+  }
+  // 旧版本可能保存了接口已不支持的语音名，此时显示默认项而不是空白
+  const savedVoice = settings.edgeVoiceName || ''
+  voiceSelect.value = isSupportedEdgeVoice(savedVoice) ? savedVoice : EDGE_TTS_VOICES[0].name
+  voiceRow.appendChild(voiceSelect)
+  form.appendChild(voiceRow)
+
+  container.appendChild(form)
+
+  const btns = createBtnRow()
+  btns.cancel.onclick = (e) => { e.stopPropagation(); removeOptionsPanel() }
+  btns.confirm.onclick = (e) => {
+    e.stopPropagation()
+    const rate = parseFloat(rateSlider.value)
+    const voice = voiceSelect.value || EDGE_TTS_VOICES[0].name
+    autoReadAction = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev'
+    saveTTSSettings({ lastMode: 'edge', edgeRate: rate, edgeVoiceName: voice, autoReadAction })
+    getEdgeTTSEngine().activatePlayback()
+    removeOptionsPanel()
+    startEdgePlayback(voice, rate, parseInt(startSelect.value), endSelect.value === 'all' ? undefined : parseInt(endSelect.value))
+  }
+  container.appendChild(btns.wrap)
+}
+
 
 function renderFreeContent(container: HTMLElement, total: number, autoSel?: HTMLSelectElement): void {
   const settings = getTTSSettings()
@@ -491,6 +553,38 @@ function waitForDocLoaded(): Promise<void> {
       resolve()
     }, 5000)
   })
+}
+
+function startEdgePlayback(voice: string, rate: number, startP: number, endP: number | undefined): void {
+  const engine = getEdgeTTSEngine()
+  engine.setVoice(voice)
+  engine.setRate(rate)
+  engine.extractParagraphs()
+  engine.onStateChange = (state, index, total) => updatePlaybackBar(state, index, total)
+  engine.onError = (msg) => {
+    Notify.showErrorCommandCannotExecute(msg)
+    removePlaybackBar()
+  }
+  engine.onFinish = async () => {
+    if (autoReadAction === 'stop') {
+      const statusEl = playbackBar?.querySelector('#tts-bar-status') as HTMLElement
+      if (statusEl) statusEl.textContent = t('tts.readingComplete', undefined, '朗读完成')
+      engine.onStateChange = () => {}
+      await engine.speakOnce(t('tts.documentReadingCompleteSpeech', undefined, '本文档已经朗读完成'), () => removePlaybackBar())
+      return
+    }
+    const success = await navigateToAdjacentDoc(autoReadAction)
+    if (!success) {
+      removePlaybackBar()
+      showMessage(t('tts.noMoreDocuments', undefined, '已无更多文档'), 2000, 'info')
+      return
+    }
+    await waitForDocLoaded()
+    await engine.extractParagraphsAsync()
+    engine.speak(0, undefined)
+  }
+  createPlaybackBar(engine)
+  engine.speak(startP, endP)
 }
 
 function startWebSpeechPlayback(opts: TTSOptions): void {

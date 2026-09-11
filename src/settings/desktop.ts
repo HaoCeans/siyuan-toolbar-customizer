@@ -10,7 +10,7 @@ import { TRIAL_CODE, clearTrial } from '../utils/licenseManager'
 
 import type { Setting } from 'siyuan'
 import type { GlobalButtonConfig, ButtonConfig } from '../toolbarManager'
-import { calculateButtonOverflow, resetAllConfigsToFactoryDefaults } from '../toolbarManager'
+import { calculateButtonOverflow, resetAllConfigsToFactoryDefaults, DEFAULT_FLOATING_TOOLBAR_Z_INDEX } from '../toolbarManager'
 import { createDesktopButtonItem, type DesktopButtonContext } from '../ui/buttonItems/desktop'
 import { createMobileButtonItem, type MobileButtonContext } from '../ui/buttonItems/mobile'
 import { createToolbarPreview } from '../ui/toolbarPreview'
@@ -180,6 +180,7 @@ export interface FeatureConfig {
   floatingToolbarBorderRadius?: number
   floatingToolbarHeight?: number
   floatingToolbarWidth?: number
+  floatingToolbarZIndex?: number
   floatingToolbarOverflowDistance?: number
   floatingToolbarStyle?: 'glass' | 'solid'
   floatingToolbarScrollHide?: boolean
@@ -2405,6 +2406,42 @@ export function createDesktopSettingLayout(
           context.applyDesktopToolbarPosition()
         }
       ))
+
+      // 胶囊堆叠层级
+      const zIndexRow = document.createElement('div')
+      zIndexRow.style.cssText = 'display: flex; align-items: center; gap: 10px;'
+
+      const zIndexLabel = document.createElement('label')
+      zIndexLabel.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface); min-width: 110px;'
+      zIndexLabel.textContent = t("settings.desktop.269", undefined, "层级高度（z-index）")
+
+      const zIndexInput = document.createElement('input')
+      zIndexInput.type = 'number'
+      zIndexInput.className = 'b3-text-field'
+      zIndexInput.min = '0'
+      zIndexInput.max = '2147483647'
+      zIndexInput.step = '1'
+      zIndexInput.value = String(cfg.floatingToolbarZIndex ?? DEFAULT_FLOATING_TOOLBAR_Z_INDEX)
+      zIndexInput.style.cssText = 'width: 140px; margin-left: auto;'
+      zIndexInput.onchange = async () => {
+        const parsed = Number(zIndexInput.value)
+        const value = Number.isFinite(parsed)
+          ? Math.min(2147483647, Math.max(0, Math.trunc(parsed)))
+          : DEFAULT_FLOATING_TOOLBAR_Z_INDEX
+        zIndexInput.value = String(value)
+        cfg.floatingToolbarZIndex = value
+        await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+        context.applyDesktopToolbarPosition()
+      }
+
+      zIndexRow.appendChild(zIndexLabel)
+      zIndexRow.appendChild(zIndexInput)
+      floatingSection.appendChild(zIndexRow)
+
+      const zIndexHint = document.createElement('div')
+      zIndexHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light); line-height: 1.5;'
+      zIndexHint.textContent = t("settings.desktop.270", undefined, "数值越大，胶囊越靠前显示；默认值为 50。")
+      floatingSection.appendChild(zIndexHint)
 
       // 毛玻璃 / 实心 样式选择（radio 二选一，复用上面的卡片样式）
       const styleModeRow = document.createElement('div')

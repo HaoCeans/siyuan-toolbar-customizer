@@ -3127,7 +3127,7 @@ export function createMobileSettingLayout(
   
       // 获取当前配置值，设置默认值
       const config = context.mobileFeatureConfig as any
-      const currentPopupConfig = config.popupConfig || 'bothModes'
+      const currentPopupConfig = config.popupConfig || 'disabled'
   
       // 创建选项按钮
       

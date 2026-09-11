@@ -18,6 +18,9 @@ const SVG_PATHS: Record<string, string> = {
     '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
   'skip-forward':
     '<polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/>',
+  'refresh-cw':
+    '<path d="M21 12a9 9 0 0 0-15-6.7L3 8"/><path d="M3 3v5h5"/>'
+    + '<path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"/><path d="M21 21v-5h-5"/>',
   'square':
     '<rect width="18" height="18" x="3" y="3" rx="2"/>',
   'volume-2':

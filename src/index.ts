@@ -53,11 +53,13 @@ import {
   safeSetInterval,
   clearSafeInterval,
   restoreMobileToolbarOriginal,
-  getButtonDisplayName
+  getButtonDisplayName,
+  DEFAULT_FLOATING_TOOLBAR_Z_INDEX
 } from './toolbarManager'
 
 // TTS 设置持久化初始化
 import { initTTSSettings } from './tts/httpTtsEngine'
+import { flushPreparedTtsCache, initPreparedTtsCache } from './tts/preparedTtsCache'
 
 // 清理残留草稿块
 import { deleteQuickNoteDraftBlock } from './quickNote/kernelBlock'
@@ -200,7 +202,7 @@ export default class ToolbarCustomizer extends Plugin {
     hideDocMenuButton: true,    // 文档菜单按钮隐藏
     hideMoreButton: true,       // 更多按钮隐藏
     toolbarHeight: 32,          // 工具栏高度（px）
-    toolbarStyle: 'default' as 'default' | 'divider',  // 工具栏样式：默认或带分割线
+    toolbarStyle: 'divider' as 'default' | 'divider',  // 工具栏样式：默认或带分割线
     disableCustomButtons: false,// 禁用所有自定义按钮（恢复思源原始状态，仅桌面端）
     showAllNotifications: true, // 一键开启所有按钮右上角提示
     authorActivated: false,     // 鲸鱼定制工具箱是否已激活（兼容字段，新逻辑读 licensePlan）
@@ -222,6 +224,7 @@ export default class ToolbarCustomizer extends Plugin {
     floatingToolbarBorderRadius: 20,// 胶囊圆角（px）
     floatingToolbarHeight: 40,      // 胶囊自身高度（px）
     floatingToolbarWidth: 0,        // 胶囊宽度（0=auto 自适应内容，>0=固定宽度）
+    floatingToolbarZIndex: DEFAULT_FLOATING_TOOLBAR_Z_INDEX,   // 胶囊堆叠层级（z-index）
     floatingToolbarStyle: 'glass' as 'glass' | 'solid',  // 胶囊样式：glass=毛玻璃 / solid=实心
     floatingToolbarScrollHide: true,  // 胶囊滚动隐藏：上滑隐藏、下滑显示
   }
@@ -246,7 +249,10 @@ export default class ToolbarCustomizer extends Plugin {
     licensePlan: 'none' as 'none' | 'trial' | 'm30' | 'perm',  // 当前授权套餐
     licenseExpiry: '',           // 到期日 YYYYMMDD 或 'PERM'（不含宽限期）
     licenseGraceEnd: '',         // 宽限期结束日 YYYYMMDD（PERM 时为空）
-    popupConfig: 'bothModes' as const, // 弹窗配置：'disabled'|'smallWindowOnly'|'bothModes'
+    // 弹窗配置：'disabled'|'smallWindowOnly'|'bothModes'。
+    // 新用户默认 'disabled'（关闭自启动）；加入本字段之前的老用户由下面的加载逻辑补写为 'bothModes'，
+    // 使升级后行为不变（详见 loadData('mobileFeatureConfig') 处的迁移）。
+    popupConfig: 'disabled' as const,
     quickNoteNotebookId: '',     // 自启动一键记事默认笔记本ID
     quickNoteFontSize: 14,       // 弹窗输入框字体大小（px）
     quickNoteSortMethod: 'bottomToolbar' as const, // 弹窗按钮排序方法：'topToolbar'|'bottomToolbar'
@@ -522,6 +528,16 @@ export default class ToolbarCustomizer extends Plugin {
           ...this.mobileFeatureConfig,
           ...savedMobileFeatureConfig
         }
+
+        // 一次性迁移：popupConfig 加入之前保存的配置里没有该字段，
+        // 当时实际行为是 'bothModes'（后台切前台自动弹窗）。这里显式补写该值，
+        // 使默认值改为 'disabled' 后，老用户升级后行为保持不变。
+        // 用「无有效值」判定，兼顾字段缺失与空值两种历史情况；
+        // 只处理已有保存配置的老用户，全新安装没有保存配置，会拿到新默认值。
+        if (!savedMobileFeatureConfig.popupConfig) {
+          this.mobileFeatureConfig.popupConfig = 'bothModes'
+          await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
+        }
       }
 
       // 加载电脑端全局按钮配置
@@ -727,8 +743,13 @@ export default class ToolbarCustomizer extends Plugin {
     cleanupOrphanBlockWindows()  // 清理残留的僵尸记事弹窗
     this.initPluginFunctions()  // initPluginFunctions 是 async，不阻塞后续代码
 
-    // ===== 初始化 TTS 设置缓存（从 plugin.loadData 读取）=====
-    initTTSSettings()
+    // ===== 初始化 TTS 设置及预生成音频缓存（异步执行，不阻塞布局）=====
+    void (async () => {
+      await initTTSSettings()
+      await initPreparedTtsCache()
+    })().catch((error) => {
+      logger.error('[Prepared TTS Cache] 初始化失败:', error)
+    })
 
     // ===== 应用手机端工具栏样式 =====
     if (this.isMobile) {
@@ -1138,7 +1159,7 @@ export default class ToolbarCustomizer extends Plugin {
     }
   }
 
-  onunload() {
+  async onunload() {
     destroyQuickNoteFloatWindow()
     destroyDesktopQuickNoteBlockWindow()
     cleanupImagePicker()
@@ -1224,6 +1245,13 @@ export default class ToolbarCustomizer extends Plugin {
     if (this.quickNoteTextareaContextMenuHandler) {
       document.removeEventListener('contextmenu', this.quickNoteTextareaContextMenuHandler, true)
       this.quickNoteTextareaContextMenuHandler = null
+    }
+
+    // 持久化 prepared TTS cache 清单；WAV 文件保留供下次启动复用。
+    try {
+      await flushPreparedTtsCache()
+    } catch (error) {
+      logger.error('[Prepared TTS Cache] 卸载时写入失败:', error)
     }
 
     // 所有业务模块清理完成后再释放共享运行时。
@@ -1775,6 +1803,7 @@ export default class ToolbarCustomizer extends Plugin {
         floatingToolbarBorderRadius: cfg.floatingToolbarBorderRadius ?? 20,
         floatingToolbarHeight: cfg.floatingToolbarHeight ?? 40,
         floatingToolbarWidth: cfg.floatingToolbarWidth ?? 0,
+        floatingToolbarZIndex: cfg.floatingToolbarZIndex ?? DEFAULT_FLOATING_TOOLBAR_Z_INDEX,
         floatingToolbarStyle: cfg.floatingToolbarStyle === 'solid' ? 'solid' : 'glass',
         floatingToolbarScrollHide: cfg.floatingToolbarScrollHide === true,
       },

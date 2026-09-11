@@ -17,6 +17,11 @@ async function request<T>(url: string, data: ApiPayload): Promise<ApiResponse<T>
   return response.code === 0 ? (response.data as T) : null;
 }
 
+async function requestSucceeded(url: string, data: ApiPayload): Promise<boolean> {
+  const response: IWebSocketData = await fetchSyncPost(url, data);
+  return response.code === 0;
+}
+
 // **************************************** Noteboook ****************************************
 
 export async function lsNotebooks(): Promise<IReslsNotebooks> {
@@ -351,12 +356,26 @@ export async function getFile(path: string): Promise<IWebSocketData | null> {
   try {
     let file = await fetchSyncPost(url, data);
     return file;
-  } catch (error_msg) {
+  } catch {
     return null;
   }
 }
 
-export async function putFile(path: string, isDir: boolean, file: Blob) {
+/** Fetch a workspace file without passing binary data through fetchSyncPost's JSON handling. */
+export async function getFileBlob(path: string): Promise<Blob | null> {
+  try {
+    const response = await fetch("/api/file/getFile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+    return response.ok ? await response.blob() : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function putFile(path: string, isDir: boolean, file: Blob): Promise<boolean> {
   let form = new FormData();
   form.append("path", path);
   form.append("isDir", isDir.toString());
@@ -365,15 +384,15 @@ export async function putFile(path: string, isDir: boolean, file: Blob) {
   form.append("modTime", Math.floor(Date.now() / 1000).toString());
   form.append("file", file);
   let url = "/api/file/putFile";
-  return request(url, form);
+  return requestSucceeded(url, form);
 }
 
-export async function removeFile(path: string) {
+export async function removeFile(path: string): Promise<boolean> {
   let data = {
     path: path,
   };
   let url = "/api/file/removeFile";
-  return request(url, data);
+  return requestSucceeded(url, data);
 }
 
 export async function readDir(path: string): Promise<IResReadDir> {
@@ -445,11 +464,13 @@ export async function pushErrMsg(msg: string, timeout: number = 7000) {
 }
 
 // **************************************** Network ****************************************
+export type ForwardProxyHeaders = Array<Record<string, string>>
+
 export async function forwardProxy(
   url: string,
   method: string = "GET",
   payload: Record<string, unknown> = {},
-  headers: Record<string, string> = {},
+  headers: ForwardProxyHeaders = [],
   timeout: number = 7000,
   contentType: string = "text/html",
   responseEncoding: string = ""

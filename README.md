@@ -117,7 +117,7 @@
 - ⑩ **Floating Outline**: A floating outline panel on the left for quickly jumping to headings
 - ⑪ **Previous/Next Document**: Browse documents in file-tree order with a floating navigation bar at the bottom
 - ⑫ **Swipe Quick Annotation**: Annotate text with a finger swipe using the 「WhaleQuickannotation」 plugin (activated users can download it with one click)
-- ⑬ **Read Documents Aloud**: Use browser speech to read documents aloud; supports speed adjustment and paragraph highlighting
+- ⑬ **Read Documents Aloud**: Multiple engines — browser speech, a free endpoint, SiliconFlow and Edge Online on desktop; SiliconFlow or the free endpoint on mobile. Supports speed control and current-paragraph highlighting, and on mobile you can pre-render the whole document to keep reading with the screen off or in the background
 - ⑭ **One-Click Empty Block Cleanup**: Automatically scan and delete empty paragraphs, headings, and list items in the current document
 - ⑮ **Immersive Reading Mode (Free)**: 🔒 Lock the document to prevent accidental edits and automatically hide the toolbar when swiping up
 - ⑯ **Quick Add Attachments**: Upload any file, rename it, and optionally compress images. ⚠️ Not effective in the note popup
@@ -287,11 +287,11 @@ Quickly record ideas, supporting both automatic and manual triggering.
 
 #### 1. Auto-Start One-Click Note-Taking
 
-Automatically show the note popup when the app returns to the foreground from the background.
+Automatically show the note popup when the app returns to the foreground from the background (**off by default — it only triggers after you pick ② or ③ under "Trigger mode"**).
 
 | Setting | Description |
 |--------|------|
-| **Trigger mode** | ① Disabled ② Small-window mode only ③ Small-window + full-screen modes |
+| **Trigger mode** | ① Disabled (default) ② Small-window mode only ③ Small-window + full-screen modes |
 | **Save method** | Save to today’s diary or append to a specified document |
 | **Notebook/document** | Select a target notebook or enter a document ID |
 | **Input font** | adjust font size（12-30px） |
@@ -338,6 +338,59 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.8.8 — Custom stacking level for the desktop bottom capsule
+
+> 💡 Is the bottom floating capsule hidden behind SiYuan elements or another plugin? You can now adjust its stacking level manually.
+
+**① New desktop capsule stacking-level setting**
+- Added a "Stacking level (z-index)" number field under "Desktop global toolbar configuration → Floating capsule style configuration"
+- Higher values display the bottom floating capsule above more elements; changes take effect immediately without restarting SiYuan
+- The default remains `50`, so upgrading does not change the existing appearance
+- Accepts integers from `0–2147483647`; invalid input automatically falls back to the default
+
+**② Edge online reading fixes (desktop)**
+- Corrected the voice list: removed 7 voices that the Edge read-aloud endpoint does not actually provide (Xiaochen, Xiaohan, Xiaomo, Xiaoshuang, Yunfeng, Yunhao, Yunze) and added the working Yunxia and Yunyang plus the dialect voices Xiaobei (Northeastern) and Xiaoni (Shaanxi)
+- Picking a non-existent voice made the endpoint complete the handshake, accept the text and then close the connection without returning audio — reported as "connection closed, no audio received" and it aborted the whole document. Those voices are gone, and an unsupported voice saved in old settings now falls back to the default voice
+- Much shorter pauses between blocks: the next block is synthesized while the current one is still playing, so synthesis time overlaps playback
+- Blocks with nothing to read (punctuation or symbols only) are skipped instead of aborting the whole document
+- Fixed the failure to announce "this document has been read to the end": a failed block is now logged and skipped, and only 3 consecutive transport failures stop playback
+- One automatic retry when the first connection is reset; requests that already received part of the audio are not retried, to avoid repeating speech
+- Reuses one audio element activated by the click, avoiding the "play() can only be initiated by a user gesture" block
+
+**③ SiliconFlow background reading preparation fixes (mobile)**
+- Fixed decoding of base64 variants returned through the SiYuan network proxy (url-safe, missing padding, `base64-std`, containing whitespace); previously this reported "audio decode failed" and blocked preparation on mobile
+- Audio validation no longer requires an MP3 header and now also accepts WAV and Ogg
+- Very long paragraphs are split into multiple requests, reducing the chance of a single-request timeout
+- A failed persistent-cache write now degrades to session-only availability instead of failing the whole preparation
+
+**④ Mobile auto-start quick note is now off by default**
+- New users default to "① Disabled"; enable it under "Quick note popup → Trigger: background to foreground" when needed
+- Existing users are unaffected: a saved value is kept as-is, and configs predating this field are back-filled with the previous behavior (both small-window and full-screen)
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
+### v3.8.7 — Full Chinese/English interface support + centralized debug logging + quick-note residue cleanup
+
+> 💡 Still seeing Chinese text in the English interface? Too much console noise while troubleshooting? Unable to open a daily note or document after using Quick Note? Update.
+
+**① Full Chinese and English interface support**
+- Settings, dialogs, notifications, toolbar text, commands, Quick Note, document navigation, outlines, tabs, text-to-speech, and activation content now follow SiYuan's Chinese or English interface language
+- Built-in button names switch with the interface language while preserving saved button IDs and user-defined names
+- Added automated i18n validation for bilingual keys, placeholder parameters, missing references, and README paths
+
+**② Centralized plugin debug logging with an on/off switch**
+- Added a "Plugin debug log" switch to desktop settings; it is disabled by default and saved independently
+- When enabled, diagnostic logs share the `[ToolbarCustomizer]` prefix for quick filtering in the developer console
+- Routine logs from the toolbar, Quick Note, text-to-speech, settings, and floating panels now use the centralized logger, reducing unrelated console output
+
+**③ Quick Note popup residue cleanup**
+- Closing a block-format Quick Note popup with × also cleans up other leftover Quick Note block windows, preventing stale window routes from blocking daily notes or documents
+- Cleanup also resets the associated draft-window state
+- If a daily note or document still cannot open, run "Clean up Quick Note popup residue (use when daily notes/documents won't open)" from the command palette to close both block-format and plain-text leftovers
+
 ### v3.8.6 — Side capsule is now the default + frosted-glass styles + a batch of fixes
 
 > 💡 Want more buttons in the side capsule? Frosted-glass toolbar? ⌥⇧L not working on SiYuan v3.8.2+? Update.
@@ -370,11 +423,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 - Hidden scrollbars on overflow/side panels (touch scrolling unaffected)
 - Toolbar preview adapted to side-capsule mode: shows the ⋮ mini capsule + vertical panel, drag-to-sort still works
 - Misc default-value/behavior fixes (mobile toolbar style picker, restore-factory settings, etc.)
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ Older versions
-  </summary>
 
 ### v3.8.5 — Mobile upgrade: toolbars hide with SiYuan's nav bars + new side capsule
 

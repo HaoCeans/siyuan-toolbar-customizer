@@ -2206,8 +2206,8 @@ function handleVisibilityChange() {
     return;
   }
 
-  // 获取弹窗配置
-  const popupConfig = pluginInstance.mobileFeatureConfig?.popupConfig || 'bothModes';
+  // 获取弹窗配置（缺省为 'disabled'：自启动需用户主动开启）
+  const popupConfig = pluginInstance.mobileFeatureConfig?.popupConfig || 'disabled';
 
   // ========== 切后台时：弹出弹窗 ==========
   if (document.hidden) {
@@ -2429,8 +2429,8 @@ export function initSmallWindowDetector(): void {
     heightCheckTimer = null;
   }
 
-  // 获取当前配置
-  const popupConfig = pluginInstance?.mobileFeatureConfig?.popupConfig || 'bothModes';
+  // 获取当前配置（缺省为 'disabled'：自启动需用户主动开启）
+  const popupConfig = pluginInstance?.mobileFeatureConfig?.popupConfig || 'disabled';
 
   // 如果是 disabled 模式，不做任何初始化
   if (popupConfig === 'disabled') {

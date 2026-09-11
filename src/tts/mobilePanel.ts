@@ -11,11 +11,15 @@ import { applyFloatPanelBackground, observeSiYuanThemeMode } from '../ui/floatPa
 import * as Notify from '../notification'
 import { showMessage } from 'siyuan'
 import { navigateToAdjacentDoc } from '../ui/mobileDocNav'
+import { getCurrentDocId } from './ttsEngine'
+import { buildPreparedTtsCacheKey, hashPreparedTtsContent, type PreparedCacheDescriptor, type PreparedTtsCacheEntry } from './preparedTtsCache'
 import { pluginInstance } from '../toolbarManager'
 import {
   getHttpTTSEngine, destroyHttpTTSEngine,
   SF_VOICES, getTTSSettings, saveTTSSettings, getSFAPIConfig, saveSFAPIConfig,
   ensureHighlightStyle, type TTSController,
+  PREPARED_TTS_SYNTHESIS_SCHEMA_VERSION, PREPARED_TTS_PARAGRAPH_SCHEMA_VERSION,
+  PREPARED_TTS_WAV_SCHEMA_VERSION, SF_TTS_MODEL,
 } from './httpTtsEngine'
 import { createIconButton, updateButtonIcon, injectSliderStyles, removeSliderStyles, lucideSvg } from './ttsIconHelper'
 
@@ -25,9 +29,59 @@ import { createIconButton, updateButtonIcon, injectSliderStyles, removeSliderSty
 
 let overlay: HTMLElement | null = null
 let bar: HTMLElement | null = null
-let visHandler: (() => void) | null = null
 let panelThemeUnsub: (() => void) | null = null
 let barThemeUnsub: (() => void) | null = null
+
+type HttpTTSEngine = ReturnType<typeof getHttpTTSEngine>
+type PrepareProgress = { current: number; total: number; paragraphIndex: number }
+type PreparedHttpTTSEngine = HttpTTSEngine & {
+  prepareAudio(
+    start: number,
+    end: number | undefined,
+    onProgress: (progress: PrepareProgress) => void,
+    trailingText?: string,
+    descriptor?: PreparedCacheDescriptor,
+  ): Promise<PreparedTtsCacheEntry | void>
+  speakPrepared(cacheKey?: string): Promise<boolean>
+  clearPreparedAudio(): void
+  clearPreparedCache(cacheKey: string): Promise<boolean>
+  hasPreparedAudioFor(cacheKey: string): Promise<boolean>
+}
+
+let mobilePanelGeneration = 0
+let playbackContinuationGeneration = 0
+
+const SILICON_FLOW_MODEL = SF_TTS_MODEL
+
+function buildPanelDescriptor(engine: HttpTTSEngine, start: number, end: number | undefined, mode: 'free' | 'api', speed: number, speaker: string | number, action: 'stop' | 'next' | 'prev', trailingText?: string): PreparedCacheDescriptor {
+  const paragraphs = engine.getParagraphs()
+  const lastParagraph = Math.max(0, paragraphs.length - 1)
+  const resolvedStart = Math.max(0, Math.min(start, lastParagraph))
+  const resolvedEnd = Math.max(resolvedStart, Math.min(end ?? lastParagraph, lastParagraph))
+  const selectedText = paragraphs
+    .slice(resolvedStart, resolvedEnd + 1)
+    .map(p => p.text)
+  return {
+    docId: getCurrentDocId(),
+    contentHash: hashPreparedTtsContent(JSON.stringify(selectedText)),
+    mode,
+    provider: mode === 'api' ? 'siliconflow' : 'baidu-youdao-fallback',
+    model: mode === 'api' ? SILICON_FLOW_MODEL : 'free-http-pipeline-v1',
+    synthesisSchemaVersion: PREPARED_TTS_SYNTHESIS_SCHEMA_VERSION,
+    paragraphSchemaVersion: PREPARED_TTS_PARAGRAPH_SCHEMA_VERSION,
+    wavSchemaVersion: PREPARED_TTS_WAV_SCHEMA_VERSION,
+    speed,
+    speaker,
+    start: resolvedStart,
+    end: resolvedEnd,
+    autoReadAction: action,
+    trailingText,
+  }
+}
+
+function engineHasPrepared(engine: PreparedHttpTTSEngine, key: string): Promise<boolean> {
+  return engine.hasPreparedAudioFor(key)
+}
 
 /** 朗读完成后动作：'stop' | 'next' | 'prev' */
 let autoReadAction: 'stop' | 'next' | 'prev' = 'stop'
@@ -48,7 +102,7 @@ export async function showTTSOptionsMobile(): Promise<void> {
 }
 
 export function cleanupMobileTTS(): void {
-  removeOverlay(); removeBar(); removeVis()
+  removeOverlay(); removeBar()
   destroyHttpTTSEngine()
   removeSliderStyles()
 }
@@ -56,6 +110,7 @@ export function cleanupMobileTTS(): void {
 // ─── 面板 ──
 
 function showTTSPanel(total: number): void {
+  mobilePanelGeneration++
   removeOverlay()
   injectSliderStyles()
 
@@ -91,9 +146,14 @@ function showTTSPanel(total: number): void {
   const savedConfig = getSFAPIConfig()
   const hasApiToken = !!savedConfig.apiKey
   const lastMode = getTTSSettings().lastMode
-  const defaultMode = lastMode || (hasApiToken ? 'api' : 'free')
+  const defaultMode = lastMode === 'api'
+    ? 'api'
+    : lastMode === 'free'
+      ? 'free'
+      : (hasApiToken ? 'api' : 'free')
 
   const modeBar = document.createElement('div')
+  modeBar.dataset.ttsModeBar = 'true'
   modeBar.style.cssText = `
     display:flex;
     background:color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent);
@@ -160,6 +220,7 @@ function showTTSPanel(total: number): void {
   card.appendChild(autoReadRow)
 
   function activateMode(mode: string) {
+    if (modeBar.dataset.locked === 'true') return
     // Apple 分段控件：激活项浮起 + 阴影，非激活项半透明
     if (mode === 'free') {
       modeFree.style.background = 'var(--b3-theme-surface)'
@@ -187,7 +248,12 @@ function showTTSPanel(total: number): void {
   activateMode(defaultMode)
 
   ov.appendChild(card)
-  ov.addEventListener('touchstart', (e) => { if (e.target === ov) removeOverlay() }, { passive: false })
+  ov.addEventListener('touchend', (e) => {
+    if (e.target === ov && ov.dataset.locked !== 'true') {
+      e.preventDefault()
+      removeOverlay()
+    }
+  }, { passive: false })
   document.body.appendChild(ov)
   overlay = ov
 }
@@ -237,28 +303,37 @@ function renderFreeContent(container: HTMLElement, total: number, autoSel?: HTML
 
     const engine = getHttpTTSEngine()
     engine.setSpeed(speed)
+    engine.setSpeaker(4)
     engine.setMode('free')
     await engine.extractParagraphsAsync()
 
-    engine.onStateChange = (st, idx, tot) => updateBar(st, idx, tot)
-    engine.onError = (msg) => { Notify.showErrorCommandCannotExecute(msg); removeBar() }
-    engine.onFinish = async () => {
-      if (autoReadAction === 'stop') {
-        const s = bar?.querySelector('#tm-s') as HTMLElement
-        if (s) s.textContent = t('tts.readingComplete', undefined, '朗读完成')
-        engine.onStateChange = () => {}
-        await engine.speakOnce(t('tts.documentReadingCompleteSpeech', undefined, '本文档已经朗读完成'), () => removeBar())
+    const action = autoReadAction
+    const descriptor = buildPanelDescriptor(engine, startP, endP, 'free', speed, 4, action, action === 'stop' ? t('tts.documentReadingCompleteSpeech', undefined, '本文档已经朗读完成') : undefined)
+    const cacheKey = buildPreparedTtsCacheKey(descriptor)
+    const continuationGeneration = ++playbackContinuationGeneration
+    if (await engineHasPrepared(engine as PreparedHttpTTSEngine, cacheKey)) {
+      if (continuationGeneration !== playbackContinuationGeneration) return
+      installPlaybackCallbacks(engine, continuationGeneration)
+      createBar(engine)
+      if (await (engine as PreparedHttpTTSEngine).speakPrepared(cacheKey)) {
         return
       }
-      const success = await navigateToAdjacentDoc(autoReadAction)
-      if (!success) { removeBar(); showMessage(t('tts.noMoreDocuments', undefined, '已无更多文档'), 2000, 'info'); return }
-      await waitForDocLoaded()
-      await engine.extractParagraphsAsync()
-      engine.speak(0, undefined)
+      if (continuationGeneration !== playbackContinuationGeneration) return
+      removeBar()
     }
+    if (continuationGeneration !== playbackContinuationGeneration) return
+    installPlaybackCallbacks(engine, continuationGeneration)
     createBar(engine)
-    engine.speak(startP, endP)
-    setupVis(engine)
+    engine.speak(descriptor.start, descriptor.end)
+  })
+  appendPrepareButton(container, total, autoSel, rangeSel, () => {
+    const speed = parseInt(rateSlider.value)
+    saveTTSSettings({ speed, lastMode: 'free' })
+    const engine = getHttpTTSEngine()
+    engine.setSpeed(speed)
+    engine.setSpeaker(4)
+    engine.setMode('free')
+    return engine as PreparedHttpTTSEngine
   })
   container.appendChild(btns.wrap)
 }
@@ -356,29 +431,215 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: HTMLS
     engine.setSpeed(speed)
     engine.setSpeaker(speaker)
     engine.setMode('api', apiKey)
+    engine.setDirectFetch(false)
     await engine.extractParagraphsAsync()
 
-    engine.onStateChange = (st, idx, tot) => updateBar(st, idx, tot)
-    engine.onError = (msg) => { Notify.showErrorCommandCannotExecute(msg); removeBar() }
-    engine.onFinish = async () => {
-      if (autoReadAction === 'stop') {
-        const s = bar?.querySelector('#tm-s') as HTMLElement
-        if (s) s.textContent = t('tts.readingComplete', undefined, '朗读完成')
-        engine.onStateChange = () => {}
-        await engine.speakOnce(t('tts.documentReadingCompleteSpeech', undefined, '本文档已经朗读完成'), () => removeBar())
+    const action = autoReadAction
+    const descriptor = buildPanelDescriptor(engine, startP, endP, 'api', speed, speaker, action, action === 'stop' ? t('tts.documentReadingCompleteSpeech', undefined, '本文档已经朗读完成') : undefined)
+    const cacheKey = buildPreparedTtsCacheKey(descriptor)
+    const continuationGeneration = ++playbackContinuationGeneration
+    if (await engineHasPrepared(engine as PreparedHttpTTSEngine, cacheKey)) {
+      if (continuationGeneration !== playbackContinuationGeneration) return
+      installPlaybackCallbacks(engine, continuationGeneration)
+      createBar(engine)
+      if (await (engine as PreparedHttpTTSEngine).speakPrepared(cacheKey)) {
         return
       }
-      const success = await navigateToAdjacentDoc(autoReadAction)
-      if (!success) { removeBar(); showMessage(t('tts.noMoreDocuments', undefined, '已无更多文档'), 2000, 'info'); return }
-      await waitForDocLoaded()
-      await engine.extractParagraphsAsync()
-      engine.speak(0, undefined)
+      if (continuationGeneration !== playbackContinuationGeneration) return
+      removeBar()
     }
+    if (continuationGeneration !== playbackContinuationGeneration) return
+    installPlaybackCallbacks(engine, continuationGeneration)
     createBar(engine)
-    engine.speak(startP, endP)
-    setupVis(engine)
+    engine.speak(descriptor.start, descriptor.end)
+  })
+  appendPrepareButton(container, total, autoSel, rangeSel, () => {
+    const apiKey = keyInput.value.trim()
+    if (!apiKey) {
+      Notify.showErrorCommandCannotExecute(t('tts.enterApiKey', undefined, '请填写 API Key'))
+      return null
+    }
+    const speed = parseFloat(rateSlider.value)
+    const speaker = speakerSel.value
+    saveSFAPIConfig({ apiKey })
+    saveTTSSettings({ apiSpeed: speed, speaker, lastMode: 'api' })
+    const engine = getHttpTTSEngine()
+    engine.setSpeed(speed)
+    engine.setSpeaker(speaker)
+    engine.setMode('api', apiKey)
+    engine.setDirectFetch(false)
+    return engine as PreparedHttpTTSEngine
   })
   container.appendChild(btns.wrap)
+}
+
+function installPlaybackCallbacks(engine: HttpTTSEngine, continuationGeneration = ++playbackContinuationGeneration): void {
+  engine.onStateChange = (st, idx, tot) => updateBar(st, idx, tot)
+  engine.onError = (msg) => { Notify.showErrorCommandCannotExecute(msg); removeBar() }
+  engine.onFinish = async (prepared) => {
+    if (autoReadAction === 'stop') {
+      const status = bar?.querySelector('#tm-s') as HTMLElement
+      if (status) status.textContent = t('tts.readingComplete', undefined, '朗读完成')
+      engine.onStateChange = () => {}
+      if (prepared) {
+        removeBar()
+        return
+      }
+      await engine.speakOnce(t('tts.documentReadingCompleteSpeech', undefined, '本文档已经朗读完成'), () => removeBar())
+      return
+    }
+    const success = await navigateToAdjacentDoc(autoReadAction)
+    if (continuationGeneration !== playbackContinuationGeneration) return
+    if (!success) { removeBar(); showMessage(t('tts.noMoreDocuments', undefined, '已无更多文档'), 2000, 'info'); return }
+    await waitForDocLoaded()
+    if (continuationGeneration !== playbackContinuationGeneration) return
+    await engine.extractParagraphsAsync()
+    if (continuationGeneration !== playbackContinuationGeneration) return
+    engine.speak(0, undefined)
+  }
+}
+
+function appendPrepareButton(
+  container: HTMLElement,
+  total: number,
+  autoSel: HTMLSelectElement | undefined,
+  rangeSel: HTMLSelectElement,
+  configureEngine: () => PreparedHttpTTSEngine | null,
+): void {
+  const prepareRow = document.createElement('div')
+  prepareRow.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:10px'
+  const refresh = makeBtn(t('tts.refresh', undefined, '刷新'), { flex: 1, secondary: true })
+  refresh.style.display = 'none'
+  const prepareButton = makeBtn(t('tts.prepareAndRead', undefined, '手机息屏或后台朗读准备'), { flex: 2, secondary: true })
+  prepareButton.style.minWidth = '0'
+  prepareButton.style.boxSizing = 'border-box'
+  prepareButton.style.whiteSpace = 'normal'
+
+  const setPreparedButtonStyle = (prepared: boolean) => {
+    prepareButton.style.background = prepared ? 'var(--b3-theme-success)' : 'var(--b3-theme-primary-lightest, color-mix(in srgb, var(--b3-theme-primary) 12%, transparent))'
+    prepareButton.style.color = prepared ? 'var(--b3-theme-on-primary, #fff)' : 'var(--b3-theme-primary)'
+    prepareButton.style.border = prepared ? '1px solid var(--b3-theme-success)' : '1px solid var(--b3-theme-primary-light, color-mix(in srgb, var(--b3-theme-primary) 35%, transparent))'
+  }
+  setPreparedButtonStyle(false)
+  prepareRow.appendChild(refresh)
+  prepareRow.appendChild(prepareButton)
+
+  let preparing = false
+  let preparedEngine: PreparedHttpTTSEngine | null = null
+  let preparedKey = ''
+  let restoreGeneration = 0
+  const taskGeneration = ++mobilePanelGeneration
+  const card = container.parentElement
+  const modeBar = card?.querySelector('[data-tts-mode-bar="true"]') as HTMLElement | null
+  const controls = Array.from(card?.querySelectorAll('input, select, a') || []) as HTMLElement[]
+  const setLocked = (locked: boolean) => {
+    preparing = locked
+    if (modeBar) { modeBar.dataset.locked = locked ? 'true' : 'false'; modeBar.style.pointerEvents = locked ? 'none' : ''; modeBar.style.opacity = locked ? '0.55' : '' }
+    if (overlay) overlay.dataset.locked = locked ? 'true' : 'false'
+    for (const control of controls) { if (control instanceof HTMLInputElement || control instanceof HTMLSelectElement) control.disabled = locked; else control.style.pointerEvents = locked ? 'none' : '' }
+    prepareButton.style.opacity = locked ? '0.65' : '1'
+  }
+  const currentDescriptor = (engine: PreparedHttpTTSEngine) => {
+    let start = 0, end: number | undefined
+    parseRange(rangeSel.value, total, (s, e) => { start = s; end = e })
+    const action = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev'
+    const settings = getTTSSettings()
+    const mode = settings.lastMode === 'api' ? 'api' : 'free'
+    const speed = mode === 'api' ? (settings.apiSpeed ?? 1) : settings.speed
+    const speaker = mode === 'api' ? settings.speaker : 4
+    return buildPanelDescriptor(engine, start, end, mode, speed, speaker, action, action === 'stop' ? t('tts.documentReadingCompleteSpeech', undefined, '本文档已经朗读完成') : undefined)
+  }
+  const showIdle = () => {
+    preparedEngine = null
+    preparedKey = ''
+    prepareButton.textContent = t('tts.prepareAndRead', undefined, '手机息屏或后台朗读准备')
+    setPreparedButtonStyle(false)
+    refresh.style.display = 'none'
+  }
+  const showReady = (engine: PreparedHttpTTSEngine, key: string) => {
+    preparedEngine = engine
+    preparedKey = key
+    prepareButton.textContent = t('tts.cachedClickToRead', undefined, '已缓存，请点击开始朗读')
+    setPreparedButtonStyle(true)
+    refresh.style.display = 'block'
+  }
+  const prepareCurrent = async (force: boolean) => {
+    if (preparing) return
+    const engine = configureEngine()
+    if (!engine) return
+    autoReadAction = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev'
+    saveTTSSettings({ autoReadAction })
+    let startP = 0, endP: number | undefined
+    parseRange(rangeSel.value, total, (s, e) => { startP = s; endP = e })
+    const completionSpeech = autoReadAction === 'stop' ? t('tts.documentReadingCompleteSpeech', undefined, '本文档已经朗读完成') : undefined
+    setLocked(true)
+    prepareButton.textContent = t('tts.preparingAudio', { current: 0, total: (endP ?? total - 1) - startP + 1 + (completionSpeech ? 1 : 0) }, '正在准备音频')
+    try {
+      await engine.extractParagraphsAsync()
+      const descriptor = currentDescriptor(engine)
+      const key = buildPreparedTtsCacheKey(descriptor)
+      startP = descriptor.start
+      endP = descriptor.end
+      if (force) {
+        engine.clearPreparedAudio()
+        await engine.clearPreparedCache(key)
+      }
+      const cached = await engineHasPrepared(engine, key)
+      const shouldPrepare = force || !cached
+      if (shouldPrepare) {
+        await engine.prepareAudio(startP, endP, ({ current, total: progressTotal }) => {
+          if (taskGeneration === mobilePanelGeneration) prepareButton.textContent = t('tts.preparingAudio', { current, total: progressTotal }, `正在准备 ${current} / ${progressTotal}`)
+        }, completionSpeech, descriptor)
+      }
+      if (taskGeneration !== mobilePanelGeneration || !overlay) return
+      if (!(await engineHasPrepared(engine, key))) throw new Error('准备完成后未生成可播放音频')
+      showReady(engine, key)
+      if (shouldPrepare) Notify.showSuccess(t('tts.preparedBackgroundReady', undefined, '准备完成，可以息屏或挂后台朗读'))
+    } catch (error) {
+      if (taskGeneration !== mobilePanelGeneration) return
+      showIdle()
+      const message = error instanceof Error ? error.message : String(error)
+      const key = force ? 'tts.reprepareFailed' : 'tts.prepareFailed'
+      const fallback = force ? `重新准备失败：${message}` : `准备失败：${message}`
+      Notify.showErrorCommandCannotExecute(t(key, { error: message }, fallback))
+    } finally {
+      if (taskGeneration === mobilePanelGeneration) setLocked(false)
+    }
+  }
+  bindTap(refresh, () => { void prepareCurrent(true) })
+  container.appendChild(prepareRow)
+
+  const restore = async () => {
+    const generation = ++restoreGeneration
+    const engine = configureEngine()
+    if (!engine) return
+    await engine.extractParagraphsAsync()
+    if (generation !== restoreGeneration || taskGeneration !== mobilePanelGeneration || !overlay) return
+    const descriptor = currentDescriptor(engine)
+    const key = buildPreparedTtsCacheKey(descriptor)
+    if (await engineHasPrepared(engine, key) && generation === restoreGeneration && taskGeneration === mobilePanelGeneration && overlay) showReady(engine, key)
+    else if (generation === restoreGeneration && taskGeneration === mobilePanelGeneration) showIdle()
+  }
+  for (const control of controls) {
+    if (control instanceof HTMLInputElement || control instanceof HTMLSelectElement) {
+      control.addEventListener('change', () => { showIdle(); void restore() })
+      if (control instanceof HTMLInputElement) control.addEventListener('input', () => { showIdle(); void restore() })
+    }
+  }
+  void restore()
+
+  bindTap(prepareButton, async () => {
+    if (preparing) return
+    if (preparedEngine && preparedKey && await engineHasPrepared(preparedEngine, preparedKey)) {
+      const continuationGeneration = ++playbackContinuationGeneration
+      installPlaybackCallbacks(preparedEngine, continuationGeneration)
+      createBar(preparedEngine)
+      if (await preparedEngine.speakPrepared(preparedKey)) removeOverlay()
+      else if (continuationGeneration === playbackContinuationGeneration) removeBar()
+      return
+    }
+    await prepareCurrent(false)
+  })
 }
 
 // ─── 工具函数 ──
@@ -445,9 +706,10 @@ function createBar(engine: TTSController): void {
   // 分隔线
   const sep = document.createElement('div')
   sep.style.cssText = 'width:1px;height:24px;background:var(--b3-theme-on-surface);opacity:0.1;margin:0 4px;'
-  b.appendChild(sep)
+    b.appendChild(sep)
 
-  b.appendChild(createIconButton('square', t('tts.stop', undefined, '停止'), 18, () => { engine.stop(); removeBar() }, { isMobile: true }))
+  b.appendChild(createIconButton('square', t('tts.stop', undefined, '停止'), 18, () => { playbackContinuationGeneration++; engine.stop(); removeBar() }, { isMobile: true }))
+
 
   document.body.appendChild(b)
   bar = b
@@ -465,20 +727,6 @@ function updateBar(st: string, idx: number, tot: number): void {
     const isPlaying = st === 'playing' || st === 'loading'
     updateButtonIcon(pp, isPlaying ? 'pause' : 'play', 18, true)
   }
-}
-
-// ─── 前后台 ──
-
-function setupVis(engine: TTSController): void {
-  removeVis()
-  visHandler = () => {
-    if (document.hidden) { if (engine.isPlaying) engine.pause() }
-    else { if (engine.isPaused) engine.resume() }
-  }
-  document.addEventListener('visibilitychange', visHandler)
-}
-function removeVis(): void {
-  if (visHandler) { document.removeEventListener('visibilitychange', visHandler); visHandler = null }
 }
 
 // ─── UI 工具 ──
@@ -499,9 +747,30 @@ function parseRange(value: string, total: number, cb: (start: number, end: numbe
 }
 
 function bindTap(el: HTMLElement, fn: () => void): void {
-  let touched = false
-  el.addEventListener('touchstart', (e) => { touched = true; e.preventDefault(); fn() }, { passive: false })
-  el.addEventListener('click', () => { if (touched) { touched = false; return } fn() })
+  let touchActive = false
+  let suppressClickUntil = 0
+
+  el.addEventListener('touchstart', (e) => {
+    touchActive = true
+    e.preventDefault()
+  }, { passive: false })
+  el.addEventListener('touchend', (e) => {
+    if (!touchActive) return
+    touchActive = false
+    suppressClickUntil = Date.now() + 700
+    e.preventDefault()
+    fn()
+  }, { passive: false })
+  el.addEventListener('touchcancel', () => {
+    touchActive = false
+  })
+  el.addEventListener('click', (e) => {
+    if (Date.now() < suppressClickUntil) {
+      e.preventDefault()
+      return
+    }
+    fn()
+  })
 }
 
 function el(tag: string, text: string) { const e = document.createElement(tag); e.textContent = text; return e }
@@ -569,11 +838,19 @@ function makeBtn(text: string, o: { flex?: number; primary?: boolean; secondary?
 }
 
 function removeOverlay(): void {
+  mobilePanelGeneration++
+  const activeElement = document.activeElement
+  if (
+    activeElement instanceof HTMLElement
+    && (activeElement.matches('input, textarea') || activeElement.isContentEditable)
+  ) {
+    activeElement.blur()
+  }
+
   if (panelThemeUnsub) { panelThemeUnsub(); panelThemeUnsub = null }
   if (overlay) { overlay.remove(); overlay = null }
 }
 function removeBar(): void {
-  removeVis()
   if (barThemeUnsub) { barThemeUnsub(); barThemeUnsub = null }
   if (bar) { bar.remove(); bar = null }
 }

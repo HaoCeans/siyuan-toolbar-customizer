@@ -838,7 +838,7 @@ export function createDesktopButtonItem(
     // 数据库悬浮弹窗配置区
     const dbConfigDiv = document.createElement('div')
     dbConfigDiv.id = 'db-config'
-    dbConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 10px; background: rgba(255, 255, 255, 0.5); border-radius: 6px;'
+    dbConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 10px; background: color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent); border-radius: 6px;'
 
     // 日记底部配置区（说明 + 笔记本ID + 等待时间配置）
     const diaryConfigDiv = document.createElement('div')
@@ -2437,7 +2437,7 @@ export function populateDesktopEditForm(
     // 数据库悬浮弹窗配置区
     const dbConfigDiv = document.createElement('div')
     dbConfigDiv.id = 'db-config'
-    dbConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 10px; background: rgba(255, 255, 255, 0.5); border-radius: 6px;'
+    dbConfigDiv.style.cssText = 'display: flex; flex-direction: column; gap: 10px; padding: 10px; background: color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent); border-radius: 6px;'
 
     // 数据库块ID
     const dbBlockIdLabel = document.createElement('label')

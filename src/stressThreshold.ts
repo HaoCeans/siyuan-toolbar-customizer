@@ -805,7 +805,7 @@ function showCardsPopup(processedData: any, config: StressThresholdConfig, plugi
     bottom: ${positionStyle.bottom || 'auto'};
     transform: ${positionStyle.transform || 'translate(-50%, -50%)'};
     margin: ${positionStyle.margin || '0'};
-    background: white;
+    background: var(--b3-menu-background);
     z-index: 999999;
     border-radius: ${isMobile ? '10px' : '12px'};
     padding: ${padding};
@@ -815,7 +815,7 @@ function showCardsPopup(processedData: any, config: StressThresholdConfig, plugi
     min-width: ${config.popupConfig.minWidth};
     max-width: ${config.popupConfig.maxWidth};
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-    border: 1px solid #e0e0e0;
+    border: 1px solid var(--b3-border-color);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-overflow-scrolling: touch;
     will-change: transform;
@@ -829,11 +829,11 @@ function showCardsPopup(processedData: any, config: StressThresholdConfig, plugi
   title.style.cssText = `
     font-size: 16px;
     font-weight: 600;
-    color: #1D1D1F;
+    color: var(--b3-theme-on-background);
     margin-bottom: ${rowCount > 0 ? '16px' : '0'};
     text-align: center;
     padding-bottom: 12px;
-    border-bottom: 1px solid #F0F0F0;
+    border-bottom: 1px solid var(--b3-border-color);
     user-select: none;
   `;
   popup.appendChild(title);
@@ -844,7 +844,7 @@ function showCardsPopup(processedData: any, config: StressThresholdConfig, plugi
     emptyMessage.style.cssText = `
       padding: 30px;
       text-align: center;
-      color: #8E8E93;
+      color: var(--b3-theme-on-surface-light);
       font-size: 14px;
       user-select: none;
     `;
@@ -982,7 +982,7 @@ function showCardsPopup(processedData: any, config: StressThresholdConfig, plugi
   note.style.cssText = `
     margin-top: ${rowCount > 0 ? '14px' : '20px'};
     font-size: 11px;
-    color: #8E8E93;
+    color: var(--b3-theme-on-surface-light);
     text-align: center;
     font-style: italic;
     opacity: 0.8;

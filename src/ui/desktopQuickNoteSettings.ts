@@ -260,7 +260,7 @@ export function createDesktopQuickNoteSettingsSection(
 
   const intro = document.createElement('div')
   intro.style.cssText =
-    'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.55; padding: 8px 10px; background: rgba(255,255,255,0.45); border-radius: 6px;'
+    'font-size: 13px; color: var(--b3-theme-on-surface); line-height: 1.55; padding: 8px 10px; background: color-mix(in srgb, var(--b3-theme-on-surface) 6%, transparent); border-radius: 6px;'
   intro.innerHTML =
     t("settings.desktopQuickNoteSettings.23", undefined, "工具栏按钮与全局快捷键共用以下配置。<br>") +
     t("settings.desktopQuickNoteSettings.24", undefined, "<strong>纯文本</strong> → 独立轻量悬浮窗（Alt+Shift+N，不唤起思源主界面）。<br>") +

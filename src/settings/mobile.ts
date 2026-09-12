@@ -1227,8 +1227,8 @@ export function createMobileSettingLayout(
           padding: 16px;
           font-size: 16px;
           font-weight: 700;
-          color: #6a1b9a;
-          background: #f3e5f5;
+          color: color-mix(in srgb, #8e24aa 65%, var(--b3-theme-on-background));
+          background: color-mix(in srgb, #8e24aa 10%, transparent);
           display: flex;
           align-items: center;
           justify-content: center;
@@ -1256,8 +1256,8 @@ export function createMobileSettingLayout(
         const container = document.createElement('div')
         container.style.cssText = `
           padding: 14px 18px;
-          background: #ffebee;
-          border: 1px solid #ffcdd2;
+          background: color-mix(in srgb, #d32f2f 10%, transparent);
+          border: 1px solid color-mix(in srgb, #d32f2f 30%, transparent);
           border-radius: 6px;
           font-size: 16px;
           font-weight: 600;
@@ -1287,8 +1287,8 @@ export function createMobileSettingLayout(
       const container = document.createElement('div')
       container.style.cssText = `
         padding: 10px 14px;
-        background: #ffebee;
-        border: 1px solid #ffcdd2;
+        background: color-mix(in srgb, #d32f2f 10%, transparent);
+        border: 1px solid color-mix(in srgb, #d32f2f 30%, transparent);
         border-radius: 6px;
         font-size: 15px;
         font-weight: 600;
@@ -3097,12 +3097,12 @@ export function createMobileSettingLayout(
       const container = document.createElement('div');
       container.style.cssText = `
         padding: 16px;
-        background: #ffebee;
-        border: 1px solid #ffcdd2;
+        background: color-mix(in srgb, #d32f2f 10%, transparent);
+        border: 1px solid color-mix(in srgb, #d32f2f 30%, transparent);
         border-radius: 8px;
         font-size: 14px;
         line-height: 1.6;
-        color: #b71c1c;
+        color: var(--b3-theme-error);
       `;
       
       container.textContent = t("settings.mobile.200", undefined, "📝 请先选择触发方式，再配置笔记本或文档 ID，选择插入位置，进行弹窗细化设置。");
@@ -3133,7 +3133,7 @@ export function createMobileSettingLayout(
       
       // 添加触发方式说明
       const triggerInfo = document.createElement('div');
-      triggerInfo.style.cssText = 'padding: 12px; background: #e3f2fd; border: 1px solid #bbdefb; border-radius: 6px; margin-bottom: 16px; font-size: 14px; line-height: 1.5;';
+      triggerInfo.style.cssText = 'padding: 12px; background: color-mix(in srgb, #1976d2 10%, transparent); border: 1px solid color-mix(in srgb, #1976d2 30%, transparent); border-radius: 6px; margin-bottom: 16px; font-size: 14px; line-height: 1.5;';
       triggerInfo.innerHTML = t("settings.mobile.201", undefined, "\n        <div style=\"font-weight: 600; margin-bottom: 8px; color: #1976d2;\">💡触发方式说明：</div>\n        <div style=\"margin-bottom: 6px;\">📱 方式一：按钮触发，请到顶部添加新按钮，选择功能④一键记事弹窗【简单】⏫</div>\n        <div>📱 方式二：自动触发：后台切前台⬇️</div>\n      ");
       container.appendChild(triggerInfo);
       
@@ -3148,7 +3148,7 @@ export function createMobileSettingLayout(
         //处理描述项
         if (option.type === 'description') {
           const descContainer = document.createElement('div');
-          descContainer.style.cssText = 'padding: 8px 12px; background: #fff3e0; border: 1px solid #ffe0b2; border-radius: 4px; margin-bottom: 8px; font-size: 13px; color: #e65100;';
+          descContainer.style.cssText = 'padding: 8px 12px; background: color-mix(in srgb, #e65100 10%, transparent); border: 1px solid color-mix(in srgb, #e65100 30%, transparent); border-radius: 4px; margin-bottom: 8px; font-size: 13px; color: #e65100;';
           descContainer.textContent = option.content;
           container.appendChild(descContainer);
           return;

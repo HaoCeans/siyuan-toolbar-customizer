@@ -31,6 +31,7 @@ let overlay: HTMLElement | null = null
 let bar: HTMLElement | null = null
 let panelThemeUnsub: (() => void) | null = null
 let barThemeUnsub: (() => void) | null = null
+let docChangeUnsub: (() => void) | null = null
 
 type HttpTTSEngine = ReturnType<typeof getHttpTTSEngine>
 type PrepareProgress = { current: number; total: number; paragraphIndex: number }
@@ -617,7 +618,14 @@ function appendPrepareButton(
     if (generation !== restoreGeneration || taskGeneration !== mobilePanelGeneration || !overlay) return
     const descriptor = currentDescriptor(engine)
     const key = buildPreparedTtsCacheKey(descriptor)
-    if (await engineHasPrepared(engine, key) && generation === restoreGeneration && taskGeneration === mobilePanelGeneration && overlay) showReady(engine, key)
+    const hasPrepared = await engineHasPrepared(engine, key)
+    logger.log('[TTS] 准备状态判定:', {
+      docId: descriptor.docId,
+      range: `${descriptor.start}-${descriptor.end}`,
+      mode: descriptor.mode,
+      hit: hasPrepared,
+    })
+    if (hasPrepared && generation === restoreGeneration && taskGeneration === mobilePanelGeneration && overlay) showReady(engine, key)
     else if (generation === restoreGeneration && taskGeneration === mobilePanelGeneration) showIdle()
   }
   for (const control of controls) {
@@ -628,15 +636,41 @@ function appendPrepareButton(
   }
   void restore()
 
+  // 切换文档后必须重新判定准备状态：缓存键包含文档 ID 与全文哈希，
+  // 旧文档的「已缓存」不应延续到新文档。手机端 switch-protyle 可能延迟或不触发，
+  // 因此两个事件都监听；点击准备按钮时还会再核对一次（见下方 bindTap）。
+  // 切换免费/API 模式会重新渲染本组件，这里先退订，避免监听器累积。
+  if (docChangeUnsub) { docChangeUnsub(); docChangeUnsub = null }
+  const handleDocChanged = () => { void restore() }
+  const panelEventBus = pluginInstance?.app?.eventBus
+  panelEventBus?.on('switch-protyle', handleDocChanged)
+  panelEventBus?.on('loaded-protyle-dynamic', handleDocChanged)
+  docChangeUnsub = () => {
+    panelEventBus?.off('switch-protyle', handleDocChanged)
+    panelEventBus?.off('loaded-protyle-dynamic', handleDocChanged)
+  }
+
   bindTap(prepareButton, async () => {
     if (preparing) return
-    if (preparedEngine && preparedKey && await engineHasPrepared(preparedEngine, preparedKey)) {
-      const continuationGeneration = ++playbackContinuationGeneration
-      installPlaybackCallbacks(preparedEngine, continuationGeneration)
-      createBar(preparedEngine)
-      if (await preparedEngine.speakPrepared(preparedKey)) removeOverlay()
-      else if (continuationGeneration === playbackContinuationGeneration) removeBar()
-      return
+    if (preparedEngine && preparedKey) {
+      // 关键：preparedKey 可能是切换文档前算出来的，直接用会播放上一篇的音频。
+      // 因此播放前按当前文档/范围/参数重新计算一次键，不一致则重新判定与准备。
+      await preparedEngine.extractParagraphsAsync()
+      const currentKey = buildPreparedTtsCacheKey(currentDescriptor(preparedEngine))
+      if (currentKey !== preparedKey) {
+        logger.log('[TTS] 准备状态已失效（文档或参数已变化），重新准备')
+        showIdle()
+        await prepareCurrent(false)
+        return
+      }
+      if (await engineHasPrepared(preparedEngine, preparedKey)) {
+        const continuationGeneration = ++playbackContinuationGeneration
+        installPlaybackCallbacks(preparedEngine, continuationGeneration)
+        createBar(preparedEngine)
+        if (await preparedEngine.speakPrepared(preparedKey)) removeOverlay()
+        else if (continuationGeneration === playbackContinuationGeneration) removeBar()
+        return
+      }
     }
     await prepareCurrent(false)
   })
@@ -848,6 +882,7 @@ function removeOverlay(): void {
   }
 
   if (panelThemeUnsub) { panelThemeUnsub(); panelThemeUnsub = null }
+  if (docChangeUnsub) { docChangeUnsub(); docChangeUnsub = null }
   if (overlay) { overlay.remove(); overlay = null }
 }
 function removeBar(): void {

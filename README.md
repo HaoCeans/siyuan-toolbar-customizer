@@ -338,9 +338,9 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
-### v3.8.8 — Custom stacking level for the desktop bottom capsule
+### v3.8.8 — Adjustable capsule level + shortcut button fixes + reading improvements
 
-> 💡 Is the bottom floating capsule hidden behind SiYuan elements or another plugin? You can now adjust its stacking level manually.
+> 💡 Bottom capsule hidden behind other elements? The "③ Desktop shortcut" button erroring or doing nothing? Edge online reading failing on some voices? Mobile reading preparation stuck halfway? Update.
 
 **① New desktop capsule stacking-level setting**
 - Added a "Stacking level (z-index)" number field under "Desktop global toolbar configuration → Floating capsule style configuration"
@@ -348,7 +348,14 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 - The default remains `50`, so upgrading does not change the existing appearance
 - Accepts integers from `0–2147483647`; invalid input automatically falls back to the default
 
-**② Edge online reading fixes (desktop)**
+**② Desktop shortcut button fixes (important)**
+- Fixed the `kt.closest is not a function` error when clicking a "③ Desktop shortcut" button, which prevented the shortcut from running; it happened almost every time with a locked document or an open outline panel
+- Two root causes: simulated key events were dispatched to `window` instead of a page element (SiYuan's handler calls `closest()` on the target and crashes), and the editor-lookup CSS selector used fullwidth quotation marks, so the editor could never be found
+- All 6 similar event-dispatch sites across the plugin now dispatch to page elements; events still reach SiYuan but the crash path is gone
+- Shortcut buttons gained tap protection: repeated clicks on the same button within 300 ms run only once, preventing toggle-style shortcuts (document tree / outline) from flipping back and forth; ignored clicks no longer show a notification
+- Added detailed diagnostic logs (branch decisions, dispatch targets, `[Shortcut]` prefix) for easier troubleshooting
+
+**③ Edge online reading fixes (desktop)**
 - Corrected the voice list: removed 7 voices that the Edge read-aloud endpoint does not actually provide (Xiaochen, Xiaohan, Xiaomo, Xiaoshuang, Yunfeng, Yunhao, Yunze) and added the working Yunxia and Yunyang plus the dialect voices Xiaobei (Northeastern) and Xiaoni (Shaanxi)
 - Picking a non-existent voice made the endpoint complete the handshake, accept the text and then close the connection without returning audio — reported as "connection closed, no audio received" and it aborted the whole document. Those voices are gone, and an unsupported voice saved in old settings now falls back to the default voice
 - Much shorter pauses between blocks: the next block is synthesized while the current one is still playing, so synthesis time overlaps playback
@@ -357,13 +364,16 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 - One automatic retry when the first connection is reset; requests that already received part of the audio are not retried, to avoid repeating speech
 - Reuses one audio element activated by the click, avoiding the "play() can only be initiated by a user gesture" block
 
-**③ SiliconFlow background reading preparation fixes (mobile)**
+**④ SiliconFlow background reading preparation fixes (mobile)**
 - Fixed decoding of base64 variants returned through the SiYuan network proxy (url-safe, missing padding, `base64-std`, containing whitespace); previously this reported "audio decode failed" and blocked preparation on mobile
+- Fixed preparation stalling halfway: some mobile WebViews neither resolve nor reject audio decoding, leaving later paragraphs waiting forever; decoding now has a 15-second timeout and retries once with a fresh copy
+- Transient failures (request timeout, network transport, proxy errors) are now retried automatically, so a single network hiccup no longer wastes the whole preparation
 - Audio validation no longer requires an MP3 header and now also accepts WAV and Ogg
 - Very long paragraphs are split into multiple requests, reducing the chance of a single-request timeout
 - A failed persistent-cache write now degrades to session-only availability instead of failing the whole preparation
+- Preparation state is re-checked after switching documents: if the cached audio belongs to a previous document or old settings, it is re-prepared automatically instead of playing the wrong document
 
-**④ Mobile auto-start quick note is now off by default**
+**⑤ Mobile auto-start quick note is now off by default**
 - New users default to "① Disabled"; enable it under "Quick note popup → Trigger: background to foreground" when needed
 - Existing users are unaffected: a saved value is kept as-is, and configs predating this field are back-filled with the previous behavior (both small-window and full-screen)
 

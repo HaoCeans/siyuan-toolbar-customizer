@@ -204,6 +204,39 @@ export function ensureHighlightStyle(): void {
 // 辅助函数
 // ═══════════════════════════════════════════════════════════════
 
+/**
+ * 带超时的音频解码。
+ *
+ * 部分移动端 WebView 在解码异常数据时既不会 resolve 也不会 reject，直接 await 会永久挂起；
+ * 由于准备流程的解码是串行排队的，一处挂起会让整次准备静止且无任何提示。
+ */
+function decodeAudioDataWithTimeout(context: AudioContext, data: ArrayBuffer, timeoutMs: number): Promise<AudioBuffer> {
+  return new Promise<AudioBuffer>((resolve, reject) => {
+    let settled = false
+    const timer = window.setTimeout(() => {
+      if (settled) return
+      settled = true
+      reject(new Error(`音频解码超时（${timeoutMs / 1000} 秒，${data.byteLength} 字节）`))
+    }, timeoutMs)
+    const finish = (error: unknown, buffer?: AudioBuffer) => {
+      if (settled) return
+      settled = true
+      window.clearTimeout(timer)
+      if (error) reject(error instanceof Error ? error : new Error(String(error)))
+      else if (!buffer) reject(new Error('音频解码返回空结果'))
+      else resolve(buffer)
+    }
+    try {
+      context.decodeAudioData(data.slice(0)).then(
+        buffer => finish(null, buffer),
+        error => finish(error),
+      )
+    } catch (error) {
+      finish(error)
+    }
+  })
+}
+
 function hasSupportedAudioHeader(bytes: Uint8Array): boolean {
   if (bytes.length < 4) return false
   const isMp3 = (bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0)
@@ -292,6 +325,9 @@ function concatBuffers(buffers: ArrayBuffer[]): ArrayBuffer {
 
 const SF_REQUEST_TIMEOUT = 30000
 const SF_MAX_ATTEMPTS = 3
+// 单段音频的解码上限。移动端 WebView 遇到异常音频时 decodeAudioData 可能既不回成功也不回失败，
+// 而解码是串行排队的，不设上限会让整次准备永久卡住且没有任何报错。
+const PREPARED_DECODE_TIMEOUT = 15000
 // MP3 keeps the proxied base64 payload small (roughly 6 KB/s of audio). Requesting an
 // uncompressed format here would inflate the same paragraph ~8-10x and make mobile
 // preparation more likely to time out or exhaust memory.
@@ -487,12 +523,14 @@ async function fetchSiliconFlowWithPolicy(
       }
     } catch (error) {
       lastError = error
+      // 超时/传输/代理类失败通常是瞬时的，重试同一段文本是安全的（合成幂等）；
+      // 只有 4xx 这类稳定错误才不重试。这样单次网络抖动不会中断整篇准备。
       const retryable = error instanceof SiliconFlowRequestError
-        && error.kind === 'http'
-        && (error.status === 429 || error.status === 503 || error.status === 504)
+        && (error.kind === 'timeout' || error.kind === 'transport' || error.kind === 'proxy'
+          || (error.kind === 'http' && (error.status === 429 || error.status === 503 || error.status === 504)))
       if (!retryable || attempt === SF_MAX_ATTEMPTS - 1) throw error
       const delay = error.retryAfterMs ?? (500 * (2 ** attempt) + Math.floor(Math.random() * 250))
-      logger.warn(`[SiliconFlowTTS] HTTP ${error.status}，${delay}ms 后重试 (${attempt + 2}/${SF_MAX_ATTEMPTS})`)
+      logger.warn(`[SiliconFlowTTS] ${error.kind} 失败，${delay}ms 后重试 (${attempt + 2}/${SF_MAX_ATTEMPTS})`)
       await new Promise(resolve => window.setTimeout(resolve, delay))
       assertCurrent?.()
     }
@@ -655,6 +693,13 @@ export class HttpTTSEngine {
     const results = new Array<PreparedParagraph>(paragraphTotal)
     let trailingResult: PreparedParagraph | null = null
     const concurrency = this.mode === 'api' && this.apiToken ? 3 : 2
+    logger.log('[HttpTTS] 开始准备音频:', {
+      mode: this.mode,
+      paragraphs: paragraphTotal,
+      trailing: hasTrailingText,
+      concurrency,
+      sampleRate: PREPARED_SAMPLE_RATE,
+    })
     let nextTask = 0
     let completed = 0
     let workerError: unknown
@@ -663,8 +708,17 @@ export class HttpTTSEngine {
     const decodePart = (encoded: ArrayBuffer): Promise<Int16Array> => {
       const task = decodeQueue.then(async () => {
         this.assertOperation(generation)
-        const decoded = await context.decodeAudioData(encoded.slice(0))
+        const startedAt = Date.now()
+        let decoded: AudioBuffer
+        try {
+          decoded = await decodeAudioDataWithTimeout(context, encoded, PREPARED_DECODE_TIMEOUT)
+        } catch (error) {
+          // 解码偶发失败时换一份数据副本重试一次，仍失败则向上抛出
+          logger.warn('[HttpTTS] 音频解码失败，重试一次:', error instanceof Error ? error.message : String(error))
+          decoded = await decodeAudioDataWithTimeout(context, encoded, PREPARED_DECODE_TIMEOUT)
+        }
         this.assertOperation(generation)
+        logger.log(`[HttpTTS] 解码完成: ${encoded.byteLength} 字节 → ${decoded.duration.toFixed(2)} 秒，耗时 ${Date.now() - startedAt}ms`)
         return this.audioBufferToPcm(decoded, PREPARED_SAMPLE_RATE)
       })
       decodeQueue = task.then(() => undefined, () => undefined)

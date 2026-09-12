@@ -2693,6 +2693,14 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
       }
     }
 
+    // 连续点击诊断：记录本次点击捕获到的选区状态（快捷键按钮依赖它定位插入位置）
+    if (config.type === 'shortcut') {
+      logger.log('[Shortcut] 点击捕获选区', {
+        button: getButtonDisplayName(config),
+        ...describeSavedSelection(savedSelection),
+      })
+    }
+
     // 将保存的选区和按钮元素传递给处理函数（使用 await 保持 async 链条）
     await handleButtonClick(config, savedSelection, lastActiveElement, button)
 
@@ -3708,6 +3716,16 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
 }
 
 /**
+ * 快捷键类型按钮的防连点间隔。
+ *
+ * 这类按钮等价于「替你按一次快捷键」，而思源的文档/大纲等快捷键是开关：
+ * 连点 N 次就是开关 N 次，偶数次回到原样，看起来像点了没反应，中间还会闪烁。
+ * 因此同一按钮在此间隔内的重复点击直接忽略（各按钮独立计时）。
+ */
+const SHORTCUT_CLICK_COOLDOWN_MS = 300
+const lastShortcutClickAt = new Map<string, number>()
+
+/**
  * 处理按钮点击
  */
 async function handleButtonClick(
@@ -3716,6 +3734,22 @@ async function handleButtonClick(
   lastActiveElement: HTMLElement | null,
   clickedButton: HTMLElement | null
 ) {
+  // 快捷键按钮防连点：放在最前面，连点被忽略时也不再弹提示
+  if (config.type === 'shortcut') {
+    const now = Date.now()
+    const last = lastShortcutClickAt.get(config.id)
+    if (last !== undefined && now - last < SHORTCUT_CLICK_COOLDOWN_MS) {
+      logger.log('[Shortcut] 连点冷却中，本次点击已忽略', {
+        buttonId: config.id,
+        button: getButtonDisplayName(config),
+        sinceLastMs: now - last,
+        cooldownMs: SHORTCUT_CLICK_COOLDOWN_MS,
+      })
+      return
+    }
+    lastShortcutClickAt.set(config.id, now)
+  }
+
   // 如果开启了右上角提示，显示消息
   const notificationEnabled = config.showNotification !== false
   Notify.showButtonExecNotification(getButtonDisplayName(config), notificationEnabled)
@@ -3961,7 +3995,7 @@ function executeBuiltinRefreshFunction(config: ButtonConfig) {
           };
           
           const eventDown = new KeyboardEvent('keydown', keyEvent);
-          window.dispatchEvent(eventDown);
+          dispatchKeyWithLog(document.body, eventDown, '刷新（备用F5）：派发 keydown', { stage: 'fallback' });
         } catch (e) {
           logger.warn('F5快捷键方法也失败:', e)
         }
@@ -3985,7 +4019,7 @@ function executeBuiltinRefreshFunction(config: ButtonConfig) {
         };
         
         const eventDown = new KeyboardEvent('keydown', keyEvent);
-        window.dispatchEvent(eventDown);
+        dispatchKeyWithLog(document.body, eventDown, '刷新（补充F5）：派发 keydown', { stage: 'supplement' });
       } catch (e) {
         logger.warn('F5快捷键补充方案失败:', e)
       }
@@ -4061,16 +4095,16 @@ function executeBuiltinRefreshFunction(config: ButtonConfig) {
         if (activeEditor instanceof HTMLElement) {
           // 先聚焦到编辑器
           activeEditor.focus();
-          
+
           // 延迟触发，确保焦点设置完成
           setTimeout(() => {
             const eventDown = new KeyboardEvent('keydown', keyEvent);
-            activeEditor.dispatchEvent(eventDown);
+            dispatchKeyWithLog(activeEditor, eventDown, '全屏切换：派发 keydown 到编辑器', {});
           }, 50);
         } else {
-          // 如果没有找到编辑器，在 window 上触发事件
+          // 如果没有找到编辑器，派发到 body（元素目标，不能是 window）
           const eventDown = new KeyboardEvent('keydown', keyEvent);
-          window.dispatchEvent(eventDown);
+          dispatchKeyWithLog(document.body, eventDown, '全屏切换：未找到编辑器，派发 keydown 到 body', {});
         }
       } catch (error) {
         logger.error('文档全屏切换失败:', error);
@@ -4093,7 +4127,7 @@ function executeBuiltinRefreshFunction(config: ButtonConfig) {
           };
           
           const eventDown = new KeyboardEvent('keydown', keyEvent);
-          document.dispatchEvent(eventDown);
+          dispatchKeyWithLog(document, eventDown, '全屏切换（备用）：派发 keydown 到 document', {});
         } catch (e) {
           logger.error('备用方案也失败:', e);
         }
@@ -5364,10 +5398,10 @@ async function executeDiary(config: ButtonConfig) {
     }
     // ==================== 电脑端流程 ====================
     if (!isMobile) {
-      // 1. 触发快捷键
+      // 1. 触发快捷键（派发到 body 元素，见 executeShortcut 内的说明）
       const keyEvent = parseHotkeyToKeyEvent(hotkeyToTrigger)
       if (keyEvent) {
-        window.dispatchEvent(new KeyboardEvent('keydown', keyEvent))
+        dispatchKeyWithLog(document.body, new KeyboardEvent('keydown', keyEvent), '日记（电脑端）：派发 keydown', {})
       }
 
       // 2. 根据位置模式，等待文档加载后滚动
@@ -5387,10 +5421,10 @@ async function executeDiary(config: ButtonConfig) {
     }
 
     // ==================== 手机端流程 ====================
-    // 1. 触发快捷键
+    // 1. 触发快捷键（派发到 body 元素，避免 window 目标导致思源处理函数崩溃）
     const keyEvent = parseHotkeyToKeyEvent(hotkeyToTrigger)
     if (keyEvent) {
-      window.dispatchEvent(new KeyboardEvent('keydown', keyEvent))
+      dispatchKeyWithLog(document.body, new KeyboardEvent('keydown', keyEvent), '日记（手机端）：派发 keydown', {})
     }
 
     // 2. 使用 MutationObserver 等待对话框出现并自动确认（比轮询更高效）
@@ -9212,17 +9246,14 @@ function executeSiyuanCommand(command: string, protyle?: any) {
     const keyEvent = parseHotkeyToKeyEvent(hotkeyToTrigger)
 
     if (keyEvent) {
-      // 在 window 和 document.body 上同时触发快捷键事件
+      // 派发到 body（元素目标）。不要派发到 window：思源处理快捷键时会对事件目标
+      // 调用 closest()，window 不是元素会抛 TypeError；body 上的事件会冒泡到 window 监听器，
+      // 且 body 上触发一次即可同时覆盖冒泡路径，无需重复派发。
       const eventDown = new KeyboardEvent('keydown', keyEvent)
       const eventUp = new KeyboardEvent('keyup', keyEvent)
 
-      // 先在 window 上触发
-      window.dispatchEvent(eventDown)
-      window.dispatchEvent(eventUp)
-
-      // 再在 body 上触发
-      document.body.dispatchEvent(eventDown)
-      document.body.dispatchEvent(eventUp)
+      dispatchKeyWithLog(document.body, eventDown, 'executeSiyuanCommand：派发 keydown', { command: hotkeyToTrigger })
+      dispatchKeyWithLog(document.body, eventUp, 'executeSiyuanCommand：派发 keyup', { command: hotkeyToTrigger })
 
       // 快捷键触发成功，直接返回
       return
@@ -9350,11 +9381,66 @@ function executeSiyuanCommand(command: string, protyle?: any) {
 /**
  * 执行快捷键（主入口函数）
  */
+// ─── 快捷键按钮连续点击诊断 ────────────────────────────────
+// 连续快速点击同一个快捷键按钮会产生并发执行（此流程没有防抖），
+// 且部分分支用 setTimeout 延迟执行，因此需要日志确认：
+// 是否有重叠执行、延迟回调真正触发时保存的选区是否还有效。
+let shortcutExecSeq = 0
+let shortcutExecInFlight = 0
+
+function describeSavedSelection(range: Range | null): Record<string, unknown> {
+  if (!range) return { hasSelection: false }
+  try {
+    const container = range.commonAncestorContainer
+    const el = container.nodeType === Node.ELEMENT_NODE ? container as HTMLElement : container.parentElement
+    return {
+      hasSelection: true,
+      collapsed: range.collapsed,
+      offsets: `${range.startOffset}-${range.endOffset}`,
+      stillConnected: el?.isConnected ?? false,
+      blockId: el?.closest('[data-node-id]')?.getAttribute('data-node-id') ?? '',
+    }
+  } catch (error) {
+    return { hasSelection: true, selectionError: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+/** 派发键盘事件并记录目标。任何情况下都禁止派发到 window（思源会对目标调 closest）。 */
+function dispatchKeyWithLog(
+  target: EventTarget,
+  event: KeyboardEvent,
+  stage: string,
+  context: Record<string, unknown> = {},
+): void {
+  const targetName = target === window
+    ? 'WINDOW(禁止!)'
+    : target === document.body
+      ? 'BODY'
+      : target === document.documentElement
+        ? 'HTML'
+        : (target as Element)?.tagName ?? String(target)
+  logger.log(`[Shortcut] ${stage}`, { ...context, target: targetName })
+  target.dispatchEvent(event)
+}
+
 function executeShortcut(config: ButtonConfig, savedSelection: Range | null = null, lastActiveElement: HTMLElement | null = null) {
   if (!config.shortcutKey) {
     Notify.showErrorShortcutNotConfigured(getButtonDisplayName(config))
     return
   }
+
+  const execSeq = ++shortcutExecSeq
+  shortcutExecInFlight++
+  const execStartedAt = Date.now()
+  logger.log('[Shortcut] 开始执行', {
+    seq: execSeq,
+    inFlight: shortcutExecInFlight,
+    button: getButtonDisplayName(config),
+    buttonId: config.id,
+    shortcutKey: config.shortcutKey,
+    lastActiveElementIsEditable: !!lastActiveElement?.matches?.('[contenteditable="true"]'),
+    ...describeSavedSelection(savedSelection),
+  })
 
   try {
     // 转换为思源的快捷键格式
@@ -9362,6 +9448,7 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
 
     // ⌘/ 是思源硬编码的块菜单快捷键，不走 keymap 也不走键盘事件模拟，直接调用内部函数
     if (siyuanHotkey === '⌘/') {
+      logger.log('[Shortcut] 命中：块菜单（⌘/）', { seq: execSeq })
       try {
         // 恢复编辑器焦点和选区
         const editArea =
@@ -9484,7 +9571,21 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
 
           if (editArea) {
             editArea.focus()
+            const deferredAt = Date.now()
+            logger.log('[Shortcut] 命中：插件命令，已聚焦编辑器，50ms 后恢复选区并执行', {
+              seq: execSeq,
+              inFlight: shortcutExecInFlight,
+              command: cmd.name || cmd.customHotkey,
+            })
             setTimeout(() => {
+              // 连续点击时这里可能同时有多次回调在跑，且共同引用同一个保存的选区
+              logger.log('[Shortcut] 延迟回调触发', {
+                seq: execSeq,
+                delayMs: Date.now() - deferredAt,
+                inFlight: shortcutExecInFlight,
+                command: cmd.name || cmd.customHotkey,
+                ...describeSavedSelection(savedSelection),
+              })
               restoreSelection(savedSelection)
               try {
                 const protyle = getActiveProtyle()
@@ -9493,6 +9594,7 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
                 } else if (cmd.callback) {
                   cmd.callback()
                 }
+                logger.log('[Shortcut] 延迟回调执行完毕', { seq: execSeq, command: cmd.name || cmd.customHotkey })
               } catch (e) {
                 logger.warn('插件命令 editorCallback 执行失败:', e)
               }
@@ -9502,6 +9604,12 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
         }
 
         // 非 editorCallback 或无保存选区，直接调用
+        logger.log('[Shortcut] 命中：插件命令，直接调用回调', {
+          seq: execSeq,
+          command: cmd.name || cmd.customHotkey,
+          hasEditorCallback,
+          hasSavedSelection: !!savedSelection,
+        })
         try {
           if (cmd.callback) {
             cmd.callback()
@@ -9604,10 +9712,26 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
       // 触发键盘事件
       if (hotkeyToTrigger) {
         const keyEvent = parseHotkeyToKeyEvent(hotkeyToTrigger)
+        logger.log('[Shortcut] 命中：keymap 命令，模拟键盘事件', {
+          seq: execSeq,
+          command,
+          isEditorCommand,
+          hotkeyToTrigger,
+          parsed: !!keyEvent,
+          activeElement: document.activeElement?.className || document.activeElement?.tagName || '',
+        })
         if (keyEvent) {
           // 移动端特殊处理：复制类命令直接使用 protyle 方法
           const isMobile = isMobileDevice()
           const copyCommands = ['copyBlockRef', 'copyBlockEmbed', 'copyText', 'copyHPath', 'copyProtocol', 'copyID', 'copyPlainText']
+          logger.log('[Shortcut] 分支判定', {
+            seq: execSeq,
+            command,
+            isMobile,
+            isEditorCommand,
+            hasSavedSelection: !!savedSelection,
+            isCopyCommand: copyCommands.includes(command),
+          })
 
           if (isMobile && isEditorCommand && copyCommands.includes(command)) {
             const windowObj = window as any
@@ -9682,12 +9806,21 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
 
             // 获取编辑器可编辑区域
             let editArea: HTMLElement | null = null
+            let editAreaSource = ''
             if (lastActiveElement?.matches('[contenteditable="true"]')) {
               editArea = lastActiveElement
+              editAreaSource = 'lastActiveElement'
             } else {
               const protyleElement = getActiveProtyleElement()
               editArea = protyleElement?.querySelector('[contenteditable="true"]') as HTMLElement
+              editAreaSource = protyleElement ? 'activeProtyle' : 'protyle未找到'
             }
+            logger.log('[Shortcut] 编辑器命令分支', {
+              seq: execSeq,
+              command,
+              editAreaFound: !!editArea,
+              editAreaSource,
+            })
 
             if (editArea) {
               // 先聚焦到编辑器
@@ -9701,7 +9834,11 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
 
                   // 触发键盘事件
                   const eventDown = new KeyboardEvent('keydown', keyEvent)
-                  editArea.dispatchEvent(eventDown)
+                  dispatchKeyWithLog(editArea, eventDown, '编辑器分支：派发 keydown（50ms 延迟后）', {
+                    seq: execSeq,
+                    command,
+                    selectionRestored: true,
+                  })
                 } catch (e) {
                   // 部分思源快捷键（如 Ctrl+/ 块菜单）依赖内部选区状态，无法通过模拟键盘事件触发
                   logger.warn('快捷键模拟执行失败:', config.shortcutKey, e)
@@ -9711,9 +9848,15 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
             }
           }
 
-          // 通用命令：在 window 上触发
+          // 通用命令：派发到 body（元素目标）而不是 window。
+          // 思源的快捷键处理函数会对事件目标调用 closest()，window 不是元素会抛
+          // "closest is not a function"；body 上的事件仍会冒泡到 window 监听器。
           const eventDown = new KeyboardEvent('keydown', keyEvent)
-          window.dispatchEvent(eventDown)
+          dispatchKeyWithLog(document.body || document.documentElement, eventDown, '通用命令分支：派发 keydown', {
+            seq: execSeq,
+            command,
+            reason: !isEditorCommand ? '非编辑器命令' : (savedSelection ? '编辑器内未找到可编辑区域' : '无已保存选区'),
+          })
 
           return
         }
@@ -9722,26 +9865,33 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
       Notify.showErrorCommandCannotExecute(command)
     } else {
       // 未在 keymap 中找到命令，直接触发用户输入的快捷键
+      logger.log('[Shortcut] 命中：keymap 中无此命令，直接派发原始快捷键', {
+        seq: execSeq,
+        shortcutKey: config.shortcutKey,
+        siyuanHotkey,
+      })
       const keyEvent = parseHotkeyToKeyEvent(siyuanHotkey)
       if (keyEvent) {
         try {
           // 尽量向”当前编辑器可编辑区域”派发（很多快捷键只在编辑器焦点内生效）
           const protyleElement = getActiveProtyleElement()
           const editArea =
-            (lastActiveElement?.matches?.('[contenteditable=”true”]') ? lastActiveElement : null) ||
-            (protyleElement?.querySelector?.('[contenteditable=”true”]') as HTMLElement | null) ||
-            (document.activeElement?.matches?.('[contenteditable=”true”]') ? (document.activeElement as HTMLElement) : null)
+            (lastActiveElement?.matches?.('[contenteditable="true"]') ? lastActiveElement : null) ||
+            (protyleElement?.querySelector?.('[contenteditable="true"]') as HTMLElement | null) ||
+            (document.activeElement?.matches?.('[contenteditable="true"]') ? (document.activeElement as HTMLElement) : null)
 
           const eventDown = new KeyboardEvent('keydown', keyEvent)
           const eventUp = new KeyboardEvent('keyup', keyEvent)
 
           if (editArea) {
             editArea.focus?.()
-            editArea.dispatchEvent(eventDown)
-            editArea.dispatchEvent(eventUp)
+            dispatchKeyWithLog(editArea, eventDown, '原始快捷键分支：派发 keydown 到编辑器', { seq: execSeq })
+            dispatchKeyWithLog(editArea, eventUp, '原始快捷键分支：派发 keyup 到编辑器', { seq: execSeq })
           } else {
-            window.dispatchEvent(eventDown)
-            window.dispatchEvent(eventUp)
+            // 不能派发到 window：思源处理快捷键时会对事件目标调用 closest()，
+            // window 不是元素会抛 "closest is not a function"。用 body 保证目标是元素。
+            dispatchKeyWithLog(document.body || document.documentElement, eventDown, '原始快捷键分支：未找到编辑器，派发 keydown 到 body', { seq: execSeq })
+            dispatchKeyWithLog(document.body || document.documentElement, eventUp, '原始快捷键分支：未找到编辑器，派发 keyup 到 body', { seq: execSeq })
           }
         } catch (e) {
           // 思源内部处理此快捷键时出错（可能不是有效快捷键）
@@ -9756,6 +9906,15 @@ function executeShortcut(config: ButtonConfig, savedSelection: Range | null = nu
   } catch (error) {
     logger.error('执行快捷键失败:', error)
     Notify.showErrorShortcutFailed(config.shortcutKey, error)
+  } finally {
+    // 注意：走 setTimeout 延迟执行的分支会先返回，这里记录的是「派发」耗时，
+    // 真正执行命令的耗时见「延迟回调触发」那条日志。
+    shortcutExecInFlight--
+    logger.log('[Shortcut] 执行结束', {
+      seq: execSeq,
+      inFlight: shortcutExecInFlight,
+      elapsedMs: Date.now() - execStartedAt,
+    })
   }
 }
 

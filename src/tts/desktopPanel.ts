@@ -836,7 +836,7 @@ function createAppleSelect(): AppleSelectEl {
     const popup = document.createElement('div')
     popup.style.cssText = `
       position: fixed; z-index: 2100;
-      min-width: 180px; max-height: 260px; overflow-y: auto;
+      min-width: 180px; max-height: 380px; overflow-y: auto;
       background: var(--b3-menu-background);
       border: 1px solid var(--b3-border-color);
       border-radius: 12px;
@@ -888,7 +888,7 @@ function createAppleSelect(): AppleSelectEl {
     const rect = root.getBoundingClientRect()
     const width = Math.max(rect.width, 200)
     popup.style.width = `${width}px`
-    const popupHeight = Math.min(popup.scrollHeight, 260)
+    const popupHeight = Math.min(popup.scrollHeight, 380)
     const spaceBelow = window.innerHeight - rect.bottom
     if (spaceBelow < popupHeight + 12 && rect.top > popupHeight + 12) {
       popup.style.top = `${Math.max(8, rect.top - popupHeight - 6)}px`

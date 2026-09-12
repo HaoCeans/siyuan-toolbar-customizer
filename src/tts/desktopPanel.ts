@@ -15,6 +15,7 @@ import {
 } from './httpTtsEngine'
 import { applyFloatPanelBackground, observeSiYuanThemeMode } from '../ui/floatPanelBackground'
 import { createIconButton, updateButtonIcon, injectSliderStyles, removeSliderStyles, lucideSvg } from './ttsIconHelper'
+import { createAppleSelectEl, type AppleSelectEl } from './appleSelect'
 import * as Notify from '../notification'
 import { pluginInstance } from '../toolbarManager'
 import { navigateToAdjacentDoc } from '../ui/desktopDocNav'
@@ -783,153 +784,8 @@ function createParagraphSelect(total: number, defaultIndex: number, hasAll = fal
  * select 的子集：value 用属性访问器实现，appendChild 被重写为"消费"传入的
  * option 元素（取其 value/text/selected，不真正挂到 DOM）。
  */
-type AppleSelectEl = HTMLDivElement & {
-  value: string
-  appendChild(child: HTMLOptionElement): void
-}
-
-interface AppleSelectOption {
-  value: string
-  text: string
-}
-
-/** 当前打开的下拉弹层（全局同时只允许一个） */
-let openAppleSelectPopup: HTMLElement | null = null
-let openAppleSelectOwner = -1
-const appleSelectPopupCleanup: Array<() => void> = []
-let appleSelectUidCounter = 0
-
-function closeAppleSelectPopup(): void {
-  openAppleSelectPopup?.remove()
-  openAppleSelectPopup = null
-  openAppleSelectOwner = -1
-  while (appleSelectPopupCleanup.length) appleSelectPopupCleanup.pop()?.()
-}
-
 function createAppleSelect(): AppleSelectEl {
-  const uid = ++appleSelectUidCounter
-  const root = document.createElement('div') as unknown as AppleSelectEl
-
-  const options: AppleSelectOption[] = []
-  let current = ''
-
-  const labelEl = document.createElement('span')
-  labelEl.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
-  const chevron = document.createElement('span')
-  chevron.style.cssText = 'display:inline-flex;align-items:center;opacity:0.45;flex-shrink:0;'
-  chevron.innerHTML = lucideSvg('chevron-down', 14)
-
-  const renderLabel = () => {
-    const found = options.find(o => o.value === current)
-    labelEl.textContent = found ? found.text : ''
-  }
-
-  ;(root as HTMLElement).appendChild(labelEl)
-  ;(root as HTMLElement).appendChild(chevron)
-
-  root.addEventListener('click', (e) => {
-    e.stopPropagation()
-    if (openAppleSelectOwner === uid) { closeAppleSelectPopup(); return }
-    closeAppleSelectPopup()
-    if (options.length === 0) return
-
-    const popup = document.createElement('div')
-    popup.style.cssText = `
-      position: fixed; z-index: 2100;
-      min-width: 180px; max-height: 380px; overflow-y: auto;
-      background: var(--b3-menu-background);
-      border: 1px solid var(--b3-border-color);
-      border-radius: 12px;
-      box-shadow: 0 12px 32px rgba(0,0,0,0.18), 0 0 0 0.5px rgba(0,0,0,0.06);
-      padding: 6px;
-      font-size: 13px; color: var(--b3-theme-on-background);
-    `
-    for (const opt of options) {
-      const rowEl = document.createElement('div')
-      const selected = opt.value === current
-      rowEl.style.cssText = `
-        padding: 9px 12px; border-radius: 8px; cursor: pointer;
-        display: flex; align-items: center; gap: 8px;
-        white-space: nowrap;
-        background: ${selected ? 'color-mix(in srgb, var(--b3-theme-primary) 12%, transparent)' : 'transparent'};
-        color: ${selected ? 'var(--b3-theme-primary)' : 'inherit'};
-        font-weight: ${selected ? '600' : '400'};
-      `
-      const textSpan = document.createElement('span')
-      textSpan.style.cssText = 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;'
-      textSpan.textContent = opt.text
-      rowEl.appendChild(textSpan)
-      if (selected) {
-        const check = document.createElement('span')
-        check.style.cssText = 'display:inline-flex;align-items:center;flex-shrink:0;'
-        check.innerHTML = lucideSvg('check', 14)
-        rowEl.appendChild(check)
-      }
-      rowEl.addEventListener('click', (ev) => {
-        ev.stopPropagation()
-        current = opt.value
-        renderLabel()
-        closeAppleSelectPopup()
-      })
-      rowEl.addEventListener('mouseenter', () => {
-        if (opt.value !== current) rowEl.style.background = 'color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent)'
-      })
-      rowEl.addEventListener('mouseleave', () => {
-        if (opt.value !== current) rowEl.style.background = 'transparent'
-      })
-      popup.appendChild(rowEl)
-    }
-
-    document.body.appendChild(popup)
-    openAppleSelectPopup = popup
-    openAppleSelectOwner = uid
-
-    // 定位：默认向下展开；面板贴底空间不足时向上翻
-    const rect = root.getBoundingClientRect()
-    const width = Math.max(rect.width, 200)
-    popup.style.width = `${width}px`
-    const popupHeight = Math.min(popup.scrollHeight, 380)
-    const spaceBelow = window.innerHeight - rect.bottom
-    if (spaceBelow < popupHeight + 12 && rect.top > popupHeight + 12) {
-      popup.style.top = `${Math.max(8, rect.top - popupHeight - 6)}px`
-    } else {
-      popup.style.top = `${Math.min(window.innerHeight - popupHeight - 8, rect.bottom + 6)}px`
-    }
-    popup.style.left = `${Math.max(8, Math.min(window.innerWidth - width - 8, rect.left))}px`
-
-    // 点外部关闭（capture 阶段，避免被卡片的 stopPropagation 拦截）
-    const onDocClick = (ev: Event) => {
-      if (popup.contains(ev.target as Node)) return
-      closeAppleSelectPopup()
-    }
-    const onKey = (ev: KeyboardEvent) => { if (ev.key === 'Escape') closeAppleSelectPopup() }
-    document.addEventListener('click', onDocClick, true)
-    document.addEventListener('keydown', onKey, true)
-    appleSelectPopupCleanup.push(() => {
-      document.removeEventListener('click', onDocClick, true)
-      document.removeEventListener('keydown', onKey, true)
-    })
-  })
-
-  Object.defineProperties(root, {
-    value: {
-      get: () => current,
-      set: (v: string) => {
-        current = v
-        // 值不在选项中时回退到第一项（模拟原生 select 不出现空白）
-        if (v && !options.some(o => o.value === v) && options.length > 0) current = options[0].value
-        renderLabel()
-      },
-    },
-  })
-  // 覆盖 appendChild：调用方 append 的 <option> 会被"消费"进选项列表
-  ;(root as unknown as { appendChild: (child: HTMLOptionElement) => void }).appendChild = (child: HTMLOptionElement) => {
-    options.push({ value: child.value, text: child.textContent || child.value })
-    if (child.selected || options.length === 1) current = child.value
-    renderLabel()
-  }
-
-  return root
+  return createAppleSelectEl()
 }
 
 /** Apple 风格按钮行（胶囊形取消 + 确认） */

@@ -22,6 +22,7 @@ import {
   PREPARED_TTS_WAV_SCHEMA_VERSION, SF_TTS_MODEL,
 } from './httpTtsEngine'
 import { createIconButton, updateButtonIcon, injectSliderStyles, removeSliderStyles, lucideSvg } from './ttsIconHelper'
+import { createAppleSelectEl, type AppleSelectEl } from './appleSelect'
 
 // ═══════════════════════════════════════════════════════════════
 // 手机端 UI
@@ -198,15 +199,12 @@ function showTTSPanel(total: number): void {
   autoLabel.textContent = t('tts.afterReading', undefined, '朗读完成后')
   autoLabel.style.cssText = 'font-size:13px;margin-bottom:6px;opacity:0.6;font-weight:500;letter-spacing:-0.01em;'
   autoReadRow.appendChild(autoLabel)
-  const autoSel = document.createElement('select')
-  autoSel.style.cssText = `
-    width:100%;padding:10px 14px;border-radius:10px;
-    border:none;
-    background:color-mix(in srgb, var(--b3-theme-on-surface) 6%, transparent);
-    color:var(--b3-theme-on-background);font-size:15px;
-    letter-spacing:-0.01em;outline:none;
-    -webkit-appearance:none;appearance:none;
-  `
+  const autoSel = createAppleSelectEl({
+    fontSize: '15px',
+    padding: '10px 14px',
+    width: '100%',
+    rowPadding: '10px 14px',
+  })
   const autoOpts: Array<{ v: string; t: string }> = [
     { v: 'stop', t: t('tts.stop', undefined, '停止') },
     { v: 'next', t: t('tts.autoNext', undefined, '自动继续朗读下一篇') },
@@ -260,7 +258,7 @@ function showTTSPanel(total: number): void {
 }
 
 /** 免费模式面板 */
-function renderFreeContent(container: HTMLElement, total: number, autoSel?: HTMLSelectElement): void {
+function renderFreeContent(container: HTMLElement, total: number, autoSel?: AppleSelectEl): void {
   const settings = getTTSSettings()
 
   const hint = document.createElement('div')
@@ -340,7 +338,7 @@ function renderFreeContent(container: HTMLElement, total: number, autoSel?: HTML
 }
 
 /** 硅基流动 API 模式面板 */
-function renderApiContent(container: HTMLElement, total: number, autoSel?: HTMLSelectElement): void {
+function renderApiContent(container: HTMLElement, total: number, autoSel?: AppleSelectEl): void {
   const cfg = getSFAPIConfig()
   const settings = getTTSSettings()
 
@@ -503,8 +501,8 @@ function installPlaybackCallbacks(engine: HttpTTSEngine, continuationGeneration 
 function appendPrepareButton(
   container: HTMLElement,
   total: number,
-  autoSel: HTMLSelectElement | undefined,
-  rangeSel: HTMLSelectElement,
+  autoSel: AppleSelectEl | undefined,
+  rangeSel: AppleSelectEl,
   configureEngine: () => PreparedHttpTTSEngine | null,
 ): void {
   const prepareRow = document.createElement('div')
@@ -532,7 +530,7 @@ function appendPrepareButton(
   const taskGeneration = ++mobilePanelGeneration
   const card = container.parentElement
   const modeBar = card?.querySelector('[data-tts-mode-bar="true"]') as HTMLElement | null
-  const controls = Array.from(card?.querySelectorAll('input, select, a') || []) as HTMLElement[]
+  const controls = Array.from(card?.querySelectorAll('input, select, a, [data-apple-select]') || []) as HTMLElement[]
   const setLocked = (locked: boolean) => {
     preparing = locked
     if (modeBar) { modeBar.dataset.locked = locked ? 'true' : 'false'; modeBar.style.pointerEvents = locked ? 'none' : ''; modeBar.style.opacity = locked ? '0.55' : '' }
@@ -819,16 +817,13 @@ function makeRow(label: string): HTMLElement {
   return row
 }
 
-function makeSelect(items: Array<{ v: string; t: string }>): HTMLSelectElement {
-  const sel = document.createElement('select')
-  sel.style.cssText = `
-    width:100%;padding:10px 14px;border-radius:10px;
-    border:none;
-    background:color-mix(in srgb, var(--b3-theme-on-surface) 6%, transparent);
-    color:var(--b3-theme-on-background);font-size:15px;
-    letter-spacing:-0.01em;outline:none;
-    -webkit-appearance:none;appearance:none;
-  `
+function makeSelect(items: Array<{ v: string; t: string }>): AppleSelectEl {
+  const sel = createAppleSelectEl({
+    fontSize: '15px',
+    padding: '10px 14px',
+    width: '100%',
+    rowPadding: '10px 14px',
+  })
   for (const i of items) { const o = document.createElement('option'); o.value = i.v; o.textContent = i.t; sel.appendChild(o) }
   return sel
 }

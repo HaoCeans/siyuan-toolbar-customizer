@@ -203,6 +203,22 @@ export function injectSliderStyles(): void {
       border: none;
       box-shadow: 0 1px 3px rgba(0,0,0,0.15);
     }
+    /* 暗黑模式适配：让 select 的原生下拉弹层跟随思源主题而不是操作系统。
+       Chromium 依据 color-scheme 决定原生弹层配色；option 需显式上色，
+       否则暗黑下点开语音列表会弹出一块白色原生菜单。 */
+    #tts-options-overlay,
+    #tts-mobile-overlay {
+      color-scheme: light;
+    }
+    html[data-theme-mode="dark"] #tts-options-overlay,
+    html[data-theme-mode="dark"] #tts-mobile-overlay {
+      color-scheme: dark;
+    }
+    #tts-options-overlay select option,
+    #tts-mobile-overlay select option {
+      background: var(--b3-theme-background);
+      color: var(--b3-theme-on-background);
+    }
   `
   document.head.appendChild(style)
   sliderStylesInjected = true

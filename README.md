@@ -338,6 +338,28 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.8.9 — Custom dropdown popups for reading settings + dark-mode refinements
+
+> 💡 The dropdowns in the reading settings still look system-default? Opening the voice list shows a white panel in dark mode? Update.
+
+**① Custom dropdown popups for reading settings (desktop + mobile)**
+- The voice, paragraph-range, speaker and "after reading" dropdowns in all four reading modes (browser speech / Edge online / free / SiliconFlow) now use a custom popup matching the panel instead of the native system dropdown
+- The popup follows SiYuan's light/dark theme: background, borders and selection highlight all use theme variables and update instantly when the theme changes
+- The selected item shows theme-colored text with a check mark; long lists scroll within a 380px cap
+- The popup flips upward automatically when the panel sits at the bottom of the screen, so it is never clipped
+- Mobile touch refinements: instant tap response, close by tapping outside, no system tap-highlight flash; preparation lock and prepared-state auto-refresh behavior are preserved
+
+**② Dark-mode adaptation fixes**
+- Fixed the white system dropdown list when opening a select in the desktop reading settings under dark mode (solved by ①), with native control colors now following SiYuan's theme
+- Fixed the solid-white "database task plan" popup: it now uses SiYuan's menu background with themed text and borders
+- Hint boxes in mobile settings (the Quick Note purple banner and the error/info/warning boxes) now use translucent tints with themed text, no longer glaring in dark mode; error text uses the theme error color
+- The desktop Quick Note intro box and the database-config blocks in button settings no longer use semi-transparent white backgrounds
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.8.8 — Adjustable capsule level + shortcut button fixes + reading improvements
 
 > 💡 Bottom capsule hidden behind other elements? The "③ Desktop shortcut" button erroring or doing nothing? Edge online reading failing on some voices? Mobile reading preparation stuck halfway? Update.
@@ -376,11 +398,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 **⑤ Mobile auto-start quick note is now off by default**
 - New users default to "① Disabled"; enable it under "Quick note popup → Trigger: background to foreground" when needed
 - Existing users are unaffected: a saved value is kept as-is, and configs predating this field are back-filled with the previous behavior (both small-window and full-screen)
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.8.7 — Full Chinese/English interface support + centralized debug logging + quick-note residue cleanup
 

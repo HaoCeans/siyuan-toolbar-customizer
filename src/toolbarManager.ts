@@ -3007,7 +3007,13 @@ function showOverflowToolbar(config: ButtonConfig) {
   // 让 tc-overflow-open 同步、外部点击关闭、二次点击切换等既有链路照常工作。
   const navTakeoverActive = isBottomToolbar && !isSideMode
     && (isCapsuleMode || mobileConfig?.showNavOnOverflow === true)
-  const showNavOnly = navTakeoverActive && enabledButtons.length === 0
+  // 注意：enabledButtons 是全部启用按钮，主工具栏装得下时它们仍在其中；
+  // 是否"扩展面板有内容"要看是否真的存在会被渲染进扩展层的按钮（overflowLevel 1..layers）
+  const hasOverflowButtons = enabledButtons.some((btn: ButtonConfig) => {
+    const lvl = btn.overflowLevel ?? 0
+    return lvl >= 1 && lvl <= layers
+  })
+  const showNavOnly = navTakeoverActive && !hasOverflowButtons
 
   // 根据层数创建多个工具栏，并在每层显示对应的按钮
   for (let i = 0; i < layers; i++) {

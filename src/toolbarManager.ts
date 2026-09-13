@@ -3001,6 +3001,14 @@ function showOverflowToolbar(config: ButtonConfig) {
   const isSideMode = isSideFloatingMode()
   let renderedLayers = 0  // 实际渲染的层数（空层跳过，导航栏位置按实际层数计算）
 
+  // 导航栏接管模式（底部固定⑦ / 底部胶囊）下，若所有按钮都已装进主工具栏
+  // （扩展面板零按钮），点击扩展按钮仍需弹出思源导航栏——导航栏"存放"在
+  // 扩展栏上方，没有面板它就永远不显示。做法：渲染一个隐藏的空面板占位，
+  // 让 tc-overflow-open 同步、外部点击关闭、二次点击切换等既有链路照常工作。
+  const navTakeoverActive = isBottomToolbar && !isSideMode
+    && (isCapsuleMode || mobileConfig?.showNavOnOverflow === true)
+  const showNavOnly = navTakeoverActive && enabledButtons.length === 0
+
   // 根据层数创建多个工具栏，并在每层显示对应的按钮
   for (let i = 0; i < layers; i++) {
     const layerNum = i + 1
@@ -3010,8 +3018,8 @@ function showOverflowToolbar(config: ButtonConfig) {
       .filter((btn: ButtonConfig) => isSideMode ? layerNum === 1 : (btn.overflowLevel ?? 0) === layerNum)
       .sort((a, b) => b.sort - a.sort) // 降序
 
-    // 空层不显示
-    if (layerButtons.length === 0) {
+    // 空层不显示；但"零按钮 + 导航栏接管"时保留第一层作为隐藏占位（弹出导航栏用）
+    if (layerButtons.length === 0 && !(showNavOnly && layerNum === 1)) {
       continue
     }
 
@@ -3340,22 +3348,35 @@ function showOverflowToolbar(config: ButtonConfig) {
       e.stopPropagation()
     }, { passive: true })
 
+    // 隐藏占位面板：不可见、不可点，仅承载"扩展栏已打开"状态（弹出导航栏）
+    if (showNavOnly) {
+      toolbar.style.display = 'none'
+    }
+
     renderedLayers = layerNum
     document.body.appendChild(toolbar)
+    // 显式同步一次（bindOverflowPanelSync 的 observer 也会触发，这里确保即时生效）
+    syncOverflowOpenClass()
   }
 
   // 底部胶囊模式：按实际渲染层数动态设置导航栏位置（--tc-nav-bottom），
   // 与层堆叠公式 bottomPos = bottomOffset + i*(toolbarHeight+toolbarSpacing) 保持一致
   if (isCapsuleMode && !isSideFloatingMode()) {
     const dist = parseInt(String(mobileConfig?.floatingToolbarOverflowDistance ?? '8'), 10) || 8
-    const navBottom = bottomOffset + (Math.max(0, renderedLayers - 1)) * (toolbarHeight + toolbarSpacing) + toolbarHeight + dist
+    // 零扩展按钮（隐藏占位面板）时导航栏紧贴主工具栏上方，不按扩展栏层数抬升
+    const navBottom = showNavOnly
+      ? bottomOffset
+      : bottomOffset + (Math.max(0, renderedLayers - 1)) * (toolbarHeight + toolbarSpacing) + toolbarHeight + dist
     document.documentElement.style.setProperty('--tc-nav-bottom', `${navBottom}px`)
   }
   // 底部固定模式（showNavOnOverflow 开关）：独立计算导航栏位置（--tc-nav-bottom-fixed），
   // 间距用底部扩展栏间距（overflowToolbarDistanceBottom），与胶囊互不共用
   if (isBottomToolbar && mobileConfig?.showNavOnOverflow === true && !isSideFloatingMode()) {
     const dist = parseInt(String(mobileConfig?.overflowToolbarDistanceBottom ?? '8'), 10) || 8
-    const navBottom = bottomOffset + (Math.max(0, renderedLayers - 1)) * (toolbarHeight + toolbarSpacing) + toolbarHeight + dist
+    // 零扩展按钮（隐藏占位面板）时导航栏紧贴主工具栏上方，不按扩展栏层数抬升
+    const navBottom = showNavOnly
+      ? bottomOffset
+      : bottomOffset + (Math.max(0, renderedLayers - 1)) * (toolbarHeight + toolbarSpacing) + toolbarHeight + dist
     document.documentElement.style.setProperty('--tc-nav-bottom-fixed', `${navBottom}px`)
   }
 

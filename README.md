@@ -338,6 +338,21 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.8.10 — The overflow button now opens the SiYuan nav bar even with zero overflow buttons
+
+> 💡 With few buttons the main toolbar fits them all, and tapping the overflow button did nothing — the SiYuan nav bar never appeared? Update.
+
+**Fixed the nav bar not showing when the extension panel has no buttons**
+- In bottom-fixed mode (with ⑦ "show the SiYuan nav bar when the extension toolbar opens" enabled) and bottom-capsule mode, tapping the overflow toolbar button now shows the SiYuan navigation bar even when every button already fits in the main toolbar — previously nothing happened
+- Root cause: the nav bar's visibility is tied to the extension panel's existence, and a panel with zero buttons was never created, leaving the nav bar with no moment to appear
+- The nav bar appears right above the main toolbar/capsule; tap outside or tap the overflow button again to dismiss
+- Side-capsule mode and ⑦-off behavior are unchanged
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.8.9 — Custom dropdown popups for reading settings + dark-mode refinements
 
 > 💡 The dropdowns in the reading settings still look system-default? Opening the voice list shows a white panel in dark mode? Update.
@@ -354,11 +369,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 - Fixed the solid-white "database task plan" popup: it now uses SiYuan's menu background with themed text and borders
 - Hint boxes in mobile settings (the Quick Note purple banner and the error/info/warning boxes) now use translucent tints with themed text, no longer glaring in dark mode; error text uses the theme error color
 - The desktop Quick Note intro box and the database-config blocks in button settings no longer use semi-transparent white backgrounds
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.8.8 — Adjustable capsule level + shortcut button fixes + reading improvements
 

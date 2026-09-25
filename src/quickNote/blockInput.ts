@@ -297,6 +297,22 @@ export async function createBlockInputHandle(
     typewriterMode: false,
   })
 
+  // 候选面板（.protyle-hint）注册表收窄：弹窗只有一小块编辑区，斜杠菜单（/、）和 emoji（:）
+  // 一弹出来就把编辑区盖住；标签（#）和引用（[[ / 【【 / （（ / (( / 「「 等变体）保留原样。
+  // 注册表项是 { key, hint }，key 即触发字符，见思源 protyle 默认 options.hint.extend。
+  //
+  // 注意：options 里嵌套对象可能是与思源默认值共享的引用，所以这里把 hint 整块换成一个新对象，
+  // 只换 extend 数组，避免改到默认值而影响主编辑器。
+  const protyleOptions = editor.protyle.options as { hint?: { extend?: Array<{ key?: string }> } }
+  if (protyleOptions.hint?.extend) {
+    // 要连引用候选也去掉（只留标签），把 '[[ 【【 （（ (( 「「 「『 『「 『『' 一并加进来即可
+    const disabledHintKeys = new Set(['/', '、', ':'])
+    protyleOptions.hint = {
+      ...protyleOptions.hint,
+      extend: protyleOptions.hint.extend.filter((item) => !disabledHintKeys.has(item?.key ?? '')),
+    }
+  }
+
   mountEl.querySelector('.fn__loading')?.classList.add('fn__none')
 
   patchQuickNoteProtyleResize(editor)

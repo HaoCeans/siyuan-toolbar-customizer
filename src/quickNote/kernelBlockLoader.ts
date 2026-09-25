@@ -56,8 +56,12 @@ export function compactQuickNoteProtyleLayout(editor: Protyle): void {
 
   clampQuickNoteContentScroll(editor)
 
+  // 注意：这里刻意**不**隐藏 .protyle-hint（标签候选 / 斜杠菜单面板）。
+  // 思源 hint.fill() 靠摘掉 fn__none 自行显示面板，若这里给它加上 fn__none，
+  // 下一次压缩布局（键盘收放触发的 resize、块结构变化）就会把正开着的候选按掉，
+  // 表现为「打 # 候选一闪就没」。面板是 position:fixed，不占布局，不影响这里的尺寸压缩。
   p.element.querySelectorAll(
-    '.protyle-preview, .protyle-upload, .protyle-gutters, .protyle-hint, .protyle-select, .protyle-toolbar, .protyle-util',
+    '.protyle-preview, .protyle-upload, .protyle-gutters, .protyle-select, .protyle-toolbar, .protyle-util',
   ).forEach((el) => {
     el.classList.add('fn__none')
   })

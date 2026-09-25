@@ -40,13 +40,22 @@
       > .protyle-preview,
       > .protyle-upload,
       > .protyle-gutters,
-      > .protyle-hint,
       > .protyle-select,
       > .protyle-toolbar,
       > .protyle-util,
       > style {
         display: none !important;
         pointer-events: none !important;
+      }
+
+      // 标签候选 / 斜杠菜单面板（.protyle-hint）这里**不再隐藏**：
+      // 思源 hint.fill() 会自己摘掉 fn__none 把面板放出来，用 !important 的 display:none 会把它彻底关死，
+      // 导致「打 # 没有标签候选」。只收窄它默认的 min-width:320px（会压过 max-width:50vw，
+      // 手机上偏宽），并把层级提到发送/取消按钮行（z-index:20）之上，避免面板被按钮压住。
+      > .protyle-hint {
+        min-width: 0 !important;
+        max-width: 92vw !important;
+        z-index: 30 !important;
       }
 
       .protyle-toolbar,
@@ -58,7 +67,6 @@
       .protyle-breadcrumb,
       .protyle-gutter,
       .protyle-title,
-      .protyle-hint,
       .protyle-attr,
       .code-block .protyle-action,
       .img .protyle-action,

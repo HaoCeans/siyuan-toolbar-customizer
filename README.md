@@ -338,6 +338,26 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.8.11 — Tag/reference suggestions in the note popup + prepend to the daily note
+
+> 💡 Typing `#` in the one-click note popup shows no tag suggestions, `[[` shows no reference suggestions, and the template button can only append to the end of the daily note? Update.
+
+**① Tag and reference suggestions re-enabled in the one-click note popup**
+- Typing `#` now shows the existing tag suggestions; `[[` / `【【` / `（（` / `((` show reference suggestions, and picking one inserts a real reference node
+- Root cause: the plugin hid SiYuan's suggestion panel (`.protyle-hint`) together with the preview, upload and toolbar elements using `display:none !important`, which SiYuan could not override by removing its own hidden class; now only this one panel is re-enabled and everything else stays hidden
+- The suggestion registry is narrowed as well: in this small popup the slash menu (`/`, `、`) and emoji (`:`) are dropped, keeping only tags and references; the panel width now follows the popup (no 320px minimum) and it sits above the send/cancel buttons
+- Applies to the mobile and desktop in-page note popups; the desktop standalone block window never hid this panel and is unaffected
+
+**② Template insertion: prepend to the daily note**
+- After setting a notebook ID on “② Handwritten template insert [Simple]”, a new switch “⬆️ Prepend to the daily note (off = append at the end)” is available
+- When on, content goes to the top of today's daily note; when off, the previous append-to-end behavior is kept
+- Available in both desktop and mobile settings; existing buttons have no such field and keep appending to the end, unchanged
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.8.10 — The overflow button now opens the SiYuan nav bar even with zero overflow buttons
 
 > 💡 With few buttons the main toolbar fits them all, and tapping the overflow button did nothing — the SiYuan nav bar never appeared? Update.
@@ -347,11 +367,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 - Root cause: the nav bar's visibility is tied to the extension panel's existence, and a panel with zero buttons was never created, leaving the nav bar with no moment to appear
 - The nav bar appears right above the main toolbar/capsule; tap outside or tap the overflow button again to dismiss
 - Side-capsule mode and ⑦-off behavior are unchanged
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.8.9 — Custom dropdown popups for reading settings + dark-mode refinements
 

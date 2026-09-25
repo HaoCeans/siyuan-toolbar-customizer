@@ -1053,6 +1053,7 @@
   "ui.buttonItems.mobile.92": "💡关闭只显示图标；最多显示4个字（大小自适应）",
   "ui.buttonItems.mobile.93": "📊 当前排序位置",
   "ui.buttonItems.mobile.94": "💡 拖动按钮调整位置，排序会自动更新",
+  "ui.buttonItems.templateDailyNoteTop": "⬆️ 追加到每日笔记顶部（关闭＝追加到末尾）",
   "ui.clickSequenceSelector.1": "电脑端：插件 → 思源手机端增强",
   "ui.clickSequenceSelector.2": "电脑端：工作区 → 配置 → 鉴权 → 打开浏览器",
   "ui.clickSequenceSelector.3": "toolbarFile → 文档树 → 填写文档名",

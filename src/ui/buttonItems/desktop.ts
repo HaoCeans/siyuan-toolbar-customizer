@@ -12,6 +12,7 @@ import {
   createDesktopSelectField,
   createDesktopIconField,
   createLineNumberedTextarea,
+  createSwitchField,
   updateIconDisplay
 } from '../fields'
 import { showConfirmDialog as showConfirmDialogModal } from '../dialog'
@@ -628,6 +629,12 @@ export function createDesktopButtonItem(
     templateField.appendChild(notebookIdLabel)
     templateField.appendChild(notebookIdInput)
     templateField.appendChild(notebookIdHint)
+    // 写入位置：默认追加到日记末尾，开关打开则插到日记最前面
+    templateField.appendChild(createSwitchField(
+      t('ui.buttonItems.templateDailyNoteTop', undefined, '⬆️ 追加到每日笔记顶部（关闭＝追加到末尾）'),
+      button.templateDailyNotePosition === 'top',
+      (value) => { button.templateDailyNotePosition = value ? 'top' : 'bottom' },
+    ))
 
     // 显示在右键菜单开关
     const contextMenuItem = document.createElement('div')
@@ -2252,6 +2259,12 @@ export function populateDesktopEditForm(
     templateField.appendChild(notebookIdLabel)
     templateField.appendChild(notebookIdInput)
     templateField.appendChild(notebookIdHint)
+    // 写入位置：默认追加到日记末尾，开关打开则插到日记最前面
+    templateField.appendChild(createSwitchField(
+      t('ui.buttonItems.templateDailyNoteTop', undefined, '⬆️ 追加到每日笔记顶部（关闭＝追加到末尾）'),
+      button.templateDailyNotePosition === 'top',
+      (value) => { button.templateDailyNotePosition = value ? 'top' : 'bottom' },
+    ))
     form.appendChild(templateField)
   } else if (button.type === 'click-sequence') {
     // 点击序列配置

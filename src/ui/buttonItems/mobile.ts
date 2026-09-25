@@ -767,6 +767,13 @@ export function createMobileButtonItem(
       notebookIdHint.textContent = t('ui.buttonItems.mobile.27', undefined, '💡 填写笔记本ID后，点击按钮将直接追加到该笔记本的每日笔记')
       templateContainer.appendChild(notebookIdHint)
 
+      // 写入位置：默认追加到日记末尾，开关打开则插到日记最前面
+      templateContainer.appendChild(createSwitchField(
+        t('ui.buttonItems.templateDailyNoteTop', undefined, '⬆️ 追加到每日笔记顶部（关闭＝追加到末尾）'),
+        button.templateDailyNotePosition === 'top',
+        (value) => { button.templateDailyNotePosition = value ? 'top' : 'bottom' },
+      ))
+
       // 显示在右键菜单开关
       const contextMenuItem = document.createElement('div')
       contextMenuItem.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px;'

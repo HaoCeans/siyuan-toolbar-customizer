@@ -108,6 +108,7 @@ export interface ButtonConfig {
   builtinRefreshType?: 'refresh' | 'reload' | 'fullscreen' | 'doc-fullscreen'; // 思源功能类型：刷新、重载、全屏、文档全屏
   template?: string;         // 模板内容
     templateNotebookId?: string; // 模板追加到每日笔记的笔记本ID（可选，为空则在当前编辑器插入）
+  templateDailyNotePosition?: 'top' | 'bottom'; // 模板追加到每日笔记的位置（'top'=日记最前面；缺省/其它=末尾）
   clickSequence?: string[];  // 模拟点击选择器序列
   shortcutKey?: string;      // 快捷键组合
   targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
@@ -4175,13 +4176,16 @@ export function insertTemplate(config: ButtonConfig, savedSelection: Range | nul
   // 处理模板变量
   const processedTemplate = processTemplateVariables(config.template)
   
-  // 如果配置了笔记本ID，使用 appendDailyNoteBlock API 追加到每日笔记
+  // 如果配置了笔记本ID，使用 appendDailyNoteBlock / prependDailyNoteBlock API 写入每日笔记
   if (config.templateNotebookId && config.templateNotebookId.trim()) {
     const notebookId = config.templateNotebookId.trim()
-    // 异步执行追加操作
+    // 写入位置：顶部用 prependDailyNoteBlock，缺省/底部用 appendDailyNoteBlock
+    const toTop = config.templateDailyNotePosition === 'top'
+    const dailyNoteEndpoint = toTop ? '/api/block/prependDailyNoteBlock' : '/api/block/appendDailyNoteBlock'
+    // 异步执行写入操作
     ;(async () => {
       try {
-        const response = await fetchSyncPost('/api/block/appendDailyNoteBlock', {
+        const response = await fetchSyncPost(dailyNoteEndpoint, {
           data: processedTemplate,
           dataType: 'markdown',
           notebook: notebookId
@@ -4192,13 +4196,13 @@ export function insertTemplate(config: ButtonConfig, savedSelection: Range | nul
             Notify.showInfoCopySuccess()
           }
         } else {
-          logger.warn('[模板插入] 追加到每日笔记失败:', response.msg)
+          logger.warn('[模板插入] 写入每日笔记失败:', response.msg)
           // 尝试替代方案
-          await appendToDailyNoteAlternative(notebookId, processedTemplate, config.showNotification)
+          await appendToDailyNoteAlternative(notebookId, processedTemplate, config.showNotification, toTop)
         }
       } catch (error) {
-        logger.warn('[模板插入] appendDailyNoteBlock API调用失败，尝试替代方案:', error)
-        await appendToDailyNoteAlternative(notebookId, processedTemplate, config.showNotification)
+        logger.warn('[模板插入] 每日笔记 API 调用失败，尝试替代方案:', error)
+        await appendToDailyNoteAlternative(notebookId, processedTemplate, config.showNotification, toTop)
       }
     })()
     return
@@ -8021,9 +8025,12 @@ async function showTextInputDialog(prompt: string, placeholder?: string): Promis
 }
 
 /**
- * 将内容追加到每日笔记的替代方案（当appendDailyNoteBlock API不可用时）
+ * 将内容写入每日笔记的替代方案（当 appendDailyNoteBlock / prependDailyNoteBlock API 不可用时）。
+ * toTop=true 写到日记最前面（prependBlock），false 写到末尾（appendBlock）。
  */
-async function appendToDailyNoteAlternative(notebookId: string, content: string, showNotification?: boolean) {
+async function appendToDailyNoteAlternative(notebookId: string, content: string, showNotification?: boolean, toTop = false) {
+  // 与 prependDailyNoteBlock / appendDailyNoteBlock 的分工一致：顶部用 prependBlock，末尾用 appendBlock
+  const writeEndpoint = toTop ? '/api/block/prependBlock' : '/api/block/appendBlock';
   try {
     // 首先获取每日笔记的ID
     const dailyNoteResponse = await fetchSyncPost('/api/filetree/getDailyNote', {
@@ -8033,8 +8040,8 @@ async function appendToDailyNoteAlternative(notebookId: string, content: string,
     if (dailyNoteResponse.code === 0 && dailyNoteResponse.data.box) {
       const docId = dailyNoteResponse.data.id;
       
-      // 使用appendBlock API将内容追加到每日笔记
-      const appendResponse = await fetchSyncPost('/api/block/appendBlock', {
+      // 使用 appendBlock / prependBlock API 写入每日笔记
+      const appendResponse = await fetchSyncPost(writeEndpoint, {
         dataType: 'markdown',
         data: content,
         parentID: docId
@@ -8064,8 +8071,8 @@ async function appendToDailyNoteAlternative(notebookId: string, content: string,
       });
       
       if (createResponse.code === 0 && createResponse.data) {
-        // 创建成功后，再追加内容
-        const appendResponse = await fetchSyncPost('/api/block/appendBlock', {
+        // 创建成功后，再写入内容
+        const appendResponse = await fetchSyncPost(writeEndpoint, {
           dataType: 'markdown',
           data: content,
           parentID: createResponse.data

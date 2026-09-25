@@ -1053,6 +1053,7 @@
   "ui.buttonItems.mobile.92": "💡Turn off displaying only icons; show up to 4 words (size responsive)",
   "ui.buttonItems.mobile.93": "📊 Current Sorting Position",
   "ui.buttonItems.mobile.94": "💡 Drag the button to reposition and the sort will update automatically",
+  "ui.buttonItems.templateDailyNoteTop": "⬆️ Prepend to the daily note (off = append at the end)",
   "ui.clickSequenceSelector.1": "Desktop: plug-in → Siyuan mobile enhancement",
   "ui.clickSequenceSelector.2": "Desktop: Workspace → Configuration → Authentication → Open Browser",
   "ui.clickSequenceSelector.3": "toolbarFile → document tree → fill in the document name",

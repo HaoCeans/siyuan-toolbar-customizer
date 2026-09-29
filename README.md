@@ -338,6 +338,27 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.8.12 — Per-button target document for the ④ note button + fixed reversed prev/next navigation
+
+> 💡 Want the ④ quick-note button to always append into one specific document? After updating SiYuan, "Previous/Next document" is flipped: tapping "Previous" in a diary jumps to tomorrow's doc? Update.
+
+**① ④ one-click note button: per-button target document**
+- The "④ one-click note popup [Simple]" button settings now include "🎯 Target document ID (optional)": when filled, notes taken via this button are always appended to that document (overriding the global save type and target); leave it empty and everything behaves exactly as before, following the global quick-note settings
+- Create multiple ④ buttons pointing at different documents, e.g. "to Inbox", "to Project A"; the insert position (top/bottom) and input format (plain/block) still follow the global settings
+- Works in all three desktop forms (in-page popup / standalone float window / block-format window) and the mobile popup; the global hotkey and auto-capture (popup on app switch) are unaffected and always use the global configuration
+- Existing buttons don't have this field and behave exactly as before — no migration needed
+
+**② Fixed the navigation direction being opposite to the file tree**
+- Root cause: SiYuan v3.8.3 rewrote the document-tree sorting internals (#19176). The plugin used to request the sibling doc list with an explicit `sort=15` (SortModeFileTree), which in the new kernel only means "order by the custom sort.json values ascending, falling back to descending block ID" — unrelated to the sort mode the file tree actually renders with. Notebooks with "create new doc at top" enabled (like daily notes) write a decreasing sort value for every new doc, so the list came back newest-first and prev/next got swapped
+- Fix: the sort parameter is no longer sent. The request now matches the file tree exactly, and the kernel resolves the same sort mode the tree uses (doc → notebook → global)
+- Navigation now strictly follows the file tree's visual order under every sort mode (name / updated / created / custom / inherited); fixed on both mobile and desktop
+- The TTS auto-read "previous/next" chain uses the same path and benefits as well
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.8.11 — Tag/reference suggestions in the note popup + prepend to the daily note
 
 > 💡 Typing `#` in the one-click note popup shows no tag suggestions, `[[` shows no reference suggestions, and the template button can only append to the end of the daily note? Update.
@@ -352,11 +373,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 - After setting a notebook ID on “② Handwritten template insert [Simple]”, a new switch “⬆️ Prepend to the daily note (off = append at the end)” is available
 - When on, content goes to the top of today's daily note; when off, the previous append-to-end behavior is kept
 - Available in both desktop and mobile settings; existing buttons have no such field and keep appending to the end, unchanged
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.8.10 — The overflow button now opens the SiYuan nav bar even with zero overflow buttons
 

@@ -942,7 +942,7 @@ t≈几秒  API 写入完成 → 内核属性 'true' → 思源最终重渲染/�
 
 **教训**：滑杆/高频输入路径里的"防抖后刷新"要问一句——这个刷新真的有必要吗？全量重初始化（重建工具栏/重注入 CSS）在移动端是布局抖动的重灾区，能持久化解决的别重初始化。
 
-## 前一篇/后一篇文档：listDocsByPath 返回顺序假设过时（v3.8.4）
+## 前一篇/后一篇文档：listDocsByPath 返回顺序反复过时（已三次：v3.7.1 / v3.8.4 / v3.8.12）
 
 **文件**：`src/ui/mobileDocNav.ts`（`fetchAdjacentDocsByFiletree`）、`src/ui/desktopDocNav.ts`（`fetchAdjacentDocs`）
 
@@ -969,6 +969,47 @@ const nextFile = idx < files.length - 1 ? files[idx + 1] : null  // 下一篇=�
 1. **对思源内部 API 返回顺序的假设会随版本过时**。凡是依赖"数组顺序方向"的逻辑，遇到"以前对、升级后反了"的现象，优先怀疑 API 行为变化，而不是自己的改动。
 2. **`config.fileTree.sort`（设置面板枚举）≠ API 的 sort 参数枚举**。透传用户配置前要确认两侧编码一致；本次依赖「未知值兜底升序」是碰巧可用，不稳定。
 3. **「以前修过方向反了」是重要历史线索**：v3.7.1 那次对调就是按当时的 API 行为校准的，之后 API 又变了——遇到方向类 bug 先查 git 历史里有没有类似的「方向修正」提交，它标记了假设的校准时点。
+
+### 第三次（插件 v3.8.12 / 思源 v3.8.3+）：显式传 sort=15 的语义被内核改掉
+
+**现象**：日记笔记本（笔记本排序=更新时间升序）里，09-21 的「上一篇」显示 09-22、「下一篇」显示 09-20——方向再次互换，手机端/电脑端同时出现。插件代码零改动，纯由思源升级触发（用户从旧版直接升到 v3.8.5，跨过了改动的 v3.8.3，感知为「升到 3.8.5 反了」）。
+
+**根因（读思源源码钉死，源码仓库 `SiYuan插件制作环境\siyuan`）**：
+
+- 内核提交 `ac0c339af2`（#19176，随思源 v3.8.3 发布）重写文档树排序：`ListDocTree` 改用 `sortDocTreeFiles`，而 `fileTreeSortLess` 里**没有 case 15（SortModeFileTree）** → 落到兜底：按 `fillSort` 读出的 `<data>/<笔记本>/.siyuan/sort.json` 自定义排序值升序，平局按 `left.ID > right.ID`（**ID 降序**）。
+- 全局 `createDocAtTop=true` 时，每篇新文档经 `addMinSort` 递减写入 sort.json → 日记这类「新文档创建位置：顶部」的笔记本，越新的文档 Sort 值越小 → API(sort=15) 返回**最新在前**（[09-22, 09-21, 09-20]）。
+- 而文件树 UI 自己调 `listDocsByPath` 时**根本不传 sort**（`app/src/layout/dock/Files.ts`）→ 内核走 `ResolveDocTreeSortMode`：文档 IAL 声明 → 笔记本 conf `sort` → 全局 `FileTree.Sort`，与树渲染完全一致。
+- 结论：v3.8.3 起 `sort=15` 不再等于「按文档树排序规则」。此前（≤v3.8.2 内核）排序 switch 无 case 15 → docs 保持 `box.Ls()` 原始顺序（文件名=ID=创建时间升序），与日记树碰巧一致——**v3.8.4 那次「实测正确」是这个巧合，不是 15 的语义正确**。
+
+**修复**：两端请求删掉 `sort` 参数，只传 `{notebook, path}`（与文件树完全同参）；取索引维持 `idx-1=上一篇（上方）、idx+1=下一篇（下方）`；两处过时注释同步改写。任何排序模式（名称/更新时间/创建时间/自定义/继承）都与树一致，新旧内核兼容。
+
+### 复发修复手册（再出现方向反了，照这个做）
+
+**不变量（唯一正确状态）**：请求**不传 sort** → 内核按文件树同样的规则解析排序 → 数组顺序 = 树视觉顺序（顶部→底部）→ `prev = files[idx-1]`、`next = files[idx+1]`。校验点只有两个：**请求参数**、**取索引方向**。
+
+**为什么反复出事**：数组顺序 = 内核版本 × sort 参数 × 用户数据（sort.json / 笔记本 conf / 文档 IAL）三者共同决定，任何一方变化顺序就变；「碰巧一致」的旧假设（ID 升序 ≈ 日记树顺序）会随内核重构或用户数据静默失效。
+
+**排查步骤**：
+
+1. 确认现象：上一篇/下一篇与文件树**上下方向相反**（不是内容错，是方向反）。
+2. 打开 `src/ui/desktopDocNav.ts`（`fetchAdjacentDocs`）和 `src/ui/mobileDocNav.ts`（`fetchAdjacentDocsByFiletree`），搜 `listDocsByPath`：
+   - 请求若带 `sort` 参数 → **删掉它**（正确形态：`fetchSyncPost('/api/filetree/listDocsByPath', { notebook, path })`）；
+   - 确认取索引：`idx-1` 给 prev、`idx+1` 给 next，若与注释相反先恢复成 idx-1=prev。
+3. 若请求已不带 sort 仍然反了 → 内核解析「树视觉顺序」的方式又变了。去思源源码查两处，**照抄文件树的请求形态**：
+   - 文件树 UI 怎么调：`app/src/layout/dock/Files.ts` 搜 `listDocsByPath`；
+   - 内核怎么排：`kernel/model/file.go`（`ListDocTree` / `ResolveDocTreeSortMode` / `fillSort`）、`kernel/model/file_tree_reorder.go`（`sortDocTreeFiles` / `fileTreeSortLess`）、`kernel/util/sort.go`（SortMode 常量表）。
+4. **铁律（三次事故的教训，勿再犯）**：
+   - 不要传 `sort=15`（SortModeFileTree）——v3.8.3 起它只表示「sort.json 自定义值升序 + ID 降序兜底」，与树的实际排序模式无关；
+   - 不要透传 `config.fileTree.sort`——那是设置面板前端枚举，与 API 的 sort 枚举不是同一套编码（第二次事故根因）；
+   - 不要假设「ID/日期升序 = 树顺序」——createDocAtTop 的 addMinSort、手动拖动排序随时打破它。
+
+**历次变更对照**：
+
+| 时期 | sort 参数 | 取索引假设 | 结局 |
+|---|---|---|---|
+| v3.7.1（fb70e32） | 硬编码 15 → 改传 `config.fileTree.sort` | files[0]=树底 | 碰巧正确 |
+| v3.8.4 | 改回 15 | files[0]=树顶（对调索引） | 碰巧正确（旧内核无 case 15，Ls 原始顺序=ID 升序≈日记树顺序） |
+| v3.8.12（思源 v3.8.3 重写后） | **不传 sort** | idx-1=prev、idx+1=next | 正确且不再依赖巧合：与文件树同一套解析 |
 
 ## 块格式记事弹窗：任务模板（- [ ]）取消后残留孤儿块 → 重建索引（v3.8.4）
 
@@ -1048,3 +1089,43 @@ v3.8.2 之后：主窗口正常，块格式弹窗内快捷键完全无反应。
 - 打开文档类功能必须按平台选 API：桌面 `openTab`、移动 `openMobileFileById`——后者桌面端不可用（无 `window.siyuan.mobile`）
 - 创建类 API 返回后立即用该 id 打开文档 = 索引竞态（移动 tabs.open 静默失败）；通用做法：先 `getBlockInfo` 轮询就绪
 - 思源移动端多处异步是"void + then 吞错误 + 静默回退"风格——排查"无日志但功能失效"时，先怀疑这类静默 API，别急着加日志
+
+## 一键记事按钮级目标文档ID：临时配置存活期与快照时机（v3.8.12）
+
+**文件**：`src/quickNote/targetConfig.ts`（新，resolveQuickNoteTargetConfig 从 windowDetector 迁出）、`src/toolbarManager.ts`（executeQuickNote）、`src/quickNote/quickNoteFloatWindow.ts`、`src/quickNote/quickNoteBlockWindow.ts`
+
+### 功能语义
+④一键记事弹窗【简单】按钮新增 `quickNoteTargetDocId` 字段：**填写 → 强制文档模式写入该文档（覆盖全局保存方式与目标）；留空 → 完全跟随全局一键记事设置**。插入位置（顶/底）始终跟随全局。
+
+### 实现机制（覆盖注入）
+`executeQuickNote` 点击按钮时注入临时配置：`{...全局拷贝, 按钮填了ID → quickNoteSaveType:'document' + quickNoteDocumentId, __quickNoteButtonTrigger:true}`。`resolveQuickNoteTargetConfig(isFromButton=true)` 读临时配置 → 所有"打开时解析"的路径（手机弹窗/桌面capture/桌面右侧面板/块窗口 open）自动吃到覆盖，零改动。
+
+### 两个必修的读取时机（不修必现"弹窗对了、保存错了"）
+1. **悬浮窗**：保存回调发生在 `executeQuickNote` 的 `finally` 恢复 `window.__pluginInstance` **之后**，保存时重解析会回落全局。修复：`toggleQuickNoteFloatWindow` 打开瞬间（临时配置存活期）把 `resolveQuickNoteTargetConfig` 的结果冻结进模块级 `floatSaveTarget`，`saveQuickNotePlainTextFromFloat` 经 `getQuickNoteFloatSaveTarget()` 取快照。
+2. **块格式窗口自动清理重建**：窗口隐藏 5 秒后 `_hideTimer` 回调重建草稿块，原代码 `resolveSaveTarget(false)` 读全局 → 按钮文档漂移成全局笔记本。修复：模块级 `_sessionSaveTarget`，打开成功后写入（必须在 `createOneWindow` 之后写，因其内部 `_clearDraftTracking` 会清掉它），重建时 `_sessionSaveTarget ?? resolveSaveTarget(false)`，窗口 closed/destroy/手动清理时清空。
+
+### 教训
+- **"打开时解析、保存时使用"的配置必须在打开瞬间快照**。凡走"回调延后执行"的路径（悬浮窗 onSave、块窗口 hideTimer），临时注入配置（executeQuickNote 的 finally 会恢复）在回调时已不存在——在回调里重解析 = 静默回落全局。
+- `resolveQuickNoteTargetConfig` 已从 windowDetector 迁到 `src/quickNote/targetConfig.ts` 共享（windowDetector ← quickNoteFloatWindow 单向依赖，反向 import 会成环）。块窗口原 `resolveSaveTarget` 本地复制了一份同样逻辑，已改为委托共享函数——**同一套解析逻辑出现第二份拷贝时必然漂移**，别复制。
+- 保存目标键挂在 `mobileFeatureConfig` 下但桌面端也读写同一组键（desktopQuickNoteSettings.ts），双端统一通道，勿按平台拆分。
+
+## 块格式记事窗口：首次打开光标闪一下就没，要手动点（v3.8.12）
+
+**文件**：`src/quickNote/quickNoteBlockWindow.ts`（`_getInjectionScripts` 新增 `focusJS`；`_injectScripts` 与 toggle 重新显示路径注入）
+
+**根因（两个时序叠加）**：
+1. 窗口以 `show:false` 创建，SiYuan 的 window.html 在**窗口隐藏期间**完成编辑器初始化（URL 配置里的 `cb-get-focus` 在隐藏状态下聚焦不生效/不稳定）；
+2. 文档内容经 WebSocket 异步到达后 wysiwyg **整体重渲染**，先前的焦点随 DOM 节点替换而丢失。
+原 `win.show(); win.focus()` 只聚焦窗口（webContents），不落到编辑器 contenteditable 上。再次打开正常是因为内容已加载、无重渲染，窗口重获 OS 焦点时文档里原先聚焦的元素自动恢复。
+
+**修复**：`focusJS` 轮询聚焦——每 100ms 检查 `.protyle-wysiwyg [contenteditable="true"]`，存在且 `activeElement` 未落在其中就 `focus()`；用户主动 mousedown（捕获阶段）或约 4s 超时退出轮询；`window.__qnFocusTimer` 复用防重复注入。注入时机在 `win.show()` **之后**（show 前注入会因窗口隐藏同样失效）。首开（did-finish-load → show）与 toggle 重新显示两条路径都注入。
+
+**教训**：Electron 隐藏窗口里的「初始化即聚焦」不可靠；凡依赖编辑器焦点的窗口，聚焦动作必须放在 `show()` 之后并用带退出条件的轮询兜底（内容异步渲染会替换 DOM，单次 focus 会被冲掉）。
+
+### focusJS 第一版无效的教训：contenteditable 在 wysiwyg 根元素上，不在子块
+
+第一版选择器用 `.protyle-wysiwyg [contenteditable="true"]`（后代）——思源源码 `wysiwyg/index.ts:504` 证实 `contenteditable` 是 `setAttribute` 在 `.protyle-wysiwyg` **根元素自身**（桌面端恒为 true，iPhone/Android 为 false），子块没有独立的 contenteditable，后代选择器永远匹配不到，轮询整个空转（表现为"修了但没效果"）。
+
+同时 focus() 本身不保证产生可见光标（contenteditable 空元素尤甚），需用 `Range.selectNodeContents + collapse + addRange` 显式落 caret。正确形态：`w.getAttribute('contenteditable')==='true' ? w : w.querySelector('[contenteditable="true"]')`（根优先、后代兜底）+ 显式 caret + 轮询自愈（重渲染丢焦后下一 tick 补回）+ mousedown/超时退出 + executeJavaScript 返回状态回传主窗口日志（`[QN-FOCUS]`）诊断。
+
+**教训**：对思源编辑器 DOM 写选择器前，先去源码确认属性挂在哪一层——`contenteditable` 这类编辑属性在 Protyle 的层级结构与直觉（"每个块独立可编辑"）相反，凭印象写选择器会做出"看起来在跑、实际永远空转"的静默失效修复。

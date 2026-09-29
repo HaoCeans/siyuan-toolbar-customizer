@@ -3,7 +3,8 @@
  */
 import { fetchSyncPost, showMessage } from 'siyuan'
 import { t } from '../i18n/runtime'
-import { createQuickNoteDraftBlock, deleteQuickNoteDraftBlock, type QuickNoteSaveTarget } from './kernelBlock'
+import { createQuickNoteDraftBlock, deleteQuickNoteDraftBlock } from './kernelBlock'
+import { resolveQuickNoteTargetConfig, type QuickNoteTargetConfig } from './targetConfig'
 import { pluginInstance } from '../toolbarManager'
 import { isLoggingEnabled, logger } from '../utils/logger'
 
@@ -22,6 +23,10 @@ const FLOATING_RESET = 'html body .protyle-breadcrumb[data-input-method]:not(.pr
 const BLOCK_EMPTY_KEY = '__qn_block_empty'  // localStorage key：Protyle 是否为空
 let qnWinId: number | null = null
 let _currentDraftBlockId: string | null = null
+// 会话级保存目标：窗口以某个目标打开后，本会话内所有草稿(重)建都用它。
+// 按钮覆盖场景：隐藏后自动清理重建草稿（_hideTimer 回调）执行时临时配置已恢复，
+// 若重解析会回落全局 → 按钮文档漂移成全局笔记本/文档。打开成功时写入，窗口销毁时清空。
+let _sessionSaveTarget: QuickNoteTargetConfig | null = null
 function _syncDraftBlockId(): void {
   try { (window as any).__qn_block_id = _currentDraftBlockId } catch {}
 }
@@ -91,6 +96,7 @@ function getBounds() {
 
 function _clearDraftTracking(): void {
   _currentDraftBlockId = null
+  _sessionSaveTarget = null
   _syncDraftBlockId()
 }
 
@@ -165,7 +171,7 @@ function _getHashFixJS(): string {
 	})()`
 }
 
-function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string; hideFloatingJS: string; hideBreadcrumbJS: string } {
+function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string; hideFloatingJS: string; hideBreadcrumbJS: string; focusJS: string } {
   const quickNoteTitle = getQuickNoteTitle()
   const dragWindowTitle = t('quickNote.block.dragWindow', undefined, '拖动窗口')
   const toolbarOn = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteToolbarVisible !== false
@@ -251,10 +257,52 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
       });
       window.__qnHideBreadcrumbObserver.observe(document.body,{childList:true,subtree:true});
     })()`,
+    // 首次打开聚焦编辑器：窗口以 show:false 创建，SiYuan 在窗口隐藏期间就完成初始化（cb-get-focus），
+    // 且文档内容经 WebSocket 异步到达后 wysiwyg 会整体重渲染，此前的焦点随节点替换丢失
+    // → 表现为「光标闪一下就没，要手动点」。必须在窗口 show 之后再轮询聚焦。
+    // ★ 选择器：contenteditable="true" 在 .protyle-wysiwyg 根元素自身（思源源码 wysiwyg/index.ts:504，
+    //   桌面端恒为 true；子块没有独立 contenteditable）——后代选择器永远匹配不到，必须先查根。
+    // focus() 不保证产生可见光标，用 Range 显式落 caret。轮询自愈（重渲染丢焦后下一 tick 补回），
+    // 用户 mousedown（捕获）或约 10s 超时退出；Promise 返回状态供主窗口日志诊断。
+    focusJS: `(function(){
+      return new Promise(function(resolve){
+        if(window.__qnFocusTimer){clearInterval(window.__qnFocusTimer);window.__qnFocusTimer=null}
+        var tries=0
+        function findEl(){
+          var w=document.querySelector('.protyle-wysiwyg')
+          if(!w)return null
+          return (w.getAttribute('contenteditable')==='true')?w:w.querySelector('[contenteditable="true"]')
+        }
+        function stop(msg){
+          if(window.__qnFocusTimer){clearInterval(window.__qnFocusTimer);window.__qnFocusTimer=null}
+          document.removeEventListener('mousedown',stopOnce,true)
+          resolve(msg)
+        }
+        function stopOnce(){stop('cancelled-by-mousedown')}
+        document.addEventListener('mousedown',stopOnce,true)
+        window.__qnFocusTimer=setInterval(function(){
+          tries++
+          if(tries>100){stop('timeout');return}
+          var el=findEl()
+          if(!el)return
+          var ae=document.activeElement
+          if(ae&&(ae===el||el.contains(ae)))return
+          el.focus()
+          try{
+            var sel=window.getSelection()
+            var range=document.createRange()
+            range.selectNodeContents(el)
+            range.collapse(false)
+            sel.removeAllRanges()
+            sel.addRange(range)
+          }catch(e){}
+        },100)
+      })
+    })()`,
   }
 }
 
-function _injectScripts(win: any, scripts: { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string; hideFloatingJS: string; hideBreadcrumbJS: string }, show: boolean): void {
+function _injectScripts(win: any, scripts: { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string; hideFloatingJS: string; hideBreadcrumbJS: string; focusJS: string }, show: boolean): void {
   win.webContents.executeJavaScript(scripts.hideJS).catch(()=>{})
   win.webContents.executeJavaScript(scripts.titleJS).catch(()=>{})
   win.webContents.executeJavaScript(scripts.closeHookJS).catch(()=>{})
@@ -264,14 +312,16 @@ function _injectScripts(win: any, scripts: { hideJS: string; titleJS: string; cl
   // 注入隐藏第三方「层级导航」插件面包屑的脚本
   win.webContents.executeJavaScript(scripts.hideBreadcrumbJS).catch((e: any) => logger.error('[QN-BREADCRUMB] inject failed', e))
   try { win.setTitle(getQuickNoteTitle()) } catch {}
-  if (show) { win.show(); win.focus() }
+  if (show) {
+    win.show(); win.focus()
+    // show 之后再聚焦编辑器：创建时窗口隐藏，编辑器初始化焦点 + 异步内容重渲染都会把光标顶掉
+    win.webContents.executeJavaScript(scripts.focusJS).then((s: unknown) => logger.log('[QN-FOCUS]', s)).catch(() => {})
+  }
 }
 
-export function resolveSaveTarget(isFromButton: boolean): QuickNoteSaveTarget {
-  const g: any = pluginInstance?.mobileFeatureConfig ?? {}
-  const t: any = (window as any).__pluginInstance?.mobileFeatureConfig
-  const cfg = (isFromButton && t) ? t : g
-  return { saveType: cfg?.quickNoteSaveType || 'daily', notebookId: cfg?.quickNoteNotebookId || '', documentId: cfg?.quickNoteDocumentId || '', insertPosition: cfg?.quickNoteInsertPosition || 'bottom' }
+export function resolveSaveTarget(isFromButton: boolean): QuickNoteTargetConfig {
+  // 与 windowDetector/悬浮窗共用同一套解析（临时配置 + 按钮级覆盖），勿再本地复制一份
+  return resolveQuickNoteTargetConfig(isFromButton)
 }
 
 function createOneWindow(blockId: string): boolean {
@@ -314,6 +364,7 @@ function createOneWindow(blockId: string): boolean {
       saveBounds(win)
       const closingBlockId = _currentDraftBlockId
       _currentDraftBlockId = null
+      _sessionSaveTarget = null
       _syncDraftBlockId()
       if (qnWinId === win.id) qnWinId = null
       let isEmpty = true
@@ -361,7 +412,9 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
         const delay = ((pluginInstance?.desktopFeatureConfig as any)?.quickNoteBlockAutoCleanup ?? 5) * 1000
         _hideTimer = setTimeout(async () => {
           _hideTimer = null
-          const target = resolveSaveTarget(false)
+          // 重建草稿块必须沿用打开时的目标（_sessionSaveTarget）：此时临时配置已恢复，
+          // 按钮覆盖的文档ID重新解析会回落全局，导致草稿块落到别的笔记本/文档
+          const target = _sessionSaveTarget ?? resolveSaveTarget(false)
           const newId = await createQuickNoteDraftBlock(target)
           if (!newId) return
           _currentDraftBlockId = newId
@@ -398,6 +451,8 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
       w.show(); w.focus()
       // show 恢复时第三方「层级导航」插件可能重新渲染面包屑，补一次隐藏（observer 复用，不会重复创建）
       w.webContents.executeJavaScript(scripts.hideBreadcrumbJS).catch(()=>{})
+      // 恢复显示后同样聚焦编辑器（隐藏期间焦点可能已丢失）
+      w.webContents.executeJavaScript(scripts.focusJS).then((s: unknown) => logger.log('[QN-FOCUS]', s)).catch(()=>{})
       return true
     } catch {}
   }
@@ -411,13 +466,19 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
   if (target.saveType === 'daily' && !target.notebookId) { showMessage(t('quickNote.configureNotebookSpaced', undefined, '请先配置笔记本 ID'), 3000, 'error'); return false }
   const blockId = await createQuickNoteDraftBlock(target)
   if (!blockId) { showMessage(t('quickNote.block.createFailed', undefined, '创建编辑块失败'), 3000, 'error'); return false }
-  return createOneWindow(blockId)
+  const ok = createOneWindow(blockId)
+  if (ok) {
+    // createOneWindow 内部会 _clearDraftTracking 清掉会话目标，故在成功后写入
+    _sessionSaveTarget = target
+  }
+  return ok
 }
 
 export function destroyDesktopQuickNoteBlockWindow(): void {
   // 先捕获草稿块 ID，再销毁窗口（防止 closed 事件异步执行时 _currentDraftBlockId 已被清空）
   const draftToDelete = _currentDraftBlockId
   _currentDraftBlockId = null
+  _sessionSaveTarget = null
   _syncDraftBlockId()
   try { const BW = getBW(), mainId = getMainId(); if (BW) { for (const w of (BW.getAllWindows?.() || [])) { try { if (!w || w.isDestroyed?.() || w.id === mainId) continue; if ((w as any).__qn_block_window) w.destroy?.() } catch {} } } } catch {}
   qnWinId = null

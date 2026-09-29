@@ -109,21 +109,20 @@ async function fetchAdjacentDocs(): Promise<void> {
       prevDoc = null
       nextDoc = null
     } else {
-      // sort=15（SortModeFileTree）：实测返回顺序与文件树视觉顺序一致（顶部→底部）
-      // 不要透传 config.fileTree.sort：那是前端枚举，6=SortModeCustom 自定义排序，无 sort 值的文档会被排到最前
-      const sortMode = 15
+      // 不传 sort：与文件树 UI 完全同参，内核按「文档 IAL → 笔记本 conf → 全局」解析排序（ResolveDocTreeSortMode），
+      // 返回顺序即树的视觉顺序。不要传 sort=15（SortModeFileTree）：思源 v3.8.3 重写排序（#19176）后，
+      // 15 只表示按 sort.json 自定义值升序 + ID 降序兜底，与树的实际排序模式无关——
+      // 开了「新文档创建位置：顶部」的笔记本会递减写入 sort.json，数组变成最新在前，上一篇/下一篇随之颠倒
       const response: any = await fetchSyncPost('/api/filetree/listDocsByPath', {
         notebook: docInfo.notebookId,
-        path: docInfo.parentPath,
-        sort: sortMode
+        path: docInfo.parentPath
       })
 
 	      if (response?.code === 0 && response?.data) {
 	        const files: FiletreeDoc[] = response.data.files || []
 	        const idx = files.findIndex(f => f.id === docId)
 
-	        // API 返回的数组顺序与文件树 UI 视觉顺序一致：
-	        // files[0] 在文件树顶部，files[last] 在文件树底部（v3.8.4 实测确认，原「相反」假设已过时）
+	        // 数组顺序 = 文件树视觉顺序（顶部→底部；前提：请求不传 sort，见 fetchDocInfo 调用处说明）
 	        // 因此 files[idx-1] 是视觉"上一篇"（上面），files[idx+1] 是视觉"下一篇"（下面）
 	        if (idx > 0) {
 	          prevDoc = { id: files[idx - 1].id, title: files[idx - 1].name || t('navigation.common.untitled', undefined, '未命名') }

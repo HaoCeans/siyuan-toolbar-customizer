@@ -16,12 +16,14 @@ import {
 import {
   shouldUseQuickNoteFloatWindow,
   toggleQuickNoteFloatWindow,
+  getQuickNoteFloatSaveTarget,
   type QuickNoteFloatSaveResult,
 } from './quickNote/quickNoteFloatWindow';
 import {
   shouldUseDesktopQuickNoteBlockWindow,
   toggleDesktopQuickNoteBlockWindow,
 } from './quickNote/quickNoteBlockWindow';
+import { resolveQuickNoteTargetConfig } from './quickNote/targetConfig';
 import { createQuoteOverlay } from './quickNote/quoteOverlay';
 import { pickAndInsertImages, installImagePasteHandler, preSaveBlockCursor, clearPreSavedBlockCursor } from './quickNote/imageInsert';
 import { fetchSyncPost } from 'siyuan';
@@ -82,41 +84,6 @@ let lifelogDialogTitle: HTMLHeadingElement | null = null;
 
 function isQuickNoteToggleSource(source: QuickNoteOpenSource): boolean {
   return source === 'button' || source === 'globalHotkey';
-}
-
-function resolveQuickNoteTargetConfig(isFromButton: boolean): {
-  notebookId: string;
-  documentId: string;
-  saveType: 'daily' | 'document';
-  insertPosition: 'top' | 'bottom';
-} {
-  const tempPlugin = (window as any).__pluginInstance;
-  let notebookId = '';
-  let documentId = '';
-  let saveType: 'daily' | 'document' = 'daily';
-  let insertPosition: 'top' | 'bottom' = 'bottom';
-
-  if (isFromButton && tempPlugin?.mobileFeatureConfig) {
-    const config = tempPlugin.mobileFeatureConfig;
-    saveType = config.quickNoteSaveType || 'daily';
-    insertPosition = config.quickNoteInsertPosition || 'bottom';
-    if (saveType === 'document') {
-      documentId = config.quickNoteDocumentId || '';
-    } else {
-      notebookId = config.quickNoteNotebookId || '';
-    }
-  } else {
-    const config = pluginInstance?.mobileFeatureConfig;
-    saveType = config?.quickNoteSaveType || 'daily';
-    insertPosition = config?.quickNoteInsertPosition || 'bottom';
-    if (saveType === 'document') {
-      documentId = config?.quickNoteDocumentId || '';
-    } else {
-      notebookId = config?.quickNoteNotebookId || '';
-    }
-  }
-
-  return { notebookId, documentId, saveType, insertPosition };
 }
 
 function setupDesktopCaptureInteraction(
@@ -2623,7 +2590,10 @@ export async function saveQuickNotePlainTextFromFloat(
     return { ok: false, message: t('quickNote.emptyContent', undefined, '请输入内容') };
   }
 
-  const { notebookId, documentId, saveType, insertPosition } = resolveQuickNoteTargetConfig(isFromButton);
+  // 保存回调发生在 executeQuickNote 的 finally 恢复临时配置之后，
+  // 按钮级覆盖的目标必须在悬浮窗打开时快照，不能在这里重新解析
+  const { notebookId, documentId, saveType, insertPosition } =
+    getQuickNoteFloatSaveTarget() ?? resolveQuickNoteTargetConfig(isFromButton);
 
   if (saveType === 'document' && !documentId) {
     return { ok: false, message: t('quickNote.configureDocumentInSettings', undefined, '请先在设置中配置文档 ID') };

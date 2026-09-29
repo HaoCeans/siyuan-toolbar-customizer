@@ -18,6 +18,7 @@ import {
 import { showConfirmDialog as showConfirmDialogModal } from '../dialog'
 import { showIconPicker as showIconPickerModal } from '../iconPicker'
 import { createDesktopQuickNoteButtonHint } from '../desktopQuickNoteSettings'
+import { createQuickNoteTargetDocIdField } from '../quickNoteDocIdField'
 
 /**
  * 电脑端按钮上下文接口
@@ -710,6 +711,7 @@ export function createDesktopButtonItem(
 
   if (button.type === 'quick-note') {
     editForm.appendChild(createDesktopQuickNoteButtonHint())
+    editForm.appendChild(createQuickNoteTargetDocIdField(button))
   }
 
   if (button.type === 'shortcut') {
@@ -2320,6 +2322,7 @@ export function populateDesktopEditForm(
     form.appendChild(clickSequenceField)
   } else if (button.type === 'quick-note') {
     form.appendChild(createDesktopQuickNoteButtonHint())
+    form.appendChild(createQuickNoteTargetDocIdField(button))
   } else if (button.type === 'shortcut') {
     // 快捷键配置
     const shortcutField = document.createElement('div')

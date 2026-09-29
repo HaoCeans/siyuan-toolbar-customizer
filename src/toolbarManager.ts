@@ -113,6 +113,7 @@ export interface ButtonConfig {
   shortcutKey?: string;      // 快捷键组合
   targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
   mobileTargetDocId?: string; // 打开指定ID块：目标块ID（移动端），支持文档ID或块ID
+  quickNoteTargetDocId?: string; // 一键记事按钮：填写后固定追加到该文档（覆盖全局保存方式与目标）；留空=跟随全局一键记事设置
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
 			  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock' | 'quick-attach'; // 鲸鱼定制工具子类型
 	  unlockIcon?: string;       // 解锁图标（仅 toggle-lock 使用，默认 🔓）
@@ -9965,9 +9966,15 @@ async function executeQuickNote(_config: ButtonConfig) {
   let tempPlugin: unknown;
   try {
     originalPluginInstance = (window as any).__pluginInstance;
+    // 按钮级覆盖：按钮填了目标文档ID → 强制文档模式写入该文档；留空 → 完全跟随全局一键记事设置。
+    // 覆盖键与全局同名，resolveQuickNoteTargetConfig 在弹窗打开时读取（此处在 finally 恢复之前）
+    const btnTargetDocId = _config.quickNoteTargetDocId?.trim();
     tempPlugin = {
       mobileFeatureConfig: {
         ...(pluginInstance?.mobileFeatureConfig || {}),
+        ...(btnTargetDocId
+          ? { quickNoteSaveType: 'document' as const, quickNoteDocumentId: btnTargetDocId }
+          : {}),
         __quickNoteButtonTrigger: true,
       },
     };

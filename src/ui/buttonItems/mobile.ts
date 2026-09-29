@@ -20,6 +20,7 @@ import {
 } from '../fields'
 import { showConfirmDialog as showConfirmDialogModal } from '../dialog'
 import { showIconPicker as showIconPickerModal } from '../iconPicker'
+import { createQuickNoteTargetDocIdField } from '../quickNoteDocIdField'
 import { showMessage } from 'siyuan'
 
 /**
@@ -2038,7 +2039,7 @@ export function createMobileButtonItem(
 
       const desc = document.createElement('div');
       desc.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface-light); line-height: 1.6;';
-      desc.innerHTML = t('ui.buttonItems.mobile.90', undefined, '本按钮的功能是触发一键记事弹窗。<br>注：配置项统一使用【一键记事弹窗】中的配置：保存方式、插入位置、目标ID');
+      desc.innerHTML = t('ui.buttonItems.mobile.90', undefined, '本按钮的功能是触发一键记事弹窗。<br>注：保存方式、插入位置、输入格式统一使用【一键记事弹窗】中的配置；目标文档 ID 可在下方填写，填写后本按钮固定追加到该文档');
       quickNoteContainer.appendChild(desc);
 
       const linkContainer = document.createElement('div');
@@ -2066,6 +2067,9 @@ export function createMobileButtonItem(
       };
       linkContainer.appendChild(link);
       quickNoteContainer.appendChild(linkContainer);
+
+      // 按钮级目标文档ID：填写后固定追加到该文档，留空跟随全局一键记事设置
+      quickNoteContainer.appendChild(createQuickNoteTargetDocIdField(button));
 
       typeFieldsContainer.appendChild(quickNoteContainer);
     }

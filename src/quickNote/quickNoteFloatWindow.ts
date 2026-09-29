@@ -4,6 +4,7 @@ import floatWindowHtml from './quick-note-float-window.html?raw'
 import { getDesktopQuickNoteCaptureSettings } from './desktopCapture'
 import { getQuickNoteFontSize } from './fontSize'
 import { resolveQuickNoteInputFormat } from './resolveFormat'
+import { resolveQuickNoteTargetConfig, type QuickNoteTargetConfig } from './targetConfig'
 import {
   attachQuickNoteWindowBoundsPersistence,
   loadQuickNoteWindowBounds,
@@ -35,6 +36,8 @@ let mainWindowListenerAttached = false
 let mainWindowCloseHandler: (() => void) | null = null
 let themeObserver: MutationObserver | null = null
 let floatSaveIsFromButton = false
+// 保存目标快照：toggle 时（临时配置存活期）解析并冻结，保存回调时经 getQuickNoteFloatSaveTarget 取用
+let floatSaveTarget: QuickNoteTargetConfig | null = null
 let floatWindowAllowAutoShow = true
 let floatWindowWantsVisible = true
 // 预创建定时器 ID（插件卸载时需清除）
@@ -258,6 +261,9 @@ export function toggleQuickNoteFloatWindow(isFromButton = false): void {
   lastFloatToggleTime = now
 
   floatSaveIsFromButton = isFromButton
+  // 打开瞬间快照保存目标：保存回调发生在 executeQuickNote 的 finally 恢复临时配置之后，
+  // 按钮级覆盖（quickNoteTargetDocId）的文档 ID 不能等到保存时再解析，否则回落全局
+  floatSaveTarget = resolveQuickNoteTargetConfig(isFromButton)
   const win = resolveFloatWindow()
   if (win) {
     try {
@@ -583,4 +589,9 @@ export function shouldUseQuickNoteFloatWindow(source: QuickNoteFloatSource = 'gl
 
 export function isQuickNoteFloatSaveFromButton(): boolean {
   return floatSaveIsFromButton
+}
+
+/** 保存目标快照（toggle 时冻结）。null 表示尚未 toggle 过，调用方需自行回落解析 */
+export function getQuickNoteFloatSaveTarget(): QuickNoteTargetConfig | null {
+  return floatSaveTarget
 }

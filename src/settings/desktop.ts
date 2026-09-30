@@ -10,6 +10,7 @@ import { TRIAL_CODE, clearTrial } from '../utils/licenseManager'
 
 import type { Setting } from 'siyuan'
 import type { GlobalButtonConfig, ButtonConfig } from '../toolbarManager'
+import type { ISlashToolbarConfig } from '../slashToolbar/catalog'
 import { calculateButtonOverflow, resetAllConfigsToFactoryDefaults, DEFAULT_FLOATING_TOOLBAR_Z_INDEX } from '../toolbarManager'
 import { createDesktopButtonItem, type DesktopButtonContext } from '../ui/buttonItems/desktop'
 import { createMobileButtonItem, type MobileButtonContext } from '../ui/buttonItems/mobile'
@@ -410,6 +411,8 @@ export interface DesktopSettingsContext {
   desktopFeatureConfig: FeatureConfig
   mobileFeatureConfig: FeatureConfig
   mobileConfig: any
+  /** 斜杠菜单工具栏配置（导出/导入用，手机端设置面板内维护） */
+  slashToolbarConfig?: ISlashToolbarConfig
   loggingEnabled: boolean
   version?: string
   isAuthorToolActivated: () => boolean
@@ -718,6 +721,7 @@ export function createDesktopSettingLayout(
               mobileFeatureConfig: context.mobileFeatureConfig,
               desktopGlobalButtonConfig: context.desktopGlobalButtonConfig,
               mobileGlobalButtonConfig: context.mobileGlobalButtonConfig,
+              slashToolbarConfig: context.slashToolbarConfig,
             }
           }
           const text = JSON.stringify(payload, null, 2)
@@ -774,6 +778,9 @@ export function createDesktopSettingLayout(
         if (data.mobileGlobalButtonConfig) {
           Object.assign(context.mobileGlobalButtonConfig, data.mobileGlobalButtonConfig)
         }
+        if (data.slashToolbarConfig && context.slashToolbarConfig) {
+          Object.assign(context.slashToolbarConfig, data.slashToolbarConfig)
+        }
 
         // 全量写入存储，然后重载 UI
         try {
@@ -784,6 +791,9 @@ export function createDesktopSettingLayout(
           await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
           await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
           await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
+          if (context.slashToolbarConfig) {
+            await context.saveData('slashToolbarConfig', context.slashToolbarConfig)
+          }
         } catch (e) {
           logger.warn('[导入配置] 保存失败:', e)
           showMessage(t("settings.desktop.38", undefined, "导入保存时部分失败，建议重载后检查配置"), 3000, 'error')
@@ -2685,6 +2695,7 @@ export function createDesktopSettingLayout(
               mobileFeatureConfig: context.mobileFeatureConfig,
               desktopGlobalButtonConfig: context.desktopGlobalButtonConfig,
               mobileGlobalButtonConfig: context.mobileGlobalButtonConfig,
+              slashToolbarConfig: context.slashToolbarConfig,
             }
           }
           const text = JSON.stringify(payload, null, 2)

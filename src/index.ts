@@ -134,6 +134,13 @@ import {
   createMobileSettingLayout,
   type MobileSettingsContext
 } from './settings/mobile'
+// 斜杠菜单工具栏（独立模块）：配置、运行时、设置分组
+import {
+  createDefaultSlashToolbarConfig,
+  normalizeSlashToolbarConfig,
+  type ISlashToolbarConfig
+} from './slashToolbar/catalog'
+import { destroySlashToolbar, syncSlashToolbar } from './slashToolbar/runtime'
 
 // 读取插件配置
 let PluginInfo = {
@@ -161,6 +168,8 @@ export default class ToolbarCustomizer extends Plugin {
   private mobileConfig: MobileToolbarConfig = DEFAULT_MOBILE_CONFIG
   private desktopButtonConfigs: ButtonConfig[] = []  // 电脑端按钮配置
   private mobileButtonConfigs: ButtonConfig[] = []   // 手机端按钮配置
+  // 斜杠菜单工具栏配置（独立功能，只存总开关与一级按钮顺序）
+  private slashToolbarConfig: ISlashToolbarConfig = createDefaultSlashToolbarConfig()
   private loggingEnabled = false
   private currentEditingButton: ButtonConfig | null = null
 
@@ -368,6 +377,7 @@ export default class ToolbarCustomizer extends Plugin {
 
     // ===== 加载配置 =====
     try {
+      this.slashToolbarConfig = normalizeSlashToolbarConfig(await this.loadData('slashToolbarConfig'))
       const savedMobileConfig = await this.loadData('mobileToolbarConfig')
       if (savedMobileConfig) {
         this.mobileConfig = {
@@ -800,6 +810,11 @@ export default class ToolbarCustomizer extends Plugin {
     // cleanup() 会清理掉胶囊状态（body class / style / data-input-method），这里重新应用
     this.applyDesktopToolbarPosition()
 
+    // ===== 斜杠菜单工具栏（独立功能）：手机端按配置同步 =====
+    if (this.isMobile) {
+      syncSlashToolbar(this.slashToolbarConfig.enabled, this.slashToolbarConfig.order)
+    }
+
     // ===== 使用思源 EventBus 监听编辑器加载事件（替代 MutationObserver，避免卡顿） =====
     // 注意：手机端的 protyle 事件监听已提前到 onload 注册（eventBusReinitHandler），
     // 这里只给【桌面端】注册 eventBusRefreshHandler，避免手机端重复监听同一事件。
@@ -1194,6 +1209,9 @@ export default class ToolbarCustomizer extends Plugin {
     cleanupDesktopDocNav()
     destroyMobileTopLineBreakButton()
 
+    // 拆卸斜杠菜单工具栏（独立功能）
+    destroySlashToolbar()
+
     // 移除动态样式
     this.removeFeatureStyles()
     const dynamicStyle = document.getElementById('mobile-toolbar-dynamic-style')
@@ -1273,7 +1291,8 @@ export default class ToolbarCustomizer extends Plugin {
       desktopFeatureConfig: this.desktopFeatureConfig,
       mobileFeatureConfig: this.mobileFeatureConfig,
       desktopGlobalButtonConfig: this.desktopGlobalButtonConfig,
-      mobileGlobalButtonConfig: this.mobileGlobalButtonConfig
+      mobileGlobalButtonConfig: this.mobileGlobalButtonConfig,
+      slashToolbarConfig: this.slashToolbarConfig
     })
 
     const setting = new Setting({
@@ -1338,6 +1357,7 @@ export default class ToolbarCustomizer extends Plugin {
         const mobileFeatureChanged = changed('mobileFeatureConfig', this.mobileFeatureConfig)
         const desktopGlobalButtonChanged = changed('desktopGlobalButtonConfig', this.desktopGlobalButtonConfig)
         const mobileGlobalButtonChanged = changed('mobileGlobalButtonConfig', this.mobileGlobalButtonConfig)
+        const slashToolbarChanged = changed('slashToolbarConfig', this.slashToolbarConfig)
 
         const hasAnyChange =
           desktopButtonsChanged ||
@@ -1346,7 +1366,8 @@ export default class ToolbarCustomizer extends Plugin {
           desktopFeatureChanged ||
           mobileFeatureChanged ||
           desktopGlobalButtonChanged ||
-          mobileGlobalButtonChanged
+          mobileGlobalButtonChanged ||
+          slashToolbarChanged
 
         if (!hasAnyChange) {
           showMessage(t('plugin.configUnchanged', undefined, '配置无变化，未保存'), 3000, 'info')
@@ -1375,6 +1396,10 @@ export default class ToolbarCustomizer extends Plugin {
         }
         if (mobileGlobalButtonChanged) {
           await this.saveData('mobileGlobalButtonConfig', this.mobileGlobalButtonConfig)
+        }
+        if (slashToolbarChanged) {
+          await this.saveData('slashToolbarConfig', this.slashToolbarConfig)
+          syncSlashToolbar(this.slashToolbarConfig.enabled, this.slashToolbarConfig.order)
         }
 
         showMessage(t('plugin.settingsSavedReloading', undefined, '设置已保存，正在重载...'), 2000, 'info')
@@ -1409,6 +1434,7 @@ export default class ToolbarCustomizer extends Plugin {
         mobileFeatureConfig: this.mobileFeatureConfig,
         loggingEnabled: this.loggingEnabled,
         mobileConfig: this.mobileConfig,
+        slashToolbarConfig: this.slashToolbarConfig,
         version: this.version,
         isAuthorToolActivated: () => this.isAuthorToolActivated(),
         getLicenseStatus: () => this.getLicenseStatus(),
@@ -1469,6 +1495,7 @@ export default class ToolbarCustomizer extends Plugin {
       desktopGlobalButtonConfig: this.desktopGlobalButtonConfig,
       mobileFeatureConfig: this.mobileFeatureConfig,
       mobileConfig: this.mobileConfig,
+      slashToolbarConfig: this.slashToolbarConfig,
       desktopFeatureConfig: this.desktopFeatureConfig,
       isAuthorToolActivated: () => this.isAuthorToolActivated(),
       getLicenseStatus: () => this.getLicenseStatus(),

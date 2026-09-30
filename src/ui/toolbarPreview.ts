@@ -14,6 +14,7 @@ import type { ButtonConfig } from '../toolbarManager'
 import { isOverflowButton } from '../toolbarManager'
 import { lucideToSvg } from '../utils/lucideHelper'
 import { getButtonDisplayName } from '../toolbarManager'
+import { renderButtonIcon } from './buttonIconRender'
 
 export interface ToolbarPreviewOptions {
   /** 取当前按钮配置数组（直接引用，预览会实时反映其变化） */
@@ -512,41 +513,6 @@ function renderButtonContent(el: HTMLElement, button: ButtonConfig): void {
   }
 
   el.innerHTML = ''
-  const icon = button.icon || ''
-
-  if (icon.startsWith('icon')) {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-    svg.setAttribute('width', `${button.iconSize}`)
-    svg.setAttribute('height', `${button.iconSize}`)
-    svg.style.cssText = 'flex-shrink:0;display:block;'
-    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
-    use.setAttribute('href', `#${icon}`)
-    svg.appendChild(use)
-    el.appendChild(svg)
-  } else if (icon.startsWith('lucide:')) {
-    const iconName = icon.substring(7)
-    const svgString = lucideToSvg(iconName, button.iconSize)
-    if (svgString) {
-      el.innerHTML = svgString
-      const svg = el.querySelector('svg')
-      if (svg) svg.style.cssText = `width:${button.iconSize}px;height:${button.iconSize}px;flex-shrink:0;`
-    } else {
-      const span = document.createElement('span')
-      span.textContent = icon; span.style.fontSize = `${button.iconSize}px`
-      el.appendChild(span)
-    }
-  } else if (/\.(png|jpg|jpeg|gif|svg)$/i.test(icon)) {
-    const img = document.createElement('img')
-    const base = '/plugins/siyuan-toolbar-customizer/'
-    img.src = icon.startsWith('/') ? icon : base + icon.replace(/^\.?\//, '')
-    img.style.cssText = `width:${button.iconSize}px;height:${button.iconSize}px;flex-shrink:0;`
-    img.draggable = false
-    el.appendChild(img)
-  } else {
-    const span = document.createElement('span')
-    span.textContent = icon
-    span.style.cssText = `font-size:${button.iconSize}px;line-height:1;flex-shrink:0;`
-    el.appendChild(span)
-  }
+  renderButtonIcon(el, button.icon || '', button.iconSize)
 }
 

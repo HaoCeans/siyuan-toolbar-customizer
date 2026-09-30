@@ -34,6 +34,9 @@ import * as licenseManager from "./utils/licenseManager";
 import { insertMultiLineText } from "./utils/protyleEnter";
 import { logger, setLoggingEnabled } from "./utils/logger"
 import { getLocale, t } from "./i18n/runtime";
+// 斜杠菜单工具栏（独立功能）：恢复出厂默认与生命周期拆卸
+import { createDefaultSlashToolbarConfig } from "./slashToolbar/catalog";
+import { destroySlashToolbar } from "./slashToolbar/runtime";
 
 // ===== 插件实例（用于需要 app 参数的 API 调用） =====
 export let pluginInstance: any = null;
@@ -568,6 +571,8 @@ export async function resetAllConfigsToFactoryDefaults(ctx: {
   desktopFeatureConfig: Record<string, unknown>
   mobileFeatureConfig: Record<string, unknown>
   mobileConfig: MobileToolbarConfig
+  /** 斜杠菜单工具栏配置（可选：调用方未提供时跳过该项） */
+  slashToolbarConfig?: { enabled: boolean; order: string[] }
   saveData: (key: string, value: unknown) => Promise<void>
   removeData: (key: string) => Promise<void>
   resetLogging?: () => Promise<void>
@@ -582,6 +587,12 @@ export async function resetAllConfigsToFactoryDefaults(ctx: {
 
   // 手机端工具栏配置 → 出厂默认
   Object.assign(ctx.mobileConfig, { ...DEFAULT_MOBILE_CONFIG })
+
+  // 斜杠菜单工具栏 → 出厂默认（关掉并回到内置按钮顺序）
+  if (ctx.slashToolbarConfig) {
+    Object.assign(ctx.slashToolbarConfig, createDefaultSlashToolbarConfig())
+    await ctx.saveData('slashToolbarConfig', ctx.slashToolbarConfig)
+  }
 
   // 小功能配置 → 出厂默认（保留授权字段 + 桌面端升级提示标记）
   const preserveKeys = [
@@ -6155,6 +6166,9 @@ export function restoreMobileToolbarOriginal(): void {
   toolbarHiddenByScroll = false
   toolbarAutoHideCapsuleMode = false
 
+  // 拆卸斜杠菜单工具栏（独立功能，恢复思源原始状态时一并收起）
+  destroySlashToolbar()
+
   // 清除面包屑上的 inline 样式 / class / 属性残留
   // （inline opacity/transform 不会随 style 元素移除而消失，是"面包屑仍被隐藏/按钮仍偏位"的根因）
   document.querySelectorAll('.protyle-breadcrumb, .protyle-breadcrumb__bar').forEach(el => {
@@ -8696,6 +8710,9 @@ export function cleanup() {
 
   // 清理自定义按钮
   cleanupCustomButtons()
+
+  // 拆卸斜杠菜单工具栏（独立功能）
+  destroySlashToolbar()
 
   // 移除事件监听器
   if (resizeHandler) {

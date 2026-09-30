@@ -10,12 +10,14 @@ import type { LicenseStatus } from '../utils/licenseManager'
 import { TRIAL_CODE, clearTrial } from '../utils/licenseManager'
 
 import type { Setting } from 'siyuan'
+import type { ISlashToolbarConfig } from '../slashToolbar/catalog'
 import type { GlobalButtonConfig } from '../toolbarManager'
 import type { ButtonConfig } from '../toolbarManager'
 import { showMessage, fetchSyncPost } from 'siyuan'
 import * as Notify from '../notification'
 import { createMobileButtonItem, type MobileButtonContext } from '../ui/buttonItems/mobile'
 import { createToolbarPreview } from '../ui/toolbarPreview'
+import { mountSlashToolbarSection } from '../slashToolbar/settings'
 import { createMobileQuickNoteFormatField } from '../ui/quickNoteFormatField'
 import { calculateButtonOverflow, getButtonDisplayName, getToolbarAvailableWidth, getButtonWidth, resetAllConfigsToFactoryDefaults } from '../toolbarManager'
 import { showConfirmDialog } from '../ui/dialog'
@@ -593,6 +595,8 @@ export interface MobileSettingsContext {
   desktopGlobalButtonConfig: GlobalButtonConfig
   mobileFeatureConfig: MobileFeatureConfig
   mobileConfig: MobileToolbarConfig
+  /** 斜杠菜单工具栏配置（独立功能，只存总开关与按钮顺序） */
+  slashToolbarConfig: ISlashToolbarConfig
   desktopFeatureConfig: MobileFeatureConfig
   isAuthorToolActivated: () => boolean
   getLicenseStatus: () => LicenseStatus
@@ -1270,6 +1274,12 @@ export function createMobileSettingLayout(
       }
     })
   }
+
+  // === 斜杠菜单工具栏（独立模块，放设置最顶部） ===
+  mountSlashToolbarSection(setting, {
+    slashToolbarConfig: context.slashToolbarConfig,
+    saveData: context.saveData,
+  }, createGroupTitle)
 
   // === 自定义按钮 ===
   createGroupTitle('📱',t("settings.mobile.91", undefined, "手机端自定义按钮"))
@@ -4563,6 +4573,7 @@ export function createMobileSettingLayout(
               mobileFeatureConfig: context.mobileFeatureConfig,
               desktopGlobalButtonConfig: context.desktopGlobalButtonConfig,
               mobileGlobalButtonConfig: context.mobileGlobalButtonConfig,
+              slashToolbarConfig: context.slashToolbarConfig,
             }
           }
           const text = JSON.stringify(payload, null, 2)

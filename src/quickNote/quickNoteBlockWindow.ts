@@ -262,8 +262,11 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
     // → 表现为「光标闪一下就没，要手动点」。必须在窗口 show 之后再轮询聚焦。
     // ★ 选择器：contenteditable="true" 在 .protyle-wysiwyg 根元素自身（思源源码 wysiwyg/index.ts:504，
     //   桌面端恒为 true；子块没有独立 contenteditable）——后代选择器永远匹配不到，必须先查根。
-    // focus() 不保证产生可见光标，用 Range 显式落 caret。轮询自愈（重渲染丢焦后下一 tick 补回），
-    // 用户 mousedown（捕获）或约 10s 超时退出；Promise 返回状态供主窗口日志诊断。
+    // ★ 绝不覆盖已有选区（removeAllRanges/addRange 禁用）：思源 insertHTML → getEditorRange 读的是
+    //   实时选区（selection.ts:215），若被钉到「根元素末尾」（不在任何 [data-node-id] 块内），
+    //   hasClosestBlock 找不到块 → 模板/粘贴等插入直接 return →「插入不显示」（v3.8.12 踩坑）。
+    //   只在 focus() 后浏览器没有产生任何光标（rangeCount===0）时才补一个。
+    // 用户 mousedown / keydown（捕获）或约 10s 超时退出；Promise 返回状态供主窗口日志诊断。
     focusJS: `(function(){
       return new Promise(function(resolve){
         if(window.__qnFocusTimer){clearInterval(window.__qnFocusTimer);window.__qnFocusTimer=null}
@@ -276,10 +279,13 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
         function stop(msg){
           if(window.__qnFocusTimer){clearInterval(window.__qnFocusTimer);window.__qnFocusTimer=null}
           document.removeEventListener('mousedown',stopOnce,true)
+          document.removeEventListener('keydown',stopKey,true)
           resolve(msg)
         }
-        function stopOnce(){stop('cancelled-by-mousedown')}
+        var stopOnce=function(){stop('cancelled-by-mousedown')}
+        var stopKey=function(){stop('cancelled-by-keydown')}
         document.addEventListener('mousedown',stopOnce,true)
+        document.addEventListener('keydown',stopKey,true)
         window.__qnFocusTimer=setInterval(function(){
           tries++
           if(tries>100){stop('timeout');return}
@@ -288,14 +294,13 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
           var ae=document.activeElement
           if(ae&&(ae===el||el.contains(ae)))return
           el.focus()
-          try{
-            var sel=window.getSelection()
+          var sel=window.getSelection()
+          if(sel && sel.rangeCount===0){
             var range=document.createRange()
             range.selectNodeContents(el)
             range.collapse(false)
-            sel.removeAllRanges()
             sel.addRange(range)
-          }catch(e){}
+          }
         },100)
       })
     })()`,

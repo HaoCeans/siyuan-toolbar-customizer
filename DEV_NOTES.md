@@ -1118,7 +1118,7 @@ v3.8.2 之后：主窗口正常，块格式弹窗内快捷键完全无反应。
 2. 文档内容经 WebSocket 异步到达后 wysiwyg **整体重渲染**，先前的焦点随 DOM 节点替换而丢失。
 原 `win.show(); win.focus()` 只聚焦窗口（webContents），不落到编辑器 contenteditable 上。再次打开正常是因为内容已加载、无重渲染，窗口重获 OS 焦点时文档里原先聚焦的元素自动恢复。
 
-**修复**：`focusJS` 轮询聚焦——每 100ms 检查 `.protyle-wysiwyg [contenteditable="true"]`，存在且 `activeElement` 未落在其中就 `focus()`；用户主动 mousedown（捕获阶段）或约 4s 超时退出轮询；`window.__qnFocusTimer` 复用防重复注入。注入时机在 `win.show()` **之后**（show 前注入会因窗口隐藏同样失效）。首开（did-finish-load → show）与 toggle 重新显示两条路径都注入。
+**修复（最终版，已实测通过）**：`focusJS` 轮询聚焦——每 100ms 检查，选择器**根元素优先**（`w.getAttribute('contenteditable')==='true' ? w : 后代兜底`，见下节），`activeElement` 未落在编辑器就 `el.focus()`；**仅当 `getSelection().rangeCount === 0` 时才补光标，绝不动已有选区**（原因见下下节，这是第一/二版踩坑的核心）；用户 mousedown / keydown（捕获阶段）或约 10s 超时退出；`window.__qnFocusTimer` 复用防重复注入；executeJavaScript 返回状态回传主窗口日志（`[QN-FOCUS]`）诊断。注入时机在 `win.show()` **之后**（show 前注入会因窗口隐藏同样失效）。首开（did-finish-load → show）与 toggle 重新显示两条路径都注入。
 
 **教训**：Electron 隐藏窗口里的「初始化即聚焦」不可靠；凡依赖编辑器焦点的窗口，聚焦动作必须放在 `show()` 之后并用带退出条件的轮询兜底（内容异步渲染会替换 DOM，单次 focus 会被冲掉）。
 
@@ -1126,6 +1126,16 @@ v3.8.2 之后：主窗口正常，块格式弹窗内快捷键完全无反应。
 
 第一版选择器用 `.protyle-wysiwyg [contenteditable="true"]`（后代）——思源源码 `wysiwyg/index.ts:504` 证实 `contenteditable` 是 `setAttribute` 在 `.protyle-wysiwyg` **根元素自身**（桌面端恒为 true，iPhone/Android 为 false），子块没有独立的 contenteditable，后代选择器永远匹配不到，轮询整个空转（表现为"修了但没效果"）。
 
-同时 focus() 本身不保证产生可见光标（contenteditable 空元素尤甚），需用 `Range.selectNodeContents + collapse + addRange` 显式落 caret。正确形态：`w.getAttribute('contenteditable')==='true' ? w : w.querySelector('[contenteditable="true"]')`（根优先、后代兜底）+ 显式 caret + 轮询自愈（重渲染丢焦后下一 tick 补回）+ mousedown/超时退出 + executeJavaScript 返回状态回传主窗口日志（`[QN-FOCUS]`）诊断。
+同时 focus() 在 Chromium 上通常能产生光标；显式 `Range` 落 caret **只在 `getSelection().rangeCount === 0` 时允许**（无条件 set 是第二版毒化实时选区的根因，见下节）。正确形态：`w.getAttribute('contenteditable')==='true' ? w : w.querySelector('[contenteditable="true"]')`（根优先、后代兜底）+ focus 后按需补 caret + 轮询自愈（重渲染丢焦后下一 tick 补回）+ mousedown/keydown/超时退出 + executeJavaScript 返回状态回传主窗口日志（`[QN-FOCUS]`）诊断。
 
 **教训**：对思源编辑器 DOM 写选择器前，先去源码确认属性挂在哪一层——`contenteditable` 这类编辑属性在 Protyle 的层级结构与直觉（"每个块独立可编辑"）相反，凭印象写选择器会做出"看起来在跑、实际永远空转"的静默失效修复。
+
+### focusJS 第二版踩坑：轮询里 removeAllRanges+addRange 会毒化实时选区，模板插入静默失败
+
+第二版聚焦脚本为「保证光标可见」，每 tick 都 `sel.removeAllRanges(); sel.addRange(caret在wysiwyg根元素末尾)`。结果用户插入思源模板「插入不显示」。
+
+**机制（思源源码对齐）**：`hintRenderTemplate` → `insertHTML(content, protyle, true, false, ...)` 第三参 `useProtyleRange=false` → `getEditorRange(protyle.wysiwyg.element)` **读实时选区**（`selection.ts:215`：`getSelection().getRangeAt(0)`）。被轮询钉成「根元素末尾」的选区，`startContainer` 是 wysiwyg 根、不在任何 `[data-node-id]` 块内 → `hasClosestBlock` 为空 → fallback `protyle.toolbar.range` 若已因重渲染失效 → `insertHTML` 开头直接 `return`，**无任何报错**。且 `getEditorRange` 对「根元素 offset 0」有矫正到第一块的逻辑，但 `collapse(false)` 的「末尾」恰好绕过它。
+
+**修复**：轮询只做 `el.focus()`；仅当 `getSelection().rangeCount === 0`（focus 后浏览器确实没产生光标）才补一个，绝不动已有选区；增加 keydown 取消（用户开始打字=光标归用户）。
+
+**教训**：**编辑器插件里任何「帮用户摆光标」的代码都必须把实时选区当成思源公共 API 的输入**——insertHTML/粘贴/模板/斜杠菜单全靠它定位。写 Range 前先问：这一笔下去，思源接下来要读选区的代码会读到什么？「只在 rangeCount===0 时补」是无害上界；无条件 set 就是毒化。

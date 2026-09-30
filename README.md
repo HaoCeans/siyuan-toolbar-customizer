@@ -153,6 +153,7 @@ Consult/join to obtain: **QQ Group 1018010924**
 
 | Link | Description |
 |------|------|
+| [Mobile quick toolbar](https://ld246.com/article/1790309810462/comment/1790310661009#comments) | Double your SiYuan efficiency on mobile, an idea from Clymer, thanks to the LianDi community! |
 | [V3.7.1 toolbar preview + bottom floating toolbar + minimalist Lucide icons](https://ld246.com/article/1773594214158) | WYSIWYG toolbar preview / bottom floating toolbar mode / minimalist Lucide icons (1,908) / standalone popup window / multiple fixes and optimizations |
 | [V3.7.0 image import refactor + attachment management + toolbox categories](https://ld246.com/article/1773594214158) | Image import refactor: block-mode insertion + physical anchor + execCommand / new attachment management / toolbox category display / LifeLog multi-window adaptation |
 | [V3.3.3 mobile: quick image insertion - floating outline - floating tabs - previous/next document](https://ld246.com/article/1777382296918) | Introduction to mobile floating features |
@@ -337,6 +338,34 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 ---
 
 # 📌 Changelog
+
+### v3.9.0 — SiYuan slash menu toolbar: the desktop insert menu, on your phone
+
+> 💡 Want a table, a heading or a quote while typing, but have to dig through the top-right menu first? This release brings the SiYuan desktop insert menu right above the mobile keyboard: the soft keyboard opens, a row of buttons is there, tap to insert. It is genuinely useful — once you try it you won't go back. Enabled by default; reorder buttons or turn it off in the "↗️ SiYuan slash menu toolbar" section at the top of the plugin settings.
+
+**One row of buttons, tap to insert**
+
+- While the soft keyboard is open, a row of buttons appears above SiYuan's keyboard toolbar: block reference, heading, list, style, quote, tabs, table, template, insert
+- Tap "Block reference" to open SiYuan's reference search directly — keep typing and pick a block, even faster than desktop
+- "Heading", "List", "Quote", "Tabs", "Table", "Style" and "Insert" are panel buttons: tap to open a bottom sheet with options like H1–H6, bullet/ordered/task lists, five callout types, code block, database, camera, image URL … and tap again to insert
+- "Template" opens SiYuan's built-in template panel; long-press "Insert" to jump straight into image picking
+
+**Want to tweak it? Drag in the settings**
+
+- The "button preview" at the top of the settings shows all 17 buttons: the first section is exactly what the toolbar shows (9), the second section holds the hidden ones (formula, mindmap, embed block, AI writing, diagrams and more)
+- Long press and drag to reorder or promote buttons from the second section; tap a button to see what it contains
+- The on/off switch sits at the top-right corner of the preview
+
+**Safe by design**
+
+- Every insert goes through SiYuan's official slash-menu channel — the same mechanism as typing `/` on desktop, with intact transactions and undo support
+- Styling matches SiYuan's own keyboard toolbar; light/dark mode and third-party themes adapt automatically
+- It hides itself automatically in read-only mode and publish mode
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
 
 ### v3.8.13 — Block-format note window: auto-focus on open + fixed template insertion
 

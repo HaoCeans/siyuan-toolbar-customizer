@@ -338,6 +338,26 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.8.13 — Block-format note window: auto-focus on open + fixed template insertion
+
+> 💡 After v3.8.12, the block-format note window doesn't focus on first open (you have to click it before typing)? Picking a SiYuan template from the slash menu inserts nothing? Update.
+
+**① Auto-focus the editor when the block-format window opens**
+- The window is created hidden, and both the editor initialization and the async content render can drop the caret, so you previously had to click the editor before typing
+- The caret now lands in the editor automatically once the window is shown (both on first open and when re-shown after hiding) — start typing right away
+- Your mouse click or key press takes over immediately; the auto-focus never fights you for focus
+
+**② Fixed templates/content not appearing after insertion**
+- Symptom: in v3.8.12, inserting a SiYuan template from the slash menu in the block-format note window showed nothing at all
+- Root cause: to keep the caret visible, the v3.8.12 focus script rewrote the browser's live selection; SiYuan computes the insertion point from that same selection when inserting a template or pasted content — a selection rewritten to the editor root (outside any block) makes the insertion fail silently, with no error shown
+- Fix: the caret is now only placed when the editor has no caret at all; existing selections are never touched
+- Templates, paste, the slash menu and image insertion — everything that inserts at the caret — work again
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.8.12 — Per-button target document for the ④ note button + fixed reversed prev/next navigation
 
 > 💡 Want the ④ quick-note button to always append into one specific document? After updating SiYuan, "Previous/Next document" is flipped: tapping "Previous" in a diary jumps to tomorrow's doc? Update.
@@ -353,11 +373,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 - Fix: the sort parameter is no longer sent. The request now matches the file tree exactly, and the kernel resolves the same sort mode the tree uses (doc → notebook → global)
 - Navigation now strictly follows the file tree's visual order under every sort mode (name / updated / created / custom / inherited); fixed on both mobile and desktop
 - The TTS auto-read "previous/next" chain uses the same path and benefits as well
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.8.11 — Tag/reference suggestions in the note popup + prepend to the daily note
 

@@ -238,16 +238,29 @@ function handleSwitchProtyle(): void {
   const existing = findTabByDocId(docId)
 
   if (existing) {
+    // 只有真实发生变化才标记 dirty：switch-protyle / loaded-protyle-dynamic 在空闲期也会触发
+    // （如后台动态加载），旧逻辑无条件 dirty=true 导致每次事件都写一次存储文件（v3.9.0 修复）
     const activeTab = getActiveTab()
-    if (activeTab) activeTab.isActive = false
-    existing.isActive = true
-    existing.notebookId = notebookId
-    state.activeTabId = existing.id
+    if (activeTab && activeTab !== existing && activeTab.isActive) {
+      activeTab.isActive = false
+      dirty = true
+    }
+    if (!existing.isActive) {
+      existing.isActive = true
+      dirty = true
+    }
+    if (notebookId && notebookId !== existing.notebookId) {
+      existing.notebookId = notebookId
+      dirty = true
+    }
+    if (state.activeTabId !== existing.id) {
+      state.activeTabId = existing.id
+      dirty = true
+    }
     if (domTitle && domTitle !== existing.title) {
       existing.title = domTitle
       dirty = true
     }
-    dirty = true
   } else {
     addTab(docId, domTitle || t('navigation.common.loading', undefined, '加载中...'), notebookId)
     dirty = true

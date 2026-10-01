@@ -173,6 +173,109 @@ export default class ToolbarCustomizer extends Plugin {
   private loggingEnabled = false
   private currentEditingButton: ButtonConfig | null = null
 
+  // ===== 存储写入去重 + 防抖（v3.9.0） =====
+  // 思源 Plugin.saveData 每次调用都经内核在磁盘写一个文件（data/storage/petal/<插件>/<key>）。
+  // 用户反馈空闲期 50 秒内出现多次 desktopFeatureConfig / mobileFeatureConfig 写入（另有
+  // desktopTabsState、preparedTtsCacheManifest）。这里统一加保护，对所有调用方生效：
+  // 1) 内容与上一次已写入内容相同 → 直接跳过（消除一切重复写）；
+  // 2) 同 key 短时间多次写 → 防抖（600ms）合并为最后一次；写后读（loadData）在待写期间返回
+  //    内存最新值，保证「先保存再读」的调用方拿到新值；
+  // 3) onunload 置 _unloading 后，后续 saveData 绕过防抖直写（防抖队列也已先冲刷）——
+  //    否则 onunload 中后段的写入（如 flushPreparedTtsCache）会因定时器不再触发而丢失；
+  // 4) 写失败 reject 传播给所有等待方（保持原生错误语义，调用方的 catch/提示不受影响）；
+  //    同步 onDataChanged 时清「已写入内容」缓存，避免磁盘被同步改写后相同内容的写入被误跳过。
+  private _storageLastJson = new Map<string, string>()
+  private _storagePending = new Map<string, { timer: ReturnType<typeof setTimeout>; latestJson: string; resolve: () => void; reject: (e: any) => void }>()
+  private _unloading = false
+
+  private _writeThrough(storageName: string, json: string): Promise<void> {
+    return super.saveData(storageName, JSON.parse(json))
+      .then(() => { this._storageLastJson.set(storageName, json) })
+  }
+
+  override saveData(storageName: string, content: any): Promise<void> {
+    let latestJson: string
+    try {
+      latestJson = JSON.stringify(content)
+    } catch {
+      // 不可序列化内容退回原生直写
+      return super.saveData(storageName, content)
+    }
+    const pending = this._storagePending.get(storageName)
+    if (pending) {
+      // 同 key 有待写：合并为最后一次，所有等待方共享同一次落盘
+      pending.latestJson = latestJson
+      return pending.promise
+    }
+    if (this._storageLastJson.get(storageName) === latestJson) {
+      // 内容与已写入内容一致：跳过磁盘写
+      return Promise.resolve()
+    }
+    if (this._unloading) {
+      // 卸载流程内没有时间窗等防抖：直写
+      return this._writeThrough(storageName, latestJson)
+    }
+    let resolveFn!: () => void
+    let rejectFn!: (e: any) => void
+    const promise = new Promise<void>((resolve, reject) => { resolveFn = resolve; rejectFn = reject })
+    const timer = setTimeout(() => {
+      const entry = this._storagePending.get(storageName)
+      if (!entry || entry.timer !== timer) { resolveFn(); return }
+      this._storagePending.delete(storageName)
+      const json = entry.latestJson
+      if (this._storageLastJson.get(storageName) === json) { entry.resolve(); return }
+      this._writeThrough(storageName, json)
+        .then(() => entry.resolve())
+        .catch((err) => {
+          logger.warn(`[存储] 写入 ${storageName} 失败:`, err)
+          entry.reject(err)
+        })
+    }, 600)
+    this._storagePending.set(storageName, { timer, latestJson, resolve: resolveFn, reject: rejectFn })
+    return promise
+  }
+
+  override async loadData(storageName: string): Promise<any> {
+    // 待写期间读内存最新值：保证 saveData 之后紧跟的 loadData 能读到新内容
+    const pending = this._storagePending.get(storageName)
+    if (pending) return JSON.parse(pending.latestJson)
+    return super.loadData(storageName)
+  }
+
+  override async removeData(storageName: string): Promise<any> {
+    // 取消待写并清缓存：恢复出厂等「先删后写」路径必须以新内容为准
+    const entry = this._storagePending.get(storageName)
+    if (entry) {
+      clearTimeout(entry.timer)
+      this._storagePending.delete(storageName)
+    }
+    this._storageLastJson.delete(storageName)
+    return super.removeData(storageName)
+  }
+
+  private _flushStorageKey(storageName: string): Promise<void> {
+    const entry = this._storagePending.get(storageName)
+    if (!entry) return Promise.resolve()
+    clearTimeout(entry.timer)
+    this._storagePending.delete(storageName)
+    const json = entry.latestJson
+    if (this._storageLastJson.get(storageName) === json) { entry.resolve(); return Promise.resolve() }
+    return this._writeThrough(storageName, json)
+      .then(() => entry.resolve())
+      .catch((err) => {
+        logger.warn(`[存储] 写入 ${storageName} 失败:`, err)
+        entry.reject(err)
+      })
+  }
+
+  private async _flushAllPendingStorage(): Promise<void> {
+    const names = [...this._storagePending.keys()]
+    for (const name of names) {
+      // 单个 key 失败不阻断其余冲刷（失败已通过 entry.reject 通知等待方）
+      await this._flushStorageKey(name).catch(() => {})
+    }
+  }
+
   // 全局按钮配置（批量设置所有按钮的默认值）
   private desktopGlobalButtonConfig: GlobalButtonConfig = { ...DEFAULT_DESKTOP_GLOBAL_BUTTON_CONFIG }
   private mobileGlobalButtonConfig: GlobalButtonConfig = { ...DEFAULT_MOBILE_GLOBAL_BUTTON_CONFIG }
@@ -1146,6 +1249,9 @@ export default class ToolbarCustomizer extends Plugin {
 
   /** 思源同步仅变更插件存储数据（dataChangePlugins）时调用，不会触发 onunload/onload */
   async onDataChanged() {
+    // 同步可能改写了磁盘存储：内存里「上次已写入内容」缓存作废，
+    // 否则后续相同内容的 saveData 会被误判为「未变化」而跳过（磁盘上却是同步后的旧值）
+    this._storageLastJson.clear()
     try {
       const savedLoggingConfig = await this.loadData('loggingConfig')
       this.loggingEnabled = savedLoggingConfig?.enabled === true
@@ -1175,6 +1281,9 @@ export default class ToolbarCustomizer extends Plugin {
   }
 
   async onunload() {
+    // 卸载流程：先置标志（后续 saveData 绕过防抖直写），再冲刷全部待写（防抖中的数据不能丢）
+    this._unloading = true
+    try { await this._flushAllPendingStorage() } catch { /* ignore */ }
     destroyQuickNoteFloatWindow()
     destroyDesktopQuickNoteBlockWindow()
     cleanupImagePicker()

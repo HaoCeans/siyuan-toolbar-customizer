@@ -1139,3 +1139,38 @@ v3.8.2 之后：主窗口正常，块格式弹窗内快捷键完全无反应。
 **修复**：轮询只做 `el.focus()`；仅当 `getSelection().rangeCount === 0`（focus 后浏览器确实没产生光标）才补一个，绝不动已有选区；增加 keydown 取消（用户开始打字=光标归用户）。
 
 **教训**：**编辑器插件里任何「帮用户摆光标」的代码都必须把实时选区当成思源公共 API 的输入**——insertHTML/粘贴/模板/斜杠菜单全靠它定位。写 Range 前先问：这一笔下去，思源接下来要读选区的代码会读到什么？「只在 rangeCount===0 时补」是无害上界；无条件 set 就是毒化。
+
+## 存储空闲期反复写入：saveData 全局去重+防抖、desktopTabs 无条件 dirty（v3.9.0）
+
+**文件**：`src/index.ts`（ToolbarCustomizer 重写 saveData/loadData/removeData + onunload 冲刷）、`src/ui/desktopTabs.ts`（handleSwitchProtyle）
+
+**用户反馈**（转述智能体的观察，因果未证实）：空闲状态 50 秒内 8 次 desktopFeatureConfig / mobileFeatureConfig 写入，另有 desktopTabsState、preparedTtsCacheManifest。
+
+**机制**：思源 `Plugin.saveData(storageName, content)` 每次调用都经内核在磁盘写一个文件（`data/storage/petal/<插件>/<key>`），不是内存操作。
+
+**实锤问题一：desktopTabs 无条件 dirty**。`handleSwitchProtyle` 的 `existing` 分支末尾无条件 `dirty = true`，而它挂在 `switch-protyle` 和 `loaded-protyle-dynamic` 两个事件上——后台动态加载也会触发后者 → **每个事件写一次 desktopTabsState 文件，哪怕活动标签根本没变**。修复：只有激活状态/activeTabId/notebookId/标题真实变化才 dirty。
+
+**实锤问题二：saveData 无任何调用方级去重**。设置面板保存虽有 hasAnyChange 检测，但运行时路径（迁移、标记位、各功能模块）都是"直接写"，内容没变也落盘。
+
+**未能定位的部分（诚实记录）**：全部 desktopFeatureConfig/mobileFeatureConfig 写入点盘点完毕——onload 一次性迁移、设置面板 UI（用户操作）、恢复出厂；**没有找到空闲期会周期性写这两个键的代码路径**。不排除观察方把内核 API 读调用（licenseManager 的授权检查会频繁读这两个配置）或同步对存储目录的触碰计成了"写入"。
+
+**修复**（全局兜底，不改每个调用点）：
+1. ToolbarCustomizer 重写 `saveData`：内容与上次已写入一致 → 跳过；同 key 600ms 内多次写 → 合并为最后一次；重写 `loadData`：待写期间返回内存最新值（保证先写后读一致）；重写 `removeData`：取消待写+清缓存（恢复出厂的"先删后写"以新内容为准）；`onunload` 冲刷全部待写。
+2. desktopTabs dirty 真实变化检测。
+
+**教训**：**`saveData` 是磁盘写不是内存写**。轮询/观察者/高频事件路径里的 saveData 必须自带变更判断；与其依赖每个调用点自觉，不如在插件入口统一加「内容相同跳过 + 防抖合并」的兜底层——一处治理，全部生效。
+
+## 斜杠菜单工具栏「换行」按钮：复用官方 Enter 链路（v3.9.2）
+
+**文件**：`src/slashToolbar/catalog.ts`（条目 + 按钮定义）、`src/slashToolbar/insert.ts`（executeNewline）
+
+**需求**：把「②手写模板插入」的 {{newline}} 能力做成斜杠工具栏按钮——点一下在光标处换行产生新块。
+
+**实现**：不新造轮子，直接复用 `utils/protyleEnter.ts`（多行模板 {{newline}} 同款机制）：
+- `ensureRange(protyle, savedRange)` 恢复按钮按下前的光标（点按钮会抢焦点，必须先还原选区）
+- `isCurrentBlockEmpty` 判空列表项 → 先补 ZWSP（思源对"空列表项 Enter"的语义是退出列表而非新建下一项）
+- `dispatchSyntheticEnter` 派发合成 Enter（keyCode 13）→ 思源官方 enter()：列表感知 + 事务落库 + focusByWbr 设光标
+
+**位置教训**：第一版把按钮插在"模板"和"插图"之间，把「插图」挤出了默认一排（一排只显示前 9 个）——**新按钮默认应追加在「不显示区」末尾**，不挤占现有可见行，想要的人在设置预览里长按拖上来。
+
+**图标**：`lucide:ListEnd`（共享渲染器 `buttonIconRender` 原生支持 `lucide:` 前缀走 `lucideToSvg`；第一版用了 `↵` 文本符号，被用户嫌丑）。

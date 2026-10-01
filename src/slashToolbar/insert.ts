@@ -15,6 +15,7 @@ import type {
 } from './catalog'
 import { getActiveProtyle } from '../toolbarManager'
 import { logger } from '../utils/logger'
+import { dispatchSyntheticEnter, isCurrentBlockEmpty } from '../utils/protyleEnter'
 import {
 
   SLASH_CARET,
@@ -244,6 +245,26 @@ const SPECIAL_SLASH_VALUES: Partial<Record<TSlashSpecial, string>> = {
 }
 
 /**
+ * 换行：等价 {{newline}} 的单次效果。
+ * 恢复按钮按下前的光标后，派发合成 Enter（keyCode 13）走思源官方换行链路
+ * （keydown.ts → enter()：列表感知 + 事务落库 + focusByWbr 设光标）。
+ * 空列表项先补 ZWSP——思源对"空列表项 Enter"的语义是退出列表而非新建下一项，
+ * 与 insertMultiLineText（{{newline}} 多行模板）保持同一套处理。
+ */
+const executeNewline = (savedRange?: Range | null): boolean => {
+  const protyle = getActiveProtyle()
+  if (!protyle) return false
+  if (!ensureRange(protyle, savedRange)) return false
+  const wysiwyg = protyle.wysiwyg?.element as HTMLElement | undefined
+  if (!wysiwyg) return false
+  if (isCurrentBlockEmpty(wysiwyg)) {
+    try { document.execCommand('insertText', false, '\u200b') } catch { /* ignore */ }
+  }
+  dispatchSyntheticEnter(wysiwyg)
+  return true
+}
+
+/**
  * 执行一个条目。
  * @param entry 条目定义
  * @param savedRange 按钮按下前保存的选区（避免点击抢焦点后丢光标）
@@ -261,6 +282,8 @@ export const executeSlashEntry = async (entry: ISlashEntry, savedRange?: Range |
         return fillSlash('((', true, savedRange)
       case 'blockEmbed':
         return fillSlash('{{', true, savedRange)
+      case 'newline':
+        return executeNewline(savedRange)
       case 'inlineMath':
         return executeInlineMath(savedRange)
       case 'pickImage':

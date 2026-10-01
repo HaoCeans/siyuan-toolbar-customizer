@@ -32,6 +32,7 @@ export type TSlashSpecial =
   | 'pickPhoto'
   | 'pickFile'
   | 'inlineMath'
+  | 'newline'
 
 export interface ISlashEntry {
   id: string
@@ -485,6 +486,14 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     kind: 'special',
     special: 'template',
   },
+  {
+    // 换行：等价 {{newline}} 的单次效果（合成 Enter 走思源官方换行链路）
+    id: 'newline',
+    fallback: '换行',
+    icon: 'lucide:ListEnd',
+    kind: 'special',
+    special: 'newline',
+  },
 ]
 
 export const SLASH_PANELS: ISlashPanel[] = [
@@ -631,6 +640,12 @@ export const SLASH_BUTTONS: ISlashButton[] = [
     fallback: '图表',
     icon: 'iconGraph',
     panelId: 'chart',
+  },
+  {
+    id: 'newline',
+    fallback: '换行',
+    icon: 'lucide:ListEnd',
+    entryId: 'newline',
   },
 ]
 

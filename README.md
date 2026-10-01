@@ -394,11 +394,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 - Fix: the caret is now only placed when the editor has no caret at all; existing selections are never touched
 - Templates, paste, the slash menu and image insertion — everything that inserts at the caret — work again
 
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
-
 ### v3.8.12 — Per-button target document for the ④ note button + fixed reversed prev/next navigation
 
 > 💡 Want the ④ quick-note button to always append into one specific document? After updating SiYuan, "Previous/Next document" is flipped: tapping "Previous" in a diary jumps to tomorrow's doc? Update.

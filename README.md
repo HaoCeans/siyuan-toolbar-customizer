@@ -339,6 +339,23 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.9.1 — Storage write optimization: no more idle disk writes
+
+> 💡 A user reported the plugin keeps writing to disk while idle (8 times in 50 seconds). Harmless to features, but it shouldn't happen — update.
+
+**① Global storage write dedup + debounce**
+- Every plugin-storage "save" in SiYuan hits the disk through the kernel. All saves now go through one guard: identical content is skipped; multiple saves within a short window are merged into a single write
+- Idle-period duplicate writes are gone; "save then read" returns the latest in-memory value, behavior unchanged; save failures still report errors; pending data is flushed automatically on plugin unload
+
+**② Fixed unconditional state persistence in the floating tabs**
+- The floating tabs (⑨) listen to document-switch and dynamic-load events; the old logic saved the state file on every event even when the active tab hadn't changed (background dynamic loads also trigger it)
+- Now it only saves on real changes (switch / add / rename)
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.9.0 — SiYuan slash menu toolbar: the desktop insert menu, on your phone
 
 > 💡 Want a table, a heading or a quote while typing, but have to dig through the top-right menu first? This release brings the SiYuan desktop insert menu right above the mobile keyboard: the soft keyboard opens, a row of buttons is there, tap to insert. It is genuinely useful — once you try it you won't go back. Enabled by default; reorder buttons or turn it off in the "↗️ SiYuan slash menu toolbar" section at the top of the plugin settings.
@@ -361,11 +378,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 - Every insert goes through SiYuan's official slash-menu channel — the same mechanism as typing `/` on desktop, with intact transactions and undo support
 - Styling matches SiYuan's own keyboard toolbar; light/dark mode and third-party themes adapt automatically
 - It hides itself automatically in read-only mode and publish mode
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.8.13 — Block-format note window: auto-focus on open + fixed template insertion
 

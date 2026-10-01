@@ -339,6 +339,20 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.9.2 — Slash menu toolbar: new "New line" button
+
+> 💡 Want a quick new line / new block while typing on mobile without reaching for the keyboard's return key? Update.
+
+**New "New line" button in the slash menu toolbar**
+- The keyboard toolbar now has a "↵ New line" button (Lucide ListEnd icon): tap to break the line at the caret and start a new block; tap repeatedly for consecutive lines
+- It goes through SiYuan's official newline chain — the same mechanism as the handwritten-template {{newline}} variable: list-aware, so inside a list it continues the list; breaking on an empty list item inserts a placeholder first instead of accidentally exiting the list; full transactions and undo support
+- It sits at the end of the hidden section by default and doesn't displace any existing button: long-press-drag it into the visible row in Settings → Slash menu toolbar → button preview
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.9.1 — Storage write optimization: no more idle disk writes
 
 > 💡 A user reported the plugin keeps writing to disk while idle (8 times in 50 seconds). Harmless to features, but it shouldn't happen — update.
@@ -350,11 +364,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 **② Fixed unconditional state persistence in the floating tabs**
 - The floating tabs (⑨) listen to document-switch and dynamic-load events; the old logic saved the state file on every event even when the active tab hadn't changed (background dynamic loads also trigger it)
 - Now it only saves on real changes (switch / add / rename)
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.9.0 — SiYuan slash menu toolbar: the desktop insert menu, on your phone
 

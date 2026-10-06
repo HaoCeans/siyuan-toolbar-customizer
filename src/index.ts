@@ -915,7 +915,7 @@ export default class ToolbarCustomizer extends Plugin {
 
     // ===== 斜杠菜单工具栏（独立功能）：手机端按配置同步 =====
     if (this.isMobile) {
-      syncSlashToolbar(this.slashToolbarConfig.enabled, this.slashToolbarConfig.order)
+      syncSlashToolbar(this.slashToolbarConfig.enabled, this.slashToolbarConfig.order, this.slashToolbarConfig.inPlaceGroups)
     }
 
     // ===== 使用思源 EventBus 监听编辑器加载事件（替代 MutationObserver，避免卡顿） =====
@@ -1508,7 +1508,7 @@ export default class ToolbarCustomizer extends Plugin {
         }
         if (slashToolbarChanged) {
           await this.saveData('slashToolbarConfig', this.slashToolbarConfig)
-          syncSlashToolbar(this.slashToolbarConfig.enabled, this.slashToolbarConfig.order)
+          syncSlashToolbar(this.slashToolbarConfig.enabled, this.slashToolbarConfig.order, this.slashToolbarConfig.inPlaceGroups)
         }
 
         showMessage(t('plugin.settingsSavedReloading', undefined, '设置已保存，正在重载...'), 2000, 'info')

@@ -11,16 +11,26 @@
  * - 位置实测 #keyboardToolbar 的 top，层级取它的 z-index + 1（该值来自思源全局计数器，会持续增长）
  */
 
-import type { ISlashEntry } from './catalog'
+import type {
+  ISlashButton,
+  ISlashEntry,
+  TSlashInPlaceGroup,
+} from './catalog'
 import { t } from '../i18n/runtime'
-import { isMobileDevice } from '../toolbarManager'
+import {
+  executeCustomButtonById,
+  getSlashCustomButtonSources,
+  isMobileDevice,
+} from '../toolbarManager'
 import { renderButtonIcon } from '../ui/buttonIconRender'
 import { logger } from '../utils/logger'
 import {
+  buildCustomSlashButtons,
   getAvailablePanelEntries,
   getBarSlashButtons,
   getSlashEntry,
   getSlashEntryName,
+  normalizeInPlaceGroups,
 } from './catalog'
 import { executeSlashEntry } from './insert'
 import {
@@ -43,6 +53,10 @@ type TTranslator = (key: string, fallback: string) => string
 
 let enabled = false
 let order: string[] = []
+/** 已开启「原地改格式」的按钮分组（设置预览里的三个开关），空 = 全部保持思源原生行为 */
+let inPlaceGroups: TSlashInPlaceGroup[] = []
+/** 运行期注册表：手机端自定义按钮（order 里 `custom:` 前缀的 id 在这里解析） */
+let customButtons: ISlashButton[] = []
 let initialized = false
 
 let barEl: HTMLDivElement | null = null
@@ -55,7 +69,7 @@ let measureTimer: number | undefined
 let bodyClassObserver: MutationObserver | undefined
 let bodyChildObserver: MutationObserver | undefined
 let heartbeatTimer: number | undefined
-let sheetResolve: ((entry: ISlashEntry | null) => void) | null = null
+let sheetResolve: ((picked: number | null) => void) | null = null
 let viewportBound = false
 
 /** 取思源界面语言文案 */
@@ -197,7 +211,7 @@ const vibrate = () => {
 
 /* ------------------------------------------------------------- 二级面板 */
 
-const closeSheet = (entry: ISlashEntry | null) => {
+const closeSheet = (picked: number | null) => {
   if (!sheetEl) {
     return
   }
@@ -214,7 +228,7 @@ const closeSheet = (entry: ISlashEntry | null) => {
       sheetEl.style.display = 'none'
     }
   }, 240)
-  resolve?.(entry)
+  resolve?.(picked)
 }
 
 const bindSheetTap = (row: HTMLElement, onTap: () => void) => {
@@ -314,7 +328,19 @@ const bindSheetDrag = () => {
   zone.addEventListener('touchcancel', finish)
 }
 
-const showSheet = (entries: ISlashEntry[]): Promise<ISlashEntry | null> => {
+/** 底部面板的一行：图标 + 文本，可选灰显禁点（disabled）与行尾角标（badge，如「已添加」） */
+interface ISheetRow {
+  icon: string
+  text: string
+  disabled?: boolean
+  badge?: string
+}
+
+/**
+ * 通用底部面板：接收行描述数组，返回被点行的下标（取消返回 null）。
+ * 斜杠条目面板与「添加自定义按钮」面板共用同一套 DOM / 遮罩 / 下滑关闭 / tap 阈值。
+ */
+const showSheetRows = (rows: ISheetRow[], title?: string): Promise<number | null> => {
   return new Promise((resolve) => {
     if (!sheetEl) {
       resolve(null)
@@ -330,25 +356,39 @@ const showSheet = (entries: ISlashEntry[]): Promise<ISlashEntry | null> => {
     panel.style.transition = ''
     panel.style.transform = ''
     list.innerHTML = ''
-    if (!entries.length) {
+    if (title) {
+      const titleEl = document.createElement('div')
+      titleEl.className = 'sy-mb-sheet-title'
+      titleEl.textContent = title
+      list.appendChild(titleEl)
+    }
+    if (!rows.length) {
       const empty = document.createElement('div')
       empty.className = 'sy-mb-empty'
       empty.textContent = t('slashToolbar.empty', undefined, '当前环境下没有可用项')
       list.appendChild(empty)
     }
-    entries.forEach((entry) => {
-      const row = document.createElement('div')
-      row.className = 'sy-mb-item'
+    rows.forEach((row, index) => {
+      const item = document.createElement('div')
+      item.className = row.disabled ? 'sy-mb-item sy-mb-item--disabled' : 'sy-mb-item'
       const iconBox = document.createElement('span')
       iconBox.className = 'sy-mb-item-icon'
-      renderButtonIcon(iconBox, entry.icon, 20)
+      renderButtonIcon(iconBox, row.icon, 20)
       const text = document.createElement('span')
       text.className = 'sy-mb-item-text'
-      text.textContent = getSlashEntryName(entry, syLang)
-      row.appendChild(iconBox)
-      row.appendChild(text)
-      bindSheetTap(row, () => closeSheet(entry))
-      list.appendChild(row)
+      text.textContent = row.text
+      item.appendChild(iconBox)
+      item.appendChild(text)
+      if (row.badge) {
+        const badge = document.createElement('span')
+        badge.className = 'sy-mb-item-badge'
+        badge.textContent = row.badge
+        item.appendChild(badge)
+      }
+      if (!row.disabled) {
+        bindSheetTap(item, () => closeSheet(index))
+      }
+      list.appendChild(item)
     })
 
     const mask = sheetEl.querySelector<HTMLElement>('.sy-mb-mask')
@@ -370,6 +410,13 @@ const showSheet = (entries: ISlashEntry[]): Promise<ISlashEntry | null> => {
   })
 }
 
+const showSheet = (entries: ISlashEntry[]): Promise<ISlashEntry | null> => {
+  return showSheetRows(entries.map((entry) => ({
+    icon: entry.icon,
+    text: getSlashEntryName(entry, syLang),
+  }))).then((picked) => (picked === null ? null : entries[picked] ?? null))
+}
+
 /* --------------------------------------------------------------- 按钮 */
 
 const runEntry = async (entry: ISlashEntry) => {
@@ -378,7 +425,9 @@ const runEntry = async (entry: ISlashEntry) => {
   }
   setBusy(true)
   try {
-    const ok = await executeSlashEntry(entry, savedRange)
+    // 「原地改格式」按按钮分组开关（设置预览里给）：关着就走官方 hint.fill 的老路
+    const allowInPlace = !!entry.inPlace && inPlaceGroups.includes(entry.inPlace.group)
+    const ok = await executeSlashEntry(entry, savedRange, allowInPlace)
     if (!ok) {
       logger.warn('[slashToolbar] 插入未执行:', entry.id)
     }
@@ -388,7 +437,24 @@ const runEntry = async (entry: ISlashEntry) => {
   }
 }
 
-const bindBarButton = (element: HTMLElement, panelId: string | undefined, entryId: string | undefined, longPressEntryId: string | undefined) => {
+/** 执行手机端自定义按钮：与主工具栏点击同一条 handleButtonClick 链路 */
+const runCustomButton = async (customId: string) => {
+  if (busy) {
+    return
+  }
+  setBusy(true)
+  try {
+    const ok = await executeCustomButtonById(customId, savedRange)
+    if (!ok) {
+      logger.warn('[slashToolbar] 自定义按钮未执行:', customId)
+    }
+  } finally {
+    setBusy(false)
+    scheduleMeasure()
+  }
+}
+
+const bindBarButton = (element: HTMLElement, button: ISlashButton) => {
   let longPressTimer: number | undefined
   let moved = false
   let fired = false
@@ -406,8 +472,12 @@ const bindBarButton = (element: HTMLElement, panelId: string | undefined, entryI
   const pressOut = () => element.classList.remove('sy-mb-press')
 
   const onTap = async () => {
-    if (panelId) {
-      const entries = getAvailablePanelEntries(panelId)
+    if (button.customButtonId) {
+      await runCustomButton(button.customButtonId)
+      return
+    }
+    if (button.panelId) {
+      const entries = getAvailablePanelEntries(button.panelId)
       if (!entries.length) {
         return
       }
@@ -417,15 +487,15 @@ const bindBarButton = (element: HTMLElement, panelId: string | undefined, entryI
       }
       return
     }
-    const entry = entryId ? getSlashEntry(entryId) : undefined
+    const entry = button.entryId ? getSlashEntry(button.entryId) : undefined
     if (entry) {
       await runEntry(entry)
     }
   }
 
-  const onLongPress = longPressEntryId
+  const onLongPress = button.longPressEntryId && button.longPressEntryId !== button.entryId
     ? async () => {
-      const entry = getSlashEntry(longPressEntryId)
+      const entry = getSlashEntry(button.longPressEntryId!)
       if (entry) {
         vibrate()
         await runEntry(entry)
@@ -519,10 +589,8 @@ const renderBar = () => {
     return
   }
   barEl.querySelectorAll('.sy-mb-btn').forEach((button) => button.remove())
-  getBarSlashButtons(order).forEach(({
+  getBarSlashButtons(order, customButtons).forEach(({
     button,
-    panel,
-    entry,
   }) => {
     const element = document.createElement('button')
     element.className = 'sy-mb-btn'
@@ -546,10 +614,7 @@ const renderBar = () => {
       iconBox.style.lineHeight = '1'
     }
     element.appendChild(iconBox)
-    const longPressEntryId = button.longPressEntryId && (!entry || entry.id !== button.longPressEntryId)
-      ? button.longPressEntryId
-      : undefined
-    bindBarButton(element, panel?.id, entry?.id, longPressEntryId)
+    bindBarButton(element, button)
     barEl?.appendChild(element)
   })
 }
@@ -669,10 +734,18 @@ const unbindEvents = () => {
 /**
  * 同步斜杠菜单工具栏（幂等）：开启时建好并按 order 渲染，关闭时拆干净。
  * 由插件 onLayoutReady、设置面板开关、以及"完全恢复思源原始状态"共同调用。
+ * inPlaceGroups 只影响点击条目时的行为（原地改格式），不影响栏的显隐。
+ * 自定义按钮注册表在这里重建（手机端按钮的改名/换图标/删除随插件重载跟上）。
  */
-export const syncSlashToolbar = (nextEnabled: boolean, nextOrder: unknown): void => {
+export const syncSlashToolbar = (nextEnabled: boolean, nextOrder: unknown, nextInPlaceGroups?: unknown): void => {
   enabled = nextEnabled === true
   order = Array.isArray(nextOrder) ? nextOrder as string[] : []
+  inPlaceGroups = normalizeInPlaceGroups(nextInPlaceGroups)
+  customButtons = buildCustomSlashButtons(getSlashCustomButtonSources())
+  logger.log('[slashToolbar] 同步:', {
+    enabled,
+    inPlaceGroups,
+  })
 
   if (!enabled || !isMobileDevice()) {
     destroySlashToolbar()
@@ -714,6 +787,7 @@ export const destroySlashToolbar = (): void => {
 export const refreshSlashToolbarButtons = (nextOrder: unknown): void => {
   order = Array.isArray(nextOrder) ? nextOrder as string[] : []
   if (initialized) {
+    customButtons = buildCustomSlashButtons(getSlashCustomButtonSources())
     renderBar()
     scheduleMeasure()
   }

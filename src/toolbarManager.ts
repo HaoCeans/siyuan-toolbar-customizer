@@ -3437,6 +3437,69 @@ function showOverflowToolbar(config: ButtonConfig) {
 }
 
 /**
+ * 斜杠菜单工具栏「添加按钮」面板的数据源：手机端自定义按钮清单。
+ * 复用 shouldShowButton 过滤（enabled !== false + 平台匹配），
+ * 名字走 getButtonDisplayName 与主工具栏同一 i18n 口径。
+ */
+export function getSlashCustomButtonSources(): Array<{ id: string, name: string, icon: string }> {
+  const configs: ButtonConfig[] = pluginInstance?.mobileButtonConfigs || []
+  return configs
+    .filter((config) => shouldShowButton(config))
+    .map((config) => ({
+      id: config.id,
+      name: getButtonDisplayName(config),
+      icon: config.icon,
+    }))
+}
+
+/**
+ * 按 id 执行手机端自定义按钮——与主工具栏点击走同一条 handleButtonClick 链路
+ * （builtin / 模板 / 快捷键 / 模拟点击 / 一键记事 / 作者工具全支持），
+ * 不模拟 DOM 点击：默认侧边胶囊模式下按钮多半不在 DOM 里，合成 click 也会丢按压时保存的选区。
+ * savedSelection / lastActiveElement 传 null 时内部按主工具栏同款兜底处理。
+ *
+ * @returns false 表示找不到该按钮（已被删除）
+ */
+export async function executeCustomButtonById(
+  id: string,
+  savedSelection: Range | null = null,
+  lastActiveElement: HTMLElement | null = null,
+): Promise<boolean> {
+  const configs: ButtonConfig[] = pluginInstance?.mobileButtonConfigs || []
+  const config = configs.find((item) => item.id === id)
+  if (!config) {
+    return false
+  }
+  // 「扩展工具栏」按钮（⋯）的动作挂在**主工具栏的 click 处理**里，不在 handleButtonClick 里：
+  // 直接转发过去会走 builtin 分支去找同名原生菜单元素、找不到就静默无反应。
+  // 这里镜像主工具栏 click 的特判，保证从斜杠栏点它与点主工具栏那个 ⋯ 完全一致。
+  if (isOverflowButton(config.id)) {
+    if (config.id === OVERFLOW_BUTTON_ID_DESKTOP) {
+      // 桌面端扩展栏需要一个锚点元素定位（斜杠栏只在手机端出现，这条是兜底）
+      const anchor = document.querySelector<HTMLElement>(`[data-custom-button="${config.id}"]`)
+      if (!anchor) {
+        return false
+      }
+      showDesktopOverflowToolbar(config, anchor)
+      return true
+    }
+    showOverflowToolbar(config)
+    return true
+  }
+  // 与主工具栏一致：点其它按钮前先收起已展开的扩展工具栏层，并清掉扩展按钮的激活态
+  const existingLayers = document.querySelectorAll('.overflow-toolbar-layer, .desktop-overflow-toolbar-layer')
+  if (existingLayers.length > 0) {
+    existingLayers.forEach((el) => el.remove())
+    document.querySelectorAll<HTMLElement>('[data-custom-button="overflow-button-mobile"], [data-custom-button="overflow-button-desktop"]').forEach((btn) => {
+      btn.classList.remove('overflow-active')
+      btn.style.backgroundColor = 'transparent'
+    })
+  }
+  await handleButtonClick(config, savedSelection, lastActiveElement, null)
+  return true
+}
+
+/**
  * 桌面端扩展工具栏：按 buttonsPerLayer 手动分配溢出层级
  * 按 sort 排序后，前 buttonsPerLayer[0] 个 → 主工具栏，接下来 buttonsPerLayer[1] 个 → 第1层，以此类推
  */

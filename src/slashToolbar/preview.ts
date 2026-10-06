@@ -8,15 +8,22 @@
  * 设置弹窗点「确定」后由 confirmCallback 统一保存并 reloadUI。
  */
 
-import type { ISlashEntry } from './catalog'
+import type {
+  ISlashButton,
+  ISlashEntry,
+  TSlashInPlaceGroup,
+} from './catalog'
 import { t } from '../i18n/runtime'
 import { renderButtonIcon } from '../ui/buttonIconRender'
 import {
   getAvailablePanelEntries,
-  getSlashButton,
+  getButtonInPlaceGroup,
+  getSlashButtonOrCustom,
   getSlashEntryName,
+  isSlashCustomId,
   normalizeSlashOrder,
   SLASH_BAR_VISIBLE_COUNT,
+  SLASH_CUSTOM_PREFIX,
 } from './catalog'
 
 export interface ISlashPreviewOptions {
@@ -28,6 +35,16 @@ export interface ISlashPreviewOptions {
   getEnabled: () => boolean
   /** 切换总开关（内部负责保存与运行时同步） */
   setEnabled: (enabled: boolean) => void | Promise<void>
+  /** 当前可用的手机端自定义按钮（运行期注册表，每次渲染时重取） */
+  getCustomButtons: () => ISlashButton[]
+  /** 把自定义按钮加入斜杠栏（追加到「不显示区」末尾，内部负责保存与运行时同步） */
+  addCustom: (sourceId: string) => void | Promise<void>
+  /** 把自定义按钮从斜杠栏移除（内部负责保存与运行时同步） */
+  removeCustom: (id: string) => void | Promise<void>
+  /** 取某个按钮分组是否开启「原地改格式」 */
+  getInPlace: (group: TSlashInPlaceGroup) => boolean
+  /** 切换「原地改格式」开关（内部负责保存与运行时同步） */
+  setInPlace: (group: TSlashInPlaceGroup, enabled: boolean) => void | Promise<void>
   /** 顺序变化后的回调（用于同步其它 UI） */
   onChanged: () => void
 }
@@ -45,6 +62,11 @@ export function createSlashToolbarPreview(options: ISlashPreviewOptions): HTMLEl
     setOrder,
     getEnabled,
     setEnabled,
+    getCustomButtons,
+    addCustom,
+    removeCustom,
+    getInPlace,
+    setInPlace,
     onChanged,
   } = options
 
@@ -92,8 +114,32 @@ export function createSlashToolbarPreview(options: ISlashPreviewOptions): HTMLEl
   detail.style.cssText = 'margin-top:8px;'
   root.appendChild(detail)
 
+  /* 「添加自定义按钮」：设置内的入口（不在栏上，属于设置功能），放预览卡片最底部。
+     展开后列出全部手机端自定义按钮，点行即加入「不显示」区；已加入的灰显标「已添加」。 */
+  const addSection = document.createElement('div')
+  addSection.style.cssText = 'margin-top:10px;'
+  const addToggle = document.createElement('button')
+  addToggle.type = 'button'
+  addToggle.className = 'b3-button b3-button--outline'
+  addToggle.style.cssText = `
+    width: 100%; font-size: 12px; padding: 6px 10px;
+    border-style: dashed; justify-content: center; display: flex; align-items: center; gap: 4px;
+  `
+  addToggle.textContent = t('slashToolbar.preview.addCustomButton', undefined, '添加自定义按钮')
+  const addList = document.createElement('div')
+  addList.style.cssText = `
+    display: none; margin-top: 6px; padding: 4px 8px; border-radius: 6px;
+    border: 1px dashed var(--b3-border-color);
+    background: color-mix(in srgb, var(--b3-theme-background) 60%, transparent);
+  `
+  addSection.appendChild(addToggle)
+  addSection.appendChild(addList)
+  root.appendChild(addSection)
+
   let dragId: string | null = null
   let expandedId: string | null = null
+  /** 每次渲染时重取的自定义按钮注册表（chip 与详情共用） */
+  let currentCustomButtons: ISlashButton[] = []
 
   const clearDragHints = () => {
     sections.querySelectorAll('[data-preview-id]').forEach((node) => {
@@ -118,9 +164,99 @@ export function createSlashToolbarPreview(options: ISlashPreviewOptions): HTMLEl
     render()
   }
 
+  /** 「添加自定义按钮」列表的展开状态（render 后保持） */
+  let addExpanded = false
+
+  /** 渲染内联添加列表：点行即加入「不显示」区；已加入的灰显标「已添加」点不动 */
+  const renderAddList = () => {
+    addList.innerHTML = ''
+    if (!addExpanded) {
+      addList.style.display = 'none'
+      return
+    }
+    addList.style.display = 'block'
+    const addedIds = new Set(
+      normalizeSlashOrder(getOrder())
+        .filter((id) => isSlashCustomId(id))
+        .map((id) => id.slice(SLASH_CUSTOM_PREFIX.length)),
+    )
+    const buttons = getCustomButtons()
+    if (!buttons.length) {
+      const empty = document.createElement('div')
+      empty.style.cssText = 'padding:8px 4px;font-size:12px;color:var(--b3-theme-on-surface-light);'
+      empty.textContent = t('slashToolbar.empty', undefined, '当前环境下没有可用项')
+      addList.appendChild(empty)
+      return
+    }
+    const title = document.createElement('div')
+    title.style.cssText = 'padding:4px 4px 2px;font-size:11px;color:var(--b3-theme-on-surface-light);'
+    title.textContent = t('slashToolbar.addSheet.title', undefined, '手机端自定义按钮')
+    addList.appendChild(title)
+    buttons.forEach((button) => {
+      const sourceId = button.customButtonId
+      if (!sourceId) {
+        return
+      }
+      const added = addedIds.has(sourceId)
+      const row = document.createElement('div')
+      row.style.cssText = `
+        display:flex;align-items:center;min-height:38px;padding:2px 4px;border-radius:4px;
+        ${added ? 'opacity:.45;' : 'cursor:pointer;'}
+      `
+      row.addEventListener('click', () => {
+        // 点未添加的行 = 加入「不显示」区；再点已添加的行 = 移除（样式不变，行为开关）
+        void Promise.resolve(added ? removeCustom(SLASH_CUSTOM_PREFIX + sourceId) : addCustom(sourceId)).then(() => render())
+      })
+      const iconBox = document.createElement('span')
+      iconBox.style.cssText = 'display:inline-flex;width:20px;height:20px;align-items:center;justify-content:center;margin-right:8px;flex-shrink:0;'
+      renderButtonIcon(iconBox, button.icon, 18)
+      row.appendChild(iconBox)
+      const text = document.createElement('span')
+      text.style.cssText = 'flex:1;min-width:0;font-size:13px;'
+      text.textContent = button.fallback
+      row.appendChild(text)
+      if (added) {
+        const badge = document.createElement('span')
+        badge.style.cssText = `
+          flex:0 0 auto;margin-left:8px;padding:2px 8px;border-radius:10px;
+          font-size:11px;color:var(--b3-theme-on-surface-light);
+          background: color-mix(in srgb, var(--b3-theme-on-surface) 10%, transparent);
+        `
+        badge.textContent = t('slashToolbar.addSheet.added', undefined, '已添加')
+        row.appendChild(badge)
+      }
+      addList.appendChild(row)
+    })
+  }
+
+  addToggle.onclick = () => {
+    addExpanded = !addExpanded
+    renderAddList()
+  }
+
   const createChip = (id: string): HTMLElement => {
-    const button = getSlashButton(id)
+    const button = getSlashButtonOrCustom(id, currentCustomButtons)
     if (!button) {
+      // 自定义按钮已被删除：渲染失效占位（问号），详情里可移除
+      if (isSlashCustomId(id)) {
+        const missing = document.createElement('div')
+        missing.dataset.previewId = id
+        missing.style.cssText = `
+          display: flex; align-items: center; justify-content: center;
+          min-width: 26px; height: 26px; border-radius: 4px; flex-shrink: 0;
+          color: var(--b3-theme-on-surface-light); opacity: .5;
+          background: color-mix(in srgb, var(--b3-theme-on-surface) 8%, transparent);
+          font-size: 14px; font-weight: 600;
+        `
+        missing.title = t('slashToolbar.preview.customMissing', undefined, '原按钮已不存在，可移除')
+        missing.textContent = '?'
+        missing.addEventListener('click', (event) => {
+          event.stopPropagation()
+          expandedId = expandedId === id ? null : id
+          render()
+        })
+        return missing
+      }
       return document.createElement('span')
     }
     const chip = document.createElement('div')
@@ -279,17 +415,66 @@ export function createSlashToolbarPreview(options: ISlashPreviewOptions): HTMLEl
     chip.addEventListener('touchcancel', finish)
   }
 
-  /** 点击后的详情：面板型列出内容，直接插入型只显示名称 */
+  /**
+   * 详情里的「原地改格式」开关：按一级按钮分组给（标题 / 列表 / 引述各一个）。
+   * 默认关闭 = 保持思源原生行为（非空块在下方新建块）；打开后点这个面板的条目会直接改当前块。
+   */
+  const appendInPlaceSwitch = (box: HTMLElement, buttonId: string) => {
+    const group = getButtonInPlaceGroup(buttonId)
+    if (!group) {
+      return
+    }
+    const row = document.createElement('label')
+    row.style.cssText = `
+      display:flex;align-items:center;gap:8px;margin-top:8px;padding-top:8px;
+      border-top:1px dashed var(--b3-border-color);cursor:pointer;
+    `
+    const toggle = document.createElement('input')
+    toggle.type = 'checkbox'
+    toggle.className = 'b3-switch'
+    toggle.checked = getInPlace(group)
+    toggle.style.cssText = 'flex:0 0 auto;transform:scale(1.1);'
+    const textBox = document.createElement('div')
+    textBox.style.cssText = 'flex:1;min-width:0;'
+    const label = document.createElement('div')
+    label.style.cssText = 'font-size:12px;font-weight:600;'
+    label.textContent = t('slashToolbar.preview.inPlaceLabel', undefined, '原地改当前块（不新建块）')
+    const desc = document.createElement('div')
+    desc.style.cssText = 'margin-top:2px;font-size:11px;font-weight:400;color:var(--b3-theme-on-surface-light);'
+    desc.textContent = t('slashToolbar.preview.inPlaceDesc', undefined, '默认关闭，保持思源原生行为。开启后：光标在非空段落上时，点这个面板的条目直接改当前段落，不再新建块。')
+    textBox.appendChild(label)
+    textBox.appendChild(desc)
+    row.appendChild(toggle)
+    row.appendChild(textBox)
+    toggle.onchange = () => {
+      void setInPlace(group, toggle.checked)
+    }
+    box.appendChild(row)
+  }
+
+  /** 详情里的「从斜杠栏移除」按钮（自定义按钮用，当场落盘） */
+  const appendRemoveButton = (box: HTMLElement, id: string) => {
+    const removeBtn = document.createElement('button')
+    removeBtn.type = 'button'
+    removeBtn.className = 'b3-button b3-button--small b3-button--outline'
+    removeBtn.style.cssText = 'margin-top:8px;color:var(--b3-theme-error);border-color:var(--b3-theme-error);'
+    removeBtn.textContent = t('slashToolbar.preview.removeCustom', undefined, '从斜杠栏移除')
+    removeBtn.onclick = () => {
+      expandedId = null
+      void Promise.resolve(removeCustom(id)).then(() => render())
+    }
+    box.appendChild(removeBtn)
+  }
+
+  /** 点击后的详情：面板型列出内容，直接插入型只显示名称；自定义按钮另有移除/失效态 */
   const renderDetail = () => {
     detail.innerHTML = ''
     if (!expandedId) {
       return
     }
-    const button = getSlashButton(expandedId)
-    if (!button) {
-      return
-    }
-    const name = buttonName(button.id, button.fallback)
+    const id = expandedId
+    const button = getSlashButtonOrCustom(id, currentCustomButtons)
+
     const box = document.createElement('div')
     box.style.cssText = `
       padding: 8px; border-radius: 6px; font-size: 12px;
@@ -297,6 +482,36 @@ export function createSlashToolbarPreview(options: ISlashPreviewOptions): HTMLEl
       border: 1px dashed var(--b3-theme-primary);
       color: var(--b3-theme-on-surface);
     `
+
+    // 自定义按钮已被删除：失效提示 + 移除入口
+    if (!button) {
+      if (isSlashCustomId(id)) {
+        const head = document.createElement('div')
+        head.style.cssText = 'font-weight:600;'
+        head.textContent = '?'
+        box.appendChild(head)
+        const tip = document.createElement('div')
+        tip.style.cssText = 'margin-top:4px;color:var(--b3-theme-on-surface-light);'
+        tip.textContent = t('slashToolbar.preview.customMissing', undefined, '原按钮已不存在，可移除')
+        box.appendChild(tip)
+        appendRemoveButton(box, id)
+      }
+      detail.appendChild(box)
+      return
+    }
+
+    const name = buttonName(button.id, button.fallback)
+
+    // 自定义按钮：名称 + 移除入口
+    if (button.customButtonId) {
+      const head = document.createElement('div')
+      head.style.cssText = 'font-weight:600;'
+      head.textContent = name
+      box.appendChild(head)
+      appendRemoveButton(box, id)
+      detail.appendChild(box)
+      return
+    }
 
     if (!button.panelId) {
       const head = document.createElement('div')
@@ -307,6 +522,7 @@ export function createSlashToolbarPreview(options: ISlashPreviewOptions): HTMLEl
       tip.style.cssText = 'margin-top:4px;color:var(--b3-theme-on-surface-light);'
       tip.textContent = t('slashToolbar.preview.directTip', undefined, '点一下直接插入，无二级面板')
       box.appendChild(tip)
+      appendInPlaceSwitch(box, button.id)
       detail.appendChild(box)
       return
     }
@@ -345,6 +561,7 @@ export function createSlashToolbarPreview(options: ISlashPreviewOptions): HTMLEl
       list.appendChild(item)
     })
     box.appendChild(list)
+    appendInPlaceSwitch(box, button.id)
     detail.appendChild(box)
   }
 
@@ -372,6 +589,8 @@ export function createSlashToolbarPreview(options: ISlashPreviewOptions): HTMLEl
 
   function render() {
     sections.innerHTML = ''
+    currentCustomButtons = getCustomButtons()
+    renderAddList()
     const order = normalizeSlashOrder(getOrder())
     const shown = order.slice(0, SLASH_BAR_VISIBLE_COUNT)
     const hidden = order.slice(SLASH_BAR_VISIBLE_COUNT)

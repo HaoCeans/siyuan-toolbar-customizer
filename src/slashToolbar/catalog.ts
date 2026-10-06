@@ -34,6 +34,12 @@ export type TSlashSpecial =
   | 'inlineMath'
   | 'newline'
 
+/**
+ * 原地改格式的开关分组：与设置预览里的一级按钮 id 一致，
+ * 也就是「标题 / 列表 / 引述」这三个按钮各一个开关。
+ */
+export type TSlashInPlaceGroup = 'heading' | 'list' | 'quote'
+
 export interface ISlashEntry {
   id: string
   /** 取思源界面语言包的键；取不到时用 fallback */
@@ -43,6 +49,18 @@ export interface ISlashEntry {
   kind: 'fill' | 'special'
   /** kind === 'fill' 时传给 hint.fill 的值；{C} 会替换为 Lute.Caret */
   value?: string
+  /**
+   * 原地改格式：光标所在块是「非空普通段落」时，改为把 mark 打进块首，
+   * 走思源官方输入管线（input 事件 → Lute.SpinBlockDOM）把这个块原地转成目标块
+   * （块 ID 与内容、行内元素都保留），而不是像 hint.fill 那样在下方新建块。
+   * 需设置预览里所属按钮（group）的开关打开才生效；**默认关闭 = 思源原生行为**。
+   * 其余情况（空段落 / 已是标题列表引述 / 不在段落里）自动回退官方 hint.fill。
+   * 只有实测能原地转换的条目才填该字段，细节见 insert.ts 的 tryInPlaceMark 注释。
+   */
+  inPlace?: {
+    group: TSlashInPlaceGroup
+    mark: string
+  }
   /** (( 与 {{ 需要把 hint 切到对应模式，调用后不能还原 splitChar */
   keepHintSplit?: boolean
   /** kind === 'special' 时走哪条专用通道 */
@@ -65,7 +83,32 @@ export interface ISlashButton {
   entryId?: string
   /** 长按直接执行的条目（不展开面板） */
   longPressEntryId?: string
+  /** 执行手机端自定义按钮（值是 ButtonConfig.id，不含前缀） */
+  customButtonId?: string
 }
+
+/** 自定义按钮在 order 里的 id 前缀：`custom:<ButtonConfig.id>` */
+export const SLASH_CUSTOM_PREFIX = 'custom:'
+
+/** 判断 order 里的一项是否为用户自定义按钮（运行期才知道，不在 buttonMap 里） */
+export const isSlashCustomId = (id: string): boolean => id.startsWith(SLASH_CUSTOM_PREFIX)
+
+/** 手机端自定义按钮的源信息（由 toolbarManager 提供，catalog 不反向依赖它） */
+export interface ISlashCustomButtonSource {
+  /** ButtonConfig.id（不含前缀） */
+  id: string
+  name: string
+  icon: string
+}
+
+/** 把手机端自定义按钮转成斜杠栏按钮定义（id 加前缀，进入 order / 预览 / 渲染全链路） */
+export const buildCustomSlashButtons = (sources: ISlashCustomButtonSource[]): ISlashButton[] =>
+  sources.map((source) => ({
+    id: SLASH_CUSTOM_PREFIX + source.id,
+    fallback: source.name,
+    icon: source.icon,
+    customButtonId: source.id,
+  }))
 
 /** 内置样式（对齐官方 style${ZWSP}color:var(--b3-card-*-color);background-color:var(--b3-card-*-background); ） */
 export const builtinStyleSlashValue = (id: 'info' | 'success' | 'warning' | 'error') =>
@@ -80,6 +123,10 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     icon: 'iconH1',
     kind: 'fill',
     value: `# ${SLASH_CARET}`,
+    inPlace: {
+      group: 'heading',
+      mark: '# ',
+    },
   },
   {
     id: 'h2',
@@ -88,6 +135,10 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     icon: 'iconH2',
     kind: 'fill',
     value: `## ${SLASH_CARET}`,
+    inPlace: {
+      group: 'heading',
+      mark: '## ',
+    },
   },
   {
     id: 'h3',
@@ -96,6 +147,10 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     icon: 'iconH3',
     kind: 'fill',
     value: `### ${SLASH_CARET}`,
+    inPlace: {
+      group: 'heading',
+      mark: '### ',
+    },
   },
   {
     id: 'h4',
@@ -104,6 +159,10 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     icon: 'iconH4',
     kind: 'fill',
     value: `#### ${SLASH_CARET}`,
+    inPlace: {
+      group: 'heading',
+      mark: '#### ',
+    },
   },
   {
     id: 'h5',
@@ -112,6 +171,10 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     icon: 'iconH5',
     kind: 'fill',
     value: `##### ${SLASH_CARET}`,
+    inPlace: {
+      group: 'heading',
+      mark: '##### ',
+    },
   },
   {
     id: 'h6',
@@ -120,6 +183,10 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     icon: 'iconH6',
     kind: 'fill',
     value: `###### ${SLASH_CARET}`,
+    inPlace: {
+      group: 'heading',
+      mark: '###### ',
+    },
   },
 
   // ===== 列表 =====
@@ -130,6 +197,10 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     icon: 'iconList',
     kind: 'fill',
     value: `- ${SLASH_CARET}`,
+    inPlace: {
+      group: 'list',
+      mark: '- ',
+    },
   },
   {
     id: 'orderedList',
@@ -138,6 +209,10 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     icon: 'iconOrderedList',
     kind: 'fill',
     value: `1. ${SLASH_CARET}`,
+    inPlace: {
+      group: 'list',
+      mark: '1. ',
+    },
   },
   {
     id: 'task',
@@ -146,6 +221,10 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     icon: 'iconCheck',
     kind: 'fill',
     value: `- [ ] ${SLASH_CARET}`,
+    inPlace: {
+      group: 'list',
+      mark: '- [ ] ',
+    },
   },
   {
     id: 'mindmap',
@@ -275,6 +354,10 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     icon: 'iconQuote',
     kind: 'fill',
     value: `> ${SLASH_CARET}`,
+    inPlace: {
+      group: 'quote',
+      mark: '> ',
+    },
   },
   {
     id: 'calloutNote',
@@ -282,6 +365,10 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     icon: 'iconCallout',
     kind: 'fill',
     value: `> [!NOTE]\n> ${SLASH_CARET}`,
+    inPlace: {
+      group: 'quote',
+      mark: '> [!NOTE]\n> ',
+    },
   },
   {
     id: 'calloutTip',
@@ -289,6 +376,10 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     icon: 'iconCallout',
     kind: 'fill',
     value: `> [!TIP]\n> ${SLASH_CARET}`,
+    inPlace: {
+      group: 'quote',
+      mark: '> [!TIP]\n> ',
+    },
   },
   {
     id: 'calloutImportant',
@@ -296,6 +387,10 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     icon: 'iconCallout',
     kind: 'fill',
     value: `> [!IMPORTANT]\n> ${SLASH_CARET}`,
+    inPlace: {
+      group: 'quote',
+      mark: '> [!IMPORTANT]\n> ',
+    },
   },
   {
     id: 'calloutWarning',
@@ -303,6 +398,10 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     icon: 'iconCallout',
     kind: 'fill',
     value: `> [!WARNING]\n> ${SLASH_CARET}`,
+    inPlace: {
+      group: 'quote',
+      mark: '> [!WARNING]\n> ',
+    },
   },
   {
     id: 'calloutCaution',
@@ -310,6 +409,10 @@ export const SLASH_ENTRIES: ISlashEntry[] = [
     icon: 'iconCallout',
     kind: 'fill',
     value: `> [!CAUTION]\n> ${SLASH_CARET}`,
+    inPlace: {
+      group: 'quote',
+      mark: '> [!CAUTION]\n> ',
+    },
   },
 
   // ===== 表格 =====
@@ -666,16 +769,21 @@ export const getSlashButton = (id: string) => buttonMap.get(id)
 export const getSlashPanel = (id: string) => panelMap.get(id)
 export const getSlashEntry = (id: string) => entryMap.get(id)
 
+/** 解析一个一级按钮 id：先查静态定义，再查运行期注册表（自定义按钮） */
+export const getSlashButtonOrCustom = (id: string, customButtons?: ISlashButton[]): ISlashButton | undefined =>
+  buttonMap.get(id) ?? customButtons?.find((button) => button.id === id)
+
 /**
  * 规范化一级按钮顺序：过滤未知 id、去重、把定义里新增但配置里没有的按钮补在末尾。
  * 这样以后往 SLASH_BUTTONS 加按钮时，老用户不需要手动迁移。
+ * `custom:` 前缀的用户自定义按钮是运行期数据，同样保留（解析不到时由渲染层跳过）。
  */
 export const normalizeSlashOrder = (order: unknown): string[] => {
   const result: string[] = []
   const used = new Set<string>()
   if (Array.isArray(order)) {
     order.forEach((id) => {
-      if (typeof id === 'string' && buttonMap.has(id) && !used.has(id)) {
+      if (typeof id === 'string' && (buttonMap.has(id) || isSlashCustomId(id)) && !used.has(id)) {
         result.push(id)
         used.add(id)
       }
@@ -737,15 +845,25 @@ export const getAvailablePanelEntries = (panelId: string): ISlashEntry[] => {
  * 取按当前环境过滤后、且按 order 排序的一级按钮定义。
  * 面板内一个条目都不可用的按钮会被跳过（例如非 Android 且无 AI 时的空面板）。
  * limit 大于 0 时只取前 N 个（工具栏一排只显示 SLASH_BAR_VISIBLE_COUNT 个）。
+ * customButtons 是运行期注册表（手机端自定义按钮），order 里解析不到的 id 一律跳过
+ * （自定义按钮被删除后，栏与预览上自动消失）。
  */
-export const getOrderedSlashButtons = (order: unknown, limit = 0): Array<{ button: ISlashButton, panel?: ISlashPanel, entry?: ISlashEntry }> => {
+export const getOrderedSlashButtons = (order: unknown, limit = 0, customButtons?: ISlashButton[]): Array<{ button: ISlashButton, panel?: ISlashPanel, entry?: ISlashEntry }> => {
   const result: Array<{ button: ISlashButton, panel?: ISlashPanel, entry?: ISlashEntry }> = []
+  const customMap = customButtons?.length ? new Map(customButtons.map((button) => [button.id, button])) : undefined
   normalizeSlashOrder(order).forEach((id) => {
     if (limit > 0 && result.length >= limit) {
       return
     }
-    const button = buttonMap.get(id)
+    const button = customMap?.get(id) ?? buttonMap.get(id)
     if (!button) {
+      return
+    }
+    // 自定义按钮的可用性已在注册表构建时过滤（shouldShowButton），这里直接放行
+    if (button.customButtonId) {
+      result.push({
+        button,
+      })
       return
     }
     if (button.panelId) {
@@ -772,7 +890,8 @@ export const getOrderedSlashButtons = (order: unknown, limit = 0): Array<{ butto
 }
 
 /** 取工具栏一排实际显示的按钮（按顺序取前 SLASH_BAR_VISIBLE_COUNT 个可用的） */
-export const getBarSlashButtons = (order: unknown) => getOrderedSlashButtons(order, SLASH_BAR_VISIBLE_COUNT)
+export const getBarSlashButtons = (order: unknown, customButtons?: ISlashButton[]) =>
+  getOrderedSlashButtons(order, SLASH_BAR_VISIBLE_COUNT, customButtons)
 
 /** 取条目显示名：优先思源界面语言，取不到用兜底名 */
 export const getSlashEntryName = (entry: ISlashEntry, translate: (key: string, fallback: string) => string): string => {
@@ -784,19 +903,51 @@ export const getSlashEntryName = (entry: ISlashEntry, translate: (key: string, f
 
 /* --------------------------------------------------------------- 用户配置 */
 
-/** 斜杠菜单工具栏配置：只存总开关与一级按钮顺序 */
+/** 斜杠菜单工具栏配置：只存总开关、一级按钮顺序、以及「原地改格式」的按钮开关 */
 export interface ISlashToolbarConfig {
   enabled: boolean
   order: string[]
+  /**
+   * 已开启「原地改格式」的按钮分组（见 TSlashInPlaceGroup）。
+   * 空数组 = 全部保持思源原生行为（非空块走斜杠值时在下方新建块）。
+   */
+  inPlaceGroups: TSlashInPlaceGroup[]
+}
+
+/** 原地改格式分组清单：由条目反推，以后加新分组不用改这里 */
+export const SLASH_IN_PLACE_GROUPS: TSlashInPlaceGroup[] = SLASH_ENTRIES
+  .reduce<TSlashInPlaceGroup[]>((groups, entry) => {
+    const group = entry.inPlace?.group
+    if (group && !groups.includes(group)) {
+      groups.push(group)
+    }
+    return groups
+  }, [])
+
+/** 规范化「原地改格式」开关：只保留已知分组并去重 */
+export const normalizeInPlaceGroups = (value: unknown): TSlashInPlaceGroup[] => {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  const result: TSlashInPlaceGroup[] = []
+  value.forEach((item) => {
+    if (typeof item === 'string' && SLASH_IN_PLACE_GROUPS.includes(item as TSlashInPlaceGroup)
+      && !result.includes(item as TSlashInPlaceGroup)) {
+      result.push(item as TSlashInPlaceGroup)
+    }
+  })
+  return result
 }
 
 export const createDefaultSlashToolbarConfig = (): ISlashToolbarConfig => ({
   enabled: true,
   order: [...DEFAULT_SLASH_ORDER],
+  inPlaceGroups: [],
 })
 
 /** 规范化存储值：缺失/损坏时回到出厂默认，顺序按 catalog 补齐。
-    enabled 缺失视为默认开启（老存储里没有该字段时按 true 处理）。 */
+    enabled 缺失视为默认开启（老存储里没有该字段时按 true 处理）；
+    inPlaceGroups 缺失视为全部关闭，保持思源原生行为。 */
 export const normalizeSlashToolbarConfig = (saved: unknown): ISlashToolbarConfig => {
   let value = saved
   if (typeof value === 'string') {
@@ -813,5 +964,18 @@ export const normalizeSlashToolbarConfig = (saved: unknown): ISlashToolbarConfig
   return {
     enabled: record.enabled !== false,
     order: normalizeSlashOrder(record.order),
+    inPlaceGroups: normalizeInPlaceGroups(record.inPlaceGroups),
   }
+}
+
+/** 取一级按钮对应的原地改格式分组：由该按钮的条目反推（没有可原地转换的条目则不给开关） */
+export const getButtonInPlaceGroup = (buttonId: string): TSlashInPlaceGroup | undefined => {
+  const button = buttonMap.get(buttonId)
+  if (!button) {
+    return undefined
+  }
+  const entries = button.panelId
+    ? getAvailablePanelEntries(button.panelId)
+    : (button.entryId ? [entryMap.get(button.entryId)] : [])
+  return entries.find((entry) => entry?.inPlace)?.inPlace?.group
 }

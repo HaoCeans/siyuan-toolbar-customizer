@@ -8,6 +8,12 @@
 import type { Setting } from 'siyuan'
 import type { ISlashToolbarConfig } from './catalog'
 import { t } from '../i18n/runtime'
+import { getSlashCustomButtonSources } from '../toolbarManager'
+import {
+  buildCustomSlashButtons,
+  normalizeInPlaceGroups,
+  SLASH_CUSTOM_PREFIX,
+} from './catalog'
 import { createSlashToolbarPreview } from './preview'
 import { syncSlashToolbar } from './runtime'
 
@@ -84,10 +90,39 @@ export function mountSlashToolbarSection(
         setEnabled: async (enabled) => {
           config.enabled = enabled
           await context.saveData(CONFIG_KEY, config)
-          syncSlashToolbar(config.enabled, config.order)
+          syncSlashToolbar(config.enabled, config.order, config.inPlaceGroups)
+        },
+        // 手机端自定义按钮（设置内「添加自定义按钮」列表的数据源 + 预览里的 chip 解析）
+        getCustomButtons: () => buildCustomSlashButtons(getSlashCustomButtonSources()),
+        // 加入：追加到 order 末尾（=「不显示区」），当场落盘并同步
+        addCustom: async (sourceId) => {
+          const key = SLASH_CUSTOM_PREFIX + sourceId
+          if (!config.order.includes(key)) {
+            config.order = [...config.order, key]
+          }
+          await context.saveData(CONFIG_KEY, config)
+          syncSlashToolbar(config.enabled, config.order, config.inPlaceGroups)
+        },
+        // 从斜杠栏移除自定义按钮：当场落盘并同步（与原地改格式开关同一路径）
+        removeCustom: async (id) => {
+          config.order = config.order.filter((item) => item !== id)
+          await context.saveData(CONFIG_KEY, config)
+          syncSlashToolbar(config.enabled, config.order, config.inPlaceGroups)
+        },
+        // 「原地改格式」按钮开关（标题 / 列表 / 引述各一个），默认全部关闭 = 思源原生新建块。
+        // 导入的配置文件可能是脏值，读之前按数组判断一次
+        getInPlace: (group) => Array.isArray(config.inPlaceGroups) && config.inPlaceGroups.includes(group),
+        setInPlace: async (group, enabled) => {
+          const next = normalizeInPlaceGroups(config.inPlaceGroups).filter((item) => item !== group)
+          if (enabled) {
+            next.push(group)
+          }
+          config.inPlaceGroups = normalizeInPlaceGroups(next)
+          await context.saveData(CONFIG_KEY, config)
+          syncSlashToolbar(config.enabled, config.order, config.inPlaceGroups)
         },
         onChanged: () => {
-          syncSlashToolbar(config.enabled, config.order)
+          syncSlashToolbar(config.enabled, config.order, config.inPlaceGroups)
         },
       })
       wrapper.appendChild(preview)

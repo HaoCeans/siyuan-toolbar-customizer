@@ -267,6 +267,30 @@ body:not(.sy-mb-enabled) #syMobileToolbarSheet {
   min-width: 0;
 }
 
+/* 面板标题（「添加自定义按钮」面板顶部，小字弱化） */
+.sy-mb-sheet-title {
+  padding: 8px 8px 2px;
+  font-size: 12px;
+  color: var(--b3-theme-on-surface-light, var(--b3-theme-on-surface, #666));
+}
+
+/* 已添加 / 已失效的行：灰显禁点 */
+.sy-mb-item--disabled {
+  opacity: .45;
+  pointer-events: none;
+}
+
+/* 行尾角标（如「已添加」） */
+.sy-mb-item-badge {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  color: var(--b3-theme-on-surface-light, var(--b3-theme-on-surface, #666));
+  background: color-mix(in srgb, var(--b3-theme-on-surface, #666) 10%, transparent);
+}
+
 .sy-mb-empty {
   padding: 18px 12px 24px;
   text-align: center;

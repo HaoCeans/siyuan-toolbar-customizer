@@ -1174,3 +1174,104 @@ v3.8.2 之后：主窗口正常，块格式弹窗内快捷键完全无反应。
 **位置教训**：第一版把按钮插在"模板"和"插图"之间，把「插图」挤出了默认一排（一排只显示前 9 个）——**新按钮默认应追加在「不显示区」末尾**，不挤占现有可见行，想要的人在设置预览里长按拖上来。
 
 **图标**：`lucide:ListEnd`（共享渲染器 `buttonIconRender` 原生支持 `lucide:` 前缀走 `lucideToSvg`；第一版用了 `↵` 文本符号，被用户嫌丑）。
+
+## 斜杠菜单工具栏：标题 / 列表 / 引述「原地改格式」（可选开关，默认关）
+
+**文件**：`src/slashToolbar/catalog.ts`（条目新增 `inPlace: { group, mark }` + 配置新增 `inPlaceGroups`）、`src/slashToolbar/insert.ts`（`tryInPlaceMark` + 光标还原/兜底清理）、`src/slashToolbar/preview.ts`（三个按钮详情里的开关）、`src/slashToolbar/settings.ts` / `runtime.ts`（开关的读写与分发）、`src/index.ts`（sync 传参）
+
+**背景**：斜杠菜单走 `protyle.hint.fill`，而官方对**非空块**的语义是在下方新建块（hint/index.ts 的 fill 末段分支：光标在空段落才原地转换，其它一律 insert 新块）。用户「想把这段已经写完的文字变成标题」，得到的却是一个空标题 + 原段落原地不动，还得自己剪切粘贴。
+
+**这是个开关，不是默认行为**：设置预览里点「标题 / 列表 / 引述」按钮，详情底下多一个「原地改当前块（不新建块）」开关，**默认关闭 = 思源原生行为**（老存储没有 `inPlaceGroups` 字段 → 规范化为空数组 → 全部关闭）。开关按一级按钮分组（`TSlashInPlaceGroup = 'heading' | 'list' | 'quote'`，与按钮 id 一致），分组清单由条目反推（`SLASH_IN_PLACE_GROUPS`），加新分组不用改清单。
+
+**方案**：不碰事务层、也不走 `/api/block/updateBlock`（结构性变更不能让内核拿到非法块树），而是**替用户把 Markdown 标记打进块首**：`execCommand('insertText', '# ')` → 真实 input 事件 → 思源 wysiwyg 的 input 监听 → `Lute.SpinBlockDOM` → 官方事务原地转换。与「换行」按钮同一哲学：复用官方链路，块 ID、行内元素、折叠、撤销全由官方处理。
+
+**边界（用 siyuan 仓库 `app/stage/protyle/js/lute/lute.min.js` 实跑 SpinBlockDOM 实测得出，不是推测）**：
+- 普通段落 + `# `~`###### ` → **同 data-node-id** 的标题，正文与行内元素（加粗等）保留；
+- 普通段落 + `- ` / `1. ` / `- [ ] ` / `> ` → 列表 / 有序列表 / 任务列表 / 引述，正文保留；
+- **已是标题的块再打标题标记不会转换**——标记会变成标题里的字面 "# " 文本（所以「H2 改 H1」这类需求不能走标记路线，得靠官方块标菜单的「转换为」）；
+- 代码块标记（```）让 Lute 直接抛 `slice bounds out of range`；公式块（$$）与分割线（---）会丢正文；callout / tabs / 思维导图是多行标记，单次插入不转换 —— **这些条目不要加 `inPlace`**。
+
+**只接管「光标在非空普通段落」**：空段落交给官方（hint.fill 对空段落本来就是原地转换、同样保留块 ID），其它块类型一律回退官方新建，无行为回归（列表项内打列表标记会被官方管线删掉标记、内容不动，等价官方斜杠菜单的拒绝语义）。
+
+**光标**：打标记会把光标带到块首（手动敲标记的自然结果），与「点按钮把这段文字变成标题」的预期不符，所以官方管线处理完后按打标记前的字符偏移还原光标。实测转换后块 ID 保留，直接从选区所在块定位即可；还原前校验正文与打标记前一致，不一致不动光标。
+
+**兜底**：`execCommand` 不可用（编辑器被禁用/只读）时还原选区回退官方通道；标记打进去后等到上限（10 帧）还没被官方管线消费，删掉标记，不给正文留下字面 "# "。只读文档另用 `protyle.disabled` / `custom-sy-readonly` 提前拦截——`execCommand` 是浏览器层命令，绕过了思源自己的只读判断，这一步不能省。
+
+**真机"没生效"排查（v3.9.2 开发期实测反馈：标题/列表/引述全不生效）**：`tryInPlaceMark` 失败时会静默回退官方新建块，用户看到的就是"开关没生效"。改法：
+1. **execCommand 结果核对**：返回 true 不代表真插进来了（Android WebView 有返回 true 却没动 DOM 的情况），插入后核对 `editable.textContent` 是否以标记开头，不对就走兜底；
+2. **合成 input 兜底通道**：`beforeinput`（思源用它记撤销基线 recordReplacementUndo）→ Range 手动插文本节点 → 光标移到标记后 → 派发合成 `InputEvent('input', {inputType:'insertText', data:mark})`。思源的输入监听不校验 isTrusted（换行按钮的合成 Enter 同理），收到后走同一条 input → SpinBlockDOM → 事务落库链路；
+3. **全路径诊断日志**：`tryInPlaceMark` 每个提前返回点都 `logger.warn('[slashToolbar] 原地转换跳过: <原因>')`，`syncSlashToolbar` 打印当前 inPlaceGroups——用户开日志后一眼区分"开关没同步到运行时"还是"转换被某个守卫拦下"。
+
+**真机复测结论（关键）**：开日志后现场报 `原地转换跳过: 当前块类型是 NodeHeading，只有普通段落支持原地转换`——**第一次转换是成功的**，段落已变标题；用户再点第二次时，光标所在的块已经是标题，被守卫挡下 → 静默回退官方新建块，观感就是"第一次行、后面不行"。两条教训：
+1. 守卫只看"普通段落"是错的：**原地改格式的第二次操作对象必然是上一次的结果**（段落→标题后，用户多半还想改级别/转列表）；
+2. 标题块不能再走"直接打标记"（Lute 实测：标题内打 `# ` 不转换、会变字面文本），所以新增通道 `convertHeadingViaFakeParagraph`：**把标题临时伪装成段落**（改 `data-type="NodeParagraph"`、摘掉 `data-subtype`/`fold`/`hN` class）→ 打标记让官方管线按"段落 + 块级标记"重旋 → Lute 生成目标块且保留块 ID（与官方空段落转换同形态：单条 update）；插入失败时还原被改的属性再交回官方通道。
+   标题的语义收敛：同级再点 = showMessage「当前已是同级标题」且不动作（返回 true 表示已接管）；不同级 = 原地改级别；标题 → 列表/引述 = 原地转换；空标题不接管（交给官方）。
+
+**引述原地转换不生效（v3.9.2 开发期实测反馈）**：根因不在我们的代码，而在**官方对引述有一条专属分支**——`input.ts` 的 `inputBlock` 里：
+```js
+const blockquoteContext = type === "NodeParagraph" ? getBlockquoteContext(blockElement, wysiwyg) : undefined;
+if (blockquoteContext && currentWbrElement) {
+    const marker = 光标前的文本;            // 我们打进去的 "> " 正好命中
+    if (isBlockquoteMarker(marker)) {      // /^ {0,3}[>》] ?$/
+        markerRange.deleteContents();      // 删掉标记
+        shouldCancelBlockquote(...) ? turnsOneInto({type:"CancelBlockquote"})   // 退出引述
+                                    : wrapBlockInBlockquote(...);              // 再套一层
+        return;                            // 直接返回，走不到后面转块的 spin
+    }
+}
+```
+即：**块已经在引述（含 callout）内**时，块首的 `> ` 被理解为「退出引述 / 再叠一层引述」，官方删标记后退场，永远不会把当前块转成引述。另一处 `beforeBlockquoteInput`（beforeinput 阶段）只在 `event.data === ">"` 单字符时触发，我们的整串 "> " 不会命中。
+**修复**：`tryInPlaceMark` 里对 `group === 'quote'` 增加前置拦截——块在 `[data-type="NodeBlockquote"]` 祖先内时 `showMessage`「当前块已在引述内，无需转换」并返回 true（已接管、不回退 hint.fill），与同级标题同一口径。
+**教训**：给「怪块」做原地转换时，先确认官方在输入管线里有没有为这个标记开专属分支——引述有（退出/嵌套引述），标题/列表没有。
+
+**提示块（Note / Tip / Important / Warning / Caution）原地转换（用户实测反馈"这些貌似不行"）**：最初**故意没接**——早期用 lute 跑 SpinBlockDOM 得到的是"普通引述 + 字面 [!NOTE] 文本"，据此判断多行标记不转换。**这个结论是错的**，错在测试环境少配了 Lute 开关：
+- 官方 `app/src/protyle/render/setLute.ts` 里配了 **`lute.SetCallout(true)`**（还有 SetSpin / SetProtyleWYSIWYG / SetKramdownIAL / SetSuperBlock / SetTabs 等）。补上 `SetCallout(true)` 后同一条 `> [!NOTE]` + 换行 + `> 文字` **一次 spin 直接出 `NodeCallout`**（五种预设、大小写都识别；只写 `> [!NOTE]` 没有第二行则只变普通引述）。
+- **本地复现官方行为前，必须照 setLute.ts 把开关配齐**，否则会得出"Lute 不支持 X"的错误结论（这次就踩了）。
+- 条目标记：`mark` = `> [!NOTE]` + 换行 + `> `（五种），共用引述面板的 `group: 'quote'` 开关。
+- **插入方式**：标记含换行，`execCommand('insertText')` 可能把换行变成 `<br>` 或吞掉，而核对失败后无法干净回滚（会留下半截标记）→ `insertMarkAtBlockStart` 里**含换行的标记直接跳过 execCommand**，走文本节点 + 合成 input 通道（DOM 里就是真换行字符，Lute 正常解析）。
+- **提示块之间互相切换（Note → Tip → Warning…）**：用户实测提出"为什么不能相互切换"。原来的拦截是「已在提示块内就只提示不动作」，现改为**换型**：`switchCalloutType(callout, mark)` 照抄官方 `updateCalloutType`（app/src/protyle/wysiwyg/callout.ts）的 DOM 改动——改 `data-subtype`、标题等于旧类型名时才跟着换（自定义标题保留）、换 `.callout-icon`；同级再点弹「当前已是该类型提示块」。
+  **落库方式**：`/api/block/updateBlock`（`dataType: 'dom'`，只改属性与文本、块树结构不变）。**另两条路都验证过不可行**：
+  1. 「改 DOM 后让官方输入管线落库」✗ —— 实测 **Lute 对提示块 HTML 的重旋完全幂等**（不会按 subtype 归一化标题/图标），官方「重旋结果 ≠ 现有 DOM 才发事务」（input.ts 的 needRender 判断）因此不成立，改动会被静默丢弃、下次重渲染还原；
+  2. 「模拟块标菜单」（`gutter.renderMenu` 是 public → 「转换为」子菜单 → `[data-id="calloutTip"]`）能走官方 `updateCalloutType` 且可撤销，但手机上要弹菜单 + 展开二级子菜单，且依赖私有方法签名与菜单 DOM，太脆。
+  **已知代价**：这次换型不进本地撤销栈（撤销按钮/Ctrl+Z 不回退它，再点回原类型即可）。落库失败会回滚 DOM，不留「看起来换了其实没保存」的状态。
+  注：`getContenteditableElement` 对 `.callout-title` 有专门分支（光标在标题里时返回标题元素），所以换型在「光标位于提示块正文」和「光标位于提示块标题」两种位置都能命中（`closest('[data-type="NodeCallout"]')`）。
+- **引述拦截收窄**：只对**普通引述标记**（`> `）生效，且只在 `NodeBlockquote` 祖先内；提示块标记（`> [!TYPE]...`）不再走这条——它在提示块内是换型、在引述内则允许原地转成提示块（官方 hijack 分支只认 `NodeBlockquote` 祖先且标记须匹配 `^ {0,3}[>》] ?$`）。
+
+## 斜杠菜单工具栏「扩展工具栏」按钮：复用 showOverflowToolbar
+
+**文件**：`src/slashToolbar/catalog.ts`（条目 + 一级按钮）、`src/slashToolbar/insert.ts`（special 分发）、`src/toolbarManager.ts`（新增导出 `toggleExtensionToolbar`）
+
+**需求**：斜杠栏上再给一个按钮，点一下打开手机端主工具栏那个「扩展工具栏」（⋯）。
+
+**实现**：不模拟点击主工具栏按钮、也不复制面板逻辑，从 toolbarManager 导出 `toggleExtensionToolbar()` 直接调 `showOverflowToolbar(config)`——与 ⋯ 按钮的 click 处理是同一个函数，所以行为天然一致（已展开时再点收起、层数/位置/毛玻璃都跟随同一套配置）。配置项取当前手机端按钮配置里的扩展按钮，用户把扩展按钮从工具栏删掉时退回 `DEFAULT_MOBILE_BUTTONS`，保证这个按钮仍然可用；非手机端返回 false（斜杠栏本来也只在手机端渲染）。
+
+**位置**：按「换行」按钮那条教训，新按钮**追加在「不显示区」末尾**，不挤占默认一排的 9 个位置。
+
+**图标**：`lucide:Ellipsis`（与主工具栏 ⋯ 按钮同一个意象；`lucide:` 前缀走共享渲染器）。
+
+**待真机确认**：软键盘打开（斜杠栏贴在键盘上方）时展开扩展栏，两者可能视觉重叠——扩展栏的位置取决于主工具栏是顶部模式还是底部模式，真机看一眼再决定要不要在展开时临时收起斜杠栏。
+
+**【已撤销，未随版本发布】**：随后做了「添加自定义按钮」（见下一节）——自定义按钮能直接挂上斜杠栏后，用户就不需要从斜杠栏去开主工具栏的扩展面板了，此按钮整体移除（条目、一级按钮、`toggleExtensionToolbar` 导出、i18n 键）。留档原因：避免以后当"缺失功能"重新加回来；`toggleExtensionToolbar` 的实现思路（直接调 `showOverflowToolbar` 而非模拟点击）在需要时可按原样恢复。
+
+## 斜杠菜单工具栏「添加自定义按钮」：设置内入口，把手机端自定义按钮挂上斜杠栏
+
+**文件**：`src/slashToolbar/catalog.ts`（`custom:` 前缀 + 动态注册表 + `addCustom` 按钮）、`src/toolbarManager.ts`（`getSlashCustomButtonSources` / `executeCustomButtonById`）、`src/slashToolbar/runtime.ts`（面板 + 分派 + 落盘）、`src/slashToolbar/preview.ts` / `settings.ts`（chip/移除/失效态）、`style.ts`（灰显/角标/标题）
+
+**交互（用户拍板，两轮迭代后的最终口径）**：「添加」**不是栏上的按钮**——它本质是设置类功能。入口在设置预览卡片里：一个「＋ 添加自定义按钮」虚线按钮，点开展开内联列表（全部手机端自定义按钮），**点行即加入「不显示」区末尾**（当场落盘 + 同步），已加入的灰显 + 角标「已添加」点不动；再去预览里长按拖上栏即可用。预览详情里可「从斜杠栏移除」。
+**第一版教训**：曾把「+」做成 `SLASH_BUTTONS` 里的卡片（默认不显示区）+ 栏上底部面板，结果用户在预览里点它没有任何反应（面板只能从栏上唤起，而卡片默认不在栏上）——「点了没弹窗」的直接原因。设置类功能就该放设置里，不要伪装成栏按钮。
+
+**设计核心：不建第二个列表**。自定义按钮以 `custom:<ButtonConfig.id>` 前缀直接进现有 order——否则 `normalizeSlashOrder` 会把运行期 id 当未知项丢掉，而这个规范化被栏渲染、预览渲染、配置读写、拖动 swap 四处共用。改一处（保留 `buttonMap.has(id) || isSlashCustomId(id)`）四处全通，这是本方案唯一动静态数据的点。
+
+**运行期注册表**：`syncSlashToolbar` 每次从 `pluginInstance.mobileButtonConfigs` 重建 `buildCustomSlashButtons(...)`（过 `shouldShowButton` 过滤禁用项、`getButtonDisplayName` 保持 i18n 口径）→ 按钮改名/换图标/删除后重载即跟上；注册表里解析不到的 order 条目由渲染层跳过（= 按钮删了栏上自动消失），预览里渲染「?」占位并给移除入口。
+
+**执行链路**：`executeCustomButtonById(id, savedRange)` 走既有 `handleButtonClick(config, savedSelection, lastActiveElement, null)`——与主工具栏点击同一条链路，**不模拟 DOM 点击**：默认侧边胶囊模式下按钮多半不在 DOM（全被挪进扩展层），合成 click 也会丢按压时保存的选区，插入类按钮会插错位置。
+
+**「扩展工具栏」按钮加到斜杠栏后点了没反应（用户实测反馈）**：根因是**它的动作不在 `handleButtonClick` 里**——主工具栏的 click 处理对扩展按钮有特判（`isOverflowButton(config.id)` → `showOverflowToolbar(config)` / `showDesktopOverflowToolbar(config, button)`），而 `handleButtonClick` 的 builtin 分支只会去找同名原生菜单元素，找不到就静默返回。`executeCustomButtonById` 只转发给 `handleButtonClick`，于是从斜杠栏点它什么都不会发生。
+**修复**：在 `executeCustomButtonById` 里镜像主工具栏 click 的特判——扩展按钮 → 手机端直接 `showOverflowToolbar(config)`（桌面端用 DOM 按钮当锚点调 `showDesktopOverflowToolbar`）；其它按钮转发前也先**收起已展开的扩展层并清掉扩展按钮激活态**，与主工具栏一致。
+**教训**：`handleButtonClick` **不等于**"按钮的完整动作"——按钮的 click 处理在它之前还有特判与状态清理。给按钮做"从别处执行"的能力时（本次是斜杠栏），要顺着**主工具栏 click 处理器**逐条对齐，而不是只看那个分发函数。
+
+**落盘时机**：「添加」是运行期动作、当场写盘（`persistSlashOrder` 直接改 `pluginInstance.slashToolbarConfig.order` + `saveData`）；而预览里拖动仍是「点设置确定才保存」——两者沿用各自既有约定。注意边界：用户拖动后不点确定就去点 + 添加，会以运行时 order 为准写盘，未确认的拖动被覆盖（可接受，记录在案）。
+
+**待真机确认**：各类型自定义按钮（内置/模板/模拟点击/一键记事/作者工具）从斜杠栏触发的实际表现——作者工具未激活会照原样提示、一键记事会弹窗，与主工具栏一致，不做特殊处理；图标是 Emoji 的自定义按钮在栏上的显示效果。
+
+

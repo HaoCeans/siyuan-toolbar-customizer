@@ -339,6 +339,35 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.9.3 — Slash menu toolbar: convert in place, custom buttons on the bar
+
+> 💡 Want the paragraph you just wrote to *become* a heading (instead of getting another empty heading below)? Want your own custom buttons on the keyboard row? Update.
+
+**① Heading / List / Quote / Callout can convert the current block in place (new switch, off by default)**
+- SiYuan's native rule for these buttons is "insert a new block below the current one": to turn a paragraph you already wrote into a heading, list or quote you had to cut and paste it yourself
+- Now there is a switch: Settings → Slash menu toolbar → button preview → tap the "Heading" / "List" / "Quote" button → turn on "Convert the current block in place (no new block)"
+- With it on, if the caret sits in a **non-empty paragraph**, tapping those buttons converts that very paragraph — text, inline styles and the block ID are all preserved, no new block
+- Headings work the same way: tapping a different heading level re-levels it in place, tapping list / quote / callout turns it into that block in place; tapping the level it already is shows "Already this heading level"
+- Callouts (Note / Tip / Important / Warning / Caution) can be created in place on a paragraph, and you can **switch between callout types** (Note → Tip); a custom title you edited is kept
+- Off by default = SiYuan's native behavior is untouched; empty paragraphs, code blocks, tables etc. still follow SiYuan's own logic
+- Internally it is equivalent to "typing the marker at the start of the block for you" (hash, dash, greater-than, `> [!TIP]` …), through SiYuan's official input pipeline — full transactions, undo support
+
+**② Custom buttons can be put on the slash bar**
+- Settings → Slash menu toolbar → at the very bottom of the preview there is now "+ Add custom buttons": tap to list all of your mobile custom buttons
+- Tap one to add it (it lands at the end of the hidden section); long-press-drag it into the visible row to use it; tap the same row again to remove it
+- Added ones are marked "Added" to prevent duplicates; if the underlying custom button is deleted, it disappears from the slash bar automatically
+- Tapping it on the slash bar runs the exact same chain as tapping it on the main toolbar (built-in features / templates / shortcuts / click sequences / quick note / the paid toolbox all supported, including the "Overflow toolbar" button)
+
+**③ Fixes**
+- **Convert-in-place did nothing on the second tap**: after a paragraph became a heading, further taps did nothing (and inserted yet another new block below) — the first implementation only handled plain paragraphs, while the caret block was already a heading. Headings now convert in place too (re-level, to list, to quote)
+- **Quote conversion in place did not work**: when the caret block is already inside a quote, SiYuan treats a leading `> ` as "exit the quote / nest another quote" and deletes the marker before any conversion could happen. This position now shows "The block is already inside a quote" instead of silently eating your quote
+- **The "Overflow toolbar" button did nothing when put on the slash bar**: its action lives in the main toolbar's click handler (not in the generic button execution chain). Tapping it on the slash bar now behaves exactly like tapping the ⋯ button on the main toolbar (including closing an open overflow panel when other buttons are tapped)
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.9.2 — Slash menu toolbar: new "New line" button
 
 > 💡 Want a quick new line / new block while typing on mobile without reaching for the keyboard's return key? Update.
@@ -347,11 +376,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 - The keyboard toolbar now has a "↵ New line" button (Lucide ListEnd icon): tap to break the line at the caret and start a new block; tap repeatedly for consecutive lines
 - It goes through SiYuan's official newline chain — the same mechanism as the handwritten-template {{newline}} variable: list-aware, so inside a list it continues the list; breaking on an empty list item inserts a placeholder first instead of accidentally exiting the list; full transactions and undo support
 - It sits at the end of the hidden section by default and doesn't displace any existing button: long-press-drag it into the visible row in Settings → Slash menu toolbar → button preview
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.9.1 — Storage write optimization: no more idle disk writes
 

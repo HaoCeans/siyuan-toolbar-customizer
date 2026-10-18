@@ -339,6 +339,30 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.9.4 — Hide/replace the mobile Command Panel button + toolbar restored after disabling the plugin
+
+> 💡 SiYuan v3.8.6 added a Command Panel button (terminal icon) to the mobile toolbar — want to hide it and put your own button there, just like More / Document / Lock? Or noticed the native toolbar shifts left with its buttons in the middle after disabling the plugin? Update. ⚠️ Starting with this version, SiYuan v3.8.6+ is required.
+
+**① Mobile Command Panel button: hide it or replace it**
+- Settings → Mobile → 5️⃣ Small function selection: a new "⑤ Hide command panel button" follows ④ More, enabled by default; the old ⑤ Line break / ⑥ Status bar / ⑦ Keep top title become ⑥ / ⑦ / ⑧
+- When the overflow toolbar is enabled it is force-hidden, same as ②③④
+- A new default "Command panel" button is added (terminal icon, left of "Lock document"), using built-in function `command-panel` — the same execution path as "More" and "Document menu"
+- "Command panel (mobile toolbar)" is also added to the built-in function picker for manual button creation
+- Existing configs get the replacement button automatically if missing; mobile only, desktop unaffected
+
+**② Toolbar no longer shifts / centers after disabling the plugin**
+- Fix: after hide → show, the desktop capsule leaves `translateX(-50%)` in the breadcrumb's inline style. The old cleanup only handled elements that still had `.toolbar-scroll-hidden`, so the inline transform survived; with the stylesheet gone, the native toolbar was shifted left by 50% — path bar off-screen, buttons centered
+- Disabling/unloading and switching back to the native top toolbar now clear inline transform / transition / opacity / positioning on all breadcrumbs
+- Mobile audit: also clears the top-mode `.protyle` bottom padding, the `siyuan-toolbar-floating` / `siyuan-toolbar-nav-overflow` / `tc-overflow-open` body classes, `--tc-nav-bottom*` variables, and tracks the 500 ms delayed mobile style injection with the shared cleanup timer
+
+**③ Minimum SiYuan version raised to v3.8.6**
+- Because the feature uses the native mobile Command Panel button, this version requires SiYuan v3.8.6 or later; older versions cannot install it or will be marked incompatible in the marketplace
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.9.3 — Slash menu toolbar: convert in place, custom buttons on the bar
 
 > 💡 Want the paragraph you just wrote to *become* a heading (instead of getting another empty heading below)? Want your own custom buttons on the keyboard row? Update.
@@ -362,11 +386,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 - **Convert-in-place did nothing on the second tap**: after a paragraph became a heading, further taps did nothing (and inserted yet another new block below) — the first implementation only handled plain paragraphs, while the caret block was already a heading. Headings now convert in place too (re-level, to list, to quote)
 - **Quote conversion in place did not work**: when the caret block is already inside a quote, SiYuan treats a leading `> ` as "exit the quote / nest another quote" and deletes the marker before any conversion could happen. This position now shows "The block is already inside a quote" instead of silently eating your quote
 - **The "Overflow toolbar" button did nothing when put on the slash bar**: its action lives in the main toolbar's click handler (not in the generic button execution chain). Tapping it on the slash bar now behaves exactly like tapping the ⋯ button on the main toolbar (including closing an open overflow panel when other buttons are tapped)
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.9.2 — Slash menu toolbar: new "New line" button
 
@@ -1059,8 +1078,8 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 ### v3.7.0 — Image import refactor + attachment management + toolbox categories (major version update)
 
 > ⚠️ **Requirements (important)**
-> Starting with v3.8.5, this plugin requires **SiYuan Note v3.8.2 or later** to work properly.
-> If your SiYuan version is below v3.8.2, the plugin cannot be installed or will be shown as incompatible in the plugin marketplace; upgrade SiYuan Note first.
+> This plugin requires **SiYuan Note v3.8.6 or later** to work properly.
+> If your SiYuan version is below v3.8.6, the plugin cannot be installed or will be shown as incompatible in the plugin marketplace; upgrade SiYuan Note first.
 > (Reason: the plugin now follows SiYuan v3.8's language identifier convention, which older versions cannot match correctly.)
 
 ## New

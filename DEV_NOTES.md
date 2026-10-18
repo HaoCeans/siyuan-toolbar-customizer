@@ -1275,3 +1275,15 @@ if (blockquoteContext && currentWbrElement) {
 **待真机确认**：各类型自定义按钮（内置/模板/模拟点击/一键记事/作者工具）从斜杠栏触发的实际表现——作者工具未激活会照原样提示、一键记事会弹窗，与主工具栏一致，不做特殊处理；图标是 Emoji 的自定义按钮在栏上的显示效果。
 
 
+
+## 禁用插件后原生工具栏左移 / 按钮居中：cleanup 漏清 inline transform
+
+**现象**：在插件市场关闭（不是卸载）插件后，思源原生工具栏恢复，但整体左移约半个屏幕——路径条消失，锁定 / 文档 / 更多三个按钮跑到屏幕中间。
+
+**根因**：桌面端胶囊的滚动隐藏→显示路径会把 `transform: translateX(-50%) translateY(0)` 写到面包屑的 **inline style** 上。恢复显示时只移除 `.toolbar-scroll-hidden` class，inline transform 仍保留。`cleanup()` 原先只对仍带 `.toolbar-scroll-hidden` 的元素清理 transform，漏掉了这些"已显示但带 inline transform"的元素；`<style>` 移除后 CSS 的 `left: 50%` 消失，inline 的 `translateX(-50%)` 还在，原生 flex 工具栏于是被整体左移 50%。
+
+**修复**：新增 `clearBreadcrumbInlineStyles()`，对所有 `.protyle-breadcrumb` / `.protyle-breadcrumb__bar` 无条件清除插件写入的 inline transform / transition / opacity / 定位 / 背景 / padding 等；`cleanup()`（禁用、卸载）与 `unbindDesktopScrollForFloating()`（切回原生顶部）都调用。`cleanup()` 同时补清 `siyuan-toolbar-floating`、`siyuan-toolbar-nav-overflow`、`tc-overflow-open` body class 和 `--tc-nav-bottom*` 变量。
+
+**教训**：清理不能只按"当前处于隐藏状态"的标记 class 选元素——隐藏→显示的路径会把样式挪到已无标记的可见元素上。应按"插件可能写过的所有 inline 属性"枚举清理，而不是按状态选择器。
+
+**手机端同类残留**：`applyToolbarAutoHideState` 在移动端底部胶囊隐藏→显示时同样会留下 `translateX(-50%)` inline transform，已由 `clearBreadcrumbInlineStyles()` 一并覆盖。另外补清了两处移动端专属残留：顶部工具栏模式写入的 `.protyle { padding-bottom: 0 !important }`，以及 `onLayoutReady` 里延迟 500ms 注入移动端样式的裸 `setTimeout`（改为 `safeSetTimeout`，纳入统一清理）。

@@ -35,6 +35,7 @@ const BUILTIN_BUTTONS: BuiltinButtonDefinition[] = [
   { id: 'menuRecent', nameKey: 'ui.buttonSelector.item.3', fallbackName: '最近的文档', icon: 'iconList' },
   { id: 'menuSearch', nameKey: 'ui.buttonSelector.item.4', fallbackName: '搜索', icon: 'iconSearch' },
   { id: 'menuCommand', nameKey: 'ui.buttonSelector.item.5', fallbackName: '命令面板', icon: 'iconTerminal' },
+  { id: 'command-panel', nameKey: 'ui.buttonSelector.item.28', fallbackName: '命令面板（移动端工具栏）', icon: 'iconTerminal' },
   { id: 'menuSyncNow', nameKey: 'ui.buttonSelector.item.6', fallbackName: '立即同步', icon: 'iconCloudSucc' },
   { id: 'menuNewDoc', nameKey: 'ui.buttonSelector.item.7', fallbackName: '新建文档', icon: 'iconFile' },
   { id: 'menuNewNotebook', nameKey: 'ui.buttonSelector.item.8', fallbackName: '新建笔记本', icon: 'iconFilesRoot' },

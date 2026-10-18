@@ -550,6 +550,8 @@ export interface MobileFeatureConfig {
   hideReadonlyButton: boolean
   hideDocMenuButton: boolean
   hideMoreButton: boolean
+  /** 命令面板按钮隐藏（原生 command-panel，仅手机端，默认开） */
+  hideCommandPanelButton?: boolean
   /** 顶部工具栏云同步位置左侧显示 H，点击硬换行 */
   showMobileLineBreakButton?: boolean
   disableCustomButtons: boolean
@@ -4317,7 +4319,7 @@ export function createMobileSettingLayout(
   createGroupTitle('5️⃣ ',t("settings.mobile.274", undefined, "小功能选择"))
 
   // 说明文字
-  createNotice(t("settings.mobile.275", undefined, "⚙️调整手机端的图标隐藏设置：①面包屑按钮默认隐藏，需要时关闭①即可显示并弹出路径菜单；打开扩展工具栏会强制隐藏②③④原生按钮"))
+  createNotice(t("settings.mobile.275", undefined, "⚙️调整手机端的图标隐藏设置：①面包屑按钮默认隐藏，需要时关闭①即可显示并弹出路径菜单；打开扩展工具栏会强制隐藏②③④⑤原生按钮"))
 
   // 检查扩展工具栏按钮是否启用
   const isOverflowButtonEnabled = () => {
@@ -4415,7 +4417,30 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: t("settings.mobile.284", undefined, "⑤换行按钮"),
+    title: t("settings.mobile.373", undefined, "⑤命令面板按钮隐藏"),
+    description: t("settings.mobile.374", undefined, "💡隐藏移动端工具栏的「命令面板」按钮（终端图标，位于锁定编辑左侧）"),
+    createActionElement: () => {
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'b3-switch'
+      const overflowEnabled = isOverflowButtonEnabled()
+      toggle.checked = overflowEnabled ? true : context.mobileFeatureConfig.hideCommandPanelButton !== false
+      toggle.style.cssText = 'transform: scale(1.2);'
+      if (overflowEnabled) {
+        toggle.disabled = true
+        toggle.style.opacity = '0.5'
+      }
+      toggle.onchange = async () => {
+        context.mobileFeatureConfig.hideCommandPanelButton = toggle.checked
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+        context.applyFeatures()
+      }
+      return toggle
+    }
+  })
+
+  setting.addItem({
+    title: t("settings.mobile.284", undefined, "⑥换行按钮"),
     description: t("settings.mobile.285", undefined, "💡在顶部工具栏原云同步位置左侧显示 H，并隐藏云同步图标；点击 H 在正文中分段换行（与编辑区内按 Enter 相同）"),
     createActionElement: () => {
       const toggle = document.createElement('input')
@@ -4433,7 +4458,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: t("settings.mobile.286", undefined, "⑥手机端状态条隐藏"),
+    title: t("settings.mobile.286", undefined, "⑦手机端状态条隐藏"),
     description: t("settings.mobile.287", undefined, "💡隐藏手机端底部的状态条（含同步状态、字数统计等）。默认开启。"),
     createActionElement: () => {
       const toggle = document.createElement('input')
@@ -4451,7 +4476,7 @@ export function createMobileSettingLayout(
   })
 
   setting.addItem({
-    title: t("settings.mobile.288", undefined, "⑦不隐藏顶栏标题"),
+    title: t("settings.mobile.288", undefined, "⑧不隐藏顶栏标题"),
     description: t("settings.mobile.289", undefined, "💡开启后，滚动沉浸时顶部标题栏保持显示（不随导航栏一起隐藏），可点击编辑标题。默认关闭。"),
     createActionElement: () => {
       const toggle = document.createElement('input')

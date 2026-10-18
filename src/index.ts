@@ -50,6 +50,7 @@ import {
   triggerDesktopLifelogGlobalCapture,
   triggerDesktopLifelogGlobalCaptureSmart,
   markDesktopBreadcrumbForFloating,
+  safeSetTimeout,
   safeSetInterval,
   clearSafeInterval,
   restoreMobileToolbarOriginal,
@@ -347,6 +348,7 @@ export default class ToolbarCustomizer extends Plugin {
     hideReadonlyButton: true,   // 锁定编辑按钮隐藏
     hideDocMenuButton: true,    // 文档菜单按钮隐藏
     hideMoreButton: true,       // 更多按钮隐藏
+    hideCommandPanelButton: true, // 命令面板按钮隐藏（原生 command-panel，仅手机端，v3.8.6+）
     toolbarStyle: 'divider' as 'default' | 'divider',  // 工具栏样式：默认或带分割线（手机端默认分割线）
     glassEffect: true,  // 毛玻璃背景（半透明+背景模糊，独立于分割线样式，可叠加；默认开）
     disableCustomButtons: false,// 禁用所有自定义按钮
@@ -604,6 +606,24 @@ export default class ToolbarCustomizer extends Plugin {
       } else {
         // 配置不存在或格式错误，使用默认配置（首次加载时不保存，等用户修改时再保存）
         this.mobileButtonConfigs = DEFAULT_MOBILE_BUTTONS.map(btn => ({...btn}))
+      }
+
+      // 升级兼容：思源 v3.8.6+ 移动端新增原生「命令面板」按钮，插件默认隐藏它。
+      // 已有配置里没有替代按钮时补一个（放在「锁住文档」之前，与原生位置一致），
+      // 避免老用户升级后命令面板入口从工具栏消失。
+      if (!this.mobileButtonConfigs.some(btn => btn.id === 'command-panel-mobile')) {
+        const commandPanelTemplate = DEFAULT_MOBILE_BUTTONS.find(btn => btn.id === 'command-panel-mobile')
+        if (commandPanelTemplate) {
+          const insertIndex = this.mobileButtonConfigs.findIndex(btn => btn.id === 'readonly-mobile')
+          if (insertIndex >= 0) {
+            this.mobileButtonConfigs.splice(insertIndex, 0, { ...commandPanelTemplate })
+          } else {
+            this.mobileButtonConfigs.push({ ...commandPanelTemplate })
+          }
+          this.mobileButtonConfigs.forEach((btn, idx) => {
+            btn.sort = idx
+          })
+        }
       }
 
       // 加载电脑端小功能配置
@@ -866,8 +886,9 @@ export default class ToolbarCustomizer extends Plugin {
 
     // ===== 应用手机端工具栏样式 =====
     if (this.isMobile) {
-      // 延迟应用以确保 toolbarManager 的样式已经加载
-      setTimeout(() => {
+      // 延迟应用以确保 toolbarManager 的样式已经加载；
+      // 用 safeSetTimeout 纳入统一清理，避免禁用插件时 500ms 内又把样式注入回来
+      safeSetTimeout(() => {
         this.applyMobileToolbarStyle()
       }, 500)
       syncMobileTopLineBreakButton(
@@ -1438,6 +1459,7 @@ export default class ToolbarCustomizer extends Plugin {
           this.mobileFeatureConfig.hideReadonlyButton = true
           this.mobileFeatureConfig.hideDocMenuButton = true
           this.mobileFeatureConfig.hideMoreButton = true
+          this.mobileFeatureConfig.hideCommandPanelButton = true
 
           // 重新计算所有按钮的溢出层级
           const overflowLayers = overflowBtn.layers || 1
@@ -1748,6 +1770,22 @@ export default class ToolbarCustomizer extends Plugin {
       styleContent += `
         .protyle-breadcrumb__bar button[data-type="more"],
         .protyle-breadcrumb button[data-type="more"] {
+          transform: scale(0) !important;
+          width: 0 !important;
+          min-width: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          overflow: hidden !important;
+        }
+      `
+    }
+
+    // 命令面板按钮隐藏（仅手机端；思源 v3.8.6+ 移动端工具栏原生按钮）
+    // 只作用于面包屑内的按钮，不影响移动端主菜单/底部栏里的其他命令面板入口
+    if (this.isMobile && this.mobileFeatureConfig.hideCommandPanelButton && !disableCustomButtons) {
+      styleContent += `
+        .protyle-breadcrumb__bar button[data-type="command-panel"],
+        .protyle-breadcrumb button[data-type="command-panel"] {
           transform: scale(0) !important;
           width: 0 !important;
           min-width: 0 !important;

@@ -260,7 +260,7 @@ export const DEFAULT_MOBILE_CONFIG: MobileToolbarConfig = {
 
 export const DEFAULT_BUTTONS_CONFIG: ButtonConfig[] = []
 
-// 桌面端默认按钮（9个，包含扩展工具栏按钮）
+// 桌面端默认按钮（含扩展工具栏按钮）
 export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
   {
     id: 'overflow-button-desktop',
@@ -410,7 +410,7 @@ export const DEFAULT_DESKTOP_BUTTONS: ButtonConfig[] = [
   }
 ]
 
-// 移动端默认按钮（9个，包含扩展工具栏按钮）
+// 移动端默认按钮（含扩展工具栏按钮）
 export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
   {
     id: 'overflow-button-mobile',
@@ -455,21 +455,35 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     platform: 'mobile',
     showNotification: true
   },
-	  {
-		    id: 'readonly-mobile',
-		    name: '锁住文档',
-		    nameKey: 'button.default.lock',
-		    type: 'author-tool',
-		    authorToolSubtype: 'toggle-lock',
-		    lockIcon: 'lucide:Lock',
-		    icon: 'lucide:LockOpen',
-	    iconSize: 23,
-	    minWidth: 23,
-	    marginRight: 10,
-	    sort: 3,
-	    platform: 'mobile',
-	    showNotification: true
-	  },
+  {
+    id: 'command-panel-mobile',
+    name: '命令面板',
+    nameKey: 'button.default.commandPanel',
+    type: 'builtin',
+    builtinId: 'command-panel',
+    icon: 'iconTerminal',
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
+    sort: 3,
+    platform: 'mobile',
+    showNotification: true
+  },
+  {
+    id: 'readonly-mobile',
+    name: '锁住文档',
+    nameKey: 'button.default.lock',
+    type: 'author-tool',
+    authorToolSubtype: 'toggle-lock',
+    lockIcon: 'lucide:Lock',
+    icon: 'lucide:LockOpen',
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
+    sort: 4,
+    platform: 'mobile',
+    showNotification: true
+  },
   {
     id: 'plugin-settings-mobile',
     name: '插件设置',
@@ -480,7 +494,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
-    sort: 4,
+    sort: 5,
     platform: 'mobile',
     showNotification: true
   },
@@ -494,7 +508,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
-    sort: 5,
+    sort: 6,
     platform: 'mobile',
     showNotification: true
   },
@@ -508,7 +522,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
-    sort: 6,
+    sort: 7,
     platform: 'mobile',
     showNotification: true
   },
@@ -522,7 +536,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
-    sort: 7,
+    sort: 8,
     platform: 'mobile',
     showNotification: true
   },
@@ -536,7 +550,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
-    sort: 8,
+    sort: 9,
     platform: 'mobile',
     showNotification: true
   },
@@ -550,7 +564,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
-    sort: 9,
+    sort: 10,
     platform: 'mobile',
     showNotification: true
   }
@@ -735,7 +749,7 @@ export function setGlobalToolbarManager() {
 /**
  * 安全的 setTimeout，返回的定时器会被跟踪以便清理
  */
-function safeSetTimeout(callback: () => void, delay: number): ReturnType<typeof setTimeout> {
+export function safeSetTimeout(callback: () => void, delay: number): ReturnType<typeof setTimeout> {
   const timerId = setTimeout(() => {
     activeTimers.delete(timerId)
     callback()
@@ -2478,6 +2492,7 @@ const DEFAULT_NAME_BY_ID: Record<string, { key: string; legacy: string[] }> = {
   'overflow-button-desktop': { key: 'button.default.overflow', legacy: ['扩展工具栏'] }, 'overflow-button-mobile': { key: 'button.default.overflow', legacy: ['扩展工具栏'] },
   'more-desktop': { key: 'button.default.more', legacy: ['更多'] }, 'more-mobile': { key: 'button.default.more', legacy: ['更多'] },
   'doc-desktop': { key: 'button.default.menu', legacy: ['打开菜单'] }, 'doc-mobile': { key: 'button.default.menu', legacy: ['打开菜单'] },
+  'command-panel-mobile': { key: 'button.default.commandPanel', legacy: ['命令面板'] },
   'readonly-desktop': { key: 'button.default.lock', legacy: ['锁住文档'] }, 'readonly-mobile': { key: 'button.default.lock', legacy: ['锁住文档'] },
   'plugin-settings-desktop': { key: 'button.default.pluginSettings', legacy: ['插件设置'] }, 'plugin-settings-mobile': { key: 'button.default.pluginSettings', legacy: ['插件设置'] },
   'open-diary-desktop': { key: 'button.default.dailyNote', legacy: ['打开日记'] }, 'open-diary-mobile': { key: 'button.default.dailyNote', legacy: ['打开日记'] },
@@ -4532,11 +4547,11 @@ async function executeClickSequence(config: ButtonConfig, clickedButton?: HTMLEl
           throw new Error(`未找到元素: ${actualSelector}`)
         }
 
-        // 编辑器限定查找：仅对 more / doc 两个原生按钮生效
+        // 编辑器限定查找：对 more / doc / command-panel 三个原生按钮生效
         // （切换文档后旧编辑器的 fn__none 隐藏元素会被 querySelector 优先命中，
-        //  其坐标 (0,0) 导致菜单跑左上角）
+        //  其坐标 (0,0) 导致菜单跑左上角；command-panel 还可能作用到错误的编辑器）
         // 其他所有选择器（barPlugins、text:xxx、#id、.class 等）完全走原逻辑，不受影响
-        if (clickedButton && (actualSelector === 'more' || actualSelector === 'doc')) {
+        if (clickedButton && (actualSelector === 'more' || actualSelector === 'doc' || actualSelector === 'command-panel')) {
           const pluginEditor = clickedButton.closest('.protyle')
           if (pluginEditor && !pluginEditor.contains(element)) {
             // 在插件按钮所在编辑器内重新查找
@@ -5260,6 +5275,32 @@ function clickElement(element: HTMLElement): void {
     openMobileMoreMenu()
     return
   }
+
+  // 移动端命令面板：思源在 pointerdown 阶段捕获「关闭后恢复软键盘」的上下文，
+  // 纯 click() 不会触发它（面板能打开，但关闭后不一定恢复键盘）。
+  // 先补发一次 pointerdown，再走正常 click。
+  if (isMobileDevice() && element.getAttribute('data-type') === 'command-panel') {
+    try {
+      const rect = element.getBoundingClientRect()
+      const eventInit = {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+      }
+      if (typeof PointerEvent !== 'undefined') {
+        element.dispatchEvent(new PointerEvent('pointerdown', {
+          ...eventInit,
+          pointerType: 'touch',
+          isPrimary: true,
+        }))
+      } else {
+        element.dispatchEvent(new MouseEvent('pointerdown', eventInit))
+      }
+    } catch { /* 兼容旧 WebView：拿不到 PointerEvent 时仍可正常 click */ }
+  }
+
   // 尝试多种点击方式以确保兼容性
   try {
     // 方式1: 标准click()
@@ -6253,6 +6294,17 @@ export function restoreMobileToolbarOriginal(): void {
     htmlEl.removeAttribute('data-prevent-swipe')
   })
 
+  // 顶部工具栏模式曾把 .protyle 的 padding-bottom 强制设为 0（inline !important）。
+  // 恢复原始状态时移除，让思源自己的底部状态条/工具栏间距规则重新生效。
+  document.querySelectorAll('.protyle').forEach(el => {
+    const htmlEl = el as HTMLElement
+    const value = htmlEl.style.getPropertyValue('padding-bottom').trim()
+    if ((value === '0' || value === '0px')
+      && htmlEl.style.getPropertyPriority('padding-bottom') === 'important') {
+      htmlEl.style.removeProperty('padding-bottom')
+    }
+  })
+
   // 清除残留 body class（不除干净 isNavTakeoverMode 会持续为真，接管逻辑反复介入）
   document.body.classList.remove(
     'siyuan-toolbar-floating',
@@ -6291,6 +6343,33 @@ function getDesktopScrollElementForFloating(): HTMLElement | null {
   return null
 }
 
+/**
+ * 清除插件写在面包屑上的 inline 定位/动画样式。
+ *
+ * inline transform 不会随 <style> 元素移除而消失：滚动隐藏→显示后，可见元素上会残留
+ * translateX(-50%)（胶囊居中）。旧清理只命中仍带 .toolbar-scroll-hidden 的元素，
+ * 会漏掉这些已显示但带 inline transform 的工具栏，导致切回原生顶部/禁用插件后整体左移、
+ * 路径条消失、右侧按钮居中。这里对所有面包屑无条件清理。
+ * 不清理 data-* 属性与 display：属性由调用方按场景处理，display 由思源 class 控制。
+ */
+function clearBreadcrumbInlineStyles(): void {
+  document.querySelectorAll('.protyle-breadcrumb, .protyle-breadcrumb__bar').forEach(el => {
+    const htmlEl = el as HTMLElement
+    htmlEl.classList.remove('toolbar-scroll-hidden')
+    htmlEl.style.removeProperty('transform')
+    htmlEl.style.removeProperty('transition')
+    htmlEl.style.removeProperty('opacity')
+    htmlEl.style.removeProperty('position')
+    htmlEl.style.removeProperty('bottom')
+    htmlEl.style.removeProperty('top')
+    htmlEl.style.removeProperty('left')
+    htmlEl.style.removeProperty('right')
+    htmlEl.style.removeProperty('z-index')
+    htmlEl.style.removeProperty('background-color')
+    htmlEl.style.removeProperty('padding-bottom')
+  })
+}
+
 /** 解绑电脑端胶囊的 scroll 监听 + 清理所有 timer */
 function unbindDesktopScrollForFloating(): void {
   if (desktopFloatingScrollHandler && desktopFloatingScrollBoundEl) {
@@ -6311,14 +6390,10 @@ function unbindDesktopScrollForFloating(): void {
     clearTimeout(desktopAutoHidePendingTimer)
     desktopAutoHidePendingTimer = null
   }
-  // 恢复所有被隐藏的工具栏（清除残留的 toolbar-scroll-hidden class 和 inline transform）
-  document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => {
-    const htmlEl = el as HTMLElement
-    htmlEl.classList.remove('toolbar-scroll-hidden')
-    // 胶囊模式需要保留 translateX(-50%) 居中（由 applyDesktopFloatingToolbar 的 CSS 提供，清除 inline 即可）
-    htmlEl.style.transform = ''
-    htmlEl.style.transition = ''
-  })
+  // 恢复所有面包屑，清除残留的 toolbar-scroll-hidden class 和 inline 定位/动画样式。
+  // 不能只清 .toolbar-scroll-hidden：滚动隐藏后再显示时 class 已移除，但 inline
+  // translateX(-50%) 还在；切回原生顶部后它会把工具栏整体左移（路径条消失、按钮居中）。
+  clearBreadcrumbInlineStyles()
   document.body.classList.remove('toolbar-autohide-active')
   // 复位桌面端独立的滚动隐藏状态变量
   desktopAutoHideForceActive = false
@@ -8862,6 +8937,8 @@ export function cleanup() {
   // 清理扩展工具栏弹出层 DOM
   document.querySelectorAll('.overflow-toolbar-layer, .desktop-overflow-toolbar-layer').forEach(el => el.remove())
   document.documentElement.style.removeProperty('--mobile-toolbar-offset')
+  document.documentElement.style.removeProperty('--tc-nav-bottom')
+  document.documentElement.style.removeProperty('--tc-nav-bottom-fixed')
 
   // 清理工具栏滚动隐藏监听和 class
   unbindToolbarAutoHideScroll()
@@ -8879,10 +8956,38 @@ export function cleanup() {
     clearTimeout(toolbarAutoHidePendingTimer)
     toolbarAutoHidePendingTimer = null
   }
-  document.querySelectorAll('.protyle-breadcrumb.toolbar-scroll-hidden, .protyle-breadcrumb__bar.toolbar-scroll-hidden').forEach(el => { (el as HTMLElement).classList.remove('toolbar-scroll-hidden'); (el as HTMLElement).style.transform = 'translateZ(0) translateY(0)' })
+
+  // 清除面包屑上的插件 inline 痕迹（必须在所有 unbind 之后执行）。
+  // 这是“禁用插件后原生工具栏整体左移、按钮居中”的根因修复，详见
+  // clearBreadcrumbInlineStyles 的注释。
+  clearBreadcrumbInlineStyles()
+  document.querySelectorAll('.protyle-breadcrumb, .protyle-breadcrumb__bar').forEach(el => {
+    const htmlEl = el as HTMLElement
+    htmlEl.removeAttribute('data-prevent-swipe')
+    // 只清理本插件添加的属性，不干扰原生面包屑的隐藏逻辑
+    if (htmlEl.getAttribute('data-toolbar-customized') === 'true') {
+      htmlEl.removeAttribute('data-input-method')
+      htmlEl.removeAttribute('data-toolbar-customized')
+    }
+  })
+
+  // 顶部工具栏模式写入 .protyle 的 padding-bottom: 0（inline !important）同样要清，
+  // 否则禁用后思源底部状态条恢复显示，正文仍贴着底边。
+  document.querySelectorAll('.protyle').forEach(el => {
+    const htmlEl = el as HTMLElement
+    const value = htmlEl.style.getPropertyValue('padding-bottom').trim()
+    if ((value === '0' || value === '0px')
+      && htmlEl.style.getPropertyPriority('padding-bottom') === 'important') {
+      htmlEl.style.removeProperty('padding-bottom')
+    }
+  })
+
   document.body.classList.remove('toolbar-autohide-active')
   document.body.classList.remove('kmind-zen-active')
   document.body.classList.remove('toolbar-locked')
+  document.body.classList.remove('siyuan-toolbar-floating')
+  document.body.classList.remove('siyuan-toolbar-nav-overflow')
+  document.body.classList.remove('tc-overflow-open')
 
   // 清理全局变量
   delete (window as any).__mobileToolbarConfig

@@ -353,6 +353,9 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 - A tip box now sits under the "↗️ SiYuan slash menu toolbar" title: ① the keyboard pops up when opened ② improved SiYuan menu button triggering
 - The tip reuses the shared mobile-settings notice style, matching the font size and padding of the "Mobile custom buttons" notice, with multi-line support
 
+**③ Mobile settings action bar: Cancel on the left**
+- "Cancel" now sits on the left and "Save" stays on the right, so the two buttons are separated instead of both being pushed to the bottom-right
+
 <details>
   <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
     ⬇️ View version history

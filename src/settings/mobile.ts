@@ -885,6 +885,21 @@ export function createMobileSettingLayout(
 	    document.head.appendChild(style)
 	  }
 
+	  // === 底部操作栏：取消放左、保存放右 ===
+	  if (!document.getElementById('toolbar-customizer-mobile-action')) {
+	    const style = document.createElement('style')
+	    style.id = 'toolbar-customizer-mobile-action'
+	    style.textContent = `
+	      [data-plugin-dialog="toolbar-customizer"] .b3-dialog__action {
+	        justify-content: space-between !important;
+	      }
+	      [data-plugin-dialog="toolbar-customizer"] .b3-dialog__action > .fn__space {
+	        display: none !important;
+	      }
+	    `
+	    document.head.appendChild(style)
+	  }
+
   // === 自定义滑杆组件 ===
   const createCustomSlider = (
     labelText: string,

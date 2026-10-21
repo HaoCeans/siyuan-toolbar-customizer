@@ -96,6 +96,7 @@ import { showConfirmDialog as showConfirmDialogModal } from './ui/dialog'
 import { showButtonSelector, type ButtonInfo } from './ui/buttonSelector'
 import { showIconPicker as showIconPickerModal } from './ui/iconPicker'
 import { showClickSequenceSelector } from './ui/clickSequenceSelector'
+import { injectMobileSettingsNav, cleanupMobileSettingsNav } from './ui/mobileSettingsNav'
 import { updateIconDisplay as updateIconDisplayUtil } from './data/icons'
 // 导入标签切换器
 import { injectTabSwitcher as injectTabSwitcherUtil, cleanupTabSwitcher } from './ui/tabs'
@@ -1319,6 +1320,7 @@ export default class ToolbarCustomizer extends Plugin {
 
     // 清理标签切换器资源
     cleanupTabSwitcher()
+    cleanupMobileSettingsNav()
 
     // 清理手机端标签页Tab资源
     cleanupMobileTabs()
@@ -1603,8 +1605,11 @@ export default class ToolbarCustomizer extends Plugin {
 
     setting.open(t('plugin.settingsTitle', undefined, '思源手机端增强'))
 
-    // 电脑端：对话框打开后注入标签栏
-    if (!this.isMobile) {
+    // 手机端：对话框打开后注入顶部粘性章节导航
+    if (this.isMobile) {
+      injectMobileSettingsNav()
+    } else {
+      // 电脑端：对话框打开后注入标签栏
       this.injectTabSwitcher()
     }
   }

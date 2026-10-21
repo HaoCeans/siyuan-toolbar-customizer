@@ -21,6 +21,8 @@ export interface ISlashToolbarSettingsContext {
   /** 插件持有的斜杠工具栏配置对象（直接引用，改动即时生效） */
   slashToolbarConfig: ISlashToolbarConfig
   saveData: (key: string, value: unknown) => Promise<void>
+  /** 分组标题的 DOM id，供设置页章节导航定位 */
+  sectionId?: string
 }
 
 const CONFIG_KEY = 'slashToolbarConfig'
@@ -60,19 +62,22 @@ const createGroupTitle = (setting: Setting, icon: string, title: string) => {
  * @param setting 思源设置对话框实例
  * @param context 斜杠工具栏配置与保存回调
  * @param createTitle 复用调用方的分组标题工厂（保证与其它分组外观一致）
+ * @param createNotice 复用调用方的使用说明框工厂（保证与其它分组外观一致）
  */
 export function mountSlashToolbarSection(
   setting: Setting,
   context: ISlashToolbarSettingsContext,
   createTitle?: (icon: string, title: string, id?: string) => void,
+  createNotice?: (content: string) => void,
 ): void {
   const config = context.slashToolbarConfig
   const title = t('slashToolbar.settings.group', undefined, '思源移动端斜杠菜单栏')
   if (createTitle) {
-    createTitle('↗️', title)
+    createTitle('↗️', title, context.sectionId)
   } else {
     createGroupTitle(setting, '⬆️', title)
   }
+  createNotice?.(t('slashToolbar.settings.inputMethodNotice', undefined, '💡 使用说明：\n①打开时输入法弹出\n②思源菜单按钮触发优化'))
 
   // 只有一个设置项：按钮预览，右上角带总开关
   setting.addItem({

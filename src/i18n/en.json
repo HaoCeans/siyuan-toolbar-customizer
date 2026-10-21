@@ -1597,6 +1597,7 @@
   "slashToolbar.empty": "No available item in the current environment",
   "slashToolbar.settings.group": "SiYuan slash menu toolbar",
   "slashToolbar.settings.toggle": "Enable the SiYuan slash menu toolbar",
+  "slashToolbar.settings.inputMethodNotice": "💡 Tip:\n①The keyboard pops up when opened\n②Improved SiYuan menu button triggering",
   "slashToolbar.preview.title": "Button preview (drag to sort)",
   "slashToolbar.preview.hint": "Long press to drag and sort · tap a button to see its content",
   "slashToolbar.inPlace.sameLevel": "Already this heading level",
@@ -1630,5 +1631,14 @@
   "slashToolbar.button.newSubDocRef": "New sub-doc",
   "slashToolbar.button.aiWriting": "AI writing",
   "slashToolbar.button.chart": "Diagram",
-  "slashToolbar.button.style": "Style"
+  "slashToolbar.button.style": "Style",
+  "settings.mobile.nav.aria": "Settings sections",
+  "settings.mobile.nav.slash": "Menu",
+  "settings.mobile.nav.buttons": "Buttons",
+  "settings.mobile.nav.globalButtons": "Global",
+  "settings.mobile.nav.toolbar": "Toolbar",
+  "settings.mobile.nav.position": "Position",
+  "settings.mobile.nav.quickNote": "Notes",
+  "settings.mobile.nav.features": "Extras",
+  "settings.mobile.nav.activation": "License"
 }

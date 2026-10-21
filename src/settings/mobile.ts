@@ -1261,14 +1261,15 @@ export function createMobileSettingLayout(
         `
         const container = document.createElement('div')
         container.style.cssText = `
-          padding: 14px 18px;
+          padding: 10px 14px;
           background: color-mix(in srgb, #d32f2f 10%, transparent);
           border: 1px solid color-mix(in srgb, #d32f2f 30%, transparent);
           border-radius: 6px;
-          font-size: 16px;
+          font-size: 15px;
           font-weight: 600;
           color: var(--b3-theme-on-surface);
-          line-height: 1.6;
+          line-height: 1.5;
+          white-space: pre-line;
         `
         container.textContent = content
         wrapper.appendChild(container)
@@ -1281,10 +1282,11 @@ export function createMobileSettingLayout(
   mountSlashToolbarSection(setting, {
     slashToolbarConfig: context.slashToolbarConfig,
     saveData: context.saveData,
-  }, createGroupTitle)
+    sectionId: 'mobile-settings-nav-slash',
+  }, createGroupTitle, createNotice)
 
   // === 自定义按钮 ===
-  createGroupTitle('📱',t("settings.mobile.91", undefined, "手机端自定义按钮"))
+  createGroupTitle('📱',t("settings.mobile.91", undefined, "手机端自定义按钮"), 'mobile-settings-nav-buttons')
 
   // 说明文字
   setting.addItem({
@@ -1508,7 +1510,7 @@ export function createMobileSettingLayout(
   })
 
   // === 手机端全局按钮配置 ===
-  createGroupTitle('1️⃣ ',t("settings.mobile.95", undefined, "全局按钮配置"))
+  createGroupTitle('1️⃣ ',t("settings.mobile.95", undefined, "全局按钮配置"), 'mobile-settings-nav-global-buttons')
 
   // 存储所有配置项的 input 元素，用于统一控制禁用状态
   const mobileConfigInputs: HTMLInputElement[] = []
@@ -1743,7 +1745,7 @@ export function createMobileSettingLayout(
   // === 移动端工具栏设置 ===
 
   // === 全局工具栏配置 ===
-  createGroupTitle('2️⃣ ',t("settings.mobile.109", undefined, "全局工具栏配置"))
+  createGroupTitle('2️⃣ ',t("settings.mobile.109", undefined, "全局工具栏配置"), 'mobile-settings-nav-toolbar')
 
   // 说明文字
   createNotice(t("settings.mobile.110", undefined, "📱手机端工具栏样式调整，推荐配置：40px高、分割线、跟随主题、100%"))
@@ -2072,7 +2074,7 @@ export function createMobileSettingLayout(
   })
 
   // === 工具栏位置配置（整合顶部和底部配置） ===
-  createGroupTitle('3️⃣ ',t("settings.mobile.134", undefined, "工具栏位置配置"))
+  createGroupTitle('3️⃣ ',t("settings.mobile.134", undefined, "工具栏位置配置"), 'mobile-settings-nav-position')
 
   // 说明文字
   createNotice(t("settings.mobile.135", undefined, "📍选择📱工具栏显示位置，下方会显示对应的配置选项；默认配置已经调好，若修改，请认真阅读和理解"))
@@ -4316,7 +4318,7 @@ export function createMobileSettingLayout(
   })
 
   // === 小功能选择 ===
-  createGroupTitle('5️⃣ ',t("settings.mobile.274", undefined, "小功能选择"))
+  createGroupTitle('5️⃣ ',t("settings.mobile.274", undefined, "小功能选择"), 'mobile-settings-nav-features')
 
   // 说明文字
   createNotice(t("settings.mobile.275", undefined, "⚙️调整手机端的图标隐藏设置：①面包屑按钮默认隐藏，需要时关闭①即可显示并弹出路径菜单；打开扩展工具栏会强制隐藏②③④⑤原生按钮"))
@@ -4494,7 +4496,7 @@ export function createMobileSettingLayout(
   })
 
   // === 使用帮助 ===
-  createGroupTitle('6️⃣ ',t("settings.mobile.290", undefined, "手机端关闭与激活码"))
+  createGroupTitle('6️⃣ ',t("settings.mobile.290", undefined, "手机端关闭与激活码"), 'mobile-settings-nav-activation')
 
   // 说明文字（已移除）
 

@@ -339,6 +339,25 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.9.5 — Sticky section navigation in mobile settings + slash toolbar usage tip
+
+> 💡 The mobile settings page keeps growing — tired of scrolling all the way down? Want to jump straight to a section? Not sure when the slash menu toolbar pops up? Update.
+
+**① Mobile settings: sticky section navigation**
+- A horizontally scrollable chip bar is now pinned at the top of the settings dialog: Menu / Buttons / Global / Toolbar / Position / Notes / Extras / License
+- Tap a chip to smoothly jump to that section; scrolling highlights the current section automatically and scrolls its chip into view
+- A thin progress line under the chips shows the page scroll position; follows SiYuan's light/dark theme and honors the system "Reduce motion" setting
+- The bar sits above the scrolling content, so no settings content peeks through at the top and the scrollbar thumb no longer overlaps the bar
+
+**② Slash menu toolbar: usage tip**
+- A tip box now sits under the "↗️ SiYuan slash menu toolbar" title: ① the keyboard pops up when opened ② improved SiYuan menu button triggering
+- The tip reuses the shared mobile-settings notice style, matching the font size and padding of the "Mobile custom buttons" notice, with multi-line support
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.9.4 — Hide/replace the mobile Command Panel button + toolbar restored after disabling the plugin
 
 > 💡 SiYuan v3.8.6 added a Command Panel button (terminal icon) to the mobile toolbar — want to hide it and put your own button there, just like More / Document / Lock? Or noticed the native toolbar shifts left with its buttons in the middle after disabling the plugin? Update. ⚠️ Starting with this version, SiYuan v3.8.6+ is required.
@@ -357,11 +376,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 **③ Minimum SiYuan version raised to v3.8.6**
 - Because the feature uses the native mobile Command Panel button, this version requires SiYuan v3.8.6 or later; older versions cannot install it or will be marked incompatible in the marketplace
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.9.3 — Slash menu toolbar: convert in place, custom buttons on the bar
 

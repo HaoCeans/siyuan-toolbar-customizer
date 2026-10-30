@@ -339,6 +339,35 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.9.6 — Mobile undo/redo buttons + desktop LifeLog popup: prevent accidental closing
+
+> 💡 SiYuan v3.8.9 added Undo/Redo buttons to the mobile toolbar — want to hide the native group and use your own minimal icons? Closed the desktop LifeLog popup by tapping outside and lost your content? Update.
+
+**① Mobile undo/redo buttons (SiYuan v3.8.9+)**
+- The native Undo/Redo group is hidden by default and replaced with two "① Built-in function" buttons: Undo / Redo, using the minimal Lucide Undo2 / Redo2 icons by default (changeable in the button editor)
+- Taps reuse SiYuan's own document-level undo/redo chain; the custom buttons mirror the native state: dimmed when there is no history, hidden in read-only/locked documents
+- Settings → Small function selection adds "⑥ Hide Undo/Redo buttons"; the native group is force-hidden when the overflow toolbar is enabled
+- The built-in function picker adds "Undo (mobile document)" and "Redo (mobile document)"; existing configs get the buttons automatically while keeping their current order
+
+**② Desktop LifeLog: clicking outside no longer closes the popup**
+- Clicking the backdrop no longer closes the popup; it only puts the focus back in the input so you don't lose content by accident
+
+**③ Desktop LifeLog: confirm before canceling**
+- With content in the input, clicking "Cancel" now asks first: Keep editing / Discard and cancel
+- An empty input still closes immediately
+- Closing with Esc or the global shortcut keeps its existing unsaved-content confirmation
+
+**④ Mobile settings navigation label**
+- The 6th chip in the top navigation, "Notes", is renamed to "Note popup"
+
+**⑤ Minimum SiYuan version raised to v3.8.9**
+- This version now requires SiYuan v3.8.9 or later; older versions cannot install it or will be marked incompatible in the marketplace
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.9.5 — Sticky section navigation in mobile settings + slash toolbar usage tip
 
 > 💡 The mobile settings page keeps growing — tired of scrolling all the way down? Want to jump straight to a section? Not sure when the slash menu toolbar pops up? Update.
@@ -352,11 +381,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 **② Slash menu toolbar: usage tip**
 - A tip box now sits under the "↗️ SiYuan slash menu toolbar" title: ① the keyboard pops up when opened ② improved SiYuan menu button triggering
 - The tip reuses the shared mobile-settings notice style, matching the font size and padding of the "Mobile custom buttons" notice, with multi-line support
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.9.4 — Hide/replace the mobile Command Panel button + toolbar restored after disabling the plugin
 
@@ -1092,8 +1116,8 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 ### v3.7.0 — Image import refactor + attachment management + toolbox categories (major version update)
 
 > ⚠️ **Requirements (important)**
-> This plugin requires **SiYuan Note v3.8.6 or later** to work properly.
-> If your SiYuan version is below v3.8.6, the plugin cannot be installed or will be shown as incompatible in the plugin marketplace; upgrade SiYuan Note first.
+> This plugin requires **SiYuan Note v3.8.9 or later** to work properly.
+> If your SiYuan version is below v3.8.9, the plugin cannot be installed or will be shown as incompatible in the plugin marketplace; upgrade SiYuan Note first.
 > (Reason: the plugin now follows SiYuan v3.8's language identifier convention, which older versions cannot match correctly.)
 
 ## New

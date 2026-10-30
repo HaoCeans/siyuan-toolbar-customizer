@@ -31,6 +31,10 @@ const BUILTIN_BUTTONS: BuiltinButtonDefinition[] = [
   { id: 'toolbarMore', nameKey: 'ui.buttonSelector.item.1', fallbackName: '右上角：设置（☰ 菜单）', icon: 'iconSettings' },
   { id: 'toolbarFile', nameKey: 'ui.buttonSelector.item.2', fallbackName: '左上角：文档树', icon: 'iconFolder' },
 
+  // ===== 移动端文档历史（v3.8.9+）=====
+  { id: 'history-undo', nameKey: 'ui.buttonSelector.item.historyUndo', fallbackName: '撤销（移动端文档）', icon: 'lucide:Undo2' },
+  { id: 'history-redo', nameKey: 'ui.buttonSelector.item.historyRedo', fallbackName: '重做（移动端文档）', icon: 'lucide:Redo2' },
+
   // ===== 菜单内 - 常用功能（无需展开子菜单）=====
   { id: 'menuRecent', nameKey: 'ui.buttonSelector.item.3', fallbackName: '最近的文档', icon: 'iconList' },
   { id: 'menuSearch', nameKey: 'ui.buttonSelector.item.4', fallbackName: '搜索', icon: 'iconSearch' },

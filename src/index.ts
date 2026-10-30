@@ -55,6 +55,7 @@ import {
   clearSafeInterval,
   restoreMobileToolbarOriginal,
   getButtonDisplayName,
+  syncHistoryButtonStates,
   DEFAULT_FLOATING_TOOLBAR_Z_INDEX
 } from './toolbarManager'
 
@@ -350,6 +351,7 @@ export default class ToolbarCustomizer extends Plugin {
     hideDocMenuButton: true,    // 文档菜单按钮隐藏
     hideMoreButton: true,       // 更多按钮隐藏
     hideCommandPanelButton: true, // 命令面板按钮隐藏（原生 command-panel，仅手机端，v3.8.6+）
+    hideHistoryButtons: true, // 撤销/重做按钮隐藏（原生 protyle-breadcrumb__history，仅手机端，v3.8.9+）
     toolbarStyle: 'divider' as 'default' | 'divider',  // 工具栏样式：默认或带分割线（手机端默认分割线）
     glassEffect: true,  // 毛玻璃背景（半透明+背景模糊，独立于分割线样式，可叠加；默认开）
     disableCustomButtons: false,// 禁用所有自定义按钮
@@ -624,6 +626,48 @@ export default class ToolbarCustomizer extends Plugin {
           this.mobileButtonConfigs.forEach((btn, idx) => {
             btn.sort = idx
           })
+        }
+      }
+
+      // 升级兼容：思源 v3.8.9+ 移动端新增撤销/重做按钮，插件默认隐藏并换成自定义按钮。
+      // 已有配置缺少时补上，并按当前视觉顺序（sort 降序 = 工具栏从左到右）插到命令面板左边，
+      // 同时重排 sort，保证不破坏用户已有的自定义排序。
+      // 先兼容上一版把撤销/重做放在「鲸鱼定制工具箱」里的配置：改回思源内置功能。
+      this.mobileButtonConfigs.forEach(btn => {
+        const subtype = (btn as any).authorToolSubtype
+        if (subtype === 'history-undo' || subtype === 'history-redo') {
+          const isRedo = subtype === 'history-redo'
+          btn.type = 'builtin'
+          btn.builtinId = isRedo ? 'history-redo' : 'history-undo'
+          delete (btn as any).authorToolSubtype
+          if (!btn.icon || btn.icon === 'iconUndo' || btn.icon === 'iconRedo') {
+            btn.icon = isRedo ? 'lucide:Redo2' : 'lucide:Undo2'
+          }
+        }
+      })
+      const hasUndoButton = this.mobileButtonConfigs.some(btn => btn.id === 'undo-mobile')
+      const hasRedoButton = this.mobileButtonConfigs.some(btn => btn.id === 'redo-mobile')
+      if (!hasUndoButton || !hasRedoButton) {
+        const undoTemplate = DEFAULT_MOBILE_BUTTONS.find(btn => btn.id === 'undo-mobile')
+        const redoTemplate = DEFAULT_MOBILE_BUTTONS.find(btn => btn.id === 'redo-mobile')
+        if (undoTemplate && redoTemplate) {
+          const ordered = [...this.mobileButtonConfigs].sort((a, b) => (b.sort ?? 0) - (a.sort ?? 0))
+          const existingUndo = ordered.find(btn => btn.id === 'undo-mobile')
+          const existingRedo = ordered.find(btn => btn.id === 'redo-mobile')
+          const withoutHistory = ordered.filter(btn => btn.id !== 'undo-mobile' && btn.id !== 'redo-mobile')
+          const undoButton = existingUndo ?? { ...undoTemplate }
+          const redoButton = existingRedo ?? { ...redoTemplate }
+          const commandPanelIndex = withoutHistory.findIndex(btn => btn.id === 'command-panel-mobile')
+          const readonlyIndex = withoutHistory.findIndex(btn => btn.id === 'readonly-mobile')
+          const insertIndex = commandPanelIndex >= 0
+            ? commandPanelIndex
+            : (readonlyIndex >= 0 ? readonlyIndex : 0)
+          // 视觉顺序：撤销 → 重做 → 命令面板
+          withoutHistory.splice(insertIndex, 0, undoButton, redoButton)
+          withoutHistory.forEach((btn, idx) => {
+            btn.sort = withoutHistory.length - 1 - idx
+          })
+          this.mobileButtonConfigs = withoutHistory
         }
       }
 
@@ -1462,6 +1506,7 @@ export default class ToolbarCustomizer extends Plugin {
           this.mobileFeatureConfig.hideDocMenuButton = true
           this.mobileFeatureConfig.hideMoreButton = true
           this.mobileFeatureConfig.hideCommandPanelButton = true
+          this.mobileFeatureConfig.hideHistoryButtons = true
 
           // 重新计算所有按钮的溢出层级
           const overflowLayers = overflowBtn.layers || 1
@@ -1801,6 +1846,17 @@ export default class ToolbarCustomizer extends Plugin {
       `
     }
 
+    // 撤销/重做按钮隐藏（仅手机端；思源 v3.8.9+ 移动端文档级历史按钮）
+    // 整组隐藏，避免用裸 [data-type="undo"] 误伤键盘工具栏/padHTML 里的同名按钮
+    if (this.isMobile && this.mobileFeatureConfig.hideHistoryButtons !== false && !disableCustomButtons) {
+      styleContent += `
+        .protyle-breadcrumb__bar .protyle-breadcrumb__history,
+        .protyle-breadcrumb .protyle-breadcrumb__history {
+          display: none !important;
+        }
+      `
+    }
+
     // 桌面端工具栏高度（仅桌面端生效，禁用自定义按钮时跳过）
     if (!this.isMobile && this.desktopFeatureConfig.toolbarHeight !== undefined && this.desktopFeatureConfig.toolbarHeight !== 32 && !disableCustomButtons) {
       styleContent += `
@@ -1965,6 +2021,9 @@ export default class ToolbarCustomizer extends Plugin {
       this.mobileFeatureConfig.showMobileLineBreakButton === true,
       disableCustomButtons
     )
+
+    // 撤销/重做按钮的隐藏开关变化后，自定义按钮的可见性也要立即跟随
+    syncHistoryButtonStates()
   }
 
   /**

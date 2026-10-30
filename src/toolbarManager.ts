@@ -470,6 +470,34 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     showNotification: true
   },
   {
+    id: 'undo-mobile',
+    name: '撤销',
+    nameKey: 'button.default.undo',
+    type: 'builtin',
+    builtinId: 'history-undo',
+    icon: 'lucide:Undo2',
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
+    sort: 5,
+    platform: 'mobile',
+    showNotification: false
+  },
+  {
+    id: 'redo-mobile',
+    name: '重做',
+    nameKey: 'button.default.redo',
+    type: 'builtin',
+    builtinId: 'history-redo',
+    icon: 'lucide:Redo2',
+    iconSize: 23,
+    minWidth: 23,
+    marginRight: 10,
+    sort: 4,
+    platform: 'mobile',
+    showNotification: false
+  },
+  {
     id: 'readonly-mobile',
     name: '锁住文档',
     nameKey: 'button.default.lock',
@@ -480,7 +508,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
-    sort: 4,
+    sort: 6,
     platform: 'mobile',
     showNotification: true
   },
@@ -494,7 +522,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
-    sort: 5,
+    sort: 7,
     platform: 'mobile',
     showNotification: true
   },
@@ -508,7 +536,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
-    sort: 6,
+    sort: 8,
     platform: 'mobile',
     showNotification: true
   },
@@ -522,7 +550,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
-    sort: 7,
+    sort: 9,
     platform: 'mobile',
     showNotification: true
   },
@@ -536,7 +564,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
-    sort: 8,
+    sort: 10,
     platform: 'mobile',
     showNotification: true
   },
@@ -550,7 +578,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
-    sort: 9,
+    sort: 11,
     platform: 'mobile',
     showNotification: true
   },
@@ -564,7 +592,7 @@ export const DEFAULT_MOBILE_BUTTONS: ButtonConfig[] = [
     iconSize: 23,
     minWidth: 23,
     marginRight: 10,
-    sort: 10,
+    sort: 12,
     platform: 'mobile',
     showNotification: true
   }
@@ -2228,6 +2256,7 @@ function cleanupCustomButtons() {
   // 清理分割线
   const oldDividers = document.querySelectorAll('[data-toolbar-divider]')
   oldDividers.forEach(div => div.remove())
+  cleanupHistoryObservers()
 }
 
 function setupEditorButtons(configs: ButtonConfig[], waitFrameBudget = 60) {
@@ -2370,6 +2399,9 @@ export function createButtonsForEditors(editors: NodeListOf<Element>, configs: B
             updateToggleLockIcon(btn as HTMLElement, getDocLockedState(editor))
           }
         })
+        // 撤销/重做按钮：绑定原生状态并同步一次
+        observeHistoryContainer(editor as HTMLElement)
+        syncHistoryButtonStates()
         return
       }
     }
@@ -2419,6 +2451,9 @@ export function createButtonsForEditors(editors: NodeListOf<Element>, configs: B
 	        updateToggleLockIcon(btn, getDocLockedState(editor))
 	      }
 	    })
+	    // 撤销/重做按钮：绑定原生状态并同步一次
+	    observeHistoryContainer(editor as HTMLElement)
+	    syncHistoryButtonStates()
 	  })
 
 	  // 重试机制：当编辑器已存在但 breadcrumb 尚未渲染完成（readonlyBtn 未找到）时，
@@ -2493,6 +2528,8 @@ const DEFAULT_NAME_BY_ID: Record<string, { key: string; legacy: string[] }> = {
   'more-desktop': { key: 'button.default.more', legacy: ['更多'] }, 'more-mobile': { key: 'button.default.more', legacy: ['更多'] },
   'doc-desktop': { key: 'button.default.menu', legacy: ['打开菜单'] }, 'doc-mobile': { key: 'button.default.menu', legacy: ['打开菜单'] },
   'command-panel-mobile': { key: 'button.default.commandPanel', legacy: ['命令面板'] },
+  'undo-mobile': { key: 'button.default.undo', legacy: ['撤销'] },
+  'redo-mobile': { key: 'button.default.redo', legacy: ['重做'] },
   'readonly-desktop': { key: 'button.default.lock', legacy: ['锁住文档'] }, 'readonly-mobile': { key: 'button.default.lock', legacy: ['锁住文档'] },
   'plugin-settings-desktop': { key: 'button.default.pluginSettings', legacy: ['插件设置'] }, 'plugin-settings-mobile': { key: 'button.default.pluginSettings', legacy: ['插件设置'] },
   'open-diary-desktop': { key: 'button.default.dailyNote', legacy: ['打开日记'] }, 'open-diary-mobile': { key: 'button.default.dailyNote', legacy: ['打开日记'] },
@@ -3393,6 +3430,9 @@ function showOverflowToolbar(config: ButtonConfig) {
     syncOverflowOpenClass()
   }
 
+  // 扩展面板里的撤销/重做按钮也要同步原生状态（面板是独立 DOM，不在 .protyle 内）
+  syncHistoryButtonStates()
+
   // 底部胶囊模式：按实际渲染层数动态设置导航栏位置（--tc-nav-bottom），
   // 与层堆叠公式 bottomPos = bottomOffset + i*(toolbarHeight+toolbarSpacing) 保持一致
   if (isCapsuleMode && !isSideFloatingMode()) {
@@ -3915,6 +3955,12 @@ function executeBuiltinFunction(config: ButtonConfig) {
 
   // 应用别名映射（思源 v3.7 重构手机端菜单后，旧 ID 自动转新 ID）
   const targetId = resolveBuiltinId(config.builtinId)
+
+  // 移动端文档级撤销/重做：不走通用选择器（避免命中键盘工具栏/padHTML 的同名按钮）
+  if (targetId === 'history-undo' || targetId === 'history-redo') {
+    executeHistoryAction(targetId === 'history-redo')
+    return
+  }
 
   // 尝试多种方式查找按钮
   let menuItem: HTMLElement | null = null
@@ -5837,6 +5883,90 @@ async function executeToggleLock(config: ButtonConfig): Promise<void> {
 }
 
 /**
+ * 同步自定义撤销/重做按钮的禁用与可见状态。
+ *
+ * 原生按钮被 CSS 隐藏后，不能靠 getComputedStyle/offsetParent 判断可见性，
+ * 直接看：容器 fn__none、原生按钮 fn__none、原生按钮 disabled、文档只读。
+ */
+export function syncHistoryButtonStates(): void {
+  const hideNative = pluginInstance?.mobileFeatureConfig?.hideHistoryButtons !== false
+    && pluginInstance?.mobileFeatureConfig?.disableCustomButtons !== true
+
+  document.querySelectorAll<HTMLElement>('[data-custom-button]').forEach((btn) => {
+    const cfg = currentButtonConfigs.find(c => c.id === btn.dataset.customButton)
+    if (!cfg || (cfg.builtinId !== 'history-undo' && cfg.builtinId !== 'history-redo')) return
+
+    const editor = (btn.closest('.protyle') as HTMLElement | null)
+      ?? (getActiveProtyle()?.element as HTMLElement | undefined)
+    if (!editor || !hideNative) {
+      btn.style.setProperty('display', 'none', 'important')
+      btn.disabled = true
+      btn.style.setProperty('opacity', '0.35', 'important')
+      return
+    }
+
+    const container = editor.querySelector('.protyle-breadcrumb__history') as HTMLElement | null
+    const nativeType = cfg.builtinId === 'history-redo' ? 'redo' : 'undo'
+    const nativeBtn = container?.querySelector<HTMLButtonElement>(`[data-type="${nativeType}"]`) ?? null
+    // 只读/锁定、原生容器缺失时隐藏；只是“没有历史”时保留按钮但置灰（避免工具栏布局跳动）
+    const locked = getDocLockedState(editor)
+    const noHistory = !container
+      || !nativeBtn
+      || container.classList.contains('fn__none')
+      || nativeBtn.classList.contains('fn__none')
+    const hidden = !container || !nativeBtn || locked
+
+    btn.style.setProperty('display', hidden ? 'none' : 'flex', 'important')
+    const disabled = hidden || noHistory || nativeBtn.disabled
+    btn.disabled = disabled
+    btn.setAttribute('aria-disabled', String(disabled))
+    btn.style.setProperty('opacity', disabled ? '0.35' : '1', 'important')
+    if (disabled) {
+      btn.style.setProperty('pointer-events', 'none', 'important')
+    } else {
+      btn.style.removeProperty('pointer-events')
+    }
+  })
+}
+
+const historyStateObservers = new Set<MutationObserver>()
+const observedHistoryContainers = new Set<Element>()
+
+/** 监听原生撤销/重做容器的 class/disabled 变化，驱动自定义按钮同步 */
+function observeHistoryContainer(editor: HTMLElement): void {
+  const container = editor.querySelector('.protyle-breadcrumb__history')
+  if (!container || observedHistoryContainers.has(container)) return
+  observedHistoryContainers.add(container)
+  const observer = new MutationObserver(() => syncHistoryButtonStates())
+  observer.observe(container, {
+    attributes: true,
+    attributeFilter: ['disabled', 'class'],
+    subtree: true,
+  })
+  historyStateObservers.add(observer)
+}
+
+function cleanupHistoryObservers(): void {
+  historyStateObservers.forEach(observer => observer.disconnect())
+  historyStateObservers.clear()
+  observedHistoryContainers.clear()
+}
+
+/** 执行移动端文档级撤销/重做：点击隐藏的原生按钮，复用思源自己的全局历史链路 */
+function executeHistoryAction(redo: boolean): void {
+  const protyle = getActiveProtyle()
+  const editor = protyle?.element as HTMLElement | undefined
+  const container = editor?.querySelector('.protyle-breadcrumb__history') as HTMLElement | null
+  const nativeBtn = container?.querySelector<HTMLButtonElement>(`[data-type="${redo ? 'redo' : 'undo'}"]`) ?? null
+  if (!container || !nativeBtn || nativeBtn.disabled
+    || container.classList.contains('fn__none') || nativeBtn.classList.contains('fn__none')) {
+    return
+  }
+  nativeBtn.click()
+  setTimeout(syncHistoryButtonStates, 0)
+}
+
+/**
  * 更新 toggle-lock 按钮的图标（🔒 / 🔓）
  * 复用 createButtonElement 的图标渲染逻辑，支持 4 种类型
  */
@@ -7358,23 +7488,34 @@ async function executeImageUpload(config: ButtonConfig, preSavedRange: Range | n
   }, 30000)
 }
 
+interface ILifeLogCloseConfirmOptions {
+  title?: string
+  body?: string
+  cancelText?: string
+  confirmText?: string
+}
+
 /**
- * 关闭 LifeLog 确认弹窗（支持键盘左右选 + Enter 确认）
+ * 关闭 / 取消 LifeLog 确认弹窗（支持键盘左右选 + Enter 确认）
  */
-function showCloseConfirmDialog(): Promise<boolean> {
+function showCloseConfirmDialog(options: ILifeLogCloseConfirmOptions = {}): Promise<boolean> {
+  const title = options.title ?? t('toolbarManager.lifeLog.closeConfirmTitle', undefined, '关闭 LifeLog？')
+  const body = options.body ?? t('toolbarManager.lifeLog.closeConfirmBody', undefined, '输入框内有未保存的内容，确定要关闭吗？')
+  const cancelText = options.cancelText ?? t('toolbarManager.9', undefined, '取消')
+  const confirmText = options.confirmText ?? t('toolbarManager.10', undefined, '关闭')
   return new Promise(resolve => {
     const overlay = document.createElement('div')
     overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);'
     const box = document.createElement('div')
     box.style.cssText = 'background:var(--b3-theme-background);border-radius:14px;padding:24px;min-width:280px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.25);'
-    box.innerHTML = `<div style="font-size:16px;font-weight:600;margin-bottom:8px;color:var(--b3-theme-on-background)">${t('toolbarManager.lifeLog.closeConfirmTitle', undefined, '关闭 LifeLog？')}</div><div style="font-size:13px;color:var(--b3-theme-on-surface-light);margin-bottom:20px">${t('toolbarManager.lifeLog.closeConfirmBody', undefined, '输入框内有未保存的内容，确定要关闭吗？')}</div>`
+    box.innerHTML = `<div style="font-size:16px;font-weight:600;margin-bottom:8px;color:var(--b3-theme-on-background)">${title}</div><div style="font-size:13px;color:var(--b3-theme-on-surface-light);margin-bottom:20px">${body}</div>`
     const btnRow = document.createElement('div')
     btnRow.style.cssText = 'display:flex;gap:10px;justify-content:center;'
     const cancelBtn = document.createElement('button')
-    cancelBtn.textContent = t('toolbarManager.9', undefined, '取消')
+    cancelBtn.textContent = cancelText
     cancelBtn.style.cssText = 'padding:8px 24px;border-radius:8px;border:1px solid var(--b3-border-color);background:var(--b3-theme-surface);color:var(--b3-theme-on-surface);cursor:pointer;font-size:14px;outline:none;'
     const okBtn = document.createElement('button')
-    okBtn.textContent = t('toolbarManager.10', undefined, '关闭')
+    okBtn.textContent = confirmText
     okBtn.style.cssText = 'padding:8px 24px;border-radius:8px;border:none;background:var(--b3-theme-primary);color:#fff;cursor:pointer;font-size:14px;outline:none;'
     btnRow.appendChild(cancelBtn)
     btnRow.appendChild(okBtn)
@@ -7627,7 +7768,23 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
       color: var(--b3-theme-on-background); border: none; cursor: pointer;
       font-weight: 400;
     `;
-    cancelBtn.onclick = () => { cleanup(); resolve(null); };
+    cancelBtn.onclick = async () => {
+      const text = input.value.trim()
+      if (text) {
+        const confirmed = await showCloseConfirmDialog({
+          title: t('toolbarManager.lifeLog.cancelConfirmTitle', undefined, '取消 LifeLog？'),
+          body: t('toolbarManager.lifeLog.cancelConfirmBody', undefined, '输入框内有未保存的内容，确定要取消吗？'),
+          cancelText: t('toolbarManager.lifeLog.continueEditing', undefined, '继续编辑'),
+          confirmText: t('toolbarManager.lifeLog.confirmCancel', undefined, '确定取消'),
+        })
+        if (!confirmed) {
+          input.focus()
+          return
+        }
+      }
+      cleanup()
+      resolve(null)
+    }
     btnRow.appendChild(cancelBtn);
 
     const confirmBtn = document.createElement('button');
@@ -7667,9 +7824,13 @@ async function showLifelogDialog(categories: string[], opts?: { fontSize?: numbe
       }
     }, 100);
 
+    // 点击弹窗外部不再关闭：只允许通过「取消」或 Esc 关闭（有内容时会确认）
     overlay.addEventListener('mousedown', (e) => {
-      if (e.target === overlay) { cleanup(); resolve(null); }
-    });
+      if (e.target === overlay) {
+        e.preventDefault()
+        input.focus()
+      }
+    })
 
     const cleanup = () => {
       overlay.remove();

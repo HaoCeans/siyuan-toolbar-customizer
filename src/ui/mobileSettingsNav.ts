@@ -51,7 +51,7 @@ const SECTIONS: IMobileSettingsNavSection[] = [
   {
     id: 'quick-note-settings-section',
     labelKey: 'settings.mobile.nav.quickNote',
-    fallback: '记事',
+    fallback: '记事弹窗',
   },
   {
     id: 'mobile-settings-nav-features',

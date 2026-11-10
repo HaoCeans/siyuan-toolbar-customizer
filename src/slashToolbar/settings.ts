@@ -5,7 +5,7 @@
  * 由 settings/mobile.ts 调一次 mountSlashToolbarSection()，本文件内部自己注册设置项。
  */
 
-import type { Setting } from 'siyuan'
+import type { MobileSettingSink } from '../ui/mobileSettingsDialog'
 import type { ISlashToolbarConfig } from './catalog'
 import { t } from '../i18n/runtime'
 import { getSlashCustomButtonSources } from '../toolbarManager'
@@ -28,7 +28,7 @@ export interface ISlashToolbarSettingsContext {
 const CONFIG_KEY = 'slashToolbarConfig'
 
 /** 渲染分组标题（与手机端设置里其它分组标题同款外观） */
-const createGroupTitle = (setting: Setting, icon: string, title: string) => {
+const createGroupTitle = (setting: MobileSettingSink, icon: string, title: string) => {
   setting.addItem({
     title: '',
     description: '',
@@ -59,13 +59,13 @@ const createGroupTitle = (setting: Setting, icon: string, title: string) => {
 
 /**
  * 挂载斜杠菜单工具栏设置分组。
- * @param setting 思源设置对话框实例
+ * @param setting 设置项收集器（插件自建弹层 sink，接口与 Setting.addItem 一致）
  * @param context 斜杠工具栏配置与保存回调
  * @param createTitle 复用调用方的分组标题工厂（保证与其它分组外观一致）
  * @param createNotice 复用调用方的使用说明框工厂（保证与其它分组外观一致）
  */
 export function mountSlashToolbarSection(
-  setting: Setting,
+  setting: MobileSettingSink,
   context: ISlashToolbarSettingsContext,
   createTitle?: (icon: string, title: string, id?: string) => void,
   createNotice?: (content: string) => void,

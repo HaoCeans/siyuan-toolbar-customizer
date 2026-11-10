@@ -9,7 +9,7 @@ import { validateActivationCode } from '../utils/activationCodeValidator'
 import type { LicenseStatus } from '../utils/licenseManager'
 import { TRIAL_CODE, clearTrial } from '../utils/licenseManager'
 
-import type { Setting } from 'siyuan'
+import type { MobileSettingSink } from '../ui/mobileSettingsDialog'
 import type { ISlashToolbarConfig } from '../slashToolbar/catalog'
 import type { GlobalButtonConfig } from '../toolbarManager'
 import type { ButtonConfig } from '../toolbarManager'
@@ -868,11 +868,11 @@ export function createBottomToolbarConfigItem(
 /**
  * 创建手机端设置布局
  * 这是手机端设置界面创建的主入口函数
- * @param setting - SiYuan Setting 对象
+ * @param setting - 设置项收集器（插件自建弹层的 sink，接口与 Setting.addItem 一致）
  * @param context - 手机端设置上下文（依赖注入）
  */
 export function createMobileSettingLayout(
-  setting: Setting,
+  setting: MobileSettingSink,
   context: MobileSettingsContext
 ): void {
   // 预览元素引用（提升到函数作用域：位置模式切换后需要刷新预览形态，如侧边胶囊竖排）

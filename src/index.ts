@@ -99,6 +99,11 @@ import { showButtonSelector, type ButtonInfo } from './ui/buttonSelector'
 import { showIconPicker as showIconPickerModal } from './ui/iconPicker'
 import { showClickSequenceSelector } from './ui/clickSequenceSelector'
 import { injectMobileSettingsNav, cleanupMobileSettingsNav } from './ui/mobileSettingsNav'
+import {
+  cleanupMobileSettingsDialog,
+  openMobileSettingsDialog,
+  type MobileSettingSink,
+} from './ui/mobileSettingsDialog'
 import { updateIconDisplay as updateIconDisplayUtil } from './data/icons'
 // 导入标签切换器
 import { injectTabSwitcher as injectTabSwitcherUtil, cleanupTabSwitcher } from './ui/tabs'
@@ -1370,6 +1375,8 @@ export default class ToolbarCustomizer extends Plugin {
     // 清理标签切换器资源
     cleanupTabSwitcher()
     cleanupMobileSettingsNav()
+    // 手机端自建设置面板（overlay + 滚动锁 + 注入样式）
+    cleanupMobileSettingsDialog()
 
     // 清理手机端标签页Tab资源
     cleanupMobileTabs()
@@ -1476,10 +1483,83 @@ export default class ToolbarCustomizer extends Plugin {
       slashToolbarConfig: this.slashToolbarConfig
     })
 
+    // 手机端：使用插件自建的全屏面板，不再借用思源原生 Setting 窗口
+    if (this.isMobile) {
+      this.openMobileSettings(snapshot)
+      return
+    }
+
     const setting = new Setting({
-      width: this.isMobile ? '100%' : '800px',
-      height: this.isMobile ? '100%' : '90vh',
-      confirmCallback: async () => {
+      width: '800px',
+      height: '90vh',
+      confirmCallback: this.createConfirmHandler(snapshot)
+    })
+
+    // 电脑端：使用标签切换布局
+    const context: DesktopSettingsContext = {
+        desktopButtonConfigs: this.desktopButtonConfigs,
+        mobileButtonConfigs: this.mobileButtonConfigs,
+        desktopGlobalButtonConfig: this.desktopGlobalButtonConfig,
+        mobileGlobalButtonConfig: this.mobileGlobalButtonConfig,
+        desktopFeatureConfig: this.desktopFeatureConfig,
+        mobileFeatureConfig: this.mobileFeatureConfig,
+        loggingEnabled: this.loggingEnabled,
+        mobileConfig: this.mobileConfig,
+        slashToolbarConfig: this.slashToolbarConfig,
+        version: this.version,
+        isAuthorToolActivated: () => this.isAuthorToolActivated(),
+        getLicenseStatus: () => this.getLicenseStatus(),
+        showConfirmDialog: (msg) => this.showConfirmDialog(msg),
+        showIconPicker: (current, onSelect) => this.showIconPicker(current, onSelect),
+        saveData: (key, value) => this.saveData(key, value),
+        removeData: (key) => this.removeData(key),
+        setLoggingEnabled: async (enabled) => {
+          const previous = this.loggingEnabled
+          this.loggingEnabled = enabled === true
+          setLoggingEnabled(this.loggingEnabled)
+          try {
+            await this.saveData('loggingConfig', { enabled: this.loggingEnabled })
+          } catch (error) {
+            this.loggingEnabled = previous
+            setLoggingEnabled(previous)
+            throw error
+          }
+        },
+        resetLogging: async () => {
+          await this.removeData('loggingConfig')
+          this.loggingEnabled = false
+          context.loggingEnabled = false
+          setLoggingEnabled(false)
+        },
+        applyFeatures: () => this.applyFeatures(),
+        applyDesktopToolbarPosition: () => this.applyDesktopToolbarPosition(),
+        refreshButtons: () => {
+          // 刷新桌面端按钮
+          initCustomButtons(this.desktopButtonConfigs)
+        }
+      }
+    createDesktopSettingLayout(setting, context)
+
+    setting.open(t('plugin.settingsTitle', undefined, '思源手机端增强'))
+
+    // 电脑端：对话框打开后注入标签栏
+    this.injectTabSwitcher()
+  }
+
+  /** 手机端：自建全屏设置面板 */
+  private openMobileSettings(snapshot: string) {
+    openMobileSettingsDialog({
+      title: t('plugin.settingsTitle', undefined, '思源手机端增强'),
+      build: (sink) => this.initMobileSettingLayout(sink),
+      onConfirm: this.createConfirmHandler(snapshot),
+    })
+    // 面板与设置项已同步就绪，注入顶部章节导航
+    injectMobileSettingsNav()
+  }
+
+  /** 设置保存逻辑：手机端自建面板与桌面端原生 Setting 共用 */
+  private createConfirmHandler(snapshot: string): () => Promise<void> {
+    return async () => {
         // 同步全局按钮配置到所有按钮（在保存前）
         // 只有启用了全局配置时才批量应用
         const isGlobalEnabled = this.mobileGlobalButtonConfig.enabled ?? true
@@ -1589,78 +1669,6 @@ export default class ToolbarCustomizer extends Plugin {
 
         // 使用官方 API 重载界面
         await fetchSyncPost('/api/ui/reloadUI', {})
-      }
-    })
-
-    // 手机端：给对话框添加标识，用于CSS定位
-    if (this.isMobile) {
-      // 等待对话框渲染后添加标识
-      setTimeout(() => {
-        const dialog = document.querySelector('.b3-dialog:not([data-plugin-dialog])')
-        if (dialog) {
-          dialog.setAttribute('data-plugin-dialog', 'toolbar-customizer')
-        }
-      }, 50)
-    }
-
-    if (this.isMobile) {
-      // 手机端：使用思源原生 b3-label 布局
-      this.initMobileSettingLayout(setting)
-    } else {
-      // 电脑端：使用标签切换布局
-      const context: DesktopSettingsContext = {
-        desktopButtonConfigs: this.desktopButtonConfigs,
-        mobileButtonConfigs: this.mobileButtonConfigs,
-        desktopGlobalButtonConfig: this.desktopGlobalButtonConfig,
-        mobileGlobalButtonConfig: this.mobileGlobalButtonConfig,
-        desktopFeatureConfig: this.desktopFeatureConfig,
-        mobileFeatureConfig: this.mobileFeatureConfig,
-        loggingEnabled: this.loggingEnabled,
-        mobileConfig: this.mobileConfig,
-        slashToolbarConfig: this.slashToolbarConfig,
-        version: this.version,
-        isAuthorToolActivated: () => this.isAuthorToolActivated(),
-        getLicenseStatus: () => this.getLicenseStatus(),
-        showConfirmDialog: (msg) => this.showConfirmDialog(msg),
-        showIconPicker: (current, onSelect) => this.showIconPicker(current, onSelect),
-        saveData: (key, value) => this.saveData(key, value),
-        removeData: (key) => this.removeData(key),
-        setLoggingEnabled: async (enabled) => {
-          const previous = this.loggingEnabled
-          this.loggingEnabled = enabled === true
-          setLoggingEnabled(this.loggingEnabled)
-          try {
-            await this.saveData('loggingConfig', { enabled: this.loggingEnabled })
-          } catch (error) {
-            this.loggingEnabled = previous
-            setLoggingEnabled(previous)
-            throw error
-          }
-        },
-        resetLogging: async () => {
-          await this.removeData('loggingConfig')
-          this.loggingEnabled = false
-          context.loggingEnabled = false
-          setLoggingEnabled(false)
-        },
-        applyFeatures: () => this.applyFeatures(),
-        applyDesktopToolbarPosition: () => this.applyDesktopToolbarPosition(),
-        refreshButtons: () => {
-          // 刷新桌面端按钮
-          initCustomButtons(this.desktopButtonConfigs)
-        }
-      }
-      createDesktopSettingLayout(setting, context)
-    }
-
-    setting.open(t('plugin.settingsTitle', undefined, '思源手机端增强'))
-
-    // 手机端：对话框打开后注入顶部粘性章节导航
-    if (this.isMobile) {
-      injectMobileSettingsNav()
-    } else {
-      // 电脑端：对话框打开后注入标签栏
-      this.injectTabSwitcher()
     }
   }
 
@@ -1671,7 +1679,7 @@ export default class ToolbarCustomizer extends Plugin {
 
 
   // 手机端设置布局
-  private initMobileSettingLayout(setting: Setting) {
+  private initMobileSettingLayout(setting: MobileSettingSink) {
     // 创建上下文对象，将插件实例的方法和数据通过依赖注入传递
     const context: MobileSettingsContext = {
       buttonConfigs: this.buttonConfigs,

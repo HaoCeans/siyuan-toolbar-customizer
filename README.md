@@ -339,6 +339,34 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.9.8 — Plugin-built mobile settings panel + document navigation follows the capsule
+
+> 💡 Want to drop SiYuan's native settings window and have the mobile settings fully owned by the plugin? And after the bottom floating capsule hides on scroll, the “previous/next document” bar stays put like an unrelated control? Both are addressed here.
+
+**① Mobile settings: plugin-built full-screen panel**
+- No longer borrows SiYuan's native settings window: the panel brings its own header (title + close) and bottom bar (Cancel / Save), filling the phone screen
+- Settings items, groups, section navigation and the save logic are unchanged; the number of items matches the native window, so nothing goes missing
+- Save still writes only changed keys and reloads the UI; Cancel still just closes the panel (no rollback, same as before)
+- Page scroll is locked while open, with scrollbar-width compensation, so the page no longer jumps sideways on open; Esc closes, and scrolling is restored afterwards
+- Header and footer respect notch / gesture-bar safe areas; no panel is left behind when the plugin is disabled or reloaded
+- Desktop settings are untouched — they still use SiYuan's native window with tabs
+
+**② Document navigation follows the capsule's scroll-hide**
+- With the desktop bottom floating capsule's “scroll-hide” enabled, the document nav bar no longer runs its own scroll-direction detection; it follows the capsule's hidden state: fades out when the capsule does, fades back in when the capsule returns
+- Timing and durations match the capsule (50 ms hide delay, 0.16 s fade-out, 0.2 s fade-in), so they never visibly lag behind each other
+- Pointer interaction is disabled while hidden, so you won't accidentally hit “previous/next” through the invisible bar
+- After switching documents, switching tabs, or dragging the window, the nav bar and capsule both come back together — no more “capsule is back but the nav bar is still missing”
+- When the capsule's scroll-hide is off, the nav bar keeps its original independent scroll detection; behavior is unchanged
+- Toggling the capsule's scroll-hide at runtime switches the driver immediately, no plugin restart needed
+
+**③ Settings hint**
+- The scroll-hide hint under “previous/next document” now mentions that the nav bar follows the capsule when the capsule's scroll-hide is enabled
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.9.7 — Side capsule, diary scrolling, and Quick Note popup stability updates
 
 > 💡 Is the side capsule unclickable, does its expanded panel become too wide, does the diary button fail to reach the requested position, or does a leftover desktop Quick Note window prevent documents from opening? This release addresses these cases together. ⚠️ SiYuan v3.8.10 stable or later is required.
@@ -373,11 +401,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 **⑤ Minimum SiYuan version raised to v3.8.10**
 - This release requires SiYuan Note v3.8.10 stable or later; the plugin’s `minAppVersion` metadata has been updated accordingly
 - SiYuan v3.8.9 and earlier, as well as prereleases below v3.8.10 stable such as v3.8.10-rc.1, do not meet the requirement; upgrade SiYuan Note first
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.9.6 — Mobile undo/redo buttons + desktop LifeLog popup: prevent accidental closing
 

@@ -723,7 +723,48 @@ let lastDesktopFloatingConfig: any = null
 	let desktopAutoHidePendingTimer: ReturnType<typeof setTimeout> | null = null
 	let desktopAutoHideForceActive = false
 	let desktopAutoHideCapsuleMode = false
-	
+
+// 电脑端胶囊滚动隐藏的外部订阅者（前一篇/后一篇导航栏等悬浮面板用它跟随胶囊一起隐藏/显示）
+type DesktopFloatingAutoHideListener = (hidden: boolean) => void
+const desktopFloatingAutoHideListeners = new Set<DesktopFloatingAutoHideListener>()
+
+/** 电脑端胶囊滚动隐藏是否已启用（胶囊模式 + 打开滚动隐藏开关） */
+export function isDesktopFloatingAutoHideActive(): boolean {
+  return !isMobileDevice() && desktopAutoHideForceActive
+}
+
+/** 电脑端胶囊当前的滚动隐藏状态（面板初始化时用它对齐，避免首帧闪烁） */
+export function getDesktopFloatingAutoHideState(): { active: boolean, hidden: boolean } {
+  return {
+    active: isDesktopFloatingAutoHideActive(),
+    hidden: desktopHiddenByScroll,
+  }
+}
+
+/**
+ * 订阅电脑端胶囊的滚动隐藏状态。
+ * 前一篇/后一篇文档导航栏通过它跟随胶囊一起隐藏/显示，视觉上与胶囊连成一体。
+ * @returns 取消订阅函数
+ */
+export function subscribeDesktopFloatingAutoHide(listener: DesktopFloatingAutoHideListener): () => void {
+  desktopFloatingAutoHideListeners.add(listener)
+  return () => {
+    desktopFloatingAutoHideListeners.delete(listener)
+  }
+}
+
+/** 广播胶囊滚动隐藏状态（无订阅者时零开销） */
+function notifyDesktopFloatingAutoHide(hidden: boolean): void {
+  if (desktopFloatingAutoHideListeners.size === 0) return
+  desktopFloatingAutoHideListeners.forEach((listener) => {
+    try {
+      listener(hidden)
+    } catch (err) {
+      logger.warn('[DesktopFloating] 滚动隐藏订阅回调失败:', err)
+    }
+  })
+}
+
 	// ===== 工具栏滚动隐藏/显示状态（仅移动端，跟随思源原生移动栏） =====
 let toolbarAutoHideScrollHandler: ((e: Event) => void) | null = null  // 保留：unbindToolbarAutoHideScroll 清理用
 let toolbarAutoHideBoundEl: HTMLElement | null = null  // 保留：unbindToolbarAutoHideScroll 清理用
@@ -6574,6 +6615,8 @@ function unbindDesktopScrollForFloating(): void {
   desktopAutoHideIgnoreUntil = 0
   desktopAutoHideLastHide = 0
   desktopAutoHideLastShow = 0
+  // 胶囊滚动隐藏已停用：通知跟随的面板恢复显示
+  notifyDesktopFloatingAutoHide(false)
 }
 
 /**
@@ -6614,6 +6657,8 @@ function handleDesktopToolbarAutoHideScroll(scrollEl: HTMLElement): void {
     desktopLastScrollTop = st
 
     document.body.classList.add('toolbar-autohide-active')
+    // 通知订阅者（前一篇/后一篇导航栏等）与胶囊同一时序淡出
+    notifyDesktopFloatingAutoHide(true)
     desktopAutoHidePendingTimer = setTimeout(() => {
       desktopAutoHidePendingTimer = null
       getToolbarElementsForAutoHide().forEach(el => {
@@ -6642,6 +6687,8 @@ function handleDesktopToolbarAutoHideScroll(scrollEl: HTMLElement): void {
       desktopAutoHidePendingTimer = null
       document.body.classList.remove('toolbar-autohide-active')
     }, 80)
+    // 通知订阅者与胶囊同时淡入
+    notifyDesktopFloatingAutoHide(false)
   }
 }
 
@@ -6719,6 +6766,8 @@ function startDesktopScrollForFloating(): void {
             el.style.transform = desktopAutoHideCapsuleMode ? 'translateX(-50%) translateY(0)' : ''
           })
           document.body.classList.remove('toolbar-autohide-active')
+          // 同步恢复跟随胶囊的面板（前一篇/后一篇导航栏）
+          notifyDesktopFloatingAutoHide(false)
         }
       }
       // 兜底轮询上限：30 次 ≈ 90 秒后停止（eventBus 此时已稳定接管）
@@ -6728,6 +6777,10 @@ function startDesktopScrollForFloating(): void {
       }
     }, 3000)
   }
+
+  // 6. 通知已存在的订阅者（前一篇/后一篇导航栏）：胶囊滚动隐藏刚被启用，
+  //    让它们立即从"自身滚动判断"切换为"跟随胶囊"，无需等下一次切文档
+  notifyDesktopFloatingAutoHide(false)
 }
 
 /**
@@ -6757,6 +6810,8 @@ export function refreshDesktopFloatingScrollOnSwitch(): void {
 	      htmlEl.style.transform = desktopAutoHideCapsuleMode ? 'translateX(-50%) translateY(0)' : ''
 	    })
 	    document.body.classList.remove('toolbar-autohide-active')
+	    // 切文档时胶囊恢复显示，跟随它的面板一起恢复
+	    notifyDesktopFloatingAutoHide(false)
 	  }
 
 	  // 2. 重置滚动基准（关键：让下一次 scroll 事件重新建立基准，避免 delta 错乱）

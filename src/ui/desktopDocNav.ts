@@ -6,7 +6,12 @@
 import { logger } from '@/utils/logger'
 import { t } from '../i18n/runtime'
 import { fetchSyncPost, showMessage, openTab as siyuanOpenTab } from "siyuan"
-import { pluginInstance, getActiveProtyle } from "../toolbarManager"
+import {
+  getActiveProtyle,
+  getDesktopFloatingAutoHideState,
+  pluginInstance,
+  subscribeDesktopFloatingAutoHide,
+} from "../toolbarManager"
 import type { ButtonConfig } from "../toolbarManager"
 import { applyFloatPanelBackground, observeSiYuanThemeMode } from "./floatPanelBackground"
 import { makeDraggable, restorePosition } from "./draggablePanel"
@@ -60,6 +65,18 @@ let boundScrollEl: HTMLElement | null = null
 let scrollBindRetryTimer: ReturnType<typeof setInterval> | null = null
 let scrollBindRetryCount = 0
 let currentBottomDistance = 20
+
+// ===== 跟随底部悬浮胶囊滚动隐藏 =====
+// 电脑端底部悬浮胶囊开启「滚动隐藏」后，导航栏不再自己做方向判断，
+// 改为订阅胶囊的隐藏状态：同一时刻、同一时长一起淡出/淡入，视觉上与胶囊连成一体。
+// 胶囊未启用滚动隐藏时，仍回落到本模块自己的滚动方向判断。
+let followingCapsule = false
+let capsuleUnsubscribe: (() => void) | null = null
+let capsulePendingTimer: ReturnType<typeof setTimeout> | null = null
+// 与胶囊保持一致的时序（见 toolbarManager.handleDesktopToolbarAutoHideScroll）
+const CAPSULE_HIDE_DELAY_MS = 50   // 胶囊先置 body class，50ms 后再淡出
+const CAPSULE_HIDE_FADE_MS = 160   // 胶囊 CSS transition: opacity 0.16s ease
+const CAPSULE_SHOW_FADE_MS = 200   // 显示时胶囊改用 0.2s ease-out
 
 // ===== 获取当前活动的 protyle 元素和文档信息 =====
 function getCurrentDocId(): string | undefined {
@@ -205,9 +222,9 @@ function createSwitchProtyleHandler(): (() => void) & { cancel?: () => void } {
 	        navBar.style.opacity = '1'
 	        navBar.style.pointerEvents = ''
 	      }
-	      // 切标签页后滚动容器变了，重绑 scroll 监听
+	      // 切标签页后滚动容器变了，按当前驱动（跟随胶囊 / 自身判断）重新对齐
 	      if (autoHideEnabled) {
-	        ensureScrollListenerBound()
+	        syncAutoHideDriver()
 	      }
 	      fetchAdjacentDocs()
 	    }, 300)
@@ -317,6 +334,8 @@ function handleScrollAutoHide(): void {
   if (!state.isVisible) return
   if (!autoHideEnabled) return
   if (!navBar) return
+  // 跟随胶囊时由订阅回调驱动，这里不做方向判断（避免两套阈值互相打架）
+  if (followingCapsule) return
 
   const scrollEl = boundScrollEl || getDesktopContentScrollElement()
   if (!scrollEl) return
@@ -391,6 +410,7 @@ function startScrollBindRetry(): void {
 }
 
 function ensureScrollListenerBound(): void {
+  if (followingCapsule) return
   bindScrollListener()
   if (!boundScrollEl) startScrollBindRetry()
 }
@@ -405,6 +425,101 @@ function detachScrollListener(): void {
     scrollBindRetryTimer = null
   }
 }
+
+// ===== 跟随胶囊：状态应用与订阅 =====
+/** 按胶囊的隐藏状态与相同时序淡出/淡入导航栏 */
+function applyCapsuleHiddenState(hidden: boolean): void {
+  if (!navBar) return
+  if (capsulePendingTimer) {
+    clearTimeout(capsulePendingTimer)
+    capsulePendingTimer = null
+  }
+
+  if (hidden) {
+    // 与胶囊对齐：50ms 后再开始淡出，避免胶囊已淡出、导航栏还停留一拍
+    capsulePendingTimer = setTimeout(() => {
+      capsulePendingTimer = null
+      if (!navBar || !followingCapsule) return
+      hiddenByScroll = true
+      navBar.style.transition = `opacity ${CAPSULE_HIDE_FADE_MS}ms ease`
+      navBar.style.opacity = '0'
+      navBar.style.pointerEvents = 'none'
+    }, CAPSULE_HIDE_DELAY_MS)
+    return
+  }
+
+  hiddenByScroll = false
+  navBar.style.transition = `opacity ${CAPSULE_SHOW_FADE_MS}ms ease-out`
+  navBar.style.opacity = '1'
+  navBar.style.pointerEvents = ''
+}
+
+/** 订阅胶囊状态：运行中开关胶囊滚动隐藏时也能立即切换驱动方式 */
+function ensureCapsuleSubscription(): void {
+  if (capsuleUnsubscribe) return
+  capsuleUnsubscribe = subscribeDesktopFloatingAutoHide((hidden) => {
+    if (!autoHideEnabled || !navBar) return
+    const capsule = getDesktopFloatingAutoHideState()
+    if (!capsule.active) {
+      // 胶囊滚动隐藏已被关闭：回落到自身判断
+      syncAutoHideDriver()
+      return
+    }
+    followingCapsule = true
+    applyCapsuleHiddenState(hidden)
+  })
+}
+
+/** 解除跟随并把导航栏恢复可见 */
+function stopCapsuleFollow(): void {
+  followingCapsule = false
+  if (capsulePendingTimer) {
+    clearTimeout(capsulePendingTimer)
+    capsulePendingTimer = null
+  }
+  if (navBar) {
+    navBar.style.removeProperty('transition')
+    navBar.style.opacity = '1'
+    navBar.style.pointerEvents = ''
+  }
+  hiddenByScroll = false
+}
+
+/** 解绑胶囊订阅并恢复可见（导航栏移除/卸载时调用） */
+function disposeCapsuleFollow(): void {
+  stopCapsuleFollow()
+  if (capsuleUnsubscribe) {
+    capsuleUnsubscribe()
+    capsuleUnsubscribe = null
+  }
+}
+
+/**
+ * 按当前配置决定由谁驱动滚动隐藏：
+ * - 胶囊已启用滚动隐藏 → 跟随胶囊（同一时刻、同一时长）
+ * - 否则 → 使用自身的滚动方向判断
+ */
+function syncAutoHideDriver(): void {
+  if (!autoHideEnabled || !navBar) {
+    detachScrollListener()
+    stopCapsuleFollow()
+    return
+  }
+  ensureCapsuleSubscription()
+
+  const capsule = getDesktopFloatingAutoHideState()
+  if (capsule.active) {
+    followingCapsule = true
+    // 交给胶囊驱动，自身滚动监听退出，避免两套阈值各隐藏一次
+    detachScrollListener()
+    applyCapsuleHiddenState(capsule.hidden)
+    return
+  }
+
+  if (followingCapsule) stopCapsuleFollow()
+  ensureScrollListenerBound()
+}
+
 
 function createNavBar(bottomDistance?: number): void {
   if (navBar) return
@@ -456,10 +571,10 @@ function createNavBar(bottomDistance?: number): void {
     boundary: 'window'
   })
 
-  // 绑定滚动隐藏
-  if (autoHideEnabled) {
-    ensureScrollListenerBound()
-  }
+	  // 绑定滚动隐藏：胶囊启用滚动隐藏时跟随胶囊，否则自身判断方向
+	  if (autoHideEnabled) {
+	    syncAutoHideDriver()
+	  }
 }
 
 function removeNavBar(): void {
@@ -469,6 +584,8 @@ function removeNavBar(): void {
   }
 
   detachScrollListener()
+  // 先解除胶囊订阅并恢复可见，再移除元素（避免回调里访问已移除的节点）
+  disposeCapsuleFollow()
 
   if (navBar) {
     navBar.remove()

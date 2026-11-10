@@ -339,6 +339,46 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.9.7 — Side capsule, diary scrolling, and Quick Note popup stability updates
+
+> 💡 Is the side capsule unclickable, does its expanded panel become too wide, does the diary button fail to reach the requested position, or does a leftover desktop Quick Note window prevent documents from opening? This release addresses these cases together. ⚠️ SiYuan v3.8.10 stable or later is required.
+
+**① Side capsule mode improvements**
+- The “Overflow toolbar” button always remains available as the fixed expand/collapse entry point, so the side capsule cannot turn into an empty, unusable shell when buttons are disabled
+- The main capsule now keeps only the expand entry point; other buttons move into the side panel, whose width is fixed and whose horizontal overflow is constrained
+- The side panel uses an icon-only layout with consistent button margins, padding, and width, keeping the capsule dimensions stable
+- Fixed the capsule remaining visible but unclickable after SiYuan adds `inert` or `pointer-events: none` while hiding the mobile toolbar; the capsule now restores interactivity while visible
+- Fixed third-party buttons inside SiYuan plugin containers being copied or hidden as a whole; external buttons are now collected individually for the expanded panel
+
+**② Diary button scrolling improvements**
+- After opening a diary, the button now scrolls to the configured top or bottom position; “Diary top” now also works on mobile
+- Prefer SiYuan’s native top/bottom scroll controls, allowing the kernel to finish positioning even when a long document is still loading
+- Resolve the active editor before scrolling, avoiding the wrong document when multiple tabs, popup editors, or editors are present at once
+- Added loading waits and retries so API opening, confirmed diary creation, and mobile flows use the same positioning behavior
+
+**③ Desktop block-format Quick Note popup stability**
+- Support the SiYuan v3.8.10+ structure where document titles also contain `.protyle-wysiwyg`; the popup now prefers the body editor so title content is not mistaken for note content
+- Clear the URL hash when hiding the popup and add hash-change handling, History API coverage, and a main-process fallback to prevent main-window diary or document clicks from being routed to the hidden popup
+- Identify leftover windows with stable URL markers as well as runtime flags, so old block-format windows can still be cleaned up after a plugin reload
+- Added a “Clean up leftover Quick Note windows now” button in settings to destroy leftover block-format/plain-text note windows and release occupied documents
+- “0 = never clean up” is now saved and honored; the hidden block-format popup stays available and can resume editing the same draft
+- Fixed automatic cleanup writing into the title editor and potentially clearing the diary or target document name; cleanup now destroys the old window instead of replacing editor HTML directly
+- Adopt running note windows after a plugin reload and preserve non-empty drafts; fixed drafts being mistaken for empty during editor rerendering or because the empty-state flag was stale when closing
+- Added window-creation locking and duplicate-trigger protection to prevent multiple windows or a popup immediately hiding after repeated shortcut events
+
+**④ Document fullscreen switching fix**
+- After switching tabs, “Toggle document fullscreen” now targets the active document instead of toggling fullscreen in an old tab
+- Prefer SiYuan’s native editor fullscreen API; the compatibility fallback also targets the current body editor, excluding hidden tabs and title editors
+
+**⑤ Minimum SiYuan version raised to v3.8.10**
+- This release requires SiYuan Note v3.8.10 stable or later; the plugin’s `minAppVersion` metadata has been updated accordingly
+- SiYuan v3.8.9 and earlier, as well as prereleases below v3.8.10 stable such as v3.8.10-rc.1, do not meet the requirement; upgrade SiYuan Note first
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.9.6 — Mobile undo/redo buttons + desktop LifeLog popup: prevent accidental closing
 
 > 💡 SiYuan v3.8.9 added Undo/Redo buttons to the mobile toolbar — want to hide the native group and use your own minimal icons? Closed the desktop LifeLog popup by tapping outside and lost your content? Update.
@@ -362,11 +402,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 **⑤ Minimum SiYuan version raised to v3.8.9**
 - This version now requires SiYuan v3.8.9 or later; older versions cannot install it or will be marked incompatible in the marketplace
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.9.5 — Sticky section navigation in mobile settings + slash toolbar usage tip
 
@@ -1116,8 +1151,8 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 ### v3.7.0 — Image import refactor + attachment management + toolbox categories (major version update)
 
 > ⚠️ **Requirements (important)**
-> This plugin requires **SiYuan Note v3.8.9 or later** to work properly.
-> If your SiYuan version is below v3.8.9, the plugin cannot be installed or will be shown as incompatible in the plugin marketplace; upgrade SiYuan Note first.
+> This plugin requires **SiYuan Note v3.8.10 stable or later** to work properly.
+> If your SiYuan version is below v3.8.10 stable (including prereleases such as v3.8.10-rc.1), upgrade SiYuan Note first.
 > (Reason: the plugin now follows SiYuan v3.8's language identifier convention, which older versions cannot match correctly.)
 
 ## New

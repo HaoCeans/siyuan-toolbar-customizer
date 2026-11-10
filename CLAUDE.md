@@ -862,9 +862,17 @@ handleToolbarAutoHideScroll()      ← 滚动事件处理器
 - 模式互斥：`enableSideFloatingToolbar` 与 `enableTopToolbar`/`enableBottomToolbar`/`enableFloatingToolbar` 四选一（radio 互斥赋值）
 - 配置字段独立：`sideFloatingRadius`/`sideFloatingHeight`/`sideFloatingStyle` 等**不要复用** `floatingToolbar*`（用户明确要求两套独立，避免模式间串扰）
 - 收起态 = 单个竖排省略号按钮（`lucide:EllipsisVertical`），CSS 竖胶囊：`width: 32px; height: 配置高度; flex-direction: column`，且要清零按钮自带 `margin-right`（否则 ⋮ 不居中）
+- 微缩胶囊尺寸按 `border-box` 控制（宽 30px、高 32px）；胶囊内自定义按钮必须同时清掉 `padding` 并设 `width:100%`、`min-width:0`，否则按钮默认 `padding: 0 8px` 会把实际宽度撑到 39px，看起来胶囊过宽
 - 展开面板：`showOverflowToolbar` 的 `isSideMode` 分支——单层显示全部按钮（不按 overflowLevel 过滤）、`position: fixed` 对齐胶囊（同侧同底）、竖排纯图标、`max-height` + `overflow-y: auto` 滚动、横向分割线（竖排面板不能用竖线分割线）
+- 侧边展开面板固定 `width: 58px` 并设 `box-sizing: border-box`；侧边模式下必须忽略按钮的 `showName`（否则 4 个字会把 `width:auto` 面板撑到 139px 左右，所有图标按钮跟着变宽）
 - 侧栏/更多面板打开（100vw 全屏覆盖）和键盘弹出时隐藏胶囊：`applySideCapsuleVisibility()`（MutationObserver 监听 `#sidebar/#sidebarRight/#menu/#model` 的 style + body class）
 - 胶囊元素加 `data-prevent-swipe` 属性，否则横向滑动会触发思源侧栏滑出手势
+- **胶囊必须主动解除思源的交互禁用**：思源移动栏隐藏时会给 `#editor > .protyle-breadcrumb` 加 `inert` 和 CSS `pointer-events:none`，表现为「胶囊还在但点不动」。显示胶囊时调用 `ensureSideCapsuleInteractive()` 清除 `inert`/`aria-hidden` 并写 inline `pointer-events:auto`，同时监听 `inert`/`aria-hidden` 属性变化（思源每次滚动渲染会重新加）
+- **隐藏原生按钮时必须保留按钮容器**：自定义按钮插在 `.protyle-breadcrumb__plugin` 内（3.8.10 起该容器同时带 `protyle-breadcrumb__actions` 类）。侧边胶囊的「只保留 ⋮」规则只能隐藏容器里的非 `[data-custom-button]` 子元素，不能把容器本身 `display:none`，否则胶囊空白且点不动
+- **侧边模式的主胶囊只保留触发器**：`shouldShowInMainToolbar()` 在侧边模式只放行扩展按钮，其余按钮全部进面板；`shouldShowButton()` 必须让触发器无视 `enabled=false`，否则主胶囊没有任何内容，只剩灰色空壳且无法展开
+- **展开面板打开时主胶囊触发器保留**：它同时是"再点一次关闭面板"的入口；不要为了消除重复观感去隐藏它（重复的 ⋮ 实际来自外部按钮镜像，见下一条）
+- 侧边展开面板必须过滤 `isOverflowButton()`：面板里再出现触发器只会点一下把面板关掉
+- `findExternalToolbarButtons()` 收集第三方按钮时必须递归进入 `.protyle-breadcrumb__plugin` / `__actions` 容器，不能把容器本身当外部按钮镜像：容器里装着本插件全部自定义按钮（含 ⋮ 触发器），整体复制会在面板底部多出一个 ⋮ 和分隔线
 
 ---
 
@@ -927,3 +935,90 @@ handleToolbarAutoHideScroll()      ← 滚动事件处理器
 - 打开文档：桌面端用 `siyuanOpenTab`，移动端用 `openMobileFileById`，平台判定走插件环境而非 UA
 - 创建类 API（createDailyNote / 新建文档）拿到 id 后**先轮询 `waitForBlockIndexReady(id)`**（getBlockInfo code===0，300ms×16≈5s）再打开，消除索引竞态
 - 思源移动端 `tabs.open` 失败是静默的（`void + then` 吞掉、只 restore）——排查"无日志但功能失效"时优先怀疑这类静默 API
+
+### 35. 电脑端块格式一键记事弹窗与思源 3.8.10+ 编辑器兼容
+
+**相关文件**: `src/quickNote/quickNoteBlockWindow.ts`、`src/ui/desktopQuickNoteSettings.ts`、`src/quickNote/kernelBlock.ts`
+
+**背景**: 电脑端块格式一键记事使用独立 `BrowserWindow` 加载 `window.html`，弹窗中的 Protyle 默认包含文档标题编辑器；仅用 CSS 隐藏 `.protyle-title` 不会销毁标题编辑器，也不会停止其内容监听。思源 3.8.10 起支持富文本文档标题，标题区域内嵌了一个 `.protyle-wysiwyg`，并且位于正文编辑器之前。
+
+**历史问题一：标题被清空**:
+- 旧代码用 `document.querySelector('.protyle-wysiwyg')` 取得编辑器；3.8.9 中它通常是正文，3.8.10 起可能先命中隐藏的标题编辑器
+- 隐藏窗口自动清理时把新空草稿 HTML 直接写入该元素，会触发思源标题编辑器的变更监听和 `setDocTitle` 事务，导致日记或目标文档标题被清空
+- 直接给编辑器 `innerHTML`、手动改 `block.id/rootID` 会绕过思源的编辑器生命周期和保存队列，也会产生草稿残留
+
+**历史问题二：今日日记无法从主窗口打开**:
+- 思源 Electron 主进程处理 `siyuan-open-file` 时，会遍历其他窗口的 URL hash；hash 中包含目标文档 ID 时，主进程把打开请求发送到该窗口并聚焦它
+- 弹窗加载日记中的草稿块后，Protyle 的 `rootID` 会解析为今日日记文档 ID；如果弹窗 hash 残留该 ID，主窗口点击今日日记会被误认为文档已经在其他窗口打开
+- 弹窗隐藏或成为残留窗口后，主窗口点击看起来像无反应；使用页签右侧、页签下侧或新窗口打开会绕过该跨窗口匹配，因此仍然可以打开
+
+**规则**:
+- 正文编辑器优先从当前 Editor 实例取得 `protyle.wysiwyg.element`；DOM 兜底时必须排除 `.protyle-title` 和 `.protyle-title__rich`，禁止在块格式独立窗口中直接使用全局 `document.querySelector('.protyle-wysiwyg')`
+- 隐藏超时后的清理应销毁旧 `BrowserWindow`，由 `closed` 流程按空/非空状态删除或保留草稿；下次打开通过正常的建草稿和 `_buildBlockUrl` 流程创建新窗口，不在旧页面中注入 HTML，不伪造 `block.id` 或 `rootID`
+- `quickNoteBlockWindow.ts` 中的正文空状态轮询和自动聚焦必须共用同一个正文编辑器解析函数，避免修复保存路径后空块判断或焦点路径再次命中标题
+- 独立窗口必须清除 URL hash，避免主进程把文档打开请求路由到弹窗：保留 `hashchange` 即时清空、`history.pushState/replaceState` 包装、轮询兜底、`did-navigate-in-page` 主进程事件清空，以及隐藏前主动清空；窗口创建时设置 `backgroundThrottling: false`
+- 不要尝试用 `Object.defineProperty` 重定义 `window.location.hash`；Location 的 `hash` 是不可配置的自有属性，会抛 `TypeError`，应采用写入后清空的事件方案
+- 弹窗必须带稳定的 `win.__qn_block_window` 标记，创建新窗口和关闭时通过标记清理残留窗口，不能依赖 `getTitle()` 判断窗口类型，因为思源会覆盖独立窗口标题
+- 插件启动/重载时先接管仍存活的记事弹窗（恢复 `qnWinId` 与 URL 中的草稿块 ID），不能一律当残留销毁：0 秒常驻的隐藏弹窗会随插件重载保留，直接销毁会让下次快捷键打开变成新空草稿
+- 插件卸载时只销毁空草稿窗口，非空窗口（无论显示还是隐藏）要保留给下一次重载接管；禁止无条件 `deleteQuickNoteDraftBlock`，草稿内容已实时写入内核，删块等于丢笔记
+- 空状态轮询在 `__qnBodyWysiwyg()` 取不到正文时必须跳过本轮，不能把编辑器重渲染期间的空结果写成“空”，否则非空草稿会被自动清理误删
+- 不能只依赖 `__qn_block_window`：插件重载后 `@electron/remote` 的窗口代理会重建，自定义属性丢失，残留窗口会被当成普通窗口跳过。清理逻辑必须同时按 URL 识别：新建窗口带 `qn=1`；旧窗口按 `window.html` 的 `json` 中 `pin=true`、标题含 `⚡`、`children.action` 含 `cb-get-focus` 判断
+- 修改窗口识别规则后，至少验证：插件重载后旧记事窗口仍能被“立即清理残留记事窗口”销毁；主窗口点击此前打不开的文档恢复正常；正常文档独立窗口不会被误删
+- 自动清理时间允许 `0` 时，配置解析必须用 `Number.isNaN` 区分无效值和合法的 0，禁止使用 `parseInt(value) || fallback`
+- 修改独立窗口生命周期、URL、Protyle 初始化或 hash 处理后，至少验证：输入并隐藏弹窗后主窗口仍能打开今日日记；弹窗自动清理后不再清空文档标题；设置为 0 后弹窗可恢复原草稿；关闭和插件重启后没有残留窗口或空草稿
+
+### 36. 手机端「滚动文档顶部/底部」与「日记顶部/底部」：必须针对当前编辑器
+
+**相关文件**: `src/toolbarManager.ts`（`resolveScrollTarget`、`scrollProtyleToBoundary`、`executeScrollDoc`、`executeDiary`）
+
+**背景**: 手机端可能同时存在主编辑器 `window.siyuan.mobile.editor`、弹出编辑器 `popEditor` 和次级编辑器（反链、引用、数据库行）；桌面端多页签也存在多个 `.protyle`。旧实现用 `document.querySelector('.protyle:not(.fn__hidden):not(.fn__none)')` 取第一个，可能命中非当前编辑器，表现为「按钮点了但当前文档没动」。另外旧实现直接写 `scrollTop`，文档未完整加载时只能滚到已加载位置，长文档会停在半路；旧版手机端选择「日记顶部」时则完全不滚动。
+
+**规则**:
+- 当前编辑器按「手机端主编辑器 → 焦点所在 `.protyle` → `getActiveProtyle()`（桌面活动页签）→ 可见 `.protyle`」解析，禁止再用全局第一个 `.protyle`
+- 滚动到边界优先点击思源原生 `.protyle-scroll__up` / `.protyle-scroll__down`，由内核 `goHome` / `goEnd` 处理 mode 0/4 动态加载；只有编辑器没有滚动控件时才回退写 `contentElement.scrollTop`
+- 不要遍历所有 `.protyle` 批量写 `scrollTop`，会误伤其他页签、弹窗或次级编辑器
+- 手机端「日记顶部」必须与电脑端一致真正滚动；打开日记后先等编辑器挂载再滚动，找不到目标时短轮询重试，不要固定一次延时后就放弃
+- 点击工具栏按钮后焦点通常在按钮上，此时回退到 `window.siyuan.mobile.editor` 是预期行为
+- 修改后至少验证：多页签、弹出引用、反链面板等场景点击滚动只影响当前文档；长文档能滚到真正末尾（含动态加载）；手机端「日记顶部」能回到顶部
+
+### 37. 记事弹窗窗口标记在插件重载后丢失，旧文档被隐藏窗口占用
+
+**相关文件**: `src/quickNote/quickNoteBlockWindow.ts`（`isQuickNoteBlockWindow`、`destroyAllBlockWindows`、`_buildBlockUrl`）、`src/utils/windowRouteDiagnostics.ts`
+
+**现象**: 主窗口普通点击某天日记（例如 2026-11-04）无反应，右键「在页签右侧打开」「在页签下侧打开」「使用新窗口打开」都正常。开启插件调试日志后可以看到：
+
+```text
+[路由诊断] 打开文档 20261104085136-5mkrm8f 被其他窗口接管: true
+[路由诊断] 窗口 11 记事弹窗= false 可见= false 命中目标= true hashIds= ['20261104085136-5mkrm8f'] url= ...window.html?...json=...⚡ 快捷记事...#20261104085136-5mkrm8f
+```
+
+**根因**:
+- 记事弹窗的 `win.__qn_block_window` 是挂在 `@electron/remote` 窗口代理上的自定义属性；插件重载后代理对象重建，属性丢失，但对应的 BrowserWindow 仍然存活
+- 残留窗口的 hash 里仍带着草稿所在日记的文档 ID；思源主进程按窗口 hash 路由 `siyuan-open-file`，主窗口点击该文档时请求被转给隐藏窗口，主窗口不再打开
+- 启动清理、命令面板、设置页按钮都按内存标记匹配，因此全部跳过这些窗口，表现为"清理没生效"
+
+**修复**:
+- 新建窗口地址增加 `qn=1`
+- `isQuickNoteBlockWindow()` 三重识别：内存标记 / `qn=1` / 旧窗口 URL 特征（`window.html` 的 `json` 中 `pin=true`、标题含 `⚡`、`children.action` 含 `cb-get-focus`）
+- 关闭流程、设置页「立即清理残留记事窗口」统一使用该函数
+- 插件启动/重载时不销毁仍存活的记事窗口，改为接管（见第 35 节规则）
+
+**规则**:
+- 窗口识别不能只依赖内存属性，必须能在插件重载后重新识别；优先使用 URL 等窗口自身携带的信息
+- 新增识别特征时保留旧窗口兜底：老版本创建的窗口没有新参数，只能靠 URL 特征匹配
+- 修改后至少验证：插件重载后旧记事窗口仍能被「立即清理残留记事窗口」销毁；此前打不开的文档恢复；普通文档独立窗口不会被误删
+- 排障入口：设置 - 桌面端 - 📝 插件调试日志，再在主窗口开发者工具过滤 `路由诊断`；日志会列出每个窗口的 `记事弹窗`、`可见`、`命中目标`、`hashIds`、`url`
+
+### 38. 文档全屏切换：必须按当前活动页签取编辑器实例
+
+**相关文件**: `src/toolbarManager.ts`（`case 'doc-fullscreen'`、`resolveActiveProtyleInstance`、`findBodyWysiwygInProtyle`）
+
+**现象**: 当前文档点「④文档全屏切换」正常；用页签切到另一篇文档后再点，新文档没有反应，旧文档反而进入/退出全屏。
+
+**根因**: 旧实现用 `document.querySelector('.protyle-wysiwyg.protyle-wysiwyg--select') || document.querySelector('.protyle-wysiwyg:not(.fn__none):not(.fn__hidden)')` 取编辑器。页签切换后旧页签的 DOM 仍留在文档中，`querySelector` 会命中旧页签（或 3.8.10 标题内嵌的 `.protyle-wysiwyg`），再把 Alt+Y 派发给它；思源按键处理器按事件目标所属 `.protyle` 解析文档，于是全屏作用在旧文档上。
+
+**规则**:
+- 文档全屏优先取当前活动编辑器实例，调用 `protyle.getInstance().setFullscreen(!isFullscreen())`，与思源 Alt+Y 走同一套逻辑，不依赖焦点和键盘事件
+- 实例解析复用滚动的优先级：手机端主/弹出编辑器 → 桌面活动页签（`getActiveProtyle()`）；只接受 `isConnected` 且 `getClientRects().length > 0` 的实例，禁止取全局第一个 `.protyle` 或 `.protyle-wysiwyg`
+- 旧版本没有 `getInstance` 时才回退键盘事件；回退也必须把事件派发到当前编辑器正文，正文查找要排除 `.protyle-title` / `.protyle-title__rich` 内的编辑器
+- 修改后至少验证：单页签切换、多分屏、弹窗/次级编辑器存在时，连续切换页签后点击全屏都只作用于当前文档

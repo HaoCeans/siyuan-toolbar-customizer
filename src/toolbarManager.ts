@@ -1078,6 +1078,12 @@ function isDesktopDevice(): boolean {
 function shouldShowButton(button: ButtonConfig): boolean {
   const isMobile = isMobileDevice()
 
+  // 侧边胶囊模式：扩展工具栏按钮是"展开面板"的结构性触发器，不受启用开关影响。
+  // 若允许禁用，主胶囊会没有任何内容，只剩灰色空壳且无法展开。
+  const sideMode = isSideFloatingMode()
+    || (pluginInstance as any)?.mobileConfig?.enableSideFloatingToolbar === true
+  if (sideMode && isOverflowButton(button.id)) return true
+
   // 弹窗上下文特殊处理：如果弹窗开启了 overflow，强制显示 overflow 按钮
   // （即使主工具栏 overflow 按钮被禁用，弹窗里仍然需要显示）
   if (
@@ -1131,6 +1137,14 @@ function isInputOrEditable(element: HTMLElement): boolean {
  * 检查按钮是否应该显示在主工具栏（而非扩展工具栏）
  */
 function shouldShowInMainToolbar(button: ButtonConfig): boolean {
+  // 侧边胶囊模式：主胶囊只保留"展开面板"的触发器（扩展工具栏按钮），其余按钮全部进展开面板。
+  // 触发器是结构性的：即使按钮被禁用也必须渲染，否则主胶囊只剩一个灰色空壳且无法展开。
+  const sideMode = isSideFloatingMode()
+    || (pluginInstance as any)?.mobileConfig?.enableSideFloatingToolbar === true
+  if (sideMode) {
+    return isOverflowButton(button.id)
+  }
+
   // 扩展工具栏按钮：启用时显示，禁用时隐藏
   // 弹窗上下文 + 弹窗 overflow 开启时，强制显示
   if (isOverflowButton(button.id)) {
@@ -1570,9 +1584,12 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
 	                bottom: calc(${miniBottom} + env(safe-area-inset-bottom)) !important;
 	                /* !important 覆盖思源 #editor > .protyle-breadcrumb 的滚动上移（--mobile-bar-translate-y） */
 	                transform: translateZ(0) !important;
-	                /* 微缩小胶囊：淡主题色背景 + 细边框 + 圆角 + 柔和阴影 */
+	                /* 微缩小胶囊：淡主题色背景 + 细边框 + 圆角 + 柔和阴影。
+	                   border-box 让 30px 是最终外宽，避免再叠加 padding/border 变成 36px。 */
 	                width: 30px !important;
+	                min-width: 30px !important;
 	                max-width: none !important;
+	                box-sizing: border-box !important;
 	                z-index: ${config.toolbarZIndex} !important;
 	                border: 1px solid var(--b3-border-color) !important;
 	                border-radius: ${floatRadius} !important;
@@ -1590,17 +1607,39 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
 	                -webkit-backface-visibility: hidden;
 	                backface-visibility: hidden;
 	                will-change: transform;
+	                /* 思源移动栏隐藏时会给面包屑加 pointer-events:none，胶囊需要保持可点击 */
+	                pointer-events: auto !important;
 	              }
-	              /* 侧边胶囊：清除按钮自带右边距，保证 ⋮ 在胶囊正中 */
+	              /* 侧边胶囊：清除按钮自带边距和内边距，保证 ⋮ 在胶囊正中且不把胶囊撑宽 */
 	              .protyle-breadcrumb[data-input-method] [data-custom-button],
 	              .protyle-breadcrumb__bar[data-input-method] [data-custom-button] {
 	                margin-right: 0 !important;
 	                margin-left: 0 !important;
+	                padding-left: 0 !important;
+	                padding-right: 0 !important;
+	                min-width: 0 !important;
+	                width: 100% !important;
 	              }
-	              /* 侧边胶囊：隐藏容器内所有非插件按钮（思源原生 readonly/doc/more/面包屑等），只保留 ⋮ */
-	              .protyle-breadcrumb[data-input-method] > :not([data-custom-button]),
-	              .protyle-breadcrumb__bar[data-input-method] > :not([data-custom-button]) {
+	              /* 侧边胶囊：隐藏思源原生按钮（readonly/doc/more/面包屑等），只保留自定义按钮。
+	                 不能把 .protyle-breadcrumb__plugin / __actions 容器本身隐藏：自定义按钮就插在
+	                 这个容器里（3.8.10 起容器同时带 __actions 类），连容器一起隐藏会让胶囊空白、点不动。 */
+	              .protyle-breadcrumb[data-input-method] > :not([data-custom-button]):not(.protyle-breadcrumb__plugin):not(.protyle-breadcrumb__actions),
+	              .protyle-breadcrumb__bar[data-input-method] > :not([data-custom-button]):not(.protyle-breadcrumb__plugin):not(.protyle-breadcrumb__actions) {
 	                display: none !important;
+	              }
+	              .protyle-breadcrumb[data-input-method] .protyle-breadcrumb__plugin > :not([data-custom-button]),
+	              .protyle-breadcrumb[data-input-method] .protyle-breadcrumb__actions > :not([data-custom-button]),
+	              .protyle-breadcrumb__bar[data-input-method] .protyle-breadcrumb__plugin > :not([data-custom-button]),
+	              .protyle-breadcrumb__bar[data-input-method] .protyle-breadcrumb__actions > :not([data-custom-button]) {
+	                display: none !important;
+	              }
+	              .protyle-breadcrumb[data-input-method] .protyle-breadcrumb__plugin,
+	              .protyle-breadcrumb[data-input-method] .protyle-breadcrumb__actions,
+	              .protyle-breadcrumb__bar[data-input-method] .protyle-breadcrumb__plugin,
+	              .protyle-breadcrumb__bar[data-input-method] .protyle-breadcrumb__actions {
+	                display: flex !important;
+	                flex: 0 0 auto !important;
+	                overflow: visible !important;
 	              }
 	          `
 	          } else if (isFloating) {
@@ -2807,6 +2846,14 @@ function findExternalToolbarButtons(): HTMLElement[] {
   const collect = (host: HTMLElement) => {
     Array.from(host.children).forEach(child => {
       const el = child as HTMLElement
+      // 思源把本插件按钮和第三方插件按钮都放在 __plugin / __actions 容器里。
+      // 不能把容器本身当成"外部按钮"复制（会把主胶囊的 ⋮ 触发器一起镜像进面板），
+      // 必须递归到容器内部逐个筛选。
+      if (el.classList.contains('protyle-breadcrumb__plugin')
+        || el.classList.contains('protyle-breadcrumb__actions')) {
+        collect(el)
+        return
+      }
       if (isExcluded(el)) return
       // 只收集"像按钮"的元素：button/a、或含图标（svg/img）、或有文字/可访问名——
       // 排除纯装饰元素（如其他插件的竖向分隔条：无内容、无图标、非 button/a）
@@ -3131,8 +3178,9 @@ function showOverflowToolbar(config: ButtonConfig) {
 	    // 胶囊模式：扩展面板跟随胶囊的位置和宽度
 	    let horizontalCss = 'left: 10px; right: 10px;'
 	    if (isSideMode) {
-	      // 侧边胶囊：横向定位已由 positionCss 的 ${side} 控制
-	      horizontalCss = 'width: auto;'
+	      // 侧边胶囊：横向定位已由 positionCss 的 ${side} 控制。
+	      // 固定宽度，避免 width:auto 被按钮文字/外部插件按钮的最大内容宽度撑开。
+	      horizontalCss = 'width: 58px;'
 	    } else if (isCapsuleMode) {
 	      const capsuleEl = document.querySelector(
 	        '.protyle-breadcrumb__bar[data-toolbar-customized], .protyle-breadcrumb[data-toolbar-customized]'
@@ -3155,8 +3203,10 @@ function showOverflowToolbar(config: ButtonConfig) {
 	        align-items: stretch;
 	        gap: 2px;
 	        padding: 6px;
+	        box-sizing: border-box;
 	        max-height: calc(100vh - ${sideBottomNum + 90}px);
 	        overflow-y: auto;
+	        overflow-x: hidden;
 	        background: var(--b3-theme-surface);
 	        ${panelFollowMain ? 'border: none;' : 'border: 1px solid var(--b3-theme-primary);'}
 	        border-radius: ${sideRadius}px;
@@ -3287,8 +3337,9 @@ function showOverflowToolbar(config: ButtonConfig) {
         layerBtn.appendChild(iconSpan)
       }
 
-	      // 如果开启显示名称，显示文字代替图标
-	      if (btn.showName) {
+	      // 如果开启显示名称，显示文字代替图标（侧边胶囊面板固定为纯图标，忽略名称，
+	      // 否则 4 个字的文字会把 width:auto 的竖排面板撑到 139px 左右）
+	      if (btn.showName && !isSideMode) {
 	        const displayNameBase = getButtonDisplayName(btn)
 	        // 最多显示4个字，超过则截取前4个字
 	        const displayName = displayNameBase.length > 4 ? displayNameBase.slice(0, 4) : displayNameBase
@@ -3319,6 +3370,7 @@ function showOverflowToolbar(config: ButtonConfig) {
           width: 100%;
           min-height: 40px;
           padding: 6px;
+          box-sizing: border-box;
           border-radius: 8px;
           background: transparent;
           border: none;
@@ -4235,46 +4287,29 @@ function executeBuiltinRefreshFunction(config: ButtonConfig) {
       break
       
     case 'doc-fullscreen':
-      // 文档全屏切换 - 仅使用快捷键方案
+      // 文档全屏切换：必须作用于当前活动页签的编辑器。
+      // 不能取全局第一个 .protyle-wysiwyg 再派发 Alt+Y：页签切换后旧页签的 DOM 仍在文档里，
+      // 第一个匹配元素可能属于隐藏页签或标题，快捷键会切到旧文档，表现为新文档按钮失效。
       try {
-        // 构建完整的键盘事件对象（参考快捷键功能实现）
-        const keyEvent = {
-          key: 'y',
-          code: 'KeyY',
-          keyCode: 89,
-          which: 89,
-          ctrlKey: false,
-          shiftKey: false,
-          altKey: true,
-          metaKey: false,
-          bubbles: true,
-          cancelable: true,
-          composed: true,
-          view: window
-        };
-        
-        // 尝试在活动编辑器上触发事件（优先方案）
-        const activeEditor = document.querySelector('.protyle-wysiwyg.protyle-wysiwyg--select') || document.querySelector('.protyle-wysiwyg:not(.fn__none):not(.fn__hidden)') as HTMLElement;
-        
-        if (activeEditor instanceof HTMLElement) {
-          // 先聚焦到编辑器
-          activeEditor.focus();
-
-          // 延迟触发，确保焦点设置完成
-          setTimeout(() => {
-            const eventDown = new KeyboardEvent('keydown', keyEvent);
-            dispatchKeyWithLog(activeEditor, eventDown, '全屏切换：派发 keydown 到编辑器', {});
-          }, 50);
-        } else {
-          // 如果没有找到编辑器，派发到 body（元素目标，不能是 window）
-          const eventDown = new KeyboardEvent('keydown', keyEvent);
-          dispatchKeyWithLog(document.body, eventDown, '全屏切换：未找到编辑器，派发 keydown 到 body', {});
+        const protyle = resolveActiveProtyleInstance()
+        const instance = protyle?.getInstance?.()
+        if (instance?.setFullscreen) {
+          const isFullscreen = typeof instance.isFullscreen === 'function'
+            ? instance.isFullscreen()
+            : Boolean(protyle?.element?.classList?.contains('fullscreen'))
+          instance.setFullscreen(!isFullscreen)
+          break
         }
-      } catch (error) {
-        logger.error('文档全屏切换失败:', error);
-        
-        // 备用方案：在 document 上触发
-        try {
+
+        // 旧版本兜底：把快捷键派发到当前编辑器，而不是全局第一个编辑器
+        const targetRoot = resolveScrollTarget().rootElement
+        const targetEditor = targetRoot ? findBodyWysiwygInProtyle(targetRoot) : null
+        if (!targetEditor) {
+          Notify.showInfoEditorNotFocused()
+          break
+        }
+        targetEditor.focus()
+        safeSetTimeout(() => {
           const keyEvent = {
             key: 'y',
             code: 'KeyY',
@@ -4287,14 +4322,12 @@ function executeBuiltinRefreshFunction(config: ButtonConfig) {
             bubbles: true,
             cancelable: true,
             composed: true,
-            view: window
-          };
-          
-          const eventDown = new KeyboardEvent('keydown', keyEvent);
-          dispatchKeyWithLog(document, eventDown, '全屏切换（备用）：派发 keydown 到 document', {});
-        } catch (e) {
-          logger.error('备用方案也失败:', e);
-        }
+            view: window,
+          }
+          dispatchKeyWithLog(targetEditor, new KeyboardEvent('keydown', keyEvent), '全屏切换：派发 keydown 到当前编辑器', {})
+        }, 50)
+      } catch (error) {
+        logger.error('文档全屏切换失败:', error)
       }
       break
       
@@ -4783,66 +4816,148 @@ function getContentElementFromDOM(): HTMLElement | null {
 }
 
 /**
+ * 解析当前应滚动的编辑器。
+ * 不能再用 document.querySelector('.protyle')：手机端可能同时存在主编辑器、弹出编辑器和
+ * 次级编辑器，桌面端多页签时也可能命中非活动页签。思源官方的当前编辑器优先级是
+ * 次级编辑器 → 弹出编辑器 → 主编辑器，这里用「手机端主编辑器 → 焦点所在编辑器 →
+ * 桌面活动页签 → 可见编辑器」近似实现。
+ */
+function resolveScrollTarget(): {
+  rootElement: HTMLElement | null
+  contentElement: HTMLElement | null
+} {
+  const windowObj = window as any
+
+  const mobileProtyle = windowObj.siyuan?.mobile?.editor?.protyle
+  if (mobileProtyle?.contentElement instanceof HTMLElement
+    && mobileProtyle.element?.isConnected
+    && mobileProtyle.element.getClientRects().length > 0) {
+    return {
+      rootElement: mobileProtyle.element,
+      contentElement: mobileProtyle.contentElement,
+    }
+  }
+
+  // 焦点所在编辑器：次级/弹出编辑器实例不暴露在全局，只能用焦点定位
+  const activeElement = document.activeElement as HTMLElement | null
+  const focusProtyleElement = activeElement?.closest?.('.protyle') as HTMLElement | null
+  if (focusProtyleElement) {
+    return {
+      rootElement: focusProtyleElement,
+      contentElement: focusProtyleElement.querySelector(':scope > .protyle-content') as HTMLElement | null,
+    }
+  }
+
+  const activeProtyle = getActiveProtyle()
+  if (activeProtyle?.contentElement instanceof HTMLElement && activeProtyle.element?.isConnected) {
+    return {
+      rootElement: activeProtyle.element,
+      contentElement: activeProtyle.contentElement,
+    }
+  }
+
+  const visible = Array.from(document.querySelectorAll('.protyle')).find((element) => {
+    const htmlElement = element as HTMLElement
+    return !htmlElement.closest('[inert]')
+      && !htmlElement.classList.contains('fn__none')
+      && !htmlElement.classList.contains('fn__hidden')
+      && htmlElement.getClientRects().length > 0
+  }) as HTMLElement | undefined
+  if (visible) {
+    return {
+      rootElement: visible,
+      contentElement: visible.querySelector(':scope > .protyle-content') as HTMLElement | null,
+    }
+  }
+
+  return {
+    rootElement: null,
+    contentElement: null,
+  }
+}
+
+/**
+ * 解析当前活动编辑器实例（用于文档全屏等需要实例 API 的操作）。
+ * 手机端优先主/弹出编辑器；桌面端只认活动页签，活动页签不是编辑器时返回 null。
+ * 只接受仍挂载且可见的实例，避免页签切换后拿到隐藏页签的旧编辑器。
+ */
+function resolveActiveProtyleInstance(): any | null {
+  const windowObj = window as any
+  const usable = (protyle: any): boolean => Boolean(
+    protyle
+    && protyle.element instanceof HTMLElement
+    && protyle.element.isConnected
+    && protyle.element.getClientRects().length > 0,
+  )
+
+  const mobile = windowObj.siyuan?.mobile
+  if (usable(mobile?.popEditor?.protyle)) return mobile.popEditor.protyle
+  if (usable(mobile?.editor?.protyle)) return mobile.editor.protyle
+
+  // 桌面端只看活动页签：活动页签不是编辑器时返回 null，
+  // 不能回退到其他页签，否则会把全屏作用到旁边分屏或后台文档
+  const activeTabId = document.querySelector('.layout__wnd--active .item--focus')?.getAttribute('data-id')
+  if (activeTabId && windowObj.siyuan?.layout?.centerLayout?.children) {
+    for (const child of windowObj.siyuan.layout.centerLayout.children) {
+      for (const tab of (child?.children || [])) {
+        if (tab?.id !== activeTabId) continue
+        const protyle = tab?.model?.editor?.protyle
+        return usable(protyle) ? protyle : null
+      }
+    }
+    return null
+  }
+
+  const activeProtyle = getActiveProtyle()
+  if (usable(activeProtyle)) return activeProtyle
+
+  return null
+}
+
+/**
+ * 取编辑器正文的 .protyle-wysiwyg。
+ * 思源 3.8.10 起标题也内嵌 .protyle-wysiwyg 且排在正文之前，必须排除标题内的编辑器。
+ */
+function findBodyWysiwygInProtyle(rootElement: HTMLElement | null): HTMLElement | null {
+  if (!rootElement) return null
+  const candidates = rootElement.querySelectorAll<HTMLElement>('.protyle-wysiwyg')
+  for (const element of Array.from(candidates)) {
+    if (!element.closest('.protyle-title,.protyle-title__rich')) return element
+  }
+  return null
+}
+
+/**
+ * 滚动到文档顶部/底部。
+ * 优先点击思源原生的边界按钮（.protyle-scroll__up/down）：它走内核的 goHome/goEnd，
+ * 文档未完整加载时会按 mode 0/4 动态加载后再滚动；直接写 scrollTop 只能滚到已加载的位置，
+ * 长文档会停在半路。没有滚动控件时（render.scroll=false）才回退到 scrollTop。
+ */
+function scrollProtyleToBoundary(rootElement: HTMLElement, direction: 'top' | 'bottom'): boolean {
+  const button = rootElement.querySelector(
+    direction === 'top' ? '.protyle-scroll__up' : '.protyle-scroll__down',
+  ) as HTMLElement | null
+  if (button) {
+    button.click()
+    return true
+  }
+  const contentElement = rootElement.querySelector(':scope > .protyle-content') as HTMLElement | null
+  if (contentElement) {
+    contentElement.scrollTop = direction === 'top' ? 0 : contentElement.scrollHeight
+    return true
+  }
+  return false
+}
+
+/**
  * 执行滚动文档到顶部或底部
- * 电脑端使用模拟键盘快捷键，手机端直接操作 scrollTop
  */
 function executeScrollDoc(config: ButtonConfig) {
   const direction = config.scrollDirection || 'top'
-
-  // 检查是否有活动的编辑器
-  const activeProtyle = document.querySelector('.protyle:not(.fn__hidden):not(.fn__none)')
-  if (!activeProtyle) {
+  const target = resolveScrollTarget()
+  if (!target.rootElement || !scrollProtyleToBoundary(target.rootElement, direction)) {
     Notify.showInfoEditorNotFocused()
-    return
   }
-
-  // 手机端：直接操作 .protyle-content 的 scrollTop 实现滚动
-  // 注意：不能用 .protyle-scroll（那是导航箭头UI组件，不是滚动容器）
-  if (isMobileDevice()) {
-    const scrollEl = activeProtyle.querySelector('.protyle-content') as HTMLElement
-    if (scrollEl) {
-      scrollEl.scrollTop = direction === 'top' ? 0 : scrollEl.scrollHeight
-    }
-    return
-  }
-
-  // 电脑端：先尝试键盘事件，若滚动未生效则回退到 scrollIntoView
-  // 注意：.protyle-scroll 是导航箭头UI组件（position: absolute），不能用来检测滚动
-  const scrollEl = activeProtyle.querySelector('.protyle-content') as HTMLElement
-  const scrollTopBefore = scrollEl ? scrollEl.scrollTop : 0
-
-  const key = direction === 'top' ? 'Home' : 'End'
-  const event = new KeyboardEvent('keydown', {
-    key: key,
-    code: key,
-    ctrlKey: true,
-    bubbles: true,
-    cancelable: true
-  })
-
-  // 分发给编辑器容器
-  activeProtyle.dispatchEvent(event)
-
-  // 同时分发给 wysiwyg 编辑区域，确保被捕获
-  const wysiwyg = activeProtyle.querySelector('.protyle-wysiwyg')
-  if (wysiwyg) {
-    wysiwyg.dispatchEvent(event)
-  }
-
-  // 检测滚动是否生效，未生效则用 scrollIntoView 回退
-  requestAnimationFrame(() => {
-    if (isCleanedUp) return
-    if (scrollEl && scrollEl.scrollTop === scrollTopBefore) {
-      const content = activeProtyle.querySelector('.protyle-content') as HTMLElement
-      if (content) {
-        if (direction === 'top') {
-          content.firstElementChild?.scrollIntoView({ behavior: 'instant', block: 'start' })
-        } else {
-          content.lastElementChild?.scrollIntoView({ behavior: 'instant', block: 'end' })
-        }
-      }
-    }
-  })
 }
 
 /**
@@ -5404,123 +5519,32 @@ async function executeDiary(config: ButtonConfig) {
     const isMobile = pluginInstance?.isMobile === true
       || windowObj.siyuan?.config?.fronted?.includes?.('mobile') === true
 
-    // ==================== 滚动到底部函数（仅在 position === 'bottom' 时使用） ====================
-    let scrollAttempts = 0
-    const maxScrollAttempts = 2  // 减少重试次数：5次 -> 2次
-    const retryDelay = 150  // 减少重试间隔：200ms -> 150ms
-
-    // DOM 缓存：避免重复查询
-    let cachedProtyles: NodeListOf<HTMLElement> | null = null
+    // ==================== 打开后滚动到顶部/底部 ====================
+    // 用同一个"当前编辑器"解析 + 原生边界按钮滚动：动态加载交给内核 goHome/goEnd，
+    // 不再遍历所有 .protyle（那会滚到非活动编辑器），也不再固定只重试 2 次。
+    function scrollToBoundaryWithRetry(direction: 'top' | 'bottom', attempt = 0) {
+      if (isCleanedUp) return
+      const target = resolveScrollTarget()
+      if (target.rootElement && scrollProtyleToBoundary(target.rootElement, direction)) {
+        if (config.showNotification !== false) {
+          if (direction === 'bottom') {
+            Notify.showInfoDiaryOpenedAndScrolled()
+          } else {
+            Notify.showInfoDiaryOpened()
+          }
+        }
+        return
+      }
+      if (attempt < 6) {
+        safeSetTimeout(() => scrollToBoundaryWithRetry(direction, attempt + 1), 200)
+      } else if (config.showNotification !== false) {
+        Notify.showInfoDiaryOpened()
+      }
+    }
 
     function startScrolling() {
-      if (position === 'bottom') {
-        scrollAttempts = 0
-        cachedProtyles = null // 重置缓存
-        scrollToBottom()
-      } else if (position === 'top' && !isMobile) {
-        // 电脑端顶部模式：滚动到顶部
-        scrollAttempts = 0
-        cachedProtyles = null // 重置缓存
-        scrollToTop()
-      }
-    }
-
-    function scrollToBottom() {
-      scrollAttempts++
-
-      // 使用缓存或查询 DOM
-      const allProtyles = cachedProtyles || document.querySelectorAll('.protyle') as NodeListOf<HTMLElement>
-
-      // 首次查询时缓存结果
-      if (!cachedProtyles) {
-        cachedProtyles = allProtyles
-      }
-
-      // 如果找不到任何 protyle 元素，说明文档还未加载，需要重试
-      if (allProtyles.length === 0) {
-        if (scrollAttempts < maxScrollAttempts) {
-          safeSetTimeout(scrollToBottom, retryDelay)
-          return
-        }
-      }
-
-      let scrolled = false
-      let hasScrollableContent = false
-
-      allProtyles.forEach((protyle) => {
-        // 尝试滚动 .protyle-content 元素
-        const content = protyle.querySelector('.protyle-content') as HTMLElement
-        if (content) {
-          if (content.scrollHeight > content.clientHeight) {
-            // 有可滚动的内容，执行滚动
-            content.scrollTop = content.scrollHeight
-            scrolled = true
-          }
-          hasScrollableContent = true
-        }
-      })
-
-      // 显示通知（只显示一次）
-      if (config.showNotification !== false && scrollAttempts === 1) {
-        if (scrolled) {
-          Notify.showInfoDiaryOpenedAndScrolled()
-        } else if (hasScrollableContent || allProtyles.length > 0) {
-          // 找到了 protyle 但没有滚动（文档内容较少），也视为成功
-          Notify.showInfoDiaryOpened()
-        }
-      }
-
-      // 如果没有找到任何 protyle，继续重试
-      if (!hasScrollableContent && scrollAttempts < maxScrollAttempts) {
-        safeSetTimeout(scrollToBottom, retryDelay)
-      }
-    }
-
-    // ==================== 滚动到顶部函数（仅电脑端 position === 'top' 时使用） ====================
-    function scrollToTop() {
-      scrollAttempts++
-
-      // 使用缓存或查询 DOM
-      const allProtyles = cachedProtyles || document.querySelectorAll('.protyle') as NodeListOf<HTMLElement>
-
-      // 首次查询时缓存结果
-      if (!cachedProtyles) {
-        cachedProtyles = allProtyles
-      }
-
-      // 如果找不到任何 protyle 元素，说明文档还未加载，需要重试
-      if (allProtyles.length === 0) {
-        if (scrollAttempts < maxScrollAttempts) {
-          safeSetTimeout(scrollToTop, retryDelay)
-          return
-        }
-      }
-
-      let scrolled = false
-
-      allProtyles.forEach((protyle) => {
-        // 尝试滚动 .protyle-content 元素到顶部
-        const content = protyle.querySelector('.protyle-content') as HTMLElement
-        if (content) {
-          content.scrollTop = 0
-          scrolled = true
-        }
-      })
-
-      // 显示通知（只显示一次）
-      if (config.showNotification !== false && scrollAttempts === 1) {
-        if (scrolled) {
-          Notify.showInfoDiaryOpened()
-        } else if (allProtyles.length > 0) {
-          // 找到了 protyle，也视为成功
-          Notify.showInfoDiaryOpened()
-        }
-      }
-
-      // 如果没有找到任何 protyle，继续重试
-      if (!scrolled && allProtyles.length === 0 && scrollAttempts < maxScrollAttempts) {
-        safeSetTimeout(scrollToTop, retryDelay)
-      }
+      // 手机端"日记顶部"此前是空实现，现在与电脑端一致真正滚到顶部
+      scrollToBoundaryWithRetry(position === 'top' ? 'top' : 'bottom')
     }
 
     // ==================== 如果配置了笔记本ID，使用API直接创建/打开日记 ====================
@@ -5556,20 +5580,9 @@ async function executeDiary(config: ButtonConfig) {
             logger.warn('[日记功能] 打开文档失败:', openError)
           }
 
-          // 根据位置模式，等待文档加载后滚动
-          if (position === 'bottom') {
-            // 底部模式：滚动到底部
-            const waitTime = isMobile ? (config.diaryWaitTime || 1000) : 800
-            safeSetTimeout(startScrolling, waitTime)
-          } else if (position === 'top' && !isMobile) {
-            // 顶部模式（仅电脑端）：滚动到顶部
-            safeSetTimeout(startScrolling, 800)
-          } else {
-            // 其他情况（移动端顶部模式等），显示成功通知
-            if (config.showNotification !== false) {
-              Notify.showInfoDiaryOpened()
-            }
-          }
+          // 根据位置模式，等待文档加载后滚动（手机端顶部也真正滚动）
+          const waitTime = isMobile ? (config.diaryWaitTime || 1000) : 800
+          safeSetTimeout(startScrolling, waitTime)
           return
         } else {
           logger.warn('[日记功能] API调用失败:', response.msg)
@@ -5598,18 +5611,7 @@ async function executeDiary(config: ButtonConfig) {
       }
 
       // 2. 根据位置模式，等待文档加载后滚动
-      if (position === 'bottom') {
-        // 底部模式：滚动到底部
-        safeSetTimeout(startScrolling, 800)
-      } else if (position === 'top') {
-        // 顶部模式（仅电脑端）：滚动到顶部
-        safeSetTimeout(startScrolling, 800)
-      } else {
-        // 其他情况，显示成功通知
-        if (config.showNotification !== false) {
-          Notify.showInfoDiaryOpened()
-        }
-      }
+      safeSetTimeout(startScrolling, 800)
       return
     }
 
@@ -5649,17 +5651,9 @@ async function executeDiary(config: ButtonConfig) {
             // 直接点击确定按钮
             (confirmBtn as HTMLElement).click()
 
-            // 根据位置模式决定后续操作
-            if (position === 'bottom') {
-              // 对话框确认后，使用配置的等待时间后再滚动
-              const waitTime = config.diaryWaitTime || 1000
-              safeSetTimeout(startScrolling, waitTime)
-            } else {
-              // 顶部模式，显示成功通知
-              if (config.showNotification !== false) {
-                Notify.showInfoDiaryOpened()
-              }
-            }
+            // 对话框确认后，等待文档加载再按位置滚动
+            const waitTime = config.diaryWaitTime || 1000
+            safeSetTimeout(startScrolling, waitTime)
             return
           }
         }
@@ -5687,15 +5681,7 @@ async function executeDiary(config: ButtonConfig) {
 
       // 如果没找到对话框，直接开始滚动
       if (!dialogFound) {
-        if (position === 'bottom') {
-          // 延迟500ms后开始滚动
-          safeSetTimeout(startScrolling, 500)
-        } else {
-          // 显示成功通知
-          if (config.showNotification !== false) {
-            Notify.showInfoDiaryOpened()
-          }
-        }
+        safeSetTimeout(startScrolling, 500)
       }
     }, 3000)
 
@@ -6222,6 +6208,8 @@ function unbindNativeBarsSync(): void {
 
 // ===== 侧栏/更多面板打开时隐藏侧边胶囊（思源侧栏为 100vw 全屏面板，会盖住胶囊） =====
 let sidePanelsObserver: MutationObserver | null = null
+let sideCapsuleAttrObserver: MutationObserver | null = null
+let sideCapsuleObservedEl: HTMLElement | null = null
 const SIDE_PANEL_IDS = ['sidebar', 'sidebarRight', 'menu', 'model']
 
 function isAnyMobilePanelOpen(): boolean {
@@ -6231,17 +6219,60 @@ function isAnyMobilePanelOpen(): boolean {
   })
 }
 
+/**
+ * 侧边胶囊就是思源原生面包屑；思源移动栏隐藏时会给它加 inert + CSS pointer-events:none，
+ * 点击事件不会派发，表现为"胶囊还在但点不动"。侧边胶囊是独立悬浮控件，需要保持可交互：
+ * 清掉 inert / aria-hidden，并用 inline pointer-events:auto 覆盖思源样式。
+ * 思源每次滚动渲染都可能重新加 inert，所以监听属性变化后再次清除。
+ */
+function ensureSideCapsuleInteractive(): void {
+  if (!isSideFloatingMode()) return
+  const capsule = document.querySelector(
+    '.protyle-breadcrumb[data-toolbar-customized], .protyle-breadcrumb__bar[data-toolbar-customized]',
+  ) as HTMLElement | null
+  if (!capsule) return
+
+  const clear = (el: HTMLElement) => {
+    if (el.hasAttribute('inert')) el.removeAttribute('inert')
+    if (el.getAttribute('aria-hidden') === 'true') el.setAttribute('aria-hidden', 'false')
+    if (el.style.getPropertyValue('pointer-events') !== 'auto') {
+      el.style.setProperty('pointer-events', 'auto', 'important')
+    }
+  }
+  clear(capsule)
+
+  if (sideCapsuleObservedEl === capsule && sideCapsuleAttrObserver) return
+  if (sideCapsuleAttrObserver) {
+    sideCapsuleAttrObserver.disconnect()
+    activeObservers.delete(sideCapsuleAttrObserver)
+    sideCapsuleAttrObserver = null
+  }
+  sideCapsuleObservedEl = capsule
+  sideCapsuleAttrObserver = new MutationObserver(() => {
+    if (!capsule.isConnected) return
+    clear(capsule)
+  })
+  sideCapsuleAttrObserver.observe(capsule, {
+    attributes: true,
+    attributeFilter: ['inert', 'aria-hidden'],
+  })
+  activeObservers.add(sideCapsuleAttrObserver)
+}
+
 function applySideCapsuleVisibility(): void {
   if (!isSideFloatingMode()) return
   const capsule = document.querySelector(
-    '.protyle-breadcrumb[data-toolbar-customized], .protyle-breadcrumb__bar[data-toolbar-customized]'
+    '.protyle-breadcrumb[data-toolbar-customized], .protyle-breadcrumb__bar[data-toolbar-customized]',
   ) as HTMLElement | null
   if (!capsule) return
-  // 侧栏/更多面板打开（全屏覆盖）或键盘弹出（遮挡胶囊）时隐藏胶囊
+  // 侧栏/更多面板打开（全屏覆盖）或键盘弹出（遮挡胶囊）时隐藏胶囊。
+  // 展开面板打开时主胶囊必须保留：它同时也是"再点一次关闭面板"的触发器。
   if (isAnyMobilePanelOpen() || document.body.classList.contains('mobile-keyboard--open')) {
     capsule.style.setProperty('display', 'none', 'important')
   } else {
     capsule.style.removeProperty('display')
+    // 显示时确保可点击（思源隐藏移动栏时会给面包屑加 inert / pointer-events:none）
+    ensureSideCapsuleInteractive()
   }
 }
 
@@ -6265,10 +6296,20 @@ function unbindSidePanelsSync(): void {
     activeObservers.delete(sidePanelsObserver)
     sidePanelsObserver = null
   }
-  // 恢复胶囊显示（移除可能残留的 display:none）
+  if (sideCapsuleAttrObserver) {
+    sideCapsuleAttrObserver.disconnect()
+    activeObservers.delete(sideCapsuleAttrObserver)
+    sideCapsuleAttrObserver = null
+  }
+  sideCapsuleObservedEl = null
+  // 恢复胶囊显示（移除可能残留的 display:none / pointer-events）
   document.querySelectorAll(
-    '.protyle-breadcrumb[data-toolbar-customized], .protyle-breadcrumb__bar[data-toolbar-customized]'
-  ).forEach(el => (el as HTMLElement).style.removeProperty('display'))
+    '.protyle-breadcrumb[data-toolbar-customized], .protyle-breadcrumb__bar[data-toolbar-customized]',
+  ).forEach(el => {
+    const htmlEl = el as HTMLElement
+    htmlEl.style.removeProperty('display')
+    htmlEl.style.removeProperty('pointer-events')
+  })
 }
 
 // ===== 扩展栏打开状态同步（底部胶囊/底部固定⑦：导航栏由扩展工具栏接管） =====

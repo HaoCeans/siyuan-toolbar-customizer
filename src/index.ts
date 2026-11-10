@@ -17,6 +17,7 @@ import "@/index.scss";
 import PluginInfoString from '@/../plugin.json'
 import { destroy, init } from '@/main'
 import { logger, setLoggingEnabled } from '@/utils/logger'
+import { installWindowRouteDiagnostics } from '@/utils/windowRouteDiagnostics'
 import { clearI18n, initializeI18n, t } from '@/i18n/runtime'
 
 // 导入新功能模块
@@ -80,7 +81,7 @@ import {
   handleQuickNoteFloatCommand,
   isQuickNoteFloatSaveFromButton,
 } from './quickNote/quickNoteFloatWindow'
-import { destroyDesktopQuickNoteBlockWindow, cleanupOrphanBlockWindows, cleanupBlockWindowResidue } from './quickNote/quickNoteBlockWindow'
+import { destroyDesktopQuickNoteBlockWindow, adoptExistingBlockWindows, cleanupBlockWindowResidue } from './quickNote/quickNoteBlockWindow'
 import { cleanupImagePicker } from './quickNote/imageInsert'
 
 // 导入 StressThreshold 清理函数
@@ -917,8 +918,12 @@ export default class ToolbarCustomizer extends Plugin {
 
   // 布局就绪后初始化（确保 DOM 完全加载）
   onLayoutReady() {
+    // 主窗口安装跨窗口路由诊断：记录打开文档是否被其他窗口接管（需开启插件调试日志）
+    if (!this.isInWindow) {
+      installWindowRouteDiagnostics()
+    }
     this.cleanupOrphanDraftBlocks()
-    cleanupOrphanBlockWindows()  // 清理残留的僵尸记事弹窗
+    adoptExistingBlockWindows()  // 接管插件重载后仍在运行的记事弹窗，避免误当残留销毁
     this.initPluginFunctions()  // initPluginFunctions 是 async，不阻塞后续代码
 
     // ===== 初始化 TTS 设置及预生成音频缓存（异步执行，不阻塞布局）=====

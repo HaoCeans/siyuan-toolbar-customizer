@@ -2,7 +2,10 @@
  * 电脑端设置底部 — 一键记事统一配置区
  */
 
+import { showMessage } from 'siyuan'
 import { t } from '../i18n/runtime'
+import { cleanupBlockWindowResidue } from '../quickNote/quickNoteBlockWindow'
+import { destroyQuickNoteFloatWindow } from '../quickNote/quickNoteFloatWindow'
 import { createDesktopQuickNoteFormatField } from './quickNoteFormatField'
 
 export const DESKTOP_QUICK_NOTE_SECTION_ID = 'desktop-quick-note-settings-section'
@@ -317,13 +320,15 @@ export function createDesktopQuickNoteSettingsSection(
   cleanupInput.type = 'number'
   cleanupInput.min = '0'
   cleanupInput.max = '120'
-  cleanupInput.value = String(desktopCfg.quickNoteBlockAutoCleanup ?? 5)
+  cleanupInput.value = String((desktopCfg as any).quickNoteBlockAutoCleanup ?? 5)
   cleanupInput.style.cssText = 'width: 60px; padding: 4px 8px; border: 1px solid var(--b3-border-color); border-radius: 4px; font-size: 13px; text-align: center;'
   const cleanupUnit = document.createElement('span')
   cleanupUnit.textContent = t("settings.desktopQuickNoteSettings.32", undefined, "秒（0 = 不自动清理）")
   cleanupUnit.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface-light);'
   cleanupInput.onchange = async () => {
-    const v = Math.max(0, Math.min(120, parseInt(cleanupInput.value) || 5))
+    const parsed = Number.parseInt(cleanupInput.value, 10)
+    // 不能用 parseInt(...) || 5：0 表示不自动清理，|| 会把它吞成 5
+    const v = Number.isNaN(parsed) ? 5 : Math.max(0, Math.min(120, parsed))
     cleanupInput.value = String(v)
     ;(desktopCfg as any).quickNoteBlockAutoCleanup = v
     await context.saveDesktopConfig()
@@ -332,6 +337,27 @@ export function createDesktopQuickNoteSettingsSection(
   cleanupRow.appendChild(cleanupInput)
   cleanupRow.appendChild(cleanupUnit)
   box.appendChild(cleanupRow)
+
+  const residueHint = createHint(
+    t("settings.desktopQuickNoteSettings.37", undefined, "主窗口点击日记或文档无反应，或记事弹窗里残留了其他文档时，可在此销毁所有一键记事弹窗并释放被占用的文档。"),
+  )
+  residueHint.style.padding = '8px 10px'
+  residueHint.style.background = 'rgba(255,255,255,0.35)'
+  residueHint.style.borderRadius = '6px'
+  box.appendChild(residueHint)
+
+  const residueRow = document.createElement('div')
+  residueRow.style.cssText = 'display: flex; align-items: center; gap: 10px; padding: 4px 0;'
+  const residueButton = document.createElement('button')
+  residueButton.className = 'b3-button b3-button--outline'
+  residueButton.textContent = t("settings.desktopQuickNoteSettings.36", undefined, "立即清理残留记事窗口")
+  residueButton.onclick = () => {
+    cleanupBlockWindowResidue()
+    destroyQuickNoteFloatWindow()
+    showMessage(t("settings.desktopQuickNoteSettings.38", undefined, "一键记事弹窗残留已清理"), 3000, 'info')
+  }
+  residueRow.appendChild(residueButton)
+  box.appendChild(residueRow)
 
   const divider = document.createElement('div')
   divider.style.cssText = 'height: 1px; background: rgba(59, 130, 246, 0.2); margin: 4px 0;'

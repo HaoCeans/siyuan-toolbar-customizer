@@ -1,7 +1,7 @@
 /**
  * 桌面端块格式一键记事 — 纯 BrowserWindow 方式
  */
-import { fetchSyncPost, showMessage } from 'siyuan'
+import { showMessage } from 'siyuan'
 import { t } from '../i18n/runtime'
 import { createQuickNoteDraftBlock, deleteQuickNoteDraftBlock } from './kernelBlock'
 import { resolveQuickNoteTargetConfig, type QuickNoteTargetConfig } from './targetConfig'
@@ -21,16 +21,41 @@ const THIRD_PARTY_BREADCRUMB_HIDE = '[class*="og-hierachy-navigate"]{display:non
 const DRAG_CSS = '#qn-drag-handle{position:fixed;top:0;left:0;width:50%;height:36px;z-index:9999;-webkit-app-region:drag;cursor:grab}'
 const FLOATING_RESET = 'html body .protyle-breadcrumb[data-input-method]:not(.protyle-breadcrumb__bar){display:none!important}'
 const BLOCK_EMPTY_KEY = '__qn_block_empty'  // localStorage key：Protyle 是否为空
+// 思源 3.8.10 起文档标题也是 .protyle-wysiwyg（嵌套在 .protyle-title 内）且排在正文之前，
+// 注入脚本一律用它取正文编辑器，不能再用 document.querySelector('.protyle-wysiwyg')
+const FIND_BODY_WYSIWYG_JS = `
+      function __qnBodyWysiwyg(){
+        try{
+          var layout=window.siyuan&&window.siyuan.layout&&window.siyuan.layout.centerLayout;
+          var found=null;
+          (function walk(node){
+            if(!node||found)return;
+            var children=node.children||[];
+            for(var i=0;i<children.length;i++){
+              var item=children[i];
+              if(!item||found)continue;
+              var model=item.model;
+              var protyle=model&&model.editor&&model.editor.protyle;
+              if(protyle&&protyle.wysiwyg&&protyle.wysiwyg.element){found=protyle.wysiwyg.element;return}
+              if(item.children)walk(item);
+            }
+          })(layout);
+          if(found)return found;
+        }catch(e){}
+        var all=document.querySelectorAll('.protyle-wysiwyg');
+        for(var i=0;i<all.length;i++){
+          if(!all[i].closest('.protyle-title,.protyle-title__rich'))return all[i];
+        }
+        return null;
+      }`
 let qnWinId: number | null = null
 let _currentDraftBlockId: string | null = null
-// 会话级保存目标：窗口以某个目标打开后，本会话内所有草稿(重)建都用它。
-// 按钮覆盖场景：隐藏后自动清理重建草稿（_hideTimer 回调）执行时临时配置已恢复，
-// 若重解析会回落全局 → 按钮文档漂移成全局笔记本/文档。打开成功时写入，窗口销毁时清空。
-let _sessionSaveTarget: QuickNoteTargetConfig | null = null
 function _syncDraftBlockId(): void {
   try { (window as any).__qn_block_id = _currentDraftBlockId } catch {}
 }
-let _hideTimer: ReturnType<typeof setTimeout> | null = null  // 隐藏后 5 秒自动清理
+let _hideTimer: ReturnType<typeof setTimeout> | null = null  // 隐藏后到时间销毁窗口
+let _creating = false  // 正在创建草稿/窗口：快捷键短时间连按时避免并发创建两个窗口
+let _lastOpenAt = 0  // 最近一次显示/创建时间：同一按键被多个入口重复触发时，忽略紧接着的隐藏
 let _saveBoundsTimer: ReturnType<typeof setTimeout> | null = null
 let _lastBounds: { x: number; y: number; width: number; height: number } | null = null  // 最后已知的窗口位置缓存（在 closed 事件中兜底使用）
 
@@ -38,29 +63,131 @@ function getBW(): any { try { return (window as any).require?.('@electron/remote
 function getMainId(): number | null { try { return (window as any).require?.('@electron/remote')?.getCurrentWindow?.()?.id ?? null } catch { return null } }
 function focusMainWindow(): void { try { const m = getBW()?.fromId(getMainId()); if (m && !m.isDestroyed?.() && !m.isMinimized?.()) m.focus() } catch { /* ignore */ } }
 
-/** 销毁所有记事弹窗（通过窗口标记 __qn_block_window 匹配） */
+/**
+ * 判断窗口是否为一键记事块格式弹窗。
+ * 不能只依赖 __qn_block_window：插件重载后 @electron/remote 的窗口代理会重建，
+ * 自定义属性丢失（日志里表现为"记事弹窗=false"），但窗口仍然存在并可能继续占用文档。
+ * URL 里的 qn=1（新窗口）和 json 中的 ⚡ 标题 + pin（旧窗口）在重载后仍可读取。
+ */
+function isQuickNoteBlockWindow(win: any): boolean {
+  if ((win as any).__qn_block_window === true) return true
+  try {
+    const rawUrl = win?.webContents?.getURL?.() || ''
+    if (!rawUrl) return false
+    const url = new URL(rawUrl)
+    if (!url.pathname.endsWith('/window.html')) return false
+    if (url.searchParams.get('qn') === '1') return true
+    const rawJSON = url.searchParams.get('json')
+    if (!rawJSON) return false
+    const tabs = JSON.parse(rawJSON)
+    if (!Array.isArray(tabs)) return false
+    return tabs.some((tab: any) =>
+      tab?.pin === true
+      && Array.isArray(tab?.children?.action) && tab.children.action.includes('cb-get-focus')
+      && typeof tab?.title === 'string' && tab.title.includes('⚡'))
+  } catch {
+    return false
+  }
+}
+
+/** 从窗口 URL 的 json 参数恢复草稿块 ID（插件重载后模块变量会丢失，URL 不会） */
+function getWindowDraftBlockId(win: any): string | null {
+  try {
+    const rawUrl = win?.webContents?.getURL?.() || ''
+    const url = new URL(rawUrl)
+    if (!url.pathname.endsWith('/window.html')) return null
+    const rawJSON = url.searchParams.get('json')
+    if (!rawJSON) return null
+    const tabs = JSON.parse(rawJSON)
+    if (!Array.isArray(tabs)) return null
+    for (const tab of tabs) {
+      const blockId = tab?.children?.blockId || tab?.children?.rootId
+      if (typeof blockId === 'string' && blockId) return blockId
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
+/** 当前仍在运行的记事弹窗：优先模块内记录的 id，插件重载后按 URL 重新识别 */
+function findBlockWindow(): any | null {
+  const BW = getBW()
+  if (!BW) return null
+  try {
+    const windows = (BW.getAllWindows?.() || []).filter((w: any) => w && !w.isDestroyed?.())
+    if (qnWinId != null) {
+      const tracked = windows.find((w: any) => w.id === qnWinId)
+      if (tracked) return tracked
+    }
+    return windows.find((w: any) => isQuickNoteBlockWindow(w)) || null
+  } catch {
+    return null
+  }
+}
+
+/** 接管已存在的记事弹窗：恢复 qnWinId 与草稿块 ID，避免插件重载后被当成残留销毁 */
+function adoptBlockWindow(win: any): void {
+  qnWinId = win?.id ?? null
+  if (!_currentDraftBlockId) {
+    const blockId = getWindowDraftBlockId(win)
+    if (blockId) {
+      _currentDraftBlockId = blockId
+      _syncDraftBlockId()
+      if (isLoggingEnabled()) logger.log('[QN-CLEANUP] 接管记事弹窗:', win?.id, blockId)
+    }
+  }
+}
+
+/** 隐藏后自动清理的等待秒数，0 表示不清理 */
+function getAutoCleanupSeconds(): number {
+  const raw = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteBlockAutoCleanup ?? 5
+  const seconds = Number(raw)
+  if (!Number.isFinite(seconds)) return 5
+  return Math.max(0, seconds)
+}
+
+/** 销毁所有记事弹窗（窗口标记 + URL 双重匹配，兼容插件重载后的残留窗口） */
 function destroyAllBlockWindows(excludeId?: number): void {
   try {
-    const BW = getBW(), mainId = getMainId()
+    const BW = getBW()
+    const mainId = getMainId()
     if (!BW) return
     for (const w of (BW.getAllWindows?.() || [])) {
       try {
         if (!w || w.isDestroyed?.() || w.id === mainId) continue
         // 排除自身：close 流程中调用时不能把自己提前 destroy（会跳过 close 内后续清理）
         if (excludeId !== undefined && w.id === excludeId) continue
-        if ((w as any).__qn_block_window) w.destroy?.()
+        if (isQuickNoteBlockWindow(w)) w.destroy?.()
       } catch { /* skip */ }
     }
   } catch { /* ignore */ }
 }
 
-/** 启动时清理残留的僵尸弹窗 */
-export function cleanupOrphanBlockWindows(): void {
-  destroyAllBlockWindows()
+/**
+ * 启动/插件重载时接管仍在运行的记事弹窗。
+ * 不能用 destroyAllBlockWindows 一刀切：0 秒常驻的隐藏弹窗会随插件重载保留下来，
+ * 直接销毁会让下次快捷键打开变成新空草稿（表现为「设置了 0 秒还是被清空」）。
+ * 同类重复窗口只保留第一个。
+ */
+export function adoptExistingBlockWindows(): void {
+  // 只由主窗口接管：弹窗自己也加载插件，若在弹窗内执行会把自身之外的同类型窗口当重复项销毁
+  if (pluginInstance?.isInWindow) return
+  const BW = getBW()
+  if (!BW) return
+  try {
+    const windows = (BW.getAllWindows?.() || []).filter((w: any) =>
+      w && !w.isDestroyed?.() && isQuickNoteBlockWindow(w))
+    if (windows.length === 0) return
+    adoptBlockWindow(windows[0])
+    for (const w of windows.slice(1)) {
+      try {
+        w.destroy?.()
+      } catch { /* ignore */ }
+    }
+  } catch { /* ignore */ }
 }
 
 /**
- * 手动清理一键记事（块格式）弹窗残留：销毁所有带 __qn_block_window 标记的残留窗口并复位草稿状态。
+ * 手动清理一键记事（块格式）弹窗残留：销毁所有识别出的残留窗口并复位草稿状态。
  * 用途：思源主进程会用"窗口 hash 是否含目标文档 ID"决定点击文档时把焦点给哪个窗口；
  * 残留弹窗会让主窗口点日记/文档无反应（占用）。执行后残留窗口销毁，文档立即可正常打开。
  * （彻底方案见 DEV_NOTES：草稿块独立于日记；当前提供手动兜底）
@@ -68,7 +195,8 @@ export function cleanupOrphanBlockWindows(): void {
 export function cleanupBlockWindowResidue(): void {
   destroyAllBlockWindows()
   _clearDraftTracking()
-  try { localStorage.removeItem(BLOCK_EMPTY_KEY) } catch { /* ignore */ }
+  // 不能在这里清空 BLOCK_EMPTY_KEY：closed 处理器要靠它区分空/非空草稿，
+  // 提前清空会把非空草稿误判为空并删除。
 }
 function loadBounds(): any { try { const r = localStorage.getItem(BOUNDS_KEY); return r ? JSON.parse(r) : null } catch { return null } }
 function saveBounds(win: any): void {
@@ -96,7 +224,6 @@ function getBounds() {
 
 function _clearDraftTracking(): void {
   _currentDraftBlockId = null
-  _sessionSaveTarget = null
   _syncDraftBlockId()
 }
 
@@ -108,45 +235,30 @@ function _buildBlockUrl(blockId: string): string {
     instance: 'Tab', action: 'Tab',
     children: { blockId, rootId: blockId, mode: 'wysiwyg', instance: 'Editor', action: ['cb-get-focus'] },
   }]))
-  return window.location.protocol + '//' + window.location.host + '/stage/build/app/window.html?' + vPart + 'json=' + json
+  return window.location.protocol + '//' + window.location.host + '/stage/build/app/window.html?' + vPart + 'qn=1&json=' + json
 }
 
 // 清空 window.location.hash，防止 Electron 主进程通过 hash 中的 rootID
 // 把其他窗口的文档焦点路由到这个弹窗
 //
-// 注意：SiYuan 内部路由使用 history.pushState/replaceState 修改 URL hash，
-// 只拦截 location.hash setter 是不够的，必须同时拦截 History API。
+// 主进程按窗口 hash 匹配文档 ID（app/electron/main.js 的 siyuan-open-file），
+// 窗口 hash 由 SiYuan 的 setModelsHash 写入（app/src/window/setHeader.ts）。
+// Location.hash 是不可配置的自有属性，Object.defineProperty 会抛 TypeError（已实测），
+// 因此无法拦截 setter，只能"写入后立刻清空"：hashchange 即时清除 + 轮询兜底。
+// 窗口隐藏时轮询靠 webPreferences.backgroundThrottling=false 避免被节流。
 function _getHashFixJS(): string {
   return `(function(){
-		  var logEnabled=${isLoggingEnabled() ? 'true' : 'false'};
-		  if (window.__qn_hashFixed) return;
+	      var logEnabled=${isLoggingEnabled() ? 'true' : 'false'};
+	      if (window.__qn_hashFixed) return;
 
 	  window.__qn_hashFixed = true;
 
-	  // 1. 拦截 location.hash 的 setter
-	  try {
-	    var proto = window.location.__proto__ || window.location.constructor.prototype;
-	    var desc = Object.getOwnPropertyDescriptor(proto, 'hash');
-	    if (desc && desc.set) {
-	      var _origSet = desc.set;
-	      Object.defineProperty(window.location, 'hash', {
-	        get: desc.get || function() { return ''; },
-	        set: function(v) {
-	          // 只调原始 setter 完成副作用，但永远写空字符串
-	          _origSet.call(this, '');
-	        },
-	        configurable: true
-	      });
-	      if(logEnabled) console.log('[QN-HASH] hash setter 拦截成功');
-	    } else {
-	      if(logEnabled) console.log('[QN-HASH] 无法获取hash descriptor, 降级到轮询');
-	    }
-	  } catch(e) {
-	    if(logEnabled) console.log('[QN-HASH] hash setter 拦截失败:', e, ', 降级到轮询');
-	  }
+	  // 1. hash 变化后立刻清空（同文档导航事件，不受隐藏窗口定时器节流影响）
+	  window.addEventListener('hashchange', function() {
+	    if (window.location.hash) window.location.hash = '';
+	  });
 
-	  // 2. 拦截 history.pushState / replaceState
-	  //    SiYuan 通过此 API 修改 URL hash，绕过 location.hash setter
+	  // 2. 拦截 history.pushState / replaceState：走 History API 的导航不触发 hashchange
 	  try {
 	    var _origPushState = history.pushState.bind(history);
 	    var _origReplaceState = history.replaceState.bind(history);
@@ -164,7 +276,6 @@ function _getHashFixJS(): string {
 	  }
 
 	  // 3. 兜底：200ms 轮询（捕获通过 location.href 等其他途径设置的 hash）
-	  //    间隔从 50ms 提升到 200ms：hash 重置对用户无即时感知，但 50ms 持续轮询会占用 CPU
 	  window.__qn_hashTimer = setInterval(function() {
 	    if (window.location.hash) window.location.hash = '';
 	  }, 200);
@@ -184,9 +295,18 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
       var d=document.createElement('div');d.id='qn-drag-handle';d.title=${JSON.stringify(dragWindowTitle)};document.body.appendChild(d);
     })()`,
     titleJS: `(function(){var t=${JSON.stringify(quickNoteTitle)};document.title=t;Object.defineProperty(document,'title',{get:function(){return t},set:function(){return t}})})()`,
-    closeHookJS: `(function(){
+    closeHookJS: `(function(){${FIND_BODY_WYSIWYG_JS}
       function forceClose(){
         try{
+          // 关闭前同步刷新空/非空标记：500ms 轮询可能还没跑到，父窗口 closed 处理器
+          // 若读到旧的“空”状态会把刚输入的非空草稿误删
+          try{
+            var body=__qnBodyWysiwyg();
+            if(body){
+              var empty=(body.textContent||'').replace(/\\u200b/g,'').trim().length===0;
+              localStorage.setItem('${BLOCK_EMPTY_KEY}',empty?'1':'0');
+            }
+          }catch(e){}
           // 先手动关 WebSocket，因为 destroy() 跳过 beforeunload
           try{
             if(window.__qnPollTimer){clearInterval(window.__qnPollTimer);window.__qnPollTimer=null}
@@ -214,6 +334,13 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
       }
       if(!hookCloseBtn()){var t=setInterval(function(){if(hookCloseBtn())clearInterval(t)},300);setTimeout(function(){clearInterval(t)},5000)}
       window.addEventListener('beforeunload',function(){
+        try{
+          var body=__qnBodyWysiwyg();
+          if(body){
+            var empty=(body.textContent||'').replace(/\\u200b/g,'').trim().length===0;
+            localStorage.setItem('${BLOCK_EMPTY_KEY}',empty?'1':'0');
+          }
+        }catch(e){}
         if(window.__qnPollTimer){clearInterval(window.__qnPollTimer);window.__qnPollTimer=null}
         try{
           var ws=window.siyuan&&window.siyuan.ws;
@@ -225,9 +352,17 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
       });
     })()`,
     // 仅在"是否为空"状态变化时才写入 localStorage，避免每 500ms 无条件 setItem。
-    // 用 localStorage 当前值作为真源（而非 window 变量缓存）：弹窗隐藏 5 秒重建时
+    // 用 localStorage 当前值作为真源（而非 window 变量缓存）：隐藏超时销毁窗口时
     // 父窗口会 removeItem 清空，若用变量缓存会与 localStorage 脱节，可能误删非空块。
-    pollJS: `window.__qnPollTimer=setInterval(function(){var w=document.querySelector('.protyle-wysiwyg');var v=(!w||(w.textContent||'').replace(/\\u200b/g,'').trim().length===0)?'1':'0';try{if(localStorage.getItem('${BLOCK_EMPTY_KEY}')!==v)localStorage.setItem('${BLOCK_EMPTY_KEY}',v)}catch(ex){}},500)`,
+    pollJS: `(function(){${FIND_BODY_WYSIWYG_JS}
+      window.__qnPollTimer=setInterval(function(){
+        var w=__qnBodyWysiwyg();
+        // 编辑器重渲染期间可能短暂取不到正文，此时不能判为空：否则会把非空草稿标记成空并被清理删除
+        if(!w)return;
+        var v=(w.textContent||'').replace(/\\u200b/g,'').trim().length===0?'1':'0';
+        try{if(localStorage.getItem('${BLOCK_EMPTY_KEY}')!==v)localStorage.setItem('${BLOCK_EMPTY_KEY}',v)}catch(ex){}
+      },500)
+    })()`,
     hideFloatingJS: `(function(){
       var el=document.querySelector('.protyle-breadcrumb');
       if(el){el.style.setProperty('display','none','important');return;}
@@ -268,11 +403,12 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
     //   只在 focus() 后浏览器没有产生任何光标（rangeCount===0）时才补一个。
     // 用户 mousedown / keydown（捕获）或约 10s 超时退出；Promise 返回状态供主窗口日志诊断。
     focusJS: `(function(){
+      ${FIND_BODY_WYSIWYG_JS}
       return new Promise(function(resolve){
         if(window.__qnFocusTimer){clearInterval(window.__qnFocusTimer);window.__qnFocusTimer=null}
         var tries=0
         function findEl(){
-          var w=document.querySelector('.protyle-wysiwyg')
+          var w=__qnBodyWysiwyg()
           if(!w)return null
           return (w.getAttribute('contenteditable')==='true')?w:w.querySelector('[contenteditable="true"]')
         }
@@ -329,6 +465,14 @@ export function resolveSaveTarget(isFromButton: boolean): QuickNoteTargetConfig 
   return resolveQuickNoteTargetConfig(isFromButton)
 }
 
+/** 清空弹窗 URL hash：主进程按 hash 中的文档 ID 路由跨窗口打开请求 */
+function _clearWindowHash(win: any): void {
+  try {
+    const result = win?.webContents?.executeJavaScript("if(window.location.hash){window.location.hash=''}")
+    result?.catch?.(() => {})
+  } catch {}
+}
+
 function createOneWindow(blockId: string): boolean {
   // 销毁所有旧记事弹窗（匹配URL中的 ⚡ 标记）
   destroyAllBlockWindows()
@@ -342,7 +486,14 @@ function createOneWindow(blockId: string): boolean {
       show: false, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height,
       minWidth: 300, minHeight: 200, alwaysOnTop: true,
       frame: false,
-      title: getQuickNoteTitle(), webPreferences: { contextIsolation: false, nodeIntegration: true },
+      // backgroundThrottling=false：窗口隐藏时仍保持 hash 轮询等定时器正常运行，
+      // 否则 hash 可能在隐藏期间长期残留，导致主窗口点日记被路由到这个隐藏窗口
+      title: getQuickNoteTitle(),
+      webPreferences: {
+        contextIsolation: false,
+        nodeIntegration: true,
+        backgroundThrottling: false,
+      },
     })
     qnWinId = win.id
     ;(win as any).__qn_block_window = true
@@ -369,7 +520,6 @@ function createOneWindow(blockId: string): boolean {
       saveBounds(win)
       const closingBlockId = _currentDraftBlockId
       _currentDraftBlockId = null
-      _sessionSaveTarget = null
       _syncDraftBlockId()
       if (qnWinId === win.id) qnWinId = null
       let isEmpty = true
@@ -392,105 +542,121 @@ function createOneWindow(blockId: string): boolean {
     win.webContents.once('did-finish-load', () => {
       _injectScripts(win, scripts, true)
     })
+    // 主进程侧兜底：hash 一变化就清空。隐藏窗口的渲染进程定时器会被节流，
+    // 而 executeJavaScript 仍会执行，避免主窗口点击文档时被路由到这里
+    win.webContents.on('did-navigate-in-page', (_event: any, url: string, isMainFrame: boolean) => {
+      if (!isMainFrame) return
+      if (isLoggingEnabled()) {
+        logger.log('[QN-HASH] 窗口 hash 变化，准备清空:', url)
+      }
+      _clearWindowHash(win)
+    })
     win.loadURL(_buildBlockUrl(blockId))
     return true
   } catch (e) { logger.error('[QN-BlockWindow] 创建窗口失败:', e); showMessage(t('quickNote.block.createWindowFailed', undefined, '创建窗口失败'), 3000, 'error'); return false }
 }
 
 export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): Promise<boolean> {
-  const BW = getBW(); if (!BW) return false
-  const mainId = getMainId()
-  // 隐藏脚本组：show 恢复 / 注入新草稿块后需要补执行 hideBreadcrumbJS（第三方层级导航面包屑可能重新渲染）
+  if (!getBW()) return false
+  // 建窗口前有异步建草稿块，短时间连按快捷键会并发创建两个窗口（第二个销毁第一个）
+  if (_creating) return false
+  // show 恢复后需要补执行 hideBreadcrumbJS（第三方层级导航面包屑可能重新渲染）
   const scripts = _getInjectionScripts()
-  let found = false
-  for (const w of (BW.getAllWindows?.() || [])) {
-    try { if (!w || w.isDestroyed?.() || w.id === mainId) continue; if (w.id !== qnWinId) continue; found = true;
-	      if (typeof w.isVisible === 'function' && w.isVisible()) {
-	        // 弹窗在后台（被其他窗口挡住）→ 拉到前台，不隐藏
-	        if (typeof w.isFocused === 'function' && !w.isFocused()) {
-	          w.focus()
-	          return true
-	        }
-	        // 弹窗在前台 → 隐藏（不强制聚焦主窗口，避免打断用户在其他软件的操作）
-        w.hide()
-        if (_hideTimer) clearTimeout(_hideTimer)
-        const delay = ((pluginInstance?.desktopFeatureConfig as any)?.quickNoteBlockAutoCleanup ?? 5) * 1000
-        _hideTimer = setTimeout(async () => {
+  const existing = findBlockWindow()
+  if (existing) {
+    // 插件重载后 qnWinId/草稿块 ID 会丢失，先接管再由下面的 show/hide 流程处理
+    adoptBlockWindow(existing)
+    try {
+      if (typeof existing.isVisible === 'function' && existing.isVisible()) {
+        // 弹窗在后台（被其他窗口挡住）→ 拉到前台，不隐藏
+        if (typeof existing.isFocused === 'function' && !existing.isFocused()) {
+          existing.focus()
+          _lastOpenAt = Date.now()
+          return true
+        }
+        // 同一按键可能同时命中全局快捷键和按钮快捷键：刚显示后紧接着的隐藏要忽略，
+        // 否则窗口会一闪而过，看起来像「打开就没了」
+        if (Date.now() - _lastOpenAt < 300) return true
+        // 弹窗在前台 → 隐藏（不强制聚焦主窗口，避免打断用户在其他软件的操作）
+        existing.hide()
+        // 隐藏前确保 hash 不含文档 ID，避免主进程把主窗口的点击路由到隐藏窗口
+        _clearWindowHash(existing)
+        if (_hideTimer) {
+          clearTimeout(_hideTimer)
           _hideTimer = null
-          // 重建草稿块必须沿用打开时的目标（_sessionSaveTarget）：此时临时配置已恢复，
-          // 按钮覆盖的文档ID重新解析会回落全局，导致草稿块落到别的笔记本/文档
-          const target = _sessionSaveTarget ?? resolveSaveTarget(false)
-          const newId = await createQuickNoteDraftBlock(target)
-          if (!newId) return
-          _currentDraftBlockId = newId
-          _syncDraftBlockId()
-          try { localStorage.removeItem(BLOCK_EMPTY_KEY) } catch {}
-          // 拿新块 HTML 直接注入 Protyle，不重载页面
+        }
+        const seconds = getAutoCleanupSeconds()
+        if (isLoggingEnabled()) {
+          logger.log('[QN-CLEANUP] 隐藏弹窗，自动清理秒数:', seconds)
+        }
+        // 0 表示不自动清理：隐藏窗口保持常驻，恢复显示后继续编辑原草稿
+        if (!(seconds > 0)) return true
+        _hideTimer = setTimeout(() => {
+          _hideTimer = null
+          // 定时期间设置可能已改为 0：以触发时的配置为准，避免旧定时器继续清理
+          if (!(getAutoCleanupSeconds() > 0)) return
+          if (isLoggingEnabled()) logger.log('[QN-CLEANUP] 自动清理隐藏弹窗:', existing.id)
+          // 不直接改思源编辑器 DOM：销毁隐藏窗口后，草稿由 closed 处理器按空/非空删除或保留，
+          // 下次打开走正常建草稿 + 建窗口流程
           try {
-            const resp = await fetchSyncPost('/api/filetree/getDoc', { id: newId, mode: 0, size: 102400 })
-            if (resp?.code === 0 && resp?.data?.content) {
-              const html = JSON.stringify(resp.data.content)
-              w.webContents.executeJavaScript(`
-                (function(){
-                  var w=document.querySelector('.protyle-wysiwyg');
-                  if(!w)return;
-                  w.innerHTML=${html};
-                  try{
-                    var tabs=window.siyuan&&window.siyuan.layout&&window.siyuan.layout.center&&window.siyuan.layout.center.tabs;
-                    if(tabs)for(var i=0;i<tabs.length;i++){
-                      var p=tabs[i].model&&tabs[i].model.editor&&tabs[i].model.editor.protyle;
-                      if(p){p.block.id='${newId}';p.block.rootID='__qn_${newId}';break}
-                    }
-                  }catch(e){}
-                })()
-              `).catch(()=>{})
-              // 注入新块后第三方「层级导航」插件可能检测到文档变化重新渲染面包屑，补一次隐藏
-              w.webContents.executeJavaScript(scripts.hideBreadcrumbJS).catch(()=>{})
-            }
+            if (!existing.isDestroyed?.()) existing.destroy?.()
           } catch {}
-        }, delay)
+        }, seconds * 1000)
         return true
       }
-      // 还没到 5 秒又摁了快捷键：取消清理，恢复编辑
+      // 还没到清理时间又摁了快捷键：取消清理，恢复编辑
       if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null }
-      w.show(); w.focus()
+      existing.show(); existing.focus()
+      _lastOpenAt = Date.now()
       // show 恢复时第三方「层级导航」插件可能重新渲染面包屑，补一次隐藏（observer 复用，不会重复创建）
-      w.webContents.executeJavaScript(scripts.hideBreadcrumbJS).catch(()=>{})
+      existing.webContents.executeJavaScript(scripts.hideBreadcrumbJS).catch(()=>{})
       // 恢复显示后同样聚焦编辑器（隐藏期间焦点可能已丢失）
-      w.webContents.executeJavaScript(scripts.focusJS).then((s: unknown) => logger.log('[QN-FOCUS]', s)).catch(()=>{})
+      existing.webContents.executeJavaScript(scripts.focusJS).then((s: unknown) => logger.log('[QN-FOCUS]', s)).catch(()=>{})
       return true
-    } catch {}
+    } catch { /* 窗口在操作间隙被销毁，落到下面重新创建 */ }
   }
   // 找不到窗口：清理跟踪，创建新窗口
-  if (!found) {
-    qnWinId = null
-    _clearDraftTracking()
+  qnWinId = null
+  _clearDraftTracking()
+  _creating = true
+  try {
+    const target = resolveSaveTarget(isFromButton)
+    if (target.saveType === 'document' && !target.documentId) { showMessage(t('quickNote.configureDocument', undefined, '请先配置文档 ID'), 3000, 'error'); return false }
+    if (target.saveType === 'daily' && !target.notebookId) { showMessage(t('quickNote.configureNotebookSpaced', undefined, '请先配置笔记本 ID'), 3000, 'error'); return false }
+    const blockId = await createQuickNoteDraftBlock(target)
+    if (!blockId) { showMessage(t('quickNote.block.createFailed', undefined, '创建编辑块失败'), 3000, 'error'); return false }
+    const created = createOneWindow(blockId)
+    if (created) _lastOpenAt = Date.now()
+    return created
+  } finally {
+    _creating = false
   }
-  const target = resolveSaveTarget(isFromButton)
-  if (target.saveType === 'document' && !target.documentId) { showMessage(t('quickNote.configureDocument', undefined, '请先配置文档 ID'), 3000, 'error'); return false }
-  if (target.saveType === 'daily' && !target.notebookId) { showMessage(t('quickNote.configureNotebookSpaced', undefined, '请先配置笔记本 ID'), 3000, 'error'); return false }
-  const blockId = await createQuickNoteDraftBlock(target)
-  if (!blockId) { showMessage(t('quickNote.block.createFailed', undefined, '创建编辑块失败'), 3000, 'error'); return false }
-  const ok = createOneWindow(blockId)
-  if (ok) {
-    // createOneWindow 内部会 _clearDraftTracking 清掉会话目标，故在成功后写入
-    _sessionSaveTarget = target
-  }
-  return ok
 }
 
 export function destroyDesktopQuickNoteBlockWindow(): void {
-  // 先捕获草稿块 ID，再销毁窗口（防止 closed 事件异步执行时 _currentDraftBlockId 已被清空）
-  const draftToDelete = _currentDraftBlockId
-  _currentDraftBlockId = null
-  _sessionSaveTarget = null
-  _syncDraftBlockId()
-  try { const BW = getBW(), mainId = getMainId(); if (BW) { for (const w of (BW.getAllWindows?.() || [])) { try { if (!w || w.isDestroyed?.() || w.id === mainId) continue; if ((w as any).__qn_block_window) w.destroy?.() } catch {} } } } catch {}
+  // 插件卸载同时发生在「更新/重载」和「禁用」两种场景：
+  // 有内容的窗口保留，重载后由 adoptExistingBlockWindows() 接管，否则 0 秒常驻设置失效；
+  // 空草稿窗口照常销毁并删除空块（空块由 closed 处理器删除）。
+  // 保留的窗口即使处于显示状态也不影响使用；用户手动关闭时仍走正常 closed 流程。
+  let keepDraftWindow = false
+  try { keepDraftWindow = localStorage.getItem(BLOCK_EMPTY_KEY) === '0' } catch { /* ignore */ }
+  try {
+    const BW = getBW()
+    const mainId = getMainId()
+    if (BW) {
+      for (const w of (BW.getAllWindows?.() || [])) {
+        try {
+          if (!w || w.isDestroyed?.() || w.id === mainId) continue
+          if (!isQuickNoteBlockWindow(w)) continue
+          if (keepDraftWindow) continue
+          w.destroy?.()
+        } catch { /* skip */ }
+      }
+    }
+  } catch { /* ignore */ }
   qnWinId = null
-  // 作为兜底：如果窗口 closed 事件中未删块，这里直接删（插件卸载时内容不重要）
-  if (draftToDelete) {
-    deleteQuickNoteDraftBlock(draftToDelete).catch(() => {})
-  }
+  // 不能无条件删除草稿块：内容已实时写入内核，删块等于丢笔记。
+  // 空草稿由窗口 closed 处理器按 BLOCK_EMPTY_KEY 删除。
   if (_saveBoundsTimer) { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = null }
   if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null }
   focusMainWindow()

@@ -109,35 +109,32 @@ HIDE_CSS 常量：
 
 - **最终修复**（`quickNoteBlockWindow.ts`）：
 
-  ① **hash 拦截**（`HASH_FIX_JS`）：
+  ① **hash 清空**（`_getHashFixJS` + 主进程事件）：
   - `window.setModelsHash` 不存在（`typeof=undefined`），hash 是直接写 `location.hash` 的
-  - 改为 `Object.defineProperty` 拦截 `window.location.hash` 的 setter，所有写入都变空字符串
-  - 50ms 轮询兜底
-  ```javascript
-  var desc = Object.getOwnPropertyDescriptor(window.location.__proto__, 'hash');
-  Object.defineProperty(window.location, 'hash', {
-    get: desc.get,
-    set: function(v) { desc.set.call(this, ''); }  // 永远写空
-  });
-  ```
+  - **`Object.defineProperty` 拦截 setter 从未生效**：`hash` 是 Location 上不可配置的自有属性（`configurable=false`），重定义直接抛 `TypeError: Cannot redefine property: hash`，`window.location` 本身也不可替换；实测见 2026-11 修复
+  - 现行方案：`hashchange` 监听即时清空 + `history.pushState/replaceState` 包装 + 200ms 轮询兜底
+  - 主进程侧监听 `did-navigate-in-page`，hash 一变就 `executeJavaScript` 清空（不受隐藏窗口定时器节流影响），隐藏前也主动清一次
+  - 窗口 `webPreferences.backgroundThrottling: false`，保证隐藏期间轮询不被 Chromium 节流（否则 hash 可能残留数秒到一分钟）
 
   ② **僵尸窗口清理**（`destroyAllBlockWindows()`）：
-  - 创建窗口时打标记 `win.__qn_block_window = true`
-  - 清理时遍历所有窗口，检查 `__qn_block_window` 标记 → 销毁
-  - 插件启动时（`onLayoutReady`）调用一次，清理上次残留的僵尸窗口
+  - 创建窗口时打标记 `win.__qn_block_window = true`，并在地址上加 `qn=1`
+  - **不能只依赖标记**：插件重载后 `@electron/remote` 的窗口代理会重建，自定义属性丢失。2026-11-06 实测日志中记事弹窗显示 `记事弹窗=false`，清理全部跳过，2026-11-04 的旧日记一直被隐藏窗口占用
+  - 清理时同时按 URL 识别：`qn=1`，或 `window.html` 的 `json` 中 `pin=true`、标题含 `⚡`、`children.action` 含 `cb-get-focus`
+  - 插件启动时（`onLayoutReady`）调用一次；设置页「立即清理残留记事窗口」与命令面板也可手动触发
 
 - **试过的无效方案**：
   | 方案 | 结果 |
   |------|------|
   | `rootId: fakeRootId`（假 ID） | 内核 API 返回真实 `root_id` 覆盖 |
   | 覆盖 `window.setModelsHash` | 该函数不存在（`typeof=undefined`），hash 是直接写的 |
-  | 200ms 轮询清空 hash | 有空窗期，且根本问题是僵尸窗口 |
+  | `Object.defineProperty` 拦截 `location.hash` setter | Location 属性不可配置，直接抛 TypeError，从未生效 |
+  | 仅 200ms 轮询清空 hash | 隐藏窗口定时器被节流，空窗期可达数秒；需配合 backgroundThrottling=false 与主进程事件 |
   | `getTitle()` 匹配销毁旧窗口 | 思源覆盖了窗口标题，永远匹配不上 |
   | Dialog + Protyle（同窗口） | 需要独立 BrowserWindow（副屏、拖拽等） |
 
 ### 手动清理兜底：一键记事弹窗残留占用文档（v3.8.6）
 
-hash 拦截 + 僵尸窗口清理是"对抗式"防护，仍有边角场景（如窗口 hide 常驻期间清理时机、思源版本变更）会导致主窗口点日记/文档无反应。
+hash 清空 + 僵尸窗口清理是"对抗式"防护。2026-11 修复后已覆盖隐藏窗口期间 hash 残留的主要场景；理论上仍存在 hash 写入到清空之间的毫秒级空窗。
 **自动兜底（v3.8.6）**：点 × 关闭块格式弹窗时自动 `destroyAllBlockWindows(win.id)`（排除自身，走正常关闭流程），顺手销毁其它残留弹窗。
 **手动兜底**：命令面板触发「清理一键记事弹窗残留」→ `cleanupBlockWindowResidue()`（销毁所有 `__qn_block_window` 标记窗口 + 复位草稿状态）+ `destroyQuickNoteFloatWindow()`。
 彻底方案（未实施）：草稿块从日记迁到独立草稿文档，弹窗 root_id 与任何真实文档解耦——需要把"所见即所得（编辑即日记块）"改为显式发送动作。

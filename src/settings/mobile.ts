@@ -604,7 +604,7 @@ export interface MobileSettingsContext {
   desktopFeatureConfig: MobileFeatureConfig
   isAuthorToolActivated: () => boolean
   getLicenseStatus: () => LicenseStatus
-  showConfirmDialog: (message: string) => Promise<boolean>
+  showConfirmDialog: (message: string, confirmText?: string) => Promise<boolean>
   showIconPicker: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void
   showButtonIdPicker: (currentValue: string, onSelect: (result: any) => void) => void
   saveData: (key: string, value: any) => Promise<void>

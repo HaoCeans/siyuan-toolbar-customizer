@@ -8,7 +8,7 @@ import { validateActivationCode } from '../utils/activationCodeValidator'
 import type { LicenseStatus } from '../utils/licenseManager'
 import { TRIAL_CODE, clearTrial } from '../utils/licenseManager'
 
-import type { Setting } from 'siyuan'
+import type { MobileSettingSink } from '../ui/mobileSettingsDialog'
 import type { GlobalButtonConfig, ButtonConfig } from '../toolbarManager'
 import type { ISlashToolbarConfig } from '../slashToolbar/catalog'
 import { calculateButtonOverflow, resetAllConfigsToFactoryDefaults, DEFAULT_FLOATING_TOOLBAR_Z_INDEX } from '../toolbarManager'
@@ -417,7 +417,7 @@ export interface DesktopSettingsContext {
   version?: string
   isAuthorToolActivated: () => boolean
   getLicenseStatus: () => LicenseStatus
-  showConfirmDialog: (message: string) => Promise<boolean>
+  showConfirmDialog: (message: string, confirmText?: string) => Promise<boolean>
   showIconPicker: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void
   saveData: (key: string, value: any) => Promise<void>
   removeData: (key: string) => Promise<void>
@@ -426,15 +426,17 @@ export interface DesktopSettingsContext {
   applyFeatures: () => void
   applyDesktopToolbarPosition: () => void
   refreshButtons: () => void
+  /** 草稿模式：立即提交草稿并落盘（导入配置 / 激活等需要马上生效的流程使用） */
+  commitNow?: () => Promise<void>
 }
 
 /**
  * 创建电脑端设置布局
- * @param setting - 思源 Setting 对象
+ * @param setting - 设置项收集器（自建弹层的 sink，接口与 Setting.addItem 一致）
  * @param context - 依赖注入的上下文对象
  */
 export function createDesktopSettingLayout(
-  setting: Setting,
+  setting: MobileSettingSink,
   context: DesktopSettingsContext
 ): void {
   // 预先注入样式：隐藏非 desktop 标签的配置项
@@ -442,14 +444,15 @@ export function createDesktopSettingLayout(
   const preloadStyle = document.createElement('style')
   preloadStyle.id = 'toolbar-customizer-preload-hide'
   preloadStyle.textContent = `
-    .b3-dialog__content .config-item {
+    /* 思源真实类名是 config__item；data-tabgroup 在行内的 .toolbar-customizer-content 上 */
+    .b3-dialog__content .config__item {
       display: none !important;
     }
-    .b3-dialog__content .config-item[data-tabgroup="desktop"] {
-      display: block !important;
+    .b3-dialog__content .config__item:has(.toolbar-customizer-content[data-tabgroup="desktop"]) {
+      display: flex !important;
     }
-    .b3-dialog__content .config-item[data-tabgroup="activation"] {
-      display: block !important;
+    .b3-dialog__content .config__item:has(.toolbar-customizer-content[data-tabgroup="activation"]) {
+      display: flex !important;
     }
   `
   document.head.appendChild(preloadStyle)
@@ -784,15 +787,20 @@ export function createDesktopSettingLayout(
 
         // 全量写入存储，然后重载 UI
         try {
-          await context.saveData('mobileToolbarConfig', context.mobileConfig)
-          await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
-          await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
-          await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
-          await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
-          await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
-          await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
-          if (context.slashToolbarConfig) {
-            await context.saveData('slashToolbarConfig', context.slashToolbarConfig)
+          if (context.commitNow) {
+            // 草稿模式：导入属于「立即生效」操作，先整体提交再落盘
+            await context.commitNow()
+          } else {
+            await context.saveData('mobileToolbarConfig', context.mobileConfig)
+            await context.saveData('desktopButtonConfigs', context.desktopButtonConfigs)
+            await context.saveData('mobileButtonConfigs', context.mobileButtonConfigs)
+            await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+            await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+            await context.saveData('desktopGlobalButtonConfig', context.desktopGlobalButtonConfig)
+            await context.saveData('mobileGlobalButtonConfig', context.mobileGlobalButtonConfig)
+            if (context.slashToolbarConfig) {
+              await context.saveData('slashToolbarConfig', context.slashToolbarConfig)
+            }
           }
         } catch (e) {
           logger.warn('[导入配置] 保存失败:', e)
@@ -1033,8 +1041,12 @@ export function createDesktopSettingLayout(
             context.mobileFeatureConfig.licenseGraceEnd = ''
             // 同时清除 localStorage 试用标记
             clearTrial()
-	            await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
-	            await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+            if (context.commitNow) {
+              await context.commitNow()
+            } else {
+              await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+              await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+            }
             showMessage(t("settings.desktop.57", undefined, "激活状态已清除，正在重载..."), 2000, 'info')
             setTimeout(() => window.location.reload(), 1000)
           } catch (err) {
@@ -1101,8 +1113,12 @@ export function createDesktopSettingLayout(
             context.mobileFeatureConfig.licensePlan = planLower
             context.mobileFeatureConfig.licenseExpiry = result.expiryDate || ''
             context.mobileFeatureConfig.licenseGraceEnd = result.graceEnd || ''
-            await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
-            await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+            if (context.commitNow) {
+              await context.commitNow()
+            } else {
+              await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+              await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+            }
             activationStatus.style.cssText = 'font-size: 12px; padding: 2px 8px; border-radius: 4px; background: rgba(34, 197, 94, 0.2); color: #22c55e;'
             activationStatus.textContent = t("settings.desktop.65", undefined, "✓ 已激活")
             // 套餐文案

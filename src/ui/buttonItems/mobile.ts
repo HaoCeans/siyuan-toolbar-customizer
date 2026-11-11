@@ -29,7 +29,7 @@ import { showMessage } from 'siyuan'
  */
 export interface MobileButtonContext {
   isAuthorToolActivated: () => boolean
-  showConfirmDialog: (message: string) => Promise<boolean>
+  showConfirmDialog: (message: string, confirmText?: string) => Promise<boolean>
   showIconPicker: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void
   showButtonIdPicker: (currentValue: string, onSelect: (result: ButtonInfo) => void) => void
   buttonConfigs: ButtonConfig[]
@@ -462,7 +462,7 @@ export function createMobileButtonItem(
   `
   deleteBtn.onclick = async (e) => {
     e.stopPropagation()
-    if (await context.showConfirmDialog(t('ui.buttonItems.mobile.deleteConfirm', { buttonName: getButtonDisplayName(button) }, '确定删除"{buttonName}"？'))) {
+    if (await context.showConfirmDialog(t('ui.buttonItems.mobile.deleteConfirm', { buttonName: getButtonDisplayName(button) }, '确定删除"{buttonName}"？'), t('dialog.delete', undefined, '删除'))) {
       // 从配置数组中删除
       const realIndex = configsArray.findIndex(btn => btn.id === button.id)
       if (realIndex !== -1) {

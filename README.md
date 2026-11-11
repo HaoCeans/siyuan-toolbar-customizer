@@ -339,42 +339,33 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
-### v3.9.8 — Plugin-built mobile settings panel, navigation follows the capsule, instant slash bar
+### v3.9.8 — Plugin-built settings dialogs, navigation follows the capsule, TTS fixes
 
-> 💡 Want to drop SiYuan's native settings window and have the mobile settings fully owned by the plugin? After the floating capsule hides on scroll, does the “previous/next document” bar stay put? Does the slash menu bar still take half a second to show up after the keyboard opens? All addressed here.
+> 💡 Settings on both mobile and desktop now use the plugin's own dialogs and only apply when you click Save; the document navigation now hides together with the bottom capsule; “read only the title” and Edge TTS 403 are fixed too.
 
-**① Mobile settings: plugin-built full-screen panel**
-- No longer borrows SiYuan's native settings window: the panel brings its own header (title + close) and bottom bar (Cancel / Save), filling the phone screen
-- Settings items, groups and the save logic are unchanged; the number of items matches the native window, so nothing goes missing
-- The section navigation now appears together with the content instead of lagging behind it
-- Rows use a consistent “title on top, control below” layout: e.g. the “② Toolbar style” four-option grid no longer squeezes next to the title; switch rows keep “text left, switch right”
-- “✅ Hide toolbar along with SiYuan's navigation bars” is now a highlighted card (light purple background, border, bold colored title, short hint), with the text on the left and the switch on the right
-- Selecting a toolbar position now shows only that position's settings group (top / bottom / capsule / side capsule) instead of stacking all four
-- Switching position updates the panel instantly: section visibility and preview refresh immediately, while saving and toolbar rebuilding run asynchronously
-- Settings now use a draft: edits only touch the draft — nothing is written to disk and the real toolbar is untouched until you click Save
-- Clicking Save with nothing changed only shows “no changes”, without reloading the UI
-- Clicking ✕ or Cancel discards the draft — none of the session's changes take effect
-- Factory reset, activation, and clearing the activation are also staged in the draft and only apply on Save
-- Saving no longer stutters: the save path bypasses the 600 ms write debounce, keeps only the last write per key, and writes them in parallel
-- Page scroll is locked while open, with scrollbar-width compensation, so the page no longer jumps sideways on open; Esc closes, and scrolling is restored afterwards
-- Header and footer respect notch / gesture-bar safe areas; no panel is left behind when the plugin is disabled or reloaded
-- Desktop settings are untouched — they still use SiYuan's native window with tabs
+**① Settings: full-screen on mobile, floating window on desktop**
+- No more SiYuan native settings window: full page on mobile, centered window on desktop, with Cancel / Save at the bottom
+- Draft mode: edits do nothing until you click Save; ✕, Cancel or clicking outside discards everything
+- Saving with no changes only shows “no changes” and does not reload
+- Saving no longer stutters; switching toolbar position shows only that position's settings
+- The dialog appears complete in one go (no small window first), and the top tabs/navigation render normally
 
-**② Document navigation follows the capsule's scroll-hide**
-- With the desktop bottom floating capsule's “scroll-hide” enabled, the document nav bar no longer runs its own scroll-direction detection; it follows the capsule's hidden state: fades out when the capsule does, fades back in when the capsule returns
-- Timing and durations match the capsule (50 ms hide delay, 0.16 s fade-out, 0.2 s fade-in), so they never visibly lag behind each other
-- Pointer interaction is disabled while hidden, so you won't accidentally hit “previous/next” through the invisible bar
-- After switching documents, switching tabs, or dragging the window, the nav bar and capsule both come back together — no more “capsule is back but the nav bar is still missing”
-- When the capsule's scroll-hide is off, the nav bar keeps its original independent scroll detection; behavior is unchanged
-- Toggling the capsule's scroll-hide at runtime switches the driver immediately, no plugin restart needed
-- The desktop “previous/next document” bar now defaults to 80 px from the bottom (previously 20 px); saved distances are untouched
+**② Desktop document navigation**
+- With scroll-hide on, “previous / next document” now fades together with the bottom floating capsule
+- Default distance from the bottom changed from 20px to 80px (saved values are kept)
 
-**③ Settings hint**
-- The scroll-hide hint under “previous/next document” now mentions that the nav bar follows the capsule when the capsule's scroll-hide is enabled
+**③ Slash menu bar**
+- Appears immediately when the keyboard opens instead of waiting ~320ms; the 320ms pass only refines the position
 
-**④ Slash menu bar: appears immediately when the keyboard opens**
-- Fixed the ~320 ms delay before the slash bar appeared after the keyboard opened (two measurement schedules overwrote each other, so only the last one ran)
-- It now measures and shows the moment the keyboard opens, with a position correction at 320 ms — instant appearance without sacrificing accuracy
+**④ TTS fixes**
+- Desktop reading no longer reads only the title — the title editor is excluded when collecting the body
+- Fixed Edge online TTS 403 by switching to Microsoft's new v2 verification token
+
+**⑤ Other fixes**
+- All desktop main-toolbar buttons disappearing after enabling the mobile side capsule
+- In bottom-capsule mode the overflow panel now opens upward instead of off-screen
+- `Cannot read properties of undefined (reading 'catch')` when saving the same config twice in a row
+- The import confirmation button showing “Delete” now shows “OK”
 
 <details>
   <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">

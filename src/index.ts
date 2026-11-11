@@ -9,7 +9,6 @@
 import {
   Plugin,
   getFrontend,
-  Setting,
   showMessage,
   fetchSyncPost,
 } from "siyuan";
@@ -102,6 +101,7 @@ import { injectMobileSettingsNav, cleanupMobileSettingsNav } from './ui/mobileSe
 import {
   cleanupMobileSettingsDialog,
   openMobileSettingsDialog,
+  openSettingsDialog,
   type MobileSettingSink,
 } from './ui/mobileSettingsDialog'
 import { updateIconDisplay as updateIconDisplayUtil } from './data/icons'
@@ -194,7 +194,7 @@ export default class ToolbarCustomizer extends Plugin {
   // 4) 写失败 reject 传播给所有等待方（保持原生错误语义，调用方的 catch/提示不受影响）；
   //    同步 onDataChanged 时清「已写入内容」缓存，避免磁盘被同步改写后相同内容的写入被误跳过。
   private _storageLastJson = new Map<string, string>()
-  private _storagePending = new Map<string, { timer: ReturnType<typeof setTimeout>; latestJson: string; resolve: () => void; reject: (e: any) => void }>()
+  private _storagePending = new Map<string, { timer: ReturnType<typeof setTimeout>; latestJson: string; resolve: () => void; reject: (e: any) => void; promise: Promise<void> }>()
   private _unloading = false
   // 保存设置时绕过 600ms 防抖：否则每个配置项都要等一个防抖周期，点保存会明显卡一下
   private _storageBypassDebounce = false
@@ -259,7 +259,7 @@ export default class ToolbarCustomizer extends Plugin {
           entry.reject(err)
         })
     }, 600)
-    this._storagePending.set(storageName, { timer, latestJson, resolve: resolveFn, reject: rejectFn })
+    this._storagePending.set(storageName, { timer, latestJson, resolve: resolveFn, reject: rejectFn, promise })
     return promise
   }
 
@@ -1508,66 +1508,95 @@ export default class ToolbarCustomizer extends Plugin {
       return
     }
 
-    const setting = new Setting({
-      width: '800px',
-      height: '90vh',
-      confirmCallback: this.createConfirmHandler(snapshot)
-    })
-
-    // 电脑端：使用标签切换布局
+    // 电脑端：使用标签切换布局（草稿模式：编辑期间不写盘、不应用效果）
+    this.beginSettingsDraft()
+    const draft = this.mobileDraft!
     const context: DesktopSettingsContext = {
-        desktopButtonConfigs: this.desktopButtonConfigs,
-        mobileButtonConfigs: this.mobileButtonConfigs,
-        desktopGlobalButtonConfig: this.desktopGlobalButtonConfig,
-        mobileGlobalButtonConfig: this.mobileGlobalButtonConfig,
-        desktopFeatureConfig: this.desktopFeatureConfig,
-        mobileFeatureConfig: this.mobileFeatureConfig,
-        loggingEnabled: this.loggingEnabled,
-        mobileConfig: this.mobileConfig,
-        slashToolbarConfig: this.slashToolbarConfig,
-        version: this.version,
-        isAuthorToolActivated: () => this.isAuthorToolActivated(),
-        getLicenseStatus: () => this.getLicenseStatus(),
-        showConfirmDialog: (msg) => this.showConfirmDialog(msg),
-        showIconPicker: (current, onSelect) => this.showIconPicker(current, onSelect),
-        saveData: (key, value) => this.saveData(key, value),
-        removeData: (key) => this.removeData(key),
-        setLoggingEnabled: async (enabled) => {
-          const previous = this.loggingEnabled
-          this.loggingEnabled = enabled === true
-          setLoggingEnabled(this.loggingEnabled)
-          try {
-            await this.saveData('loggingConfig', { enabled: this.loggingEnabled })
-          } catch (error) {
-            this.loggingEnabled = previous
-            setLoggingEnabled(previous)
-            throw error
-          }
-        },
-        resetLogging: async () => {
-          await this.removeData('loggingConfig')
-          this.loggingEnabled = false
-          context.loggingEnabled = false
-          setLoggingEnabled(false)
-        },
-        applyFeatures: () => this.applyFeatures(),
-        applyDesktopToolbarPosition: () => this.applyDesktopToolbarPosition(),
-        refreshButtons: () => {
-          // 刷新桌面端按钮
-          initCustomButtons(this.desktopButtonConfigs)
+      desktopButtonConfigs: draft.desktopButtonConfigs,
+      mobileButtonConfigs: draft.mobileButtonConfigs,
+      desktopGlobalButtonConfig: draft.desktopGlobalButtonConfig,
+      mobileGlobalButtonConfig: draft.mobileGlobalButtonConfig,
+      desktopFeatureConfig: draft.desktopFeatureConfig,
+      mobileFeatureConfig: draft.mobileFeatureConfig,
+      loggingEnabled: this.loggingEnabled,
+      mobileConfig: draft.mobileConfig,
+      slashToolbarConfig: draft.slashToolbarConfig,
+      version: this.version,
+      isAuthorToolActivated: () => this.isAuthorToolActivated(),
+      getLicenseStatus: () => this.getLicenseStatus(),
+      showConfirmDialog: (msg, confirmText) => this.showConfirmDialog(msg, confirmText),
+      showIconPicker: (current, onSelect) => this.showIconPicker(current, onSelect),
+      // 草稿期间只入队，点「保存」时统一落盘
+      saveData: (key, value) => (this.mobileDraft
+        ? this.queueMobileDraftWrite('save', key, value)
+        : this.saveData(key, value)),
+      removeData: (key) => (this.mobileDraft
+        ? this.queueMobileDraftWrite('remove', key)
+        : this.removeData(key)),
+      // 导入配置 / 激活等需要「立即生效」的流程：提交草稿并落盘，随后自行 reloadUI
+      commitNow: () => this.commitMobileDraft(),
+      setLoggingEnabled: async (enabled) => {
+        const previous = this.loggingEnabled
+        this.loggingEnabled = enabled === true
+        setLoggingEnabled(this.loggingEnabled)
+        try {
+          await this.saveData('loggingConfig', { enabled: this.loggingEnabled })
+        } catch (error) {
+          this.loggingEnabled = previous
+          setLoggingEnabled(previous)
+          throw error
         }
-      }
-    createDesktopSettingLayout(setting, context)
+      },
+      resetLogging: async () => {
+        await this.removeData('loggingConfig')
+        this.loggingEnabled = false
+        context.loggingEnabled = false
+        setLoggingEnabled(false)
+      },
+      // 草稿期间不把效果应用到真实工具栏
+      applyFeatures: () => {
+        if (!this.mobileDraft) this.applyFeatures()
+      },
+      applyDesktopToolbarPosition: () => {
+        if (!this.mobileDraft) this.applyDesktopToolbarPosition()
+      },
+      refreshButtons: () => {
+        if (this.mobileDraft) return
+        // 刷新桌面端按钮
+        initCustomButtons(this.desktopButtonConfigs)
+      },
+    }
 
-    setting.open(t('plugin.settingsTitle', undefined, '思源手机端增强'))
+    // 电脑端：自建居中浮窗（不再借用思源原生 Setting 窗口）
+    openSettingsDialog({
+      variant: 'desktop',
+      title: t('plugin.settingsTitle', undefined, '思源手机端增强'),
+      width: 800,
+      maxHeight: '90vh',
+      build: (sink) => createDesktopSettingLayout(sink, context),
+      onConfirm: async () => {
+        // 保存期间直写，避免每个 key 等 600ms 防抖
+        this._storageBypassDebounce = true
+        try {
+          await this.commitMobileDraft()
+          await this.createConfirmHandler(snapshot)()
+        } finally {
+          this._storageBypassDebounce = false
+        }
+      },
+      onClose: () => {
+        // 未点保存就关闭：丢弃草稿（保存成功时 commit 已清空）
+        this.mobileDraft = null
+        this.mobileDraftWrites = []
+      },
+    })
 
     // 电脑端：对话框打开后注入标签栏
     this.injectTabSwitcher()
   }
 
-  /** 手机端：自建全屏设置面板（草稿模式：只有点「保存」才提交） */
-  private openMobileSettings(snapshot: string) {
-    this.mobileSettingsSnapshot = snapshot
+  /** 开启设置草稿：编辑期间只改草稿，点「保存」才提交（手机端/电脑端共用） */
+  private beginSettingsDraft(): void {
     this.mobileDraft = {
       mobileConfig: this.cloneSettingsValue(this.mobileConfig),
       mobileFeatureConfig: this.cloneSettingsValue(this.mobileFeatureConfig),
@@ -1579,6 +1608,12 @@ export default class ToolbarCustomizer extends Plugin {
       desktopGlobalButtonConfig: this.cloneSettingsValue(this.desktopGlobalButtonConfig),
     }
     this.mobileDraftWrites = []
+  }
+
+  /** 手机端：自建全屏设置面板（草稿模式：只有点「保存」才提交） */
+  private openMobileSettings(snapshot: string) {
+    this.mobileSettingsSnapshot = snapshot
+    this.beginSettingsDraft()
     this.renderMobileSettingsDialog(snapshot)
   }
 
@@ -1635,6 +1670,25 @@ export default class ToolbarCustomizer extends Plugin {
     this.desktopButtonConfigs.splice(0, this.desktopButtonConfigs.length, ...draft.desktopButtonConfigs)
     this.assignSettingsValue(this.desktopGlobalButtonConfig, draft.desktopGlobalButtonConfig)
     this.mobileDraft = null
+
+    // 提交后的配置必须落盘：导入配置等流程是直接改写草稿对象、没有走 saveData 队列。
+    // 这里统一直写一次（内容未变化的 key 会被存储层去重跳过）。
+    const previousBypass = this._storageBypassDebounce
+    this._storageBypassDebounce = true
+    try {
+      await this.saveData('mobileToolbarConfig', this.mobileConfig)
+      await this.saveData('desktopButtonConfigs', this.desktopButtonConfigs)
+      await this.saveData('mobileButtonConfigs', this.mobileButtonConfigs)
+      await this.saveData('desktopFeatureConfig', this.desktopFeatureConfig)
+      await this.saveData('mobileFeatureConfig', this.mobileFeatureConfig)
+      await this.saveData('desktopGlobalButtonConfig', this.desktopGlobalButtonConfig)
+      await this.saveData('mobileGlobalButtonConfig', this.mobileGlobalButtonConfig)
+      await this.saveData('slashToolbarConfig', this.slashToolbarConfig)
+    } catch (error) {
+      logger.error('[MobileSettings] 提交草稿落盘失败:', error)
+    } finally {
+      this._storageBypassDebounce = previousBypass
+    }
 
     const writes = this.mobileDraftWrites
     this.mobileDraftWrites = []
@@ -1777,8 +1831,8 @@ export default class ToolbarCustomizer extends Plugin {
   }
 
   // 注入标签切换器（已迁移到 ui/tabs.ts）
-  private injectTabSwitcher() {
-    injectTabSwitcherUtil()
+  private injectTabSwitcher(dialogElement?: HTMLElement) {
+    injectTabSwitcherUtil(dialogElement)
   }
 
 
@@ -1807,7 +1861,7 @@ export default class ToolbarCustomizer extends Plugin {
       rebuildPanel: () => this.renderMobileSettingsDialog(this.mobileSettingsSnapshot),
       isAuthorToolActivated: () => this.isAuthorToolActivated(),
       getLicenseStatus: () => this.getLicenseStatus(),
-      showConfirmDialog: (message) => this.showConfirmDialog(message),
+      showConfirmDialog: (message, confirmText) => this.showConfirmDialog(message, confirmText),
       showIconPicker: (currentValue, onSelect) => this.showIconPicker(currentValue, onSelect),
       showButtonIdPicker: (currentValue, onSelect) => this.showButtonIdPicker(currentValue, onSelect),
       // 草稿期间只入队，点「保存」时统一落盘
@@ -1885,10 +1939,10 @@ export default class ToolbarCustomizer extends Plugin {
   }
 
   // 自定义确认对话框（已迁移到 ui/dialog.ts，兼容鸿蒙系统）
-  private showConfirmDialog(message: string): Promise<boolean> {
+  private showConfirmDialog(message: string, confirmText?: string): Promise<boolean> {
     return showConfirmDialogModal({
       message,
-      confirmText: t('dialog.delete', undefined, '删除'),
+      confirmText: confirmText ?? t('dialog.confirm', undefined, '确定'),
       cancelText: t('dialog.cancel', undefined, '取消')
     })
   }

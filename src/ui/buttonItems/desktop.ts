@@ -26,7 +26,7 @@ import { createQuickNoteTargetDocIdField } from '../quickNoteDocIdField'
  */
 export interface DesktopButtonContext {
   isAuthorToolActivated: () => boolean
-  showConfirmDialog: (message: string) => Promise<boolean>
+  showConfirmDialog: (message: string, confirmText?: string) => Promise<boolean>
   showIconPicker: (currentValue: string, onSelect: (icon: string) => void, iconSize?: number) => void
   buttonConfigs: ButtonConfig[]
   desktopButtonConfigs?: ButtonConfig[]
@@ -200,7 +200,7 @@ export function createDesktopButtonItem(
   `
   deleteBtn.onclick = async (e) => {
     e.stopPropagation()
-    if (await context.showConfirmDialog(t('ui.buttonItems.desktop.deleteConfirm', { buttonName: getButtonDisplayName(button) }, '确定删除"{buttonName}"？'))) {
+    if (await context.showConfirmDialog(t('ui.buttonItems.desktop.deleteConfirm', { buttonName: getButtonDisplayName(button) }, '确定删除"{buttonName}"？'), t('dialog.delete', undefined, '删除'))) {
       // 从配置数组中删除
       const realIndex = configsArray.findIndex(btn => btn.id === button.id)
       if (realIndex !== -1) {

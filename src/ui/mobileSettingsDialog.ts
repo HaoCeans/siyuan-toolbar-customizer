@@ -40,6 +40,8 @@ export interface MobileSettingSink {
   addItem: (item: MobileSettingItem) => void
 }
 
+export type SettingsDialogVariant = 'mobile' | 'desktop'
+
 export interface OpenMobileSettingsOptions {
   title: string
   /** 同步构建全部设置项（现有 createMobileSettingLayout 直接传入即可） */
@@ -47,6 +49,12 @@ export interface OpenMobileSettingsOptions {
   /** 点击「保存」时执行，完成后自动关闭 */
   onConfirm: () => Promise<void> | void
   onClose?: () => void
+  /** 弹窗外壳形态：mobile=全屏（默认），desktop=居中浮窗 */
+  variant?: SettingsDialogVariant
+  /** 桌面浮窗宽度（px，默认 800） */
+  width?: number
+  /** 桌面浮窗最大高度（默认 90vh） */
+  maxHeight?: string
 }
 
 interface DialogState {
@@ -55,6 +63,7 @@ interface DialogState {
   onClose?: () => void
   onKeyDown: (event: KeyboardEvent) => void
   onOverlayClick: (event: MouseEvent) => void
+  onOverlayPointerDown: (event: Event) => void
 }
 
 let state: DialogState | null = null
@@ -269,12 +278,17 @@ export function isMobileSettingsDialogOpen(): boolean {
   return state !== null
 }
 
-export function openMobileSettingsDialog(options: OpenMobileSettingsOptions): void {
+export function openSettingsDialog(options: OpenMobileSettingsOptions): void {
+  const isDesktopVariant = options.variant === 'desktop'
+  const panelWidth = options.width ?? 800
+  const panelMaxHeight = options.maxHeight ?? '90vh'
+
   // 单例：重复打开（连续点设置入口）先关旧面板，避免叠层
   closeMobileSettingsDialog()
 
   injectStyle()
-  const restoreScroll = lockPageScroll()
+  // 手机端全屏面板需要锁页面滚动；桌面浮窗保持原生对话框行为，不锁
+  const restoreScroll = isDesktopVariant ? () => {} : lockPageScroll()
 
   const overlay = document.createElement('div')
   overlay.id = OVERLAY_ID
@@ -283,7 +297,18 @@ export function openMobileSettingsDialog(options: OpenMobileSettingsOptions): vo
   overlay.setAttribute('aria-modal', 'true')
   // 章节导航与手机端布局 CSS 都按该属性识别本插件面板
   overlay.setAttribute('data-plugin-dialog', 'toolbar-customizer')
-  overlay.style.cssText = `
+  overlay.style.cssText = isDesktopVariant
+    ? `
+    position: fixed;
+    inset: 0;
+    z-index: ${OVERLAY_Z_INDEX};
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--b3-mask-background, rgba(0, 0, 0, 0.32));
+  `
+    : `
     position: fixed;
     inset: 0;
     z-index: ${OVERLAY_Z_INDEX};
@@ -294,7 +319,22 @@ export function openMobileSettingsDialog(options: OpenMobileSettingsOptions): vo
 
   const container = document.createElement('div')
   container.className = 'b3-dialog__container'
-  container.style.cssText = `
+  container.style.cssText = isDesktopVariant
+    ? `
+    display: flex;
+    flex-direction: column;
+    width: ${panelWidth}px;
+    max-width: 92vw;
+    height: auto;
+    max-height: ${panelMaxHeight};
+    margin: 0;
+    padding: 0;
+    border-radius: var(--b3-border-radius-b, 8px);
+    box-shadow: var(--b3-dialog-shadow, 0 12px 48px rgba(0, 0, 0, 0.24));
+    overflow: hidden;
+    background: var(--b3-theme-surface);
+  `
+    : `
     display: flex;
     flex-direction: column;
     width: 100%;
@@ -406,8 +446,18 @@ export function openMobileSettingsDialog(options: OpenMobileSettingsOptions): vo
     closeMobileSettingsDialog()
   }
 
+  // 只有「按下」也发生在遮罩上才视为点击遮罩关闭，
+  // 防止从弹窗内部开始拖拽（滑杆等）到外部时被误判为点击遮罩
+  let pointerDownOnOverlay = false
+  const onOverlayPointerDown = (event: Event) => {
+    pointerDownOnOverlay = event.target === overlay
+  }
   const onOverlayClick = (event: MouseEvent) => {
+    const startedOnOverlay = pointerDownOnOverlay
+    pointerDownOnOverlay = false
     if (event.target !== overlay) return
+    if (!startedOnOverlay) return
+    // 点击弹窗外面 = 关闭（草稿模式下等同取消，改动不生效）
     closeMobileSettingsDialog()
   }
 
@@ -417,15 +467,31 @@ export function openMobileSettingsDialog(options: OpenMobileSettingsOptions): vo
     onClose: options.onClose,
     onKeyDown,
     onOverlayClick,
+    onOverlayPointerDown,
   }
 
+  // 内容渲染完成前不显示，避免出现「先一个小弹窗、再变成正常弹窗」的中间态
+  overlay.style.visibility = 'hidden'
   document.body.appendChild(overlay)
   document.addEventListener('keydown', onKeyDown)
   overlay.addEventListener('click', onOverlayClick)
+  overlay.addEventListener('mousedown', onOverlayPointerDown, true)
+  overlay.addEventListener('touchstart', onOverlayPointerDown, { capture: true, passive: true })
 
   // 面板挂进文档后再创建控件：与思源原生行为一致，也让依赖滚动容器的设置项能取到容器
-  const rendered = render(content)
+  let rendered = 0
+  try {
+    rendered = render(content)
+  } finally {
+    // 无论渲染是否出错都要显示出来，避免面板一直不可见
+    overlay.style.visibility = ''
+  }
   logger.log('[MobileSettingsDialog] 面板已打开，设置项:', rendered)
+}
+
+/** 手机端全屏面板（旧的入口名，内部走通用 openSettingsDialog） */
+export function openMobileSettingsDialog(options: OpenMobileSettingsOptions): void {
+  openSettingsDialog({ ...options, variant: 'mobile' })
 }
 
 /** 关闭面板（保存成功、点取消、点 ✕、按 Esc 都走这里） */
@@ -443,6 +509,8 @@ export function closeMobileSettingsDialog(): void {
 
   document.removeEventListener('keydown', current.onKeyDown)
   current.overlay.removeEventListener('click', current.onOverlayClick)
+  current.overlay.removeEventListener('mousedown', current.onOverlayPointerDown, true)
+  current.overlay.removeEventListener('touchstart', current.onOverlayPointerDown, true)
   current.overlay.remove()
   current.restoreScroll()
 

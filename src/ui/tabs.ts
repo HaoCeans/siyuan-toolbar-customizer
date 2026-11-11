@@ -29,23 +29,34 @@ export function cleanupTabSwitcher(): void {
 }
 
 /**
+ * 找到插件设置自己的对话框内容区。
+ * 不能直接用 document.querySelector('.b3-dialog__content')：从集市打开插件设置时，
+ * 思源设置弹窗仍留在 DOM 里（3.8.10 还新增了独立设置窗口），第一个匹配到的往往是
+ * 思源设置页，标签会被注入到错误的对话框，表现为四个分组全部堆在一起、点击无反应。
+ */
+function findTabSwitcherContent(dialogElement?: HTMLElement): HTMLElement | null {
+  const fromDialog = dialogElement?.querySelector('.b3-dialog__content') as HTMLElement | null
+  if (fromDialog?.querySelector('.toolbar-customizer-content')) return fromDialog
+  const contents = Array.from(document.querySelectorAll<HTMLElement>('.b3-dialog__content'))
+  for (let i = contents.length - 1; i >= 0; i--) {
+    if (contents[i].querySelector('.toolbar-customizer-content')) return contents[i]
+  }
+  return null
+}
+
+/**
  * 注入标签切换器
  * 在设置对话框顶部创建电脑端/手机端配置的切换标签
  */
-export function injectTabSwitcher(): void {
-  // 等待对话框渲染完成，使用更长的延迟确保设置项都已创建
-  pendingTimer = setTimeout(() => {
+export function injectTabSwitcher(dialogElement?: HTMLElement): void {
+  const run = (): void => {
     pendingTimer = null
-    const dialogContent = document.querySelector('.b3-dialog__content')
-    if (!dialogContent) return
-
-    // 检查是否有设置项，如果没有则等待更长时间
-    const configItems = dialogContent.querySelectorAll('.config-item')
-    if (configItems.length === 0) {
+    const dialogContent = findTabSwitcherContent(dialogElement)
+    if (!dialogContent) {
       // 设置项还没创建，再等待一段时间（有最大重试次数限制）
       tabSwitcherAttempts++
       if (tabSwitcherAttempts < MAX_TAB_SWITCHER_ATTEMPTS) {
-        pendingTimer = setTimeout(() => { pendingTimer = null; injectTabSwitcher() }, 100)
+        pendingTimer = setTimeout(run, 100)
       }
       return
     }
@@ -53,11 +64,8 @@ export function injectTabSwitcher(): void {
     // 重置计数器
     tabSwitcherAttempts = 0
 
-    // 移除预加载的隐藏样式（如果存在）
-    const preloadStyle = document.getElementById('toolbar-customizer-preload-hide')
-    if (preloadStyle && preloadStyle.parentNode) {
-      preloadStyle.parentNode.removeChild(preloadStyle)
-    }
+    // 移除预加载的隐藏样式（可能因重复打开残留多个）
+    document.querySelectorAll('#toolbar-customizer-preload-hide').forEach((el) => el.remove())
 
     // 隐藏配置项的标题部分（左边的 .fn__flex-1），因为我们用标签切换器了
     // 先清理已存在的样式，避免累积
@@ -69,19 +77,19 @@ export function injectTabSwitcher(): void {
     injectedStyle = style  // 保存引用
     style.textContent = `
       /* 隐藏标题和间距，让它们不占空间 */
-      .b3-dialog__content .config-item > .fn__flex-1 {
+      .b3-dialog__content .config__item > .fn__flex-1 {
         display: none !important;
       }
-      .b3-dialog__content .config-item > .fn__space {
+      .b3-dialog__content .config__item > .fn__space {
         display: none !important;
       }
-      .b3-dialog__content .config-item > .fn__flex-column {
+      .b3-dialog__content .config__item > .fn__flex-column {
         width: 100% !important;
         max-width: none !important;
       }
       /* 覆盖宽度限制类，让内容容器与父容器同宽 */
-      .b3-dialog__content .config-item > .fn__size200,
-      .b3-dialog__content .config-item > .fn__flex-center.fn__size200 {
+      .b3-dialog__content .config__item > .fn__size200,
+      .b3-dialog__content .config__item > .fn__flex-center.fn__size200 {
         width: 100% !important;
         max-width: none !important;
         min-width: auto !important;
@@ -173,7 +181,8 @@ export function injectTabSwitcher(): void {
 
       // 显示/隐藏对应的配置项
       // 遍历所有配置项，根据 toolbar-customizer-content 的 data-tabGroup 属性切换显示
-      const allConfigItems = dialogContent.querySelectorAll('.config-item')
+      // 思源真实类名是 config__item（双下划线）；保留 .config-item 兼容旧版本
+      const allConfigItems = dialogContent.querySelectorAll('.config__item, .config-item')
       allConfigItems.forEach(configItem => {
         const contentEl = configItem.querySelector('.toolbar-customizer-content')
         if (contentEl) {
@@ -205,5 +214,7 @@ export function injectTabSwitcher(): void {
 
     // 默认显示电脑端配置
     switchTab('desktop')
-  }, 100)
+  }
+  // 设置项已同步渲染完成：立即注入，避免先出现无标签栏的小弹窗
+  run()
 }

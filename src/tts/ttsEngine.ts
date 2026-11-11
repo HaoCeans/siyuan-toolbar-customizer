@@ -131,7 +131,8 @@ export class TTSEngine {
 
     if (protyle) {
       // ① DOM 提取（桌面端 / 手机端 protyle 可达时）
-      const wysiwyg = protyle.querySelector('.protyle-wysiwyg')
+      // 注意：必须排除文档标题内的 .protyle-wysiwyg（思源 3.8.10+），否则只会读到标题
+      const wysiwyg = findBodyWysiwyg(protyle)
       if (wysiwyg) {
         const blocks = wysiwyg.querySelectorAll(':scope > [data-node-id]')
         for (const block of blocks) {
@@ -423,6 +424,21 @@ export class TTSEngine {
     }
     return null
   }
+}
+
+/**
+ * 取「正文」编辑器。
+ * 思源 3.8.10 起文档标题也内嵌一个 .protyle-wysiwyg（位于 .protyle-title 内），
+ * 且排在正文之前；直接 querySelector('.protyle-wysiwyg') 会拿到标题编辑器，
+ * 表现为「只能读标题、正文读不出来」。
+ */
+function findBodyWysiwyg(root: ParentNode): HTMLElement | null {
+  const list = root.querySelectorAll<HTMLElement>('.protyle-wysiwyg')
+  for (const el of list) {
+    if (el.closest('.protyle-title, .protyle-title__rich')) continue
+    return el
+  }
+  return null
 }
 
 // ─── 文档 ID 获取 + API 内容获取（参考 siyuan-sireader）──────────

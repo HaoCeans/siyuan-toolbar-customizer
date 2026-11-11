@@ -1661,5 +1661,6 @@
   "settings.mobile.draftResetHint": "Restored factory defaults. Click Save to apply.",
   "settings.mobile.draftActivatedHint": "Activation recorded. Click Save to apply.",
   "settings.mobile.draftClearedHint": "Activation marked for removal. Click Save to apply.",
-  "settings.mobile.nativeBarsHint": "💡 When the keyboard opens or the page scrolls, the toolbar hides together with SiYuan's navigation bars; turn it off to keep the toolbar always visible"
+  "settings.mobile.nativeBarsHint": "💡 When the keyboard opens or the page scrolls, the toolbar hides together with SiYuan's navigation bars; turn it off to keep the toolbar always visible",
+  "toolbarManager.buttonExecuteFailed": "Button execution failed. Enable the plugin debug log for details."
 }

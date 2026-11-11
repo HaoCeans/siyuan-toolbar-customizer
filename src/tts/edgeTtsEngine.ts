@@ -16,6 +16,7 @@ import { logger } from '@/utils/logger'
 import { TTSEngine, ParagraphInfo, getCurrentDocId } from './ttsEngine'
 import { fetchSyncPost } from 'siyuan'
 import { t } from '../i18n/runtime'
+import { EDGE_TTS_SEC_MS_GEC_VERSION, generateSecMsGecV2 } from './edgeTtsDrm'
 
 // ─── 检测 Node.js 环境 ──────────────────────────────────
 // 使用 Function 构造器绕过 Vite 静态分析，确保 require 不被打包器吃掉
@@ -187,23 +188,19 @@ class NodeWS {
 }
 
 /**
- * 生成 Sec-MS-GEC DRM 令牌（edge-tts 7.x 新增）
- * 算法：SHA256(五分钟时间窗的 Windows ticks + TrustedClientToken)
+ * 生成 Sec-MS-GEC 令牌。
+ * 2026-10 起微软要求 v2 格式（`<16位校验>-<64位哈希>`）：旧版纯 SHA-256（v1）会被拒绝，握手返回 403。
+ * 实现见 ./edgeTtsDrm.ts（与 edge-tts ≥7.3 的 drm.generate_sec_ms_gec_v2 逐字节一致）。
  */
 function generateSecMsGec(): string {
-  const token = '6A5AA1D4EAFF4E9FB37E23D68491D6F4'
-  let seconds = BigInt(Math.floor(Date.now() / 1000) + 11644473600)
-  seconds -= seconds % 300n
-  const ticks = seconds * 10000000n
-  const strToHash = `${ticks}${token}`
   try {
-    return nodeCrypto.createHash('sha256').update(strToHash, 'ascii').digest('hex').toUpperCase()
+    return generateSecMsGecV2()
   } catch {
     return ''
   }
 }
 
-const SEC_MS_GEC_VERSION = '1-143.0.3650.75'
+const SEC_MS_GEC_VERSION = EDGE_TTS_SEC_MS_GEC_VERSION
 
 /**
  * 构建完整的 Edge TTS WebSocket URL（含 Sec-MS-GEC 令牌）

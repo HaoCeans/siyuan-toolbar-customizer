@@ -1121,8 +1121,9 @@ function shouldShowButton(button: ButtonConfig): boolean {
 
   // 侧边胶囊模式：扩展工具栏按钮是"展开面板"的结构性触发器，不受启用开关影响。
   // 若允许禁用，主胶囊会没有任何内容，只剩灰色空壳且无法展开。
-  const sideMode = isSideFloatingMode()
-    || (pluginInstance as any)?.mobileConfig?.enableSideFloatingToolbar === true
+  // 注意：只对手机端生效——电脑端不应因为手机端开了侧边胶囊而隐藏主工具栏按钮
+  const sideMode = isMobile && (isSideFloatingMode()
+    || (pluginInstance as any)?.mobileConfig?.enableSideFloatingToolbar === true)
   if (sideMode && isOverflowButton(button.id)) return true
 
   // 弹窗上下文特殊处理：如果弹窗开启了 overflow，强制显示 overflow 按钮
@@ -1180,8 +1181,9 @@ function isInputOrEditable(element: HTMLElement): boolean {
 function shouldShowInMainToolbar(button: ButtonConfig): boolean {
   // 侧边胶囊模式：主胶囊只保留"展开面板"的触发器（扩展工具栏按钮），其余按钮全部进展开面板。
   // 触发器是结构性的：即使按钮被禁用也必须渲染，否则主胶囊只剩一个灰色空壳且无法展开。
-  const sideMode = isSideFloatingMode()
-    || (pluginInstance as any)?.mobileConfig?.enableSideFloatingToolbar === true
+  // 注意：只对手机端生效——电脑端不应因为手机端开了侧边胶囊而隐藏主工具栏按钮
+  const sideMode = isMobileDevice() && (isSideFloatingMode()
+    || (pluginInstance as any)?.mobileConfig?.enableSideFloatingToolbar === true)
   if (sideMode) {
     return isOverflowButton(button.id)
   }
@@ -2644,11 +2646,13 @@ function createButtonElement(config: ButtonConfig): HTMLElement {
   button.style.setProperty('filter', 'none', 'important')
 
   // 设置图标内容（侧边胶囊模式下 overflow 按钮显示竖排省略号 ⋮）
-  const renderIcon = (isOverflowButton(config.id) && isSideFloatingMode()) ? 'lucide:EllipsisVertical' : config.icon
+  // 侧边胶囊只属于手机端，电脑端按钮不受该配置影响
+  const sideCapsuleMode = isMobileDevice() && isSideFloatingMode()
+  const renderIcon = (isOverflowButton(config.id) && sideCapsuleMode) ? 'lucide:EllipsisVertical' : config.icon
   // 侧边胶囊：修正按钮 inline 样式，保证 ⋮ 在胶囊正中
   // （getButtonBaseStyle 的 margin-right/padding 是 inline !important，CSS 规则压不过，
   //   且按钮实际宽度 23px+16px padding 会超出 32px 胶囊容器）
-  if (isOverflowButton(config.id) && isSideFloatingMode()) {
+  if (isOverflowButton(config.id) && sideCapsuleMode) {
     button.style.setProperty('margin-right', '0', 'important')
     button.style.setProperty('padding', '0', 'important')
     button.style.width = '23px'
@@ -3759,12 +3763,21 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
     btn.id !== OVERFLOW_BUTTON_ID_DESKTOP
   )
 
+  // 展开方向：底部悬浮胶囊固定在屏幕底部，必须向上弹；普通工具栏下方空间不足时也向上弹
+  const barRect = breadcrumbBar.getBoundingClientRect()
+  const layerStep = toolbarHeight + 6
+  const neededHeight = layers * layerStep
+  const isBottomCapsule = document.body.classList.contains('siyuan-toolbar-desktop-floating')
+  const openUpward = isBottomCapsule
+    || (barRect.bottom + neededHeight > window.innerHeight && barRect.top - neededHeight >= 0)
+
   // 添加动画样式（overflowAnimation 关闭时不加 animation 规则，仅保留 focus 样式；
   // 每次打开都重写，保证开关切换后旧 animation 规则被移除）
+  const animName = openUpward ? 'desktopOverflowSlideUp' : 'desktopOverflowSlideDown'
   const animRule = config.overflowAnimation === false
     ? ''
     : `.desktop-overflow-toolbar-layer {
-        animation: desktopOverflowSlideDown 0.2s ease-out;
+        animation: ${animName} 0.2s ease-out;
       }`
   let animationStyle = document.getElementById('desktop-overflow-toolbar-animation')
   if (!animationStyle) {
@@ -3775,6 +3788,10 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
   animationStyle.textContent = `
     @keyframes desktopOverflowSlideDown {
       from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes desktopOverflowSlideUp {
+      from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
     }
     ${animRule}
@@ -3799,7 +3816,9 @@ function showDesktopOverflowToolbar(config: ButtonConfig, clickedButton: HTMLEle
     toolbar.dataset.overflowLayer = String(layerNum)
     toolbar.style.cssText = `
       position: absolute;
-      top: calc(100% + ${i * (toolbarHeight + 6)}px);
+      ${openUpward
+        ? `bottom: calc(100% + ${i * layerStep}px); top: auto;`
+        : `top: calc(100% + ${i * layerStep}px); bottom: auto;`}
       right: 0;
       ${toolbarWidthPx > 0 ? `width: ${toolbarWidthPx}px;` : 'left: 0;'}
       height: ${toolbarHeight}px;
@@ -4005,31 +4024,40 @@ async function handleButtonClick(
   const notificationEnabled = config.showNotification !== false
   Notify.showButtonExecNotification(getButtonDisplayName(config), notificationEnabled)
 
-  // 执行功能
-  if (config.type === 'builtin') {
-    // 执行思源内置功能
-    executeBuiltinFunction(config)
-  } else if (config.type === 'builtin-refresh') {
-    // 执行思源刷新、重载、全屏功能
-    executeBuiltinRefreshFunction(config)
-  } else if (config.type === 'template') {
-    // 插入模板，传递保存的选区和焦点元素
-    insertTemplate(config, savedSelection, lastActiveElement)
-  } else if (config.type === 'click-sequence') {
-    // 执行点击序列，传入插件按钮用于修正隐藏按钮的菜单位置
-    executeClickSequence(config, clickedButton)
-  } else if (config.type === 'shortcut') {
-    // 执行快捷键，传递保存的选区
-    executeShortcut(config, savedSelection, lastActiveElement)
-  } else if (config.type === 'author-tool') {
-    // 执行鲸鱼定制工具箱
-    await executeAuthorTool(config, savedSelection, lastActiveElement)
-  } else if (config.type === 'quick-note') {
-    // 执行一键记事功能
-    await executeQuickNote(config)
-  } else if (config.type === 'popup-select') {
-    // 执行弹窗选择输入功能
-    await executePopupSelect(config, savedSelection, lastActiveElement)
+  // 执行功能（统一捕获异常：执行失败时给出可见提示，避免「点了没反应」）
+  try {
+    if (config.type === 'builtin') {
+      // 执行思源内置功能
+      executeBuiltinFunction(config)
+    } else if (config.type === 'builtin-refresh') {
+      // 执行思源刷新、重载、全屏功能
+      executeBuiltinRefreshFunction(config)
+    } else if (config.type === 'template') {
+      // 插入模板，传递保存的选区和焦点元素
+      insertTemplate(config, savedSelection, lastActiveElement)
+    } else if (config.type === 'click-sequence') {
+      // 执行点击序列，传入插件按钮用于修正隐藏按钮的菜单位置
+      executeClickSequence(config, clickedButton)
+    } else if (config.type === 'shortcut') {
+      // 执行快捷键，传递保存的选区
+      executeShortcut(config, savedSelection, lastActiveElement)
+    } else if (config.type === 'author-tool') {
+      // 执行鲸鱼定制工具箱
+      await executeAuthorTool(config, savedSelection, lastActiveElement)
+    } else if (config.type === 'quick-note') {
+      // 执行一键记事功能
+      await executeQuickNote(config)
+    } else if (config.type === 'popup-select') {
+      // 执行弹窗选择输入功能
+      await executePopupSelect(config, savedSelection, lastActiveElement)
+    }
+  } catch (error) {
+    logger.error('[Button] 按钮执行失败:', getButtonDisplayName(config), config.type, error)
+    showMessage(
+      t('toolbarManager.buttonExecuteFailed', undefined, '按钮执行失败，请开启插件调试日志查看原因'),
+      3000,
+      'error',
+    )
   }
 
   // 功能执行完成后，延迟移除按钮焦点（1000ms）

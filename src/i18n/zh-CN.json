@@ -1661,5 +1661,6 @@
   "settings.mobile.draftResetHint": "✅ 已恢复默认配置，点击「保存」后生效",
   "settings.mobile.draftActivatedHint": "✅ 激活信息已记录，点击「保存」后生效",
   "settings.mobile.draftClearedHint": "✅ 已标记清除激活，点击「保存」后生效",
-  "settings.mobile.nativeBarsHint": "💡 键盘弹出、页面滚动时，工具栏跟着思源导航栏一起收起；关闭后工具栏常驻"
+  "settings.mobile.nativeBarsHint": "💡 键盘弹出、页面滚动时，工具栏跟着思源导航栏一起收起；关闭后工具栏常驻",
+  "toolbarManager.buttonExecuteFailed": "按钮执行失败，请开启插件调试日志查看原因"
 }

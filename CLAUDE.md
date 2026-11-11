@@ -1022,3 +1022,19 @@ handleToolbarAutoHideScroll()      ← 滚动事件处理器
 - 实例解析复用滚动的优先级：手机端主/弹出编辑器 → 桌面活动页签（`getActiveProtyle()`）；只接受 `isConnected` 且 `getClientRects().length > 0` 的实例，禁止取全局第一个 `.protyle` 或 `.protyle-wysiwyg`
 - 旧版本没有 `getInstance` 时才回退键盘事件；回退也必须把事件派发到当前编辑器正文，正文查找要排除 `.protyle-title` / `.protyle-title__rich` 内的编辑器
 - 修改后至少验证：单页签切换、多分屏、弹窗/次级编辑器存在时，连续切换页签后点击全屏都只作用于当前文档
+
+### 39. 电脑端设置四个顶部标签：必须锁定插件自己的对话框
+
+**相关文件**: `src/ui/tabs.ts`（`findTabSwitcherContent`、`injectTabSwitcher`）、`src/index.ts`（`openSetting`）
+
+**现象**: 从集市打开插件设置后，电脑配置 / 手机配置 / 数据迁移 / 激活与权益四组内容全部堆在一起，点击顶部标签没有反应。Win10 用户反馈较多。
+
+**根因**:
+- `injectTabSwitcher` 原来用 `document.querySelector('.b3-dialog__content')` 取第一个对话框内容。从思源设置页的集市打开插件设置时，思源自己的设置弹窗仍在 DOM 里，而且思源设置页也包含 `.config-item`，原来的“有没有 config-item”判断会通过，于是四个标签被注入到思源设置页，`switchTab` 遍历的也是思源设置项，插件对话框里的分组永远不会被隐藏。
+- 思源 3.8.10 的桌面端 `Dialog` DOM 没有结构性改动，插件 `Setting` 改用 `MobileDialog` 只影响手机端（桌面仍是普通 `Dialog`）；但 3.8.10 新增了独立设置窗口，`b3-dialog` 同时存在的场景更多，放大了这个选择器问题。
+
+**规则**:
+- 注入前先锁定包含 `.toolbar-customizer-content` 的 `.b3-dialog__content`，优先使用 `setting.dialog.element` 精确查询，禁止直接取全局第一个 `.b3-dialog__content`
+- 判断“设置项是否就绪”要看 `.toolbar-customizer-content`，不能只看 `.config-item` 数量，否则会误判思源设置页
+- 预加载隐藏样式 `#toolbar-customizer-preload-hide` 可能残留多个，清理时用 `querySelectorAll` 全部移除，不要只用 `getElementById` 删一个
+- 修改后至少验证：从集市打开插件设置（思源设置页仍在背后）时四个标签只出现在插件对话框内；点击四个标签只切换插件内容；关闭后重新打开不残留标签或隐藏样式

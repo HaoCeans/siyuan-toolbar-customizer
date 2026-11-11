@@ -173,7 +173,7 @@ export interface ButtonConfig {
   floatPanelPosition?: 'top' | 'center' | 'bottom'; // 悬浮弹窗垂直位置：top=顶部, center=居中(默认), bottom=底部
 	  maxVisibleTabs?: number;   // 手机端标签页：最大可见标签数 (1~10)，超出后可滚动，默认 10
 	  collapseStyle?: 'preview' | 'minimal'; // 折叠面板样式：preview=收起显示预览小图标, minimal=收起仅显示展开手柄
-	  bottomDistance?: number;   // 前一篇/后一篇导航栏距底部距离(px)，手机端默认80，桌面端默认20
+	  bottomDistance?: number;   // 前一篇/后一篇导航栏距底部距离(px)，手机端与桌面端默认均为 80
 	  showInContextMenu?: boolean; // 是否显示在文本右键菜单中（仅模板类型，默认false）
   buttonsPerLayer?: number[];  // 桌面端扩展工具栏：每层按钮数量，如 [8, 5, 5, 5, 5]（仅 overflow-button-desktop 使用）
   overflowToolbarHeight?: number;  // 桌面端扩展工具栏高度(px)，默认 32（仅 overflow-button-desktop 使用）

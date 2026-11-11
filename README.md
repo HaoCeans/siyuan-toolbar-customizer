@@ -339,14 +339,23 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
-### v3.9.8 — Plugin-built mobile settings panel + document navigation follows the capsule
+### v3.9.8 — Plugin-built mobile settings panel, navigation follows the capsule, instant slash bar
 
-> 💡 Want to drop SiYuan's native settings window and have the mobile settings fully owned by the plugin? And after the bottom floating capsule hides on scroll, the “previous/next document” bar stays put like an unrelated control? Both are addressed here.
+> 💡 Want to drop SiYuan's native settings window and have the mobile settings fully owned by the plugin? After the floating capsule hides on scroll, does the “previous/next document” bar stay put? Does the slash menu bar still take half a second to show up after the keyboard opens? All addressed here.
 
 **① Mobile settings: plugin-built full-screen panel**
 - No longer borrows SiYuan's native settings window: the panel brings its own header (title + close) and bottom bar (Cancel / Save), filling the phone screen
-- Settings items, groups, section navigation and the save logic are unchanged; the number of items matches the native window, so nothing goes missing
-- Save still writes only changed keys and reloads the UI; Cancel still just closes the panel (no rollback, same as before)
+- Settings items, groups and the save logic are unchanged; the number of items matches the native window, so nothing goes missing
+- The section navigation now appears together with the content instead of lagging behind it
+- Rows use a consistent “title on top, control below” layout: e.g. the “② Toolbar style” four-option grid no longer squeezes next to the title; switch rows keep “text left, switch right”
+- “✅ Hide toolbar along with SiYuan's navigation bars” is now a highlighted card (light purple background, border, bold colored title, short hint), with the text on the left and the switch on the right
+- Selecting a toolbar position now shows only that position's settings group (top / bottom / capsule / side capsule) instead of stacking all four
+- Switching position updates the panel instantly: section visibility and preview refresh immediately, while saving and toolbar rebuilding run asynchronously
+- Settings now use a draft: edits only touch the draft — nothing is written to disk and the real toolbar is untouched until you click Save
+- Clicking Save with nothing changed only shows “no changes”, without reloading the UI
+- Clicking ✕ or Cancel discards the draft — none of the session's changes take effect
+- Factory reset, activation, and clearing the activation are also staged in the draft and only apply on Save
+- Saving no longer stutters: the save path bypasses the 600 ms write debounce, keeps only the last write per key, and writes them in parallel
 - Page scroll is locked while open, with scrollbar-width compensation, so the page no longer jumps sideways on open; Esc closes, and scrolling is restored afterwards
 - Header and footer respect notch / gesture-bar safe areas; no panel is left behind when the plugin is disabled or reloaded
 - Desktop settings are untouched — they still use SiYuan's native window with tabs
@@ -358,9 +367,14 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 - After switching documents, switching tabs, or dragging the window, the nav bar and capsule both come back together — no more “capsule is back but the nav bar is still missing”
 - When the capsule's scroll-hide is off, the nav bar keeps its original independent scroll detection; behavior is unchanged
 - Toggling the capsule's scroll-hide at runtime switches the driver immediately, no plugin restart needed
+- The desktop “previous/next document” bar now defaults to 80 px from the bottom (previously 20 px); saved distances are untouched
 
 **③ Settings hint**
 - The scroll-hide hint under “previous/next document” now mentions that the nav bar follows the capsule when the capsule's scroll-hide is enabled
+
+**④ Slash menu bar: appears immediately when the keyboard opens**
+- Fixed the ~320 ms delay before the slash bar appeared after the keyboard opened (two measurement schedules overwrote each other, so only the last one ran)
+- It now measures and shows the moment the keyboard opens, with a position correction at 320 ms — instant appearance without sacrificing accuracy
 
 <details>
   <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">

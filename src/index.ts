@@ -196,6 +196,25 @@ export default class ToolbarCustomizer extends Plugin {
   private _storageLastJson = new Map<string, string>()
   private _storagePending = new Map<string, { timer: ReturnType<typeof setTimeout>; latestJson: string; resolve: () => void; reject: (e: any) => void }>()
   private _unloading = false
+  // 保存设置时绕过 600ms 防抖：否则每个配置项都要等一个防抖周期，点保存会明显卡一下
+  private _storageBypassDebounce = false
+
+  // ===== 手机端设置草稿（草稿模式：只有点「保存」才提交） =====
+  // 打开设置时深拷贝一份配置；设置项只改草稿、saveData 入队不落盘、效果不应用到真实工具栏；
+  // 点「保存」才把草稿写回真实配置并落盘；点 ✕ / 取消直接丢弃草稿，真实配置完全不变。
+  private mobileDraft: {
+    mobileConfig: MobileToolbarConfig
+    mobileFeatureConfig: any
+    mobileButtonConfigs: ButtonConfig[]
+    mobileGlobalButtonConfig: any
+    slashToolbarConfig: ISlashToolbarConfig
+    // 恢复出厂 / 激活会写桌面端配置，同样纳入草稿，取消时一并丢弃
+    desktopFeatureConfig: any
+    desktopButtonConfigs: ButtonConfig[]
+    desktopGlobalButtonConfig: any
+  } | null = null
+  private mobileDraftWrites: Array<{ type: 'save' | 'remove'; key: string; value?: any }> = []
+  private mobileSettingsSnapshot = ''
 
   private _writeThrough(storageName: string, json: string): Promise<void> {
     return super.saveData(storageName, JSON.parse(json))
@@ -220,8 +239,8 @@ export default class ToolbarCustomizer extends Plugin {
       // 内容与已写入内容一致：跳过磁盘写
       return Promise.resolve()
     }
-    if (this._unloading) {
-      // 卸载流程内没有时间窗等防抖：直写
+    if (this._unloading || this._storageBypassDebounce) {
+      // 卸载流程 / 保存设置时没有时间窗等防抖：直写
       return this._writeThrough(storageName, latestJson)
     }
     let resolveFn!: () => void
@@ -1546,15 +1565,100 @@ export default class ToolbarCustomizer extends Plugin {
     this.injectTabSwitcher()
   }
 
-  /** 手机端：自建全屏设置面板 */
+  /** 手机端：自建全屏设置面板（草稿模式：只有点「保存」才提交） */
   private openMobileSettings(snapshot: string) {
+    this.mobileSettingsSnapshot = snapshot
+    this.mobileDraft = {
+      mobileConfig: this.cloneSettingsValue(this.mobileConfig),
+      mobileFeatureConfig: this.cloneSettingsValue(this.mobileFeatureConfig),
+      mobileButtonConfigs: this.cloneSettingsValue(this.mobileButtonConfigs),
+      mobileGlobalButtonConfig: this.cloneSettingsValue(this.mobileGlobalButtonConfig),
+      slashToolbarConfig: this.cloneSettingsValue(this.slashToolbarConfig),
+      desktopFeatureConfig: this.cloneSettingsValue(this.desktopFeatureConfig),
+      desktopButtonConfigs: this.cloneSettingsValue(this.desktopButtonConfigs),
+      desktopGlobalButtonConfig: this.cloneSettingsValue(this.desktopGlobalButtonConfig),
+    }
+    this.mobileDraftWrites = []
+    this.renderMobileSettingsDialog(snapshot)
+  }
+
+  /** 渲染（或重绘）手机端设置面板；重绘时沿用当前草稿（恢复出厂 / 激活后使用） */
+  private renderMobileSettingsDialog(snapshot: string) {
     openMobileSettingsDialog({
       title: t('plugin.settingsTitle', undefined, '思源手机端增强'),
       build: (sink) => this.initMobileSettingLayout(sink),
-      onConfirm: this.createConfirmHandler(snapshot),
+      onConfirm: async () => {
+        // 保存期间直写，避免每个 key 等 600ms 防抖
+        this._storageBypassDebounce = true
+        try {
+          await this.commitMobileDraft()
+          await this.createConfirmHandler(snapshot)()
+        } finally {
+          this._storageBypassDebounce = false
+        }
+      },
     })
     // 面板与设置项已同步就绪，注入顶部章节导航
     injectMobileSettingsNav()
+  }
+
+  /** 深拷贝（配置都是纯 JSON 结构） */
+  private cloneSettingsValue<T>(value: T): T {
+    return JSON.parse(JSON.stringify(value)) as T
+  }
+
+  /** 就地写回配置对象，保持外部持有的引用不变 */
+  private assignSettingsValue(target: any, source: any): void {
+    Object.keys(target).forEach((key) => {
+      if (!(key in source)) delete target[key]
+    })
+    Object.assign(target, source)
+  }
+
+  /** 草稿期间的写入只入队，不落盘 */
+  private queueMobileDraftWrite(type: 'save' | 'remove', key: string, value?: any): Promise<void> {
+    this.mobileDraftWrites.push({ type, key, value })
+    return Promise.resolve()
+  }
+
+  /** 把草稿提交为真实配置，并把排队的写入落盘（供「保存」使用） */
+  private async commitMobileDraft(): Promise<void> {
+    const draft = this.mobileDraft
+    if (!draft) return
+
+    this.assignSettingsValue(this.mobileConfig, draft.mobileConfig)
+    this.assignSettingsValue(this.mobileFeatureConfig, draft.mobileFeatureConfig)
+    this.mobileButtonConfigs.splice(0, this.mobileButtonConfigs.length, ...draft.mobileButtonConfigs)
+    this.assignSettingsValue(this.mobileGlobalButtonConfig, draft.mobileGlobalButtonConfig)
+    this.assignSettingsValue(this.slashToolbarConfig, draft.slashToolbarConfig)
+    this.assignSettingsValue(this.desktopFeatureConfig, draft.desktopFeatureConfig)
+    this.desktopButtonConfigs.splice(0, this.desktopButtonConfigs.length, ...draft.desktopButtonConfigs)
+    this.assignSettingsValue(this.desktopGlobalButtonConfig, draft.desktopGlobalButtonConfig)
+    this.mobileDraft = null
+
+    const writes = this.mobileDraftWrites
+    this.mobileDraftWrites = []
+    // 同一 key 只写最后一次（设置过程中可能改了多轮），并行落盘
+    const latestByKey = new Map<string, { type: 'save' | 'remove'; key: string; value?: any }>()
+    writes.forEach((write) => latestByKey.set(write.key, write))
+    await Promise.all([...latestByKey.values()].map(async (write) => {
+      try {
+        if (write.type === 'remove') {
+          await this.removeData(write.key)
+        } else {
+          await this.saveData(write.key, write.value)
+        }
+      } catch (error) {
+        logger.error('[MobileSettings] 草稿落盘失败:', write.key, error)
+      }
+    }))
+
+    // 斜杠菜单工具栏在草稿期间被抑制，提交后统一同步一次
+    syncSlashToolbar(
+      this.slashToolbarConfig.enabled,
+      this.slashToolbarConfig.order,
+      this.slashToolbarConfig.inPlaceGroups,
+    )
   }
 
   /** 设置保存逻辑：手机端自建面板与桌面端原生 Setting 共用 */
@@ -1680,70 +1784,94 @@ export default class ToolbarCustomizer extends Plugin {
 
   // 手机端设置布局
   private initMobileSettingLayout(setting: MobileSettingSink) {
+    // 草稿模式：设置项只读写草稿，真实配置在点「保存」前保持不变
+    const draft = this.mobileDraft
+    const mobileConfig = draft?.mobileConfig ?? this.mobileConfig
+    const mobileFeatureConfig = draft?.mobileFeatureConfig ?? this.mobileFeatureConfig
+    const mobileButtonConfigs = draft?.mobileButtonConfigs ?? this.mobileButtonConfigs
+    const mobileGlobalButtonConfig = draft?.mobileGlobalButtonConfig ?? this.mobileGlobalButtonConfig
+    const slashToolbarConfig = draft?.slashToolbarConfig ?? this.slashToolbarConfig
+
     // 创建上下文对象，将插件实例的方法和数据通过依赖注入传递
     const context: MobileSettingsContext = {
-      buttonConfigs: this.buttonConfigs,
-      mobileButtonConfigs: this.mobileButtonConfigs,
-      desktopButtonConfigs: this.desktopButtonConfigs,
-      mobileGlobalButtonConfig: this.mobileGlobalButtonConfig,
-      desktopGlobalButtonConfig: this.desktopGlobalButtonConfig,
-      mobileFeatureConfig: this.mobileFeatureConfig,
-      mobileConfig: this.mobileConfig,
-      slashToolbarConfig: this.slashToolbarConfig,
-      desktopFeatureConfig: this.desktopFeatureConfig,
+      buttonConfigs: mobileButtonConfigs,
+      mobileButtonConfigs,
+      desktopButtonConfigs: draft?.desktopButtonConfigs ?? this.desktopButtonConfigs,
+      mobileGlobalButtonConfig,
+      desktopGlobalButtonConfig: draft?.desktopGlobalButtonConfig ?? this.desktopGlobalButtonConfig,
+      mobileFeatureConfig,
+      mobileConfig,
+      slashToolbarConfig,
+      desktopFeatureConfig: draft?.desktopFeatureConfig ?? this.desktopFeatureConfig,
+      isDraftMode: !!draft,
+      rebuildPanel: () => this.renderMobileSettingsDialog(this.mobileSettingsSnapshot),
       isAuthorToolActivated: () => this.isAuthorToolActivated(),
       getLicenseStatus: () => this.getLicenseStatus(),
       showConfirmDialog: (message) => this.showConfirmDialog(message),
       showIconPicker: (currentValue, onSelect) => this.showIconPicker(currentValue, onSelect),
       showButtonIdPicker: (currentValue, onSelect) => this.showButtonIdPicker(currentValue, onSelect),
-      saveData: (key, value) => this.saveData(key, value),
-      removeData: (key) => this.removeData(key),
+      // 草稿期间只入队，点「保存」时统一落盘
+      saveData: (key, value) => (draft ? this.queueMobileDraftWrite('save', key, value) : this.saveData(key, value)),
+      removeData: (key) => (draft ? this.queueMobileDraftWrite('remove', key) : this.removeData(key)),
       resetLogging: async () => {
+        if (draft) {
+          await this.queueMobileDraftWrite('remove', 'loggingConfig')
+          return
+        }
         await this.removeData('loggingConfig')
         this.loggingEnabled = false
         setLoggingEnabled(false)
       },
-      applyFeatures: () => this.applyFeatures(),
-      applyDesktopToolbarPosition: () => this.applyDesktopToolbarPosition(),
-      applyMobileToolbarStyle: () => this.applyMobileToolbarStyle(),
+      // 草稿期间不把效果应用到真实工具栏
+      applyFeatures: () => {
+        if (!draft) this.applyFeatures()
+      },
+      applyDesktopToolbarPosition: () => {
+        if (!draft) this.applyDesktopToolbarPosition()
+      },
+      applyMobileToolbarStyle: () => {
+        if (!draft) this.applyMobileToolbarStyle()
+      },
       updateMobileToolbar: () => {
+        if (draft) return
         initMobileToolbarAdjuster(this.mobileConfig, this.mobileFeatureConfig.disableCustomButtons)
-        const buttonsToInit = this.mobileButtonConfigs
-        initCustomButtons(buttonsToInit)
-        
+        initCustomButtons(this.mobileButtonConfigs)
+
         // 手机端功能初始化 - 但不重新初始化小窗检测器以避免弹窗意外触发
         if (this.isMobile) {
           // 只应用工具栏样式而不重新初始化检测器
-          this.applyMobileToolbarStyle();
+          this.applyMobileToolbarStyle()
         }
       },
       recalculateOverflow: () => {
-        // 获取扩展工具栏按钮的层数配置
-        const overflowBtn = this.mobileButtonConfigs.find(btn => btn.id === 'overflow-button-mobile')
+        // 草稿模式下只重算草稿里的溢出层级，不碰真实工具栏
+        const overflowBtn = mobileButtonConfigs.find(btn => btn.id === 'overflow-button-mobile')
         const overflowLayers = (overflowBtn && overflowBtn.enabled !== false) ? (overflowBtn.layers || 1) : 0
 
         // 如果扩展工具栏被禁用，重置所有按钮的溢出层级
         if (overflowLayers === 0 || overflowBtn?.enabled === false) {
-          this.mobileButtonConfigs.forEach(btn => {
+          mobileButtonConfigs.forEach(btn => {
             btn.overflowLevel = 0
           })
         } else {
           // 重新计算所有按钮的溢出层级
           const updatedButtons = calculateButtonOverflow(
-            this.mobileButtonConfigs,
+            mobileButtonConfigs,
             overflowLayers,
-            this.mobileGlobalButtonConfig?.externalButtonsReserveWidth ?? 0
+            mobileGlobalButtonConfig?.externalButtonsReserveWidth ?? 0
           )
           updatedButtons.forEach(btn => {
-            const original = this.mobileButtonConfigs.find(b => b.id === btn.id)
+            const original = mobileButtonConfigs.find(b => b.id === btn.id)
             if (original) {
               original.overflowLevel = btn.overflowLevel
             }
           })
         }
 
-        // 重新创建主工具栏按钮，应用新的样式配置
-        initCustomButtons(this.mobileButtonConfigs)
+        if (!draft) {
+          // 重新创建主工具栏按钮，应用新的样式配置
+          initCustomButtons(this.mobileButtonConfigs)
+        }
       }
     }
 

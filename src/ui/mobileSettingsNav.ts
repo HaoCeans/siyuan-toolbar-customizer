@@ -7,7 +7,7 @@
  * - 底部细进度条显示整页滚动位置
  *
  * 导航本身是 `.b3-dialog__content` 的直接子元素，才能在整个设置页范围内保持 sticky；
- * 若挂在某个 `.config-item` 里，粘性范围会被该设置项的高度限制。
+ * 若挂在某个 `.config__item` 里，粘性范围会被该设置项的高度限制。
  */
 
 import { t } from '@/i18n/runtime'
@@ -290,9 +290,9 @@ function buildNav(content: HTMLElement): HTMLElement | null {
 }
 
 /**
- * 在手机端设置对话框顶部注入章节导航。
- * 设置项由 createMobileSettingLayout 同步创建，但对话框要等 setting.open() 后才进 DOM，
- * 所以这里用短轮询等待容器和章节锚点。
+ * 在手机端设置面板顶部注入章节导航。
+ * 设置项由 createMobileSettingLayout 同步创建，自建面板会在调用本函数前完成渲染，
+ * 因此先立即注入一次；只有容器/锚点还没就绪时才进入短轮询兜底。
  */
 export function injectMobileSettingsNav(): void {
   if (injectTimer) {
@@ -319,7 +319,8 @@ export function injectMobileSettingsNav(): void {
     // 放到滚动内容外面：导航常驻顶部，设置内容在它下方独立滚动，避免顶部露出设置内容
     parts.body.insertBefore(nav, parts.body.firstChild)
   }
-  injectTimer = setTimeout(tryInject, 80)
+  // 自建面板已同步渲染完成：立即注入，避免导航比设置内容晚出现
+  tryInject()
 }
 
 /** 清理待注入的轮询（对话框提前关闭时调用，避免无意义的重试） */

@@ -23,6 +23,8 @@ export interface ISlashToolbarSettingsContext {
   saveData: (key: string, value: unknown) => Promise<void>
   /** 分组标题的 DOM id，供设置页章节导航定位 */
   sectionId?: string
+  /** 草稿模式：设置期间不立即同步运行时，点「保存」后由插件统一同步 */
+  deferApply?: boolean
 }
 
 const CONFIG_KEY = 'slashToolbarConfig'
@@ -71,6 +73,11 @@ export function mountSlashToolbarSection(
   createNotice?: (content: string) => void,
 ): void {
   const config = context.slashToolbarConfig
+  // 草稿模式只改配置对象，运行时同步推迟到点「保存」
+  const applySlash = () => {
+    if (context.deferApply) return
+    syncSlashToolbar(config.enabled, config.order, config.inPlaceGroups)
+  }
   const title = t('slashToolbar.settings.group', undefined, '思源移动端斜杠菜单栏')
   if (createTitle) {
     createTitle('↗️', title, context.sectionId)
@@ -95,7 +102,7 @@ export function mountSlashToolbarSection(
         setEnabled: async (enabled) => {
           config.enabled = enabled
           await context.saveData(CONFIG_KEY, config)
-          syncSlashToolbar(config.enabled, config.order, config.inPlaceGroups)
+          applySlash()
         },
         // 手机端自定义按钮（设置内「添加自定义按钮」列表的数据源 + 预览里的 chip 解析）
         getCustomButtons: () => buildCustomSlashButtons(getSlashCustomButtonSources()),
@@ -106,13 +113,13 @@ export function mountSlashToolbarSection(
             config.order = [...config.order, key]
           }
           await context.saveData(CONFIG_KEY, config)
-          syncSlashToolbar(config.enabled, config.order, config.inPlaceGroups)
+          applySlash()
         },
         // 从斜杠栏移除自定义按钮：当场落盘并同步（与原地改格式开关同一路径）
         removeCustom: async (id) => {
           config.order = config.order.filter((item) => item !== id)
           await context.saveData(CONFIG_KEY, config)
-          syncSlashToolbar(config.enabled, config.order, config.inPlaceGroups)
+          applySlash()
         },
         // 「原地改格式」按钮开关（标题 / 列表 / 引述各一个），默认全部关闭 = 思源原生新建块。
         // 导入的配置文件可能是脏值，读之前按数组判断一次
@@ -124,10 +131,10 @@ export function mountSlashToolbarSection(
           }
           config.inPlaceGroups = normalizeInPlaceGroups(next)
           await context.saveData(CONFIG_KEY, config)
-          syncSlashToolbar(config.enabled, config.order, config.inPlaceGroups)
+          applySlash()
         },
         onChanged: () => {
-          syncSlashToolbar(config.enabled, config.order, config.inPlaceGroups)
+          applySlash()
         },
       })
       wrapper.appendChild(preview)

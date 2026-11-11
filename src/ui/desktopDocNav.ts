@@ -64,7 +64,7 @@ const SCROLL_FADE_MS = 160
 let boundScrollEl: HTMLElement | null = null
 let scrollBindRetryTimer: ReturnType<typeof setInterval> | null = null
 let scrollBindRetryCount = 0
-let currentBottomDistance = 20
+let currentBottomDistance = 80
 
 // ===== 跟随底部悬浮胶囊滚动隐藏 =====
 // 电脑端底部悬浮胶囊开启「滚动隐藏」后，导航栏不再自己做方向判断，
@@ -636,7 +636,7 @@ export async function init(context: DocNavContext): Promise<void> {
   await loadState()
 
   // 从 context 恢复底部距离和滚动隐藏开关（按钮配置 > 持久化状态）
-  if (context.bottomDistance !== undefined && currentBottomDistance === 20) {
+  if (context.bottomDistance !== undefined && currentBottomDistance === 80) {
     currentBottomDistance = context.bottomDistance
   }
   if (context.autoHideOnScroll !== undefined) {

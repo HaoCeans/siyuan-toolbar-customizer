@@ -615,6 +615,10 @@ export interface MobileSettingsContext {
   applyMobileToolbarStyle: () => void
   updateMobileToolbar: () => void
   recalculateOverflow: () => void
+  /** 草稿模式：编辑只改草稿，点「保存」才落盘并应用（恢复出厂/激活等操作据此避免直接重载） */
+  isDraftMode?: boolean
+  /** 草稿模式下重绘设置面板（恢复出厂后用默认值重建界面，草稿保持不变） */
+  rebuildPanel?: () => void
 }
 
 /**
@@ -880,12 +884,14 @@ export function createMobileSettingLayout(
 	  // === v3.7 适配：手机端设置面板 ===
 	  // 默认所有设置项改为纵向堆叠（标题上、内容下铺满居中），解决手机端整体偏左。
 	  // 两项例外保持横向一行：① 裸开关（input.b3-switch）② 标记了 whale-row-layout 的项。
-	  if (!document.getElementById('toolbar-customizer-mobile-center')) {
-	    const style = document.createElement('style')
-	    style.id = 'toolbar-customizer-mobile-center'
-	    style.textContent = t("settings.mobile.90", undefined, "\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .b3-dialog__container {\n\t        max-width: 100% !important;\n\t      }\n      /* 默认全部纵向堆叠（裸 input 除外，如 b3-switch 保持原生外观） */\n      [data-plugin-dialog=\"toolbar-customizer\"] .config-item {\n        flex-direction: column !important;\n        align-items: stretch !important;\n      }\n      [data-plugin-dialog=\"toolbar-customizer\"] .config-item > .fn__flex-1 {\n        width: 100% !important;\n        flex: none !important;\n      }\n      [data-plugin-dialog=\"toolbar-customizer\"] .config-item > .fn__space {\n        display: none !important;\n      }\n      [data-plugin-dialog=\"toolbar-customizer\"] .config-item > .fn__flex-center:not(input),\n      [data-plugin-dialog=\"toolbar-customizer\"] .config-item > .fn__flex-center.fn__size200:not(input) {\n        width: 100% !important;\n        max-width: 100% !important;\n        min-width: 0 !important;\n        justify-content: flex-start !important;\n        align-items: stretch !important;\n        margin-top: 8px;\n      }\n      /* 例外①：裸开关保持横向一行（不覆写宽度，让 b3-switch 原生样式生效） */\n      [data-plugin-dialog=\"toolbar-customizer\"] .config-item:has(> input.b3-switch) {\n        flex-direction: row !important;\n        align-items: center !important;\n      }\n      [data-plugin-dialog=\"toolbar-customizer\"] .config-item:has(> input.b3-switch) > .fn__space {\n        display: block !important;\n        flex: none !important;\n        width: 12px !important;\n        min-width: 12px !important;\n      }\n\t      /* 例外②：标记项保持横向一行 */\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config-item:has(.whale-row-layout) {\n\t        flex-direction: row !important;\n\t        align-items: center !important;\n\t      }\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config-item:has(.whale-row-layout) > .fn__space {\n\t        display: block !important;\n\t      }\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config-item:has(.whale-row-layout) > .fn__flex-center,\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config-item:has(.whale-row-layout) > .fn__flex-center.fn__size200 {\n\t        width: auto !important;\n\t        margin-top: 0 !important;\n\t      }\n\t    ")
-	    document.head.appendChild(style)
+	  // 每次打开设置都重写样式内容：插件热重载后旧 <style> 仍在页面里，只判断 id 会保留旧 CSS
+	  let centerStyle = document.getElementById('toolbar-customizer-mobile-center') as HTMLStyleElement | null
+	  if (!centerStyle) {
+	    centerStyle = document.createElement('style')
+	    centerStyle.id = 'toolbar-customizer-mobile-center'
+	    document.head.appendChild(centerStyle)
 	  }
+	    centerStyle.textContent = t("settings.mobile.90", undefined, "\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .b3-dialog__container {\n\t        max-width: 100% !important;\n\t      }\n      /* 默认全部纵向堆叠（裸 input 除外，如 b3-switch 保持原生外观） */\n      [data-plugin-dialog=\"toolbar-customizer\"] .config__item {\n        flex-direction: column !important;\n        align-items: stretch !important;\n      }\n      [data-plugin-dialog=\"toolbar-customizer\"] .config__item > .fn__flex-1 {\n        width: 100% !important;\n        flex: none !important;\n      }\n      [data-plugin-dialog=\"toolbar-customizer\"] .config__item > .fn__space {\n        display: none !important;\n      }\n      [data-plugin-dialog=\"toolbar-customizer\"] .config__item > .fn__flex-center:not(input),\n      [data-plugin-dialog=\"toolbar-customizer\"] .config__item > .fn__flex-center.fn__size200:not(input) {\n        max-width: 100% !important;\n        min-width: 0 !important;\n        justify-content: flex-start !important;\n        align-items: stretch !important;\n        margin-top: 8px;\n      }\n      /* 例外①：裸开关保持横向一行（不覆写宽度，让 b3-switch 原生样式生效） */\n      [data-plugin-dialog=\"toolbar-customizer\"] .config__item:has(> input.b3-switch) {\n        flex-direction: row !important;\n        align-items: center !important;\n      }\n      [data-plugin-dialog=\"toolbar-customizer\"] .config__item:has(> input.b3-switch) > .fn__space {\n        display: block !important;\n        flex: none !important;\n        width: 12px !important;\n        min-width: 12px !important;\n      }\n      [data-plugin-dialog=\"toolbar-customizer\"] .config__item:has(> input.b3-switch) > .fn__flex-1 {\n        width: auto !important;\n        flex: 1 1 auto !important;\n        min-width: 0 !important;\n      }\n\t      /* 例外②：标记项保持横向一行 */\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config__item:has(.whale-row-layout) {\n\t        flex-direction: row !important;\n\t        align-items: center !important;\n\t      }\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config__item:has(.whale-row-layout) > .fn__space {\n\t        display: block !important;\n\t      }\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config__item:has(.whale-row-layout) > .fn__flex-center,\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config__item:has(.whale-row-layout) > .fn__flex-center.fn__size200 {\n\t        width: auto !important;\n\t        margin-top: 0 !important;\n\t      }\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config__item:has(> input.tc-important-row) {\n\t        display: flex !important;\n\t        flex-direction: row !important;\n\t        flex-wrap: nowrap !important;\n\t        align-items: flex-start !important;\n\t        gap: 12px !important;\n\t        padding: 12px 14px !important;\n\t        margin: 8px 0 !important;\n\t        border: 1px solid color-mix(in srgb, #8e24aa 32%, transparent) !important;\n\t        border-radius: 8px !important;\n\t        background: color-mix(in srgb, #8e24aa 8%, transparent) !important;\n\t      }\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config__item:has(> input.tc-important-row) > .fn__flex-1 {\n\t        width: auto !important;\n\t        flex: 1 1 auto !important;\n\t        min-width: 0 !important;\n\t        font-weight: 600 !important;\n\t        color: color-mix(in srgb, #8e24aa 65%, var(--b3-theme-on-background)) !important;\n\t      }\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config__item:has(> input.tc-important-row) > .fn__space {\n\t        display: none !important;\n\t      }\n\t      [data-plugin-dialog=\"toolbar-customizer\"] .config__item:has(> input.tc-important-row) > input.b3-switch {\n\t        flex: none !important;\n\t        margin-top: 2px !important;\n\t      }\n\t    ")
 
   // === 自定义滑杆组件 ===
   const createCustomSlider = (
@@ -1285,6 +1291,7 @@ export function createMobileSettingLayout(
     slashToolbarConfig: context.slashToolbarConfig,
     saveData: context.saveData,
     sectionId: 'mobile-settings-nav-slash',
+    deferApply: context.isDraftMode === true,
   }, createGroupTitle, createNotice)
 
   // === 自定义按钮 ===
@@ -2108,6 +2115,39 @@ export function createMobileSettingLayout(
         return 'side-floating'  // 兜底与默认一致：侧边胶囊
       }
 
+      // 位置切换的界面联动：禁用态 + 分区显隐（同步执行，不等待落盘）
+      const applyPositionUi = (value: string) => {
+        const flags: Record<string, boolean> = {
+          'top': value === 'top',
+          'bottom': value === 'bottom',
+          'floating': value === 'floating',
+          'side-floating': value === 'side-floating',
+        }
+
+        const toggleControls = (selector: string, enabled: boolean) => {
+          document.querySelectorAll(selector).forEach(el => {
+            const input = el as HTMLInputElement
+            input.disabled = !enabled
+            input.style.opacity = enabled ? '' : '0.5'
+          })
+        }
+
+        const toggleRow = (selector: string, show: boolean) => {
+          document.querySelectorAll(selector).forEach(el => {
+            const row = el.closest('.b3-dialog__content .config__item') as HTMLElement | null
+            if (row) row.style.display = show ? '' : 'none'
+          })
+        }
+
+        ;(['top', 'bottom', 'floating', 'side-floating'] as const).forEach(mode => {
+          const enabled = flags[mode]
+          toggleControls(`.${mode}-toolbar-setting`, enabled)
+          toggleRow(`.${mode}-toolbar-section`, enabled)
+          toggleRow(`.${mode}-toolbar-setting`, enabled)
+        })
+      }
+
+
       options.forEach(option => {
         const label = document.createElement('label')
         label.style.cssText = 'display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 16px; font-weight: 600;'
@@ -2119,90 +2159,22 @@ export function createMobileSettingLayout(
         radio.checked = getCurrentValue() === option.value
         radio.style.cssText = 'cursor: pointer;'
 
-        radio.onchange = async () => {
+        radio.onchange = () => {
           // 更新配置（互斥，只启用一个）
           context.mobileConfig.enableTopToolbar = option.value === 'top'
           context.mobileConfig.enableBottomToolbar = option.value === 'bottom'
           context.mobileConfig.enableFloatingToolbar = option.value === 'floating'
           context.mobileConfig.enableSideFloatingToolbar = option.value === 'side-floating'
 
-          await context.saveData('mobileToolbarConfig', context.mobileConfig)
-
-          // 动态更新底部/顶部/悬浮专用设置的禁用状态
-          const isBottom = option.value === 'bottom'
-          const isTop = option.value === 'top'
-          const isFloating = option.value === 'floating'
-          const isSideFloating = option.value === 'side-floating'
-
-          document.querySelectorAll('.bottom-toolbar-setting').forEach(el => {
-            (el as HTMLInputElement).disabled = !isBottom
-            ;(el as HTMLInputElement).style.opacity = isBottom ? '' : '0.5'
-          })
-
-          document.querySelectorAll('.top-toolbar-setting').forEach(el => {
-            (el as HTMLInputElement).disabled = !isTop
-            ;(el as HTMLInputElement).style.opacity = isTop ? '' : '0.5'
-          })
-
-          document.querySelectorAll('.floating-toolbar-setting').forEach(el => {
-            (el as HTMLInputElement).disabled = !isFloating
-            ;(el as HTMLInputElement).style.opacity = isFloating ? '' : '0.5'
-          })
-
-          document.querySelectorAll('.side-floating-toolbar-setting').forEach(el => {
-            (el as HTMLInputElement).disabled = !isSideFloating
-            ;(el as HTMLInputElement).style.opacity = isSideFloating ? '' : '0.5'
-          })
-
-          // 动态显示/隐藏整个配置分区
-          document.querySelectorAll('.top-toolbar-section').forEach(el => {
-            const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
-            if (parent) {
-              parent.style.display = isTop ? '' : 'none'
-            }
-          })
-
-          document.querySelectorAll('.bottom-toolbar-section').forEach(el => {
-            const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
-            if (parent) {
-              parent.style.display = isBottom ? '' : 'none'
-            }
-          })
-
-          document.querySelectorAll('.floating-toolbar-section').forEach(el => {
-            const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
-            if (parent) {
-              parent.style.display = isFloating ? '' : 'none'
-            }
-          })
-
-          document.querySelectorAll('.side-floating-toolbar-section').forEach(el => {
-            const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
-            if (parent) {
-              parent.style.display = isSideFloating ? '' : 'none'
-            }
-          })
-
-          // 同时显示/隐藏分区下的所有配置项
-          const updateSectionVisibility = (className: string, show: boolean) => {
-            document.querySelectorAll(className).forEach(el => {
-              const input = el as HTMLInputElement
-              const item = input.closest('.b3-dialog__content .config-item') as HTMLElement
-              if (item) {
-                item.style.display = show ? '' : 'none'
-              }
-            })
-          }
-
-          updateSectionVisibility('.top-toolbar-setting', isTop)
-          updateSectionVisibility('.bottom-toolbar-setting', isBottom)
-          updateSectionVisibility('.floating-toolbar-setting', isFloating)
-          updateSectionVisibility('.side-floating-toolbar-setting', isSideFloating)
-
-          // 重新初始化工具栏
-          context.updateMobileToolbar()
-          // 刷新顶部预览（侧边胶囊 ⇄ 其它模式切换时预览形态不同）
+          // 先切面板 UI（同步），不等落盘：saveData 有 600ms 防抖，等待会让切换卡一拍
+          applyPositionUi(option.value)
           mobilePreviewEl?.refresh()
+
+          // 重建真实工具栏是重活，放到下一帧，避免和面板 UI 抢主线程
+          requestAnimationFrame(() => context.updateMobileToolbar())
+
+          // 落盘异步进行，失败不阻塞交互
+          void context.saveData('mobileToolbarConfig', context.mobileConfig).catch(() => {})
         }
 
 	        const text = document.createElement('span')
@@ -2214,56 +2186,8 @@ export function createMobileSettingLayout(
         container.appendChild(label)
       })
 
-      // 初始化时根据当前配置设置显示状态（使用setTimeout确保DOM已渲染）
-      setTimeout(() => {
-        const isTop = context.mobileConfig.enableTopToolbar
-        const isBottom = context.mobileConfig.enableBottomToolbar
-        const isFloating = !!context.mobileConfig.enableFloatingToolbar
-        const isSideFloating = !!context.mobileConfig.enableSideFloatingToolbar
-
-        document.querySelectorAll('.top-toolbar-section').forEach(el => {
-          const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
-          if (parent) {
-            parent.style.display = isTop ? '' : 'none'
-          }
-        })
-
-        document.querySelectorAll('.bottom-toolbar-section').forEach(el => {
-          const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
-          if (parent) {
-            parent.style.display = isBottom ? '' : 'none'
-          }
-        })
-
-        document.querySelectorAll('.floating-toolbar-section').forEach(el => {
-          const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
-          if (parent) {
-            parent.style.display = isFloating ? '' : 'none'
-          }
-        })
-
-        document.querySelectorAll('.side-floating-toolbar-section').forEach(el => {
-          const parent = el.closest('.b3-dialog__content .config-item') as HTMLElement
-          if (parent) {
-            parent.style.display = isSideFloating ? '' : 'none'
-          }
-        })
-
-        const updateSectionVisibility = (className: string, show: boolean) => {
-          document.querySelectorAll(className).forEach(el => {
-            const input = el as HTMLInputElement
-            const item = input.closest('.b3-dialog__content .config-item') as HTMLElement
-            if (item) {
-              item.style.display = show ? '' : 'none'
-            }
-          })
-        }
-
-        updateSectionVisibility('.top-toolbar-setting', isTop)
-        updateSectionVisibility('.bottom-toolbar-setting', isBottom)
-        updateSectionVisibility('.floating-toolbar-setting', isFloating)
-        updateSectionVisibility('.side-floating-toolbar-setting', isSideFloating)
-      }, 100)
+      // 初始化：等所有设置行渲染完成后按当前位置收起无关分区（rAF 在本次渲染之后）
+      requestAnimationFrame(() => applyPositionUi(getCurrentValue()))
 
       wrapper.appendChild(container)
       return wrapper
@@ -2273,10 +2197,11 @@ export function createMobileSettingLayout(
   // === 随思源导航栏自动隐藏工具栏开关（对顶部固定/底部固定/底部胶囊均生效） ===
   setting.addItem({
     title: t("settings.mobile.140", undefined, "✅随思源导航栏自动隐藏工具栏"),
+    description: t("settings.mobile.nativeBarsHint", undefined, "💡 键盘弹出、页面滚动时，工具栏跟着思源导航栏一起收起；关闭后工具栏常驻"),
     createActionElement: () => {
       const toggle = document.createElement('input')
       toggle.type = 'checkbox'
-      toggle.className = 'b3-switch'
+      toggle.className = 'b3-switch tc-important-row'
       toggle.checked = context.mobileConfig.followNativeBarsAutoHide !== false  // 默认开启
       toggle.onchange = async () => {
         context.mobileConfig.followNativeBarsAutoHide = toggle.checked
@@ -4658,6 +4583,12 @@ export function createMobileSettingLayout(
         if (!ok) return
         // 全量恢复出厂默认（仅保留激活/授权字段）
         await resetAllConfigsToFactoryDefaults(context as any)
+        if (context.isDraftMode) {
+          // 草稿模式：只重置草稿，点「保存」才真正落盘
+          showMessage(t("settings.mobile.draftResetHint", undefined, "✅ 已恢复默认配置，点击「保存」后生效"), 3000, 'info')
+          context.rebuildPanel?.()
+          return
+        }
         showMessage(t("settings.mobile.303", undefined, "✅ 已恢复默认出厂配置，正在刷新界面..."), 3000, 'info')
         await fetchSyncPost('/api/ui/reloadUI', {})
       }
@@ -4797,10 +4728,15 @@ export function createMobileSettingLayout(
             if (planLower === 'trial') {
               Notify.showTrialStarted(3)
             }
-          // 延迟后重新加载设置页面
-          setTimeout(() => {
-            window.location.reload()
-          }, 1500)
+          if (context.isDraftMode) {
+            // 草稿模式：激活信息写入草稿，点「保存」后生效
+            showMessage(t("settings.mobile.draftActivatedHint", undefined, "✅ 激活信息已记录，点击「保存」后生效"), 3000, 'info')
+          } else {
+            // 延迟后重新加载设置页面
+            setTimeout(() => {
+              window.location.reload()
+            }, 1500)
+          }
           } else {
             Notify.showErrorActivationCodeInvalid(result.reason)
           }
@@ -4871,6 +4807,10 @@ export function createMobileSettingLayout(
             clearTrial()
             await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
             await context.saveData('desktopFeatureConfig', context.desktopFeatureConfig)
+            if (context.isDraftMode) {
+              showMessage(t("settings.mobile.draftClearedHint", undefined, "✅ 已标记清除激活，点击「保存」后生效"), 3000, 'info')
+              return
+            }
             showMessage(t("settings.mobile.323", undefined, "激活状态已清除，正在重载..."), 2000, 'info')
             setTimeout(() => window.location.reload(), 1000)
           } catch (err) {

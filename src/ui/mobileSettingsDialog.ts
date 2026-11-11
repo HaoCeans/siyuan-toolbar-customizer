@@ -206,6 +206,11 @@ function createSettingRow(item: MobileSettingItem): HTMLElement {
   if (actionElement) {
     actionElement.classList.remove('fn__block')
     actionElement.classList.add('fn__flex-center', 'fn__size200')
+    // 思源的 .fn__size200 会把控件钉在 200px，窄控件会与标题并排（不是上下分）。
+    // 未显式设置宽度的控件一律铺满整行；分组标题那种自带负边距宽度的保持原样。
+    if (!['INPUT', 'TEXTAREA'].includes(actionElement.tagName) && !actionElement.style.width) {
+      actionElement.style.width = '100%'
+    }
     row.appendChild(actionElement)
   }
   return row

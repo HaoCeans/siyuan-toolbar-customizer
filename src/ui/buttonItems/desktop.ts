@@ -1621,12 +1621,12 @@ export function createDesktopButtonItem(
 		    docNavDistSlider.min = '0'
 		    docNavDistSlider.max = '200'
 		    docNavDistSlider.step = '5'
-		    docNavDistSlider.value = String(button.bottomDistance ?? 20)
+		    docNavDistSlider.value = String(button.bottomDistance ?? 80)
 		    docNavDistSlider.style.cssText = 'flex: 1; accent-color: var(--b3-theme-primary);'
 
 		    const docNavDistValue = document.createElement('span')
 		    docNavDistValue.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface-light); min-width: 40px; text-align: right;'
-		    docNavDistValue.textContent = (button.bottomDistance ?? 20) + 'px'
+		    docNavDistValue.textContent = (button.bottomDistance ?? 80) + 'px'
 
 		    docNavDistSlider.addEventListener('input', () => {
 		      const val = parseInt(docNavDistSlider.value)
@@ -3251,12 +3251,12 @@ export function populateDesktopEditForm(
 		    docNavDistSlider2.min = '0'
 		    docNavDistSlider2.max = '200'
 		    docNavDistSlider2.step = '5'
-		    docNavDistSlider2.value = String(button.bottomDistance ?? 20)
+		    docNavDistSlider2.value = String(button.bottomDistance ?? 80)
 		    docNavDistSlider2.style.cssText = 'flex: 1; accent-color: var(--b3-theme-primary);'
 
 		    const docNavDistValue2 = document.createElement('span')
 		    docNavDistValue2.style.cssText = 'font-size: 13px; color: var(--b3-theme-on-surface-light); min-width: 40px; text-align: right;'
-		    docNavDistValue2.textContent = (button.bottomDistance ?? 20) + 'px'
+		    docNavDistValue2.textContent = (button.bottomDistance ?? 80) + 'px'
 
 		    docNavDistSlider2.addEventListener('input', () => {
 		      const val = parseInt(docNavDistSlider2.value)

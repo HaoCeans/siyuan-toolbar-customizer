@@ -66,6 +66,7 @@ let maxViewportH = 0
 let busy = false
 let touchMode = false
 let measureTimer: number | undefined
+let measureLateTimer: number | undefined
 let bodyClassObserver: MutationObserver | undefined
 let bodyChildObserver: MutationObserver | undefined
 let heartbeatTimer: number | undefined
@@ -181,6 +182,15 @@ const scheduleMeasure = (delay = 0) => {
   window.clearTimeout(measureTimer)
   measureTimer = window.setTimeout(() => {
     measureTimer = undefined
+    applyMeasure()
+  }, delay)
+}
+
+/** 延迟再量一次做位置校正（与 scheduleMeasure 分开，避免被后者清掉） */
+const scheduleLateMeasure = (delay: number) => {
+  window.clearTimeout(measureLateTimer)
+  measureLateTimer = window.setTimeout(() => {
+    measureLateTimer = undefined
     applyMeasure()
   }, delay)
 }
@@ -657,13 +667,15 @@ const buildBar = () => {
 /* ----------------------------------------------------------- 事件绑定 */
 
 const onKeyboardSignal = () => {
-  scheduleMeasure(60)
-  scheduleMeasure(320)
+  // 键盘弹出立即测量并显示；320ms 再校正一次位置
+  applyMeasure()
+  scheduleLateMeasure(320)
 }
 
 const onKeyboardHiding = () => {
   maxViewportH = 0
   scheduleMeasure(120)
+  scheduleLateMeasure(120)
 }
 
 const onViewportChange = () => {
@@ -727,6 +739,8 @@ const unbindEvents = () => {
   heartbeatTimer = undefined
   window.clearTimeout(measureTimer)
   measureTimer = undefined
+  window.clearTimeout(measureLateTimer)
+  measureLateTimer = undefined
 }
 
 /* --------------------------------------------------------------- 对外 */

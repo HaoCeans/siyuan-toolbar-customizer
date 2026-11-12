@@ -17,27 +17,26 @@
     }
     :root {
       color-scheme: light dark;
-      --panel-bg: rgba(255, 255, 255, 0.97);
-      --panel-border: rgba(0, 0, 0, 0.06);
-      --text: #1f2937;
-      --muted: #9ca3af;
-      --input-bg: #f9fafb;
-      --input-border: #e5e7eb;
+      --panel-bg: #ffffff;
+      --panel-border: rgba(0, 0, 0, 0.08);
+      --editor-bg: #ffffff;
+      --text: #1f2329;
+      --muted: #8a9099;
+      --line-strong: rgba(0, 0, 0, 0.16);
       --primary: #3b82f6;
-      --primary-hover: #2563eb;
-      --ghost-bg: rgba(0, 0, 0, 0.04);
-      --ghost-hover: rgba(0, 0, 0, 0.08);
-      --qnote-action-font-size: 13px;
+      --primary-hover: #2f6fe0;
+      --ghost-bg: rgba(0, 0, 0, 0.05);
+      --ghost-hover: rgba(0, 0, 0, 0.09);
     }
     html[data-theme-mode="dark"] {
-      --panel-bg: rgba(28, 28, 32, 0.96);
-      --panel-border: rgba(255, 255, 255, 0.06);
+      --panel-bg: #1e1e1e;
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --editor-bg: #1e1e1e;
       --text: #e5e7eb;
-      --muted: #6b7280;
-      --input-bg: #16161a;
-      --input-border: #2a2a30;
-      --primary: #2E7BBF;
-      --primary-hover: #3b82f6;
+      --muted: #8b949e;
+      --line-strong: rgba(255, 255, 255, 0.18);
+      --primary: #3b82f6;
+      --primary-hover: #4b8df8;
       --ghost-bg: rgba(255, 255, 255, 0.06);
       --ghost-hover: rgba(255, 255, 255, 0.10);
     }
@@ -56,34 +55,48 @@
       flex-direction: column;
       background: var(--panel-bg);
       border: 1px solid var(--panel-border);
-      border-radius: 12px;
+      border-radius: 14px;
       overflow: hidden;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      box-shadow: none;
     }
     .qnote-header {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 7px 10px 5px;
+      gap: 7px;
+      height: 34px;
+      padding: 0 12px;
+      background: transparent;
+      border-bottom: none;
       -webkit-app-region: drag;
       cursor: move;
       user-select: none;
     }
+    .qnote-header::before {
+      content: "";
+      width: 26px;
+      height: 4px;
+      flex: 0 0 auto;
+      border-radius: 2px;
+      background: var(--line-strong);
+      opacity: 0.7;
+    }
     .qnote-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-      opacity: 0.85;
-      white-space: nowrap;
+      min-width: 0;
       overflow: hidden;
+      white-space: nowrap;
       text-overflow: ellipsis;
-      letter-spacing: 0.01em;
+      color: var(--muted);
+      font-size: 10.5px;
+      font-weight: 400;
+      letter-spacing: 0.02em;
+      opacity: 0.85;
     }
     .qnote-close {
       width: 22px;
       height: 22px;
+      margin-left: auto;
       border: none;
-      border-radius: 50%;
+      border-radius: 4px;
       background: transparent;
       color: var(--muted);
       cursor: pointer;
@@ -104,73 +117,125 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      padding: 0 10px 6px;
+      padding: 2px 18px 0;
       min-height: 0;
+      background: var(--editor-bg);
       -webkit-app-region: no-drag;
     }
     textarea {
       flex: 1;
       width: 100%;
-      min-height: 52px;
+      min-height: 40px;
       resize: none;
-      border: 1px solid var(--input-border);
-      border-radius: 8px;
-      background: var(--input-bg);
+      border: none;
+      border-radius: 0;
+      background: transparent;
       color: var(--text);
-      padding: 8px 10px;
-      font-size: var(--qnote-font-size, 14px);
-      line-height: 1.5;
+      padding: 0;
+      font-family: inherit;
+      font-size: min(var(--qnote-font-size, 14px), 20px);
+      line-height: 1.8;
       outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
+      caret-color: var(--primary);
+      transition: none;
     }
     textarea::placeholder {
       color: var(--muted);
       opacity: 0.6;
     }
     textarea:focus {
-      border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+      border: none;
+      box-shadow: none;
+    }
+    .qnote-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 0 18px 12px;
+      -webkit-app-region: no-drag;
+    }
+    .qnote-foot-left {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
     }
     .qnote-hint {
+      color: var(--muted);
+      font-size: 10.5px;
+      line-height: 1.4;
+      opacity: 0.8;
+      -webkit-app-region: no-drag;
+    }
+    .qnote-hint:empty {
       display: none;
+    }
+    .qnote-hint kbd {
+      display: inline-block;
+      padding: 1px 4px;
+      border: 1px solid var(--panel-border);
+      border-bottom-width: 2px;
+      border-radius: 3px;
+      background: var(--ghost-bg);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 9.5px;
+      line-height: 1.2;
     }
     .qnote-actions {
       display: flex;
-      gap: 8px;
-      padding: 0 10px 10px;
+      align-items: center;
+      gap: 10px;
+      padding: 0;
+      background: transparent;
+      border: none;
       -webkit-app-region: no-drag;
     }
-    button.action {
-      flex: 1;
+    .qnote-cancel {
       height: 28px;
-      border-radius: 7px;
+      padding: 0 2px;
       border: none;
-      font-size: var(--qnote-action-font-size);
-      font-weight: 500;
+      background: transparent;
+      color: var(--muted);
+      font-family: inherit;
+      font-size: 11px;
       cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
+      transition: color 0.15s;
     }
-    button.action:active {
-      transform: scale(0.97);
-    }
-    .btn-cancel {
-      background: var(--ghost-bg);
+    .qnote-cancel:hover {
       color: var(--text);
     }
-    .btn-cancel:hover { background: var(--ghost-hover); }
-    .btn-save {
+    .qnote-send {
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      border-radius: 50%;
       background: var(--primary);
       color: #fff;
-      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgba(59, 130, 246, 0.35);
+      transition: background 0.15s, transform 0.1s;
     }
-    .btn-save:hover { background: var(--primary-hover); }
-    .btn-save:disabled { opacity: 0.5; cursor: default; }
+    .qnote-send:hover { background: var(--primary-hover); }
+    .qnote-send:active { transform: scale(0.95); }
+    .qnote-send:disabled { opacity: 0.5; cursor: default; }
+    .qnote-send svg {
+      width: 16px;
+      height: 16px;
+      fill: currentColor;
+    }
     .status {
       min-height: 0;
-      padding: 0 10px 3px;
-      font-size: 10px;
+      padding: 0;
       color: var(--muted);
-      text-align: center;
+      font-size: 10.5px;
+      line-height: 1.4;
+      text-align: left;
       -webkit-app-region: no-drag;
     }
     .status:empty {
@@ -183,19 +248,25 @@
 </head>
 <body>
   <div id="app">
-	    <div class="qnote-panel">
-	      <div class="qnote-header">
+    <div class="qnote-panel">
+      <div class="qnote-header">
         <div class="qnote-title" id="title"></div>
         <button class="qnote-close" id="closeBtn" title="" aria-label="">×</button>
       </div>
       <div class="qnote-body">
-	        <textarea id="input" placeholder=""></textarea>
-        <div class="qnote-hint" id="hint"></div>
+        <textarea id="input" placeholder=""></textarea>
       </div>
-      <div class="status" id="status"></div>
-      <div class="qnote-actions">
-        <button class="action btn-cancel" id="cancelBtn"></button>
-        <button class="action btn-save" id="saveBtn"></button>
+      <div class="qnote-foot">
+        <div class="qnote-foot-left">
+          <div class="qnote-hint" id="hint"></div>
+          <div class="status" id="status"></div>
+        </div>
+        <div class="qnote-actions">
+          <button class="qnote-cancel" id="cancelBtn" type="button"></button>
+          <button class="qnote-send" id="saveBtn" type="button" aria-label="发送" title="发送">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -233,14 +304,16 @@
           closeBtn.title = ui.close || '';
           closeBtn.setAttribute('aria-label', ui.close || '');
           cancelBtn.textContent = ui.cancel || '';
-          saveBtn.textContent = ui.send || '';
+          saveBtn.setAttribute('aria-label', ui.send || '');
+          saveBtn.title = ui.send || '';
           hintEl.innerHTML = ui.keyboardHint || '';
         }
         if (payload.title) titleEl.textContent = payload.title;
         if (payload.placeholder) inputEl.placeholder = payload.placeholder;
         if (typeof payload.fontSize === 'number' && payload.fontSize > 0) {
           document.documentElement.style.setProperty('--qnote-font-size', payload.fontSize + 'px');
-          inputEl.style.fontSize = payload.fontSize + 'px';
+          // 由 CSS 的 min() 统一限制上限，占位文字与输入文字保持同字号
+          inputEl.style.fontSize = '';
         }
         if (payload.initialText) {
           inputEl.value = payload.initialText;

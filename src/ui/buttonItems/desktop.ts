@@ -1671,6 +1671,31 @@ export function createDesktopButtonItem(
 
 		    docNavConfigDiv.appendChild(docNavAutoHideRow)
 		    docNavConfigDiv.appendChild(docNavAutoHideHint)
+
+		    const docNavDraggableRow = document.createElement('div')
+		    docNavDraggableRow.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px;'
+
+		    const docNavDraggableLabel = document.createElement('label')
+		    docNavDraggableLabel.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
+		    docNavDraggableLabel.textContent = t('ui.buttonItems.desktop.123a', undefined, '允许鼠标拖拽移动')
+
+		    const docNavDraggableSwitch = document.createElement('input')
+		    docNavDraggableSwitch.type = 'checkbox'
+		    docNavDraggableSwitch.className = 'b3-switch'
+		    docNavDraggableSwitch.checked = button.docNavDraggable ?? true
+		    docNavDraggableSwitch.onchange = () => {
+		      button.docNavDraggable = docNavDraggableSwitch.checked
+		    }
+
+		    docNavDraggableRow.appendChild(docNavDraggableLabel)
+		    docNavDraggableRow.appendChild(docNavDraggableSwitch)
+
+		    const docNavDraggableHint = document.createElement('div')
+		    docNavDraggableHint.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
+		    docNavDraggableHint.textContent = t('ui.buttonItems.desktop.123b', undefined, '开启后可用鼠标移动导航栏；关闭后锁定当前位置')
+
+		    docNavConfigDiv.appendChild(docNavDraggableRow)
+		    docNavConfigDiv.appendChild(docNavDraggableHint)
 		    authorToolField.appendChild(docNavConfigDiv)
 
 	    // 根据当前选择显示/隐藏配置区
@@ -3301,6 +3326,31 @@ export function populateDesktopEditForm(
 
 		    docNavConfigDiv2.appendChild(docNavAutoHideRow2)
 		    docNavConfigDiv2.appendChild(docNavAutoHideHint2)
+
+		    const docNavDraggableRow2 = document.createElement('div')
+		    docNavDraggableRow2.style.cssText = 'display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px;'
+
+		    const docNavDraggableLabel2 = document.createElement('label')
+		    docNavDraggableLabel2.style.cssText = 'font-size: 13px; font-weight: 500; color: var(--b3-theme-on-background);'
+		    docNavDraggableLabel2.textContent = t('ui.buttonItems.desktop.232a', undefined, '允许鼠标拖拽移动')
+
+		    const docNavDraggableSwitch2 = document.createElement('input')
+		    docNavDraggableSwitch2.type = 'checkbox'
+		    docNavDraggableSwitch2.className = 'b3-switch'
+		    docNavDraggableSwitch2.checked = button.docNavDraggable ?? true
+		    docNavDraggableSwitch2.onchange = () => {
+		      button.docNavDraggable = docNavDraggableSwitch2.checked
+		    }
+
+		    docNavDraggableRow2.appendChild(docNavDraggableLabel2)
+		    docNavDraggableRow2.appendChild(docNavDraggableSwitch2)
+
+		    const docNavDraggableHint2 = document.createElement('div')
+		    docNavDraggableHint2.style.cssText = 'font-size: 12px; color: var(--b3-theme-on-surface); opacity: 0.7;'
+		    docNavDraggableHint2.textContent = t('ui.buttonItems.desktop.232b', undefined, '开启后可用鼠标移动导航栏；关闭后锁定当前位置')
+
+		    docNavConfigDiv2.appendChild(docNavDraggableRow2)
+		    docNavConfigDiv2.appendChild(docNavDraggableHint2)
 		    authorToolField.appendChild(docNavConfigDiv2)
 
 	    // 根据当前选择显示/隐藏配置区

@@ -9,6 +9,7 @@ import { pluginInstance } from '../toolbarManager'
 import { isLoggingEnabled, logger } from '../utils/logger'
 
 const WIN_W = 300, WIN_H = 300, BOUNDS_KEY = '__qn_block_window_bounds'
+const ALWAYS_ON_TOP_KEY = '__qn_block_window_always_on_top'
 function getQuickNoteTitle(): string {
   return t('quickNote.block.windowTitle', undefined, '⚡ 快捷记事')
 }
@@ -156,7 +157,10 @@ function destroyAllBlockWindows(excludeId?: number): void {
         if (!w || w.isDestroyed?.() || w.id === mainId) continue
         // 排除自身：close 流程中调用时不能把自己提前 destroy（会跳过 close 内后续清理）
         if (excludeId !== undefined && w.id === excludeId) continue
-        if (isQuickNoteBlockWindow(w)) w.destroy?.()
+        if (isQuickNoteBlockWindow(w)) {
+          saveWindowAlwaysOnTop(w)
+          w.destroy?.()
+        }
       } catch { /* skip */ }
     }
   } catch { /* ignore */ }
@@ -178,8 +182,12 @@ export function adoptExistingBlockWindows(): void {
       w && !w.isDestroyed?.() && isQuickNoteBlockWindow(w))
     if (windows.length === 0) return
     adoptBlockWindow(windows[0])
+    // 插件重载后接管窗口：把运行中的真实置顶状态镜像到本机存储
+    saveWindowAlwaysOnTop(windows[0])
+    injectPinHook(windows[0])
     for (const w of windows.slice(1)) {
       try {
+        saveWindowAlwaysOnTop(w)
         w.destroy?.()
       } catch { /* ignore */ }
     }
@@ -199,6 +207,20 @@ export function cleanupBlockWindowResidue(): void {
   // 提前清空会把非空草稿误判为空并删除。
 }
 function loadBounds(): any { try { const r = localStorage.getItem(BOUNDS_KEY); return r ? JSON.parse(r) : null } catch { return null } }
+/** 上次窗口置顶状态；默认 true，保持旧版本的“打开即置顶”行为 */
+function loadWindowAlwaysOnTop(): boolean {
+  try {
+    const saved = localStorage.getItem(ALWAYS_ON_TOP_KEY)
+    return saved === null ? true : saved !== '0'
+  } catch { return true }
+}
+/** 保存当前 BrowserWindow 的真实置顶状态；窗口已销毁时静默跳过，避免覆盖已有值 */
+function saveWindowAlwaysOnTop(win: any): void {
+  try {
+    if (!win || win.isDestroyed?.() || typeof win.isAlwaysOnTop !== 'function') return
+    localStorage.setItem(ALWAYS_ON_TOP_KEY, win.isAlwaysOnTop() ? '1' : '0')
+  } catch { /* ignore */ }
+}
 function saveBounds(win: any): void {
   try {
     let b: any = null
@@ -282,7 +304,7 @@ function _getHashFixJS(): string {
 	})()`
 }
 
-function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string; hideFloatingJS: string; hideBreadcrumbJS: string; focusJS: string } {
+function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS: string; pinHookJS: string; pollJS: string; hideFloatingJS: string; hideBreadcrumbJS: string; focusJS: string } {
   const quickNoteTitle = getQuickNoteTitle()
   const dragWindowTitle = t('quickNote.block.dragWindow', undefined, '拖动窗口')
   const toolbarOn = (pluginInstance?.desktopFeatureConfig as any)?.quickNoteToolbarVisible !== false
@@ -319,6 +341,17 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
           }catch(e){}
           var remote=require('@electron/remote');
           var win=remote.getCurrentWindow();
+          // 记录用户最后一次置顶选择：优先用按钮 aria-label（同一次点击里原生 handler 已先更新），
+          // 再回退到窗口真实状态；必须在 destroy 前写入
+          try{
+            var pinEl=document.getElementById('pinWindow');
+            var pinLabel=window.siyuan&&window.siyuan.languages&&window.siyuan.languages.pinWindow;
+            if(pinEl&&pinLabel){
+              localStorage.setItem('${ALWAYS_ON_TOP_KEY}',pinEl.getAttribute('aria-label')===pinLabel?'0':'1');
+            }else{
+              localStorage.setItem('${ALWAYS_ON_TOP_KEY}',win.isAlwaysOnTop()?'1':'0');
+            }
+          }catch(e){}
           // 用 destroy() 而非 close()：同步强制销毁，跳过 SiYuan 的 beforeunload 回调，
           // 不给它通过 history.pushState 设置 location.hash 的机会。
           // close() 会触发 beforeunload → SiYuan 清理代码写 hash → hash 被 Electron
@@ -350,6 +383,43 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
           }
         }catch(e){}
       });
+    })()`,
+    // 镜像思源原生 #pinWindow 的状态：不替换原生 handler，只在其执行后记录用户选择
+    pinHookJS: `(function(){
+      var KEY='${ALWAYS_ON_TOP_KEY}';
+      function hook(){
+        var btn=document.getElementById('pinWindow');
+        if(!btn||btn.__qnPinHooked)return false;
+        btn.__qnPinHooked=true;
+        btn.addEventListener('click',function(){
+          // 原生 handler 同一次点击已先执行：用 aria-label 立即记录用户意图
+          try{
+            var pinLabel=window.siyuan&&window.siyuan.languages&&window.siyuan.languages.pinWindow;
+            if(pinLabel)localStorage.setItem(KEY,btn.getAttribute('aria-label')===pinLabel?'0':'1');
+          }catch(e){}
+          // IPC 生效后读取 BrowserWindow 真实状态校正（可能尚未生效，最多等 1 秒）
+          try{
+            var remote=require('@electron/remote');
+            var win=remote.getCurrentWindow();
+            var before=win.isAlwaysOnTop();
+            var tries=0;
+            var timer=setInterval(function(){
+              tries++;
+              var now;
+              try{ now=win.isAlwaysOnTop() }catch(e){ clearInterval(timer); return }
+              if(now!==before||tries>=20){
+                clearInterval(timer);
+                try{localStorage.setItem(KEY,now?'1':'0')}catch(e){}
+              }
+            },50);
+          }catch(e){}
+        },false);
+        return true;
+      }
+      if(!hook()){
+        var timer=setInterval(function(){if(hook())clearInterval(timer)},300);
+        setTimeout(function(){clearInterval(timer)},10000);
+      }
     })()`,
     // 仅在"是否为空"状态变化时才写入 localStorage，避免每 500ms 无条件 setItem。
     // 用 localStorage 当前值作为真源（而非 window 变量缓存）：隐藏超时销毁窗口时
@@ -443,10 +513,11 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
   }
 }
 
-function _injectScripts(win: any, scripts: { hideJS: string; titleJS: string; closeHookJS: string; pollJS: string; hideFloatingJS: string; hideBreadcrumbJS: string; focusJS: string }, show: boolean): void {
+function _injectScripts(win: any, scripts: { hideJS: string; titleJS: string; closeHookJS: string; pinHookJS: string; pollJS: string; hideFloatingJS: string; hideBreadcrumbJS: string; focusJS: string }, show: boolean): void {
   win.webContents.executeJavaScript(scripts.hideJS).catch(()=>{})
   win.webContents.executeJavaScript(scripts.titleJS).catch(()=>{})
   win.webContents.executeJavaScript(scripts.closeHookJS).catch(()=>{})
+  win.webContents.executeJavaScript(scripts.pinHookJS).catch(()=>{})
   win.webContents.executeJavaScript(scripts.pollJS).catch(()=>{})
   // 注入隐藏胶囊的脚本
   win.webContents.executeJavaScript(scripts.hideFloatingJS).catch((e: any) => logger.error('[QN-FLOAT] inject failed', e))
@@ -458,6 +529,14 @@ function _injectScripts(win: any, scripts: { hideJS: string; titleJS: string; cl
     // show 之后再聚焦编辑器：创建时窗口隐藏，编辑器初始化焦点 + 异步内容重渲染都会把光标顶掉
     win.webContents.executeJavaScript(scripts.focusJS).then((s: unknown) => logger.log('[QN-FOCUS]', s)).catch(() => {})
   }
+}
+
+/** 给已存在/接管的窗口补装置顶按钮监听（脚本内部用 __qnPinHooked 保证幂等） */
+function injectPinHook(win: any): void {
+  try {
+    const result = win?.webContents?.executeJavaScript(_getInjectionScripts().pinHookJS)
+    result?.catch?.(() => {})
+  } catch { /* ignore */ }
 }
 
 export function resolveSaveTarget(isFromButton: boolean): QuickNoteTargetConfig {
@@ -482,9 +561,10 @@ function createOneWindow(blockId: string): boolean {
   if (!BW) { showMessage(t('quickNote.block.unableCreateWindow', undefined, '无法创建窗口'), 3000, 'error'); return false }
   try {
     const bounds = getBounds()
+    const alwaysOnTop = loadWindowAlwaysOnTop()
     const win = new BW({
       show: false, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height,
-      minWidth: 300, minHeight: 200, alwaysOnTop: true,
+      minWidth: 300, minHeight: 200, alwaysOnTop,
       frame: false,
       // backgroundThrottling=false：窗口隐藏时仍保持 hash 轮询等定时器正常运行，
       // 否则 hash 可能在隐藏期间长期残留，导致主窗口点日记被路由到这个隐藏窗口
@@ -495,6 +575,8 @@ function createOneWindow(blockId: string): boolean {
         backgroundThrottling: false,
       },
     })
+    // 显式再设置一次：show:false 创建时个别 Electron 版本不会立即应用构造参数
+    try { win.setAlwaysOnTop(alwaysOnTop) } catch { /* ignore */ }
     qnWinId = win.id
     ;(win as any).__qn_block_window = true
     _currentDraftBlockId = blockId
@@ -502,6 +584,8 @@ function createOneWindow(blockId: string): boolean {
     try { localStorage.removeItem(BLOCK_EMPTY_KEY) } catch {}
 
     win.on('close', () => {
+      // 关闭前保存真实置顶状态（destroy 只触发 closed，此时可能已无法读取）
+      saveWindowAlwaysOnTop(win)
       // × 关闭弹窗时自动清理其它残留弹窗（防僵尸窗口 hash 占用导致主窗口点文档无反应）
       destroyAllBlockWindows(win.id)
       if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null }
@@ -514,6 +598,8 @@ function createOneWindow(blockId: string): boolean {
     win.on('resize', () => saveBoundsThrottled(win))
     win.on('move', () => saveBoundsThrottled(win))
     win.on('closed', () => {
+      // 正常 close 路径已保存；destroy 路径由调用方在 destroy 前保存，这里再兜底一次
+      saveWindowAlwaysOnTop(win)
       // 先保存位置（win.destroy() 只触发 closed，不触发 close，必须在此保存）
       if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null }
       if (_saveBoundsTimer) { clearTimeout(_saveBoundsTimer); _saveBoundsTimer = null }
@@ -566,6 +652,9 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
   if (existing) {
     // 插件重载后 qnWinId/草稿块 ID 会丢失，先接管再由下面的 show/hide 流程处理
     adoptBlockWindow(existing)
+    // 镜像当前窗口的真实置顶状态，避免重载后与上次保存值不一致
+    saveWindowAlwaysOnTop(existing)
+    injectPinHook(existing)
     try {
       if (typeof existing.isVisible === 'function' && existing.isVisible()) {
         // 弹窗在后台（被其他窗口挡住）→ 拉到前台，不隐藏
@@ -649,6 +738,7 @@ export function destroyDesktopQuickNoteBlockWindow(): void {
           if (!w || w.isDestroyed?.() || w.id === mainId) continue
           if (!isQuickNoteBlockWindow(w)) continue
           if (keepDraftWindow) continue
+          saveWindowAlwaysOnTop(w)
           w.destroy?.()
         } catch { /* skip */ }
       }

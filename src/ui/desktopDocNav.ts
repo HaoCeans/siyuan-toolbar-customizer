@@ -15,6 +15,7 @@ import {
 import type { ButtonConfig } from "../toolbarManager"
 import { applyFloatPanelBackground, observeSiYuanThemeMode } from "./floatPanelBackground"
 import { makeDraggable, restorePosition } from "./draggablePanel"
+import { fetchAdjacentDocs as fetchAdjacentDocsShared } from "./docNavAdjacency"
 
 // ===== 常量 =====
 const PERSIST_KEY = 'desktopDocNavState'
@@ -26,15 +27,11 @@ interface DocNavContext {
   eventBus: any
   bottomDistance?: number
   autoHideOnScroll?: boolean
+  draggable?: boolean
 }
 
 interface DesktopDocNavState {
   isVisible: boolean
-}
-
-interface FiletreeDoc {
-  id: string
-  name: string
 }
 
 // ===== 模块状态 =====
@@ -65,6 +62,10 @@ let boundScrollEl: HTMLElement | null = null
 let scrollBindRetryTimer: ReturnType<typeof setInterval> | null = null
 let scrollBindRetryCount = 0
 let currentBottomDistance = 80
+
+// ===== 文档全屏：提高层级，避免被思源 .fullscreen（z-index: 8）盖住 =====
+let fullscreenObserver: MutationObserver | null = null
+let observedProtyleEl: HTMLElement | null = null
 
 // ===== 跟随底部悬浮胶囊滚动隐藏 =====
 // 电脑端底部悬浮胶囊开启「滚动隐藏」后，导航栏不再自己做方向判断，
@@ -108,6 +109,8 @@ async function fetchDocInfo(docId: string): Promise<{ notebookId: string; parent
 }
 
 async function fetchAdjacentDocs(): Promise<void> {
+  // 每次刷新时顺便对齐全屏观察目标（切换文档后 Protyle 根节点会变）
+  bindFullscreenObserver()
   if (isLoading) return
 
   const docId = getCurrentDocId()
@@ -126,33 +129,10 @@ async function fetchAdjacentDocs(): Promise<void> {
       prevDoc = null
       nextDoc = null
     } else {
-      // 不传 sort：与文件树 UI 完全同参，内核按「文档 IAL → 笔记本 conf → 全局」解析排序（ResolveDocTreeSortMode），
-      // 返回顺序即树的视觉顺序。不要传 sort=15（SortModeFileTree）：思源 v3.8.3 重写排序（#19176）后，
-      // 15 只表示按 sort.json 自定义值升序 + ID 降序兜底，与树的实际排序模式无关——
-      // 开了「新文档创建位置：顶部」的笔记本会递减写入 sort.json，数组变成最新在前，上一篇/下一篇随之颠倒
-      const response: any = await fetchSyncPost('/api/filetree/listDocsByPath', {
-        notebook: docInfo.notebookId,
-        path: docInfo.parentPath
-      })
-
-	      if (response?.code === 0 && response?.data) {
-	        const files: FiletreeDoc[] = response.data.files || []
-	        const idx = files.findIndex(f => f.id === docId)
-
-	        // 数组顺序 = 文件树视觉顺序（顶部→底部；前提：请求不传 sort，见 fetchDocInfo 调用处说明）
-	        // 因此 files[idx-1] 是视觉"上一篇"（上面），files[idx+1] 是视觉"下一篇"（下面）
-	        if (idx > 0) {
-	          prevDoc = { id: files[idx - 1].id, title: files[idx - 1].name || t('navigation.common.untitled', undefined, '未命名') }
-	        } else {
-	          prevDoc = null
-	        }
-
-	        if (idx >= 0 && idx < files.length - 1) {
-	          nextDoc = { id: files[idx + 1].id, title: files[idx + 1].name || t('navigation.common.untitled', undefined, '未命名') }
-	        } else {
-	          nextDoc = null
-	        }
-	      }
+      // 同目录按文件树顺序；日记在目录第一条/最后一条时跨父分支续页（见 docNavAdjacency）
+      const adjacent = await fetchAdjacentDocsShared(docInfo.notebookId, docInfo.parentPath, docId)
+      prevDoc = adjacent.prev
+      nextDoc = adjacent.next
     }
   } catch (err) {
     logger.warn('[DesktopDocNav] 获取相邻文档失败:', err)
@@ -238,6 +218,69 @@ function createSwitchProtyleHandler(): (() => void) & { cancel?: () => void } {
   return handler
 }
 
+// ===== 文档全屏：层级同步 =====
+/** 当前应观察的 Protyle 根节点：全屏时优先锁定全屏编辑器 */
+function getActiveProtyleRootElement(): HTMLElement | null {
+  const fullscreenEl = document.querySelector('.protyle.fullscreen') as HTMLElement | null
+  if (fullscreenEl) return fullscreenEl
+
+  const protyle = getActiveProtyle()
+  const element = protyle?.element as HTMLElement | undefined
+  if (element?.isConnected) return element
+
+  const content = getDesktopContentScrollElement()
+  return (content?.closest('.protyle') as HTMLElement | null) ?? null
+}
+
+/** 根据全屏状态切换导航栏层级；进入全屏时顺便恢复被滚动隐藏的导航栏 */
+function applyFullscreenLayout(): void {
+  if (!navBar) return
+
+  const isFullscreen = Boolean(document.querySelector('.protyle.fullscreen'))
+  const wasFullscreen = navBar.classList.contains('desktop-doc-nav--fullscreen')
+  navBar.classList.toggle('desktop-doc-nav--fullscreen', isFullscreen)
+
+  if (isFullscreen && !wasFullscreen) {
+    // 进入全屏时思源会 resize 编辑器，可能触发一次滚动事件；
+    // 重置滚动隐藏状态，保证导航栏立刻可见
+    hiddenByScroll = false
+    lastScrollTopForAutoHide = null
+    lastAutoHideToggleAt = 0
+    navBar.style.opacity = '1'
+    navBar.style.pointerEvents = ''
+  }
+}
+
+/** 观察活动 Protyle 根节点的 class，捕获思源 .fullscreen 的增删 */
+function bindFullscreenObserver(): void {
+  if (!navBar) {
+    unbindFullscreenObserver()
+    return
+  }
+
+  const root = getActiveProtyleRootElement()
+  if (root === observedProtyleEl) {
+    applyFullscreenLayout()
+    return
+  }
+
+  unbindFullscreenObserver()
+  observedProtyleEl = root
+  if (!root) return
+
+  fullscreenObserver = new MutationObserver(() => applyFullscreenLayout())
+  fullscreenObserver.observe(root, { attributes: true, attributeFilter: ['class'] })
+  applyFullscreenLayout()
+}
+
+function unbindFullscreenObserver(): void {
+  if (fullscreenObserver) {
+    fullscreenObserver.disconnect()
+    fullscreenObserver = null
+  }
+  observedProtyleEl = null
+}
+
 // ===== DOM 构建 =====
 function injectStyles(): void {
   if (injectedStyle) return
@@ -256,6 +299,10 @@ function injectStyles(): void {
       box-shadow: 0 4px 24px rgba(0,0,0,0.12), 0 0 0 0.5px rgba(0,0,0,0.06);
       padding: 6px;
       border: 0.5px solid rgba(0,0,0,0.08);
+    }
+    /* 思源文档全屏 .protyle.fullscreen 是 z-index: 8，导航栏需高于它才能显示 */
+    #desktop-doc-nav-bar.desktop-doc-nav--fullscreen {
+      z-index: 9;
     }
     .desktop-doc-nav-btn {
       display: flex;
@@ -548,6 +595,9 @@ function createNavBar(bottomDistance?: number): void {
 
   document.body.appendChild(navBar)
 
+  // 全屏状态观察：进入文档全屏时提高层级，避免被 .fullscreen 盖住
+  bindFullscreenObserver()
+
   fetchAdjacentDocs()
 
 	  // 恢复位置或使用默认位置
@@ -565,19 +615,23 @@ function createNavBar(bottomDistance?: number): void {
 	    navBar.style.transform = 'translateX(-50%)'
 	  }
 
-  // 启用拖拽
-  dragCleanup = makeDraggable(navBar, {
-    handleSelector: undefined,
-    boundary: 'window'
-  })
+  // 启用拖拽（默认开启，兼容旧配置；关闭时仍恢复已保存位置）
+  if (ctx?.draggable !== false) {
+    dragCleanup = makeDraggable(navBar, {
+      handleSelector: undefined,
+      boundary: 'window'
+    })
+  }
 
-	  // 绑定滚动隐藏：胶囊启用滚动隐藏时跟随胶囊，否则自身判断方向
+  // 绑定滚动隐藏：胶囊启用滚动隐藏时跟随胶囊，否则自身判断方向
 	  if (autoHideEnabled) {
 	    syncAutoHideDriver()
 	  }
 }
 
 function removeNavBar(): void {
+  unbindFullscreenObserver()
+
   if (dragCleanup) {
     dragCleanup()
     dragCleanup = null

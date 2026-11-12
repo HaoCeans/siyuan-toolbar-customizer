@@ -53,6 +53,8 @@ const FLOAT_MIN_H = 120
 const QUICKNOTE_FLOAT_WINDOW_ELECTRON_ID_KEY = '__quickNoteFloatWindowElectronId'
 const QUICKNOTE_FLOAT_WINDOW_BOUNDS_KEY = '__quickNoteFloatWindowBounds'
 const QUICKNOTE_FLOAT_WINDOW_MARKER = 'quick-note-float'
+// 修改纯文本弹窗 HTML/CSS 时递增；插件重载后用它识别并销毁旧窗口，避免继续显示旧样式
+const FLOAT_WINDOW_BUILD = '20261112-3'
 
 
 function getFloatUi() {
@@ -111,13 +113,32 @@ function ensureFloatWindowSizeRevision(): void {
   // 保留空实现，避免旧版 SIZE_REV 逻辑误清用户尺寸
 }
 
+function isCurrentFloatWindowBuild(win: any): boolean {
+  try {
+    const url = win?.webContents?.getURL?.() || ''
+    return url.includes(`qn-build-${FLOAT_WINDOW_BUILD}`)
+  } catch {
+    return false
+  }
+}
+
+/** 销毁旧构建的独立窗口，下次打开会用最新 HTML 重建 */
+function destroyStaleFloatWindow(win: any): void {
+  try {
+    if (win && !win.isDestroyed?.()) win.destroy?.()
+  } catch { /* ignore */ }
+  try { localStorage.removeItem(QUICKNOTE_FLOAT_WINDOW_ELECTRON_ID_KEY) } catch { /* ignore */ }
+  floatWindow = null
+}
+
 function resolveFloatWindow(): any {
   if (floatWindow) {
     try {
       if (typeof floatWindow.isDestroyed === 'function' && floatWindow.isDestroyed()) {
         floatWindow = null
       } else if (!floatWindow.closed) {
-        return floatWindow
+        if (isCurrentFloatWindowBuild(floatWindow)) return floatWindow
+        destroyStaleFloatWindow(floatWindow)
       } else {
         floatWindow = null
       }
@@ -135,10 +156,14 @@ function resolveFloatWindow(): any {
     if (storedId) {
       const w = BrowserWindow.fromId?.(Number(storedId))
       if (w && !w.isDestroyed?.()) {
-        floatWindow = w
-        return w
+        if (isCurrentFloatWindowBuild(w)) {
+          floatWindow = w
+          return w
+        }
+        destroyStaleFloatWindow(w)
+      } else {
+        localStorage.removeItem(QUICKNOTE_FLOAT_WINDOW_ELECTRON_ID_KEY)
       }
-      localStorage.removeItem(QUICKNOTE_FLOAT_WINDOW_ELECTRON_ID_KEY)
     }
   } catch {
     // ignore
@@ -151,6 +176,10 @@ function resolveFloatWindow(): any {
       const url = w.webContents?.getURL?.() || ''
       if (!url.startsWith('data:text/html')) continue
       if (url.includes(QUICKNOTE_FLOAT_WINDOW_MARKER) || url.includes('__setQuickNoteFloatState')) {
+        if (!isCurrentFloatWindowBuild(w)) {
+          destroyStaleFloatWindow(w)
+          continue
+        }
         floatWindow = w
         localStorage.setItem(QUICKNOTE_FLOAT_WINDOW_ELECTRON_ID_KEY, String(w.id))
         return w
@@ -322,6 +351,12 @@ function getFloatWindowHtml(): string {
     html = html.replace(/__MAIN_WINDOW_ID__/g, String(mainId))
   } catch {
     // ignore
+  }
+  const marker = `<meta name="qn-build-${FLOAT_WINDOW_BUILD}" content="1">`
+  if (html.includes('</head>')) {
+    html = html.replace('</head>', `${marker}\n</head>`)
+  } else {
+    html = marker + html
   }
   return html
 }

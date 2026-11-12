@@ -9,7 +9,8 @@ import { t } from '../i18n/runtime'
 import { fetchSyncPost, openMobileFileById, showMessage } from "siyuan";
 import { isMobileDevice, pluginInstance } from "../toolbarManager";
 import type { ButtonConfig } from "../toolbarManager";
-import { applyFloatPanelBackground, observeSiYuanThemeMode } from "./floatPanelBackground";
+import { observeSiYuanThemeMode } from "./floatPanelBackground";
+import { fetchAdjacentDocs as fetchAdjacentDocsShared } from "./docNavAdjacency";
 
 // ===== 常量 =====
 const PERSIST_KEY = 'mobileDocNavState'
@@ -28,12 +29,6 @@ interface DocNavContext {
 
 interface MobileDocNavState {
   isVisible: boolean
-}
-
-interface FiletreeDoc {
-  id: string
-  name: string
-  icon?: string
 }
 
 // ===== 模块状态 =====
@@ -55,7 +50,6 @@ let nextDoc: { id: string; title: string } | null = null
 let isLoading = false
 let refreshRequestId = 0  // 用于 refreshAdjacentDocs 请求去重
 
-let lastDocNavFloatOpacity: number | undefined
 let themeModeUnsubscribe: (() => void) | null = null
 
 // ===== 输入法/键盘弹出时自动隐藏 =====
@@ -294,12 +288,6 @@ function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): T &
   return debounced
 }
 
-function truncateTitle(title: string, maxLen = 14): string {
-  if (!title) return t('navigation.common.untitled', undefined, '未命名')
-  if (title.length <= maxLen) return title
-  return title.slice(0, maxLen) + '…'
-}
-
 /**
  * 从文档 ID 获取笔记本 ID 和父目录路径
  */
@@ -330,55 +318,6 @@ async function fetchDocInfo(): Promise<{ notebookId: string; parentPath: string 
   return null
 }
 
-/**
- * 使用 /api/filetree/listDocsByPath 获取当前目录下的有序文档列表
- * 这是思源内部 API，返回按文件树排序（sort: 15）的文档列表
- */
-async function fetchAdjacentDocsByFiletree(
-  notebookId: string,
-  parentPath: string,
-  docId: string
-): Promise<{ prev: { id: string; title: string } | null; next: { id: string; title: string } | null }> {
-  try {
-    // 不传 sort：与文件树 UI 完全同参，内核按「文档 IAL → 笔记本 conf → 全局」解析排序（ResolveDocTreeSortMode），
-    // 返回顺序即树的视觉顺序。不要传 sort=15（SortModeFileTree）：思源 v3.8.3 重写排序（#19176）后，
-    // 15 只表示按 sort.json 自定义值升序 + ID 降序兜底，与树的实际排序模式无关——
-    // 开了「新文档创建位置：顶部」的笔记本会递减写入 sort.json，数组变成最新在前，上一篇/下一篇随之颠倒
-    const response: any = await fetchSyncPost('/api/filetree/listDocsByPath', {
-      notebook: notebookId,
-      path: parentPath
-    })
-
-    if (response?.code === 0 && response?.data) {
-      const files: FiletreeDoc[] = response.data.files || []
-
-      const idx = files.findIndex(f => f.id === docId)
-
-      if (idx === -1) {
-        logger.warn('[文档导航] 当前文档不在目录列表中，docId:', docId)
-        return { prev: null, next: null }
-      }
-
-	      // 数组顺序 = 文件树视觉顺序（顶部→底部；前提：请求不传 sort，见上方请求处说明）
-	      // 因此 files[idx-1] 是视觉"上一篇"（上面），files[idx+1] 是视觉"下一篇"（下面）
-	      const prevFile = idx > 0 ? files[idx - 1] : null
-	      const nextFile = idx < files.length - 1 ? files[idx + 1] : null
-
-      const result = {
-        prev: prevFile ? { id: prevFile.id, title: prevFile.name || t('navigation.common.untitled', undefined, '未命名') } : null,
-        next: nextFile ? { id: nextFile.id, title: nextFile.name || t('navigation.common.untitled', undefined, '未命名') } : null
-      }
-
-      return result
-    } else {
-      logger.warn('[文档导航] listDocsByPath 返回错误:', response?.msg || '未知错误')
-    }
-  } catch (err) {
-    logger.warn('[文档导航] listDocsByPath 失败:', err)
-  }
-  return { prev: null, next: null }
-}
-
 // ===== UI 更新 =====
 function updateNavButtons(): void {
   if (!navBar) return
@@ -390,13 +329,18 @@ function updateNavButtons(): void {
   // 等新文档的相邻结果查询完成后再一次性刷新。
   if (isLoading) return
 
+  const prevText = t('navigation.docNav.previous', undefined, '上一篇')
+  const nextText = t('navigation.docNav.next', undefined, '下一篇')
+
   if (prevBtn) {
     prevBtn.classList.toggle('disabled', !prevDoc)
-    prevBtn.style.opacity = prevDoc ? '1' : '0.3'
+    const aria = prevDoc ? `${prevText} ${prevDoc.title}` : prevText
+    prevBtn.setAttribute('aria-label', aria)
   }
   if (nextBtn) {
     nextBtn.classList.toggle('disabled', !nextDoc)
-    nextBtn.style.opacity = nextDoc ? '1' : '0.3'
+    const aria = nextDoc ? `${nextText} ${nextDoc.title}` : nextText
+    nextBtn.setAttribute('aria-label', aria)
   }
 }
 
@@ -431,7 +375,8 @@ async function refreshAdjacentDocs(): Promise<void> {
 
   currentNotebookId = docInfo.notebookId
 
-  const result = await fetchAdjacentDocsByFiletree(currentNotebookId, docInfo.parentPath, currentDocId)
+  // 同目录按文件树顺序；日记在目录第一条/最后一条时跨父分支续页（见 docNavAdjacency）
+  const result = await fetchAdjacentDocsShared(currentNotebookId, docInfo.parentPath, currentDocId)
   if (reqId !== refreshRequestId) { isLoading = false; return }
   prevDoc = result.prev
   nextDoc = result.next
@@ -513,14 +458,14 @@ async function handleSwitchProtyle(): Promise<void> {
 }
 
 // ===== 样式 =====
-function applyOpacity(el: HTMLElement | null, opacity: number | undefined): void {
-  lastDocNavFloatOpacity = opacity
-  applyFloatPanelBackground(el, opacity, 0.78)
+function applyOpacity(el: HTMLElement | null, _opacity: number | undefined): void {
+  // 纯箭头方案没有磨砂底，容器保持透明即可
+  if (el) el.style.background = 'transparent'
 }
 
 function refreshDocNavFloatBackground(): void {
   if (!navBar || !state.isVisible) return
-  applyFloatPanelBackground(navBar, lastDocNavFloatOpacity, 0.78)
+  navBar.style.background = 'transparent'
 }
 
 function injectStyles(): void {
@@ -529,62 +474,84 @@ function injectStyles(): void {
   style.id = 'mobile-doc-nav-bar-style'
   style.textContent = `
     #mobile-doc-nav-bar {
-	      position: fixed;
-	      left: 50%;
-	      transform: translateX(-50%);
-      width: 100px;
+      position: fixed;
+      left: 0;
+      right: 0;
       /* 与主工具栏同层级；仍低于扩展工具栏(1000+) */
       z-index: 5;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 16px;
-      background: rgba(255,255,255,0.78);
-      border-radius: 20px;
-      box-shadow: 0 2px 20px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.04);
+      box-sizing: border-box;
+      padding: 0 16px;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      pointer-events: none;
       touch-action: none;
       user-select: none;
       -webkit-user-select: none;
-      border: 0.5px solid rgba(0,0,0,0.08);
     }
-    .docnav-btn {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      border: none;
-      background: rgba(0,122,255,0.45);
-      border: 1px solid rgba(255,255,255,0.35);
-      color: white;
-      font-size: 18px;
+    .docnav-arrow {
+      position: relative;
+      box-sizing: border-box;
+      width: 50px;
+      height: 50px;
       display: flex;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
-      flex-shrink: 0;
-      transition: opacity 0.2s ease, transform 0.15s ease;
       padding: 0;
-      line-height: 1;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--b3-theme-on-background, #1c1c1e);
+      opacity: 1;
+      cursor: pointer;
+      pointer-events: auto;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 0.15s ease, color 0.15s ease;
     }
-    .docnav-btn:active {
-      transform: scale(0.9);
-    }
-    .docnav-btn.disabled {
-      opacity: 0.3;
+    /* 圆框 50px，与按钮同大：点击范围就是圆框范围 */
+    .docnav-arrow::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      box-sizing: border-box;
+      border: 0.6px solid rgba(0,0,0,0.10);
+      border-radius: 50%;
+      background: transparent;
       pointer-events: none;
+      transition: border-color 0.15s ease, background 0.15s ease;
     }
-    .docnav-btn svg {
-      width: 20px;
-      height: 20px;
-      fill: white;
+    .docnav-arrow:active:not(.disabled) {
+      opacity: 1;
+      color: #3b82f6;
+    }
+    .docnav-arrow:active:not(.disabled)::before {
+      border-width: 1px;
+      border-color: rgba(59,130,246,0.55);
+      background: rgba(59,130,246,0.08);
+    }
+    .docnav-arrow.disabled {
+      opacity: 0.22;
+    }
+    .docnav-arrow svg {
+      width: 30px;
+      height: 30px;
+      flex: 0 0 auto;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      opacity: 0.8;
     }
     /* 暗黑模式 */
-    html[data-theme-mode="dark"] #mobile-doc-nav-bar {
-      background: rgba(0,0,0,0.78);
-      border-color: rgba(255,255,255,0.08);
-      box-shadow: 0 2px 20px rgba(0,0,0,0.3), 0 0 0 0.5px rgba(255,255,255,0.06);
+    html[data-theme-mode="dark"] .docnav-arrow {
+      color: #f0f0f0;
     }
-    html[data-theme-mode="dark"] .docnav-btn {
-      background: rgba(10,132,255,0.5);
+    html[data-theme-mode="dark"] .docnav-arrow::before {
+      border-color: rgba(255,255,255,0.12);
     }
   `
   document.head.appendChild(style)
@@ -610,14 +577,14 @@ function createNavBar(): void {
 
   const prevBtn = document.createElement('button')
   prevBtn.id = 'docnav-prev'
-  prevBtn.className = 'docnav-btn disabled'
-  prevBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>'
+  prevBtn.className = 'docnav-arrow docnav-prev disabled'
+  prevBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/></svg>'
   prevBtn.addEventListener('click', () => navigateTo('prev'))
 
   const nextBtn = document.createElement('button')
   nextBtn.id = 'docnav-next'
-  nextBtn.className = 'docnav-btn disabled'
-  nextBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8.59 16.59L10 18l6-6-6-6-1.41 1.41L13.17 12z"/></svg>'
+  nextBtn.className = 'docnav-arrow docnav-next disabled'
+  nextBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/></svg>'
   nextBtn.addEventListener('click', () => navigateTo('next'))
 
   navBar.appendChild(prevBtn)
@@ -855,7 +822,6 @@ export function cleanup(): void {
   prevDoc = null
   nextDoc = null
   isLoading = false
-  lastDocNavFloatOpacity = undefined
   hiddenByKeyboard = false
   keyboardBaselineHeight = null
   hiddenByScroll = false

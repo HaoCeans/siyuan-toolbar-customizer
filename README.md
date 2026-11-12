@@ -115,7 +115,7 @@
 - ⑧ **Quick Image Import**: Select an image and import it into a note with one click. In block-editing mode, it can be inserted at the cursor in the note popup
 - ⑨ **Floating Tabs**: Quickly switch between documents; the floating tab bar is managed automatically
 - ⑩ **Floating Outline**: A floating outline panel on the left for quickly jumping to headings
-- ⑪ **Previous/Next Document**: Browse documents in file-tree order with a floating navigation bar at the bottom
+- ⑪ **Previous/Next Document**: Floating navigation bar at the bottom; normal documents follow file-tree order, daily notes continue into the adjacent parent branch at the first/last item
 - ⑫ **Swipe Quick Annotation**: Annotate text with a finger swipe using the 「WhaleQuickannotation」 plugin (activated users can download it with one click)
 - ⑬ **Read Documents Aloud**: Multiple engines — browser speech, a free endpoint, SiliconFlow and Edge Online on desktop; SiliconFlow or the free endpoint on mobile. Supports speed control and current-paragraph highlighting, and on mobile you can pre-render the whole document to keep reading with the screen off or in the background
 - ⑭ **One-Click Empty Block Cleanup**: Automatically scan and delete empty paragraphs, headings, and list items in the current document
@@ -339,6 +339,38 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.9.9 — Smoother document navigation and Quick Note
+
+> 💡 This release focuses on Previous/Next Document and Quick Note: the navigation bar no longer disappears in desktop document fullscreen; daily notes can continue across month folders; the mobile navigation is now two clean arrows at the screen edges; desktop navigation can be locked in place; Quick Note gets a lighter look and remembers its pin state.
+
+**① Previous / Next Document**
+- In desktop document fullscreen, the navigation bar is no longer covered and restores on exit
+- New “Allow mouse dragging” switch in the button settings: on = draggable, off = position locked; on by default
+- Daily notes at the first/last item in a folder can continue into the adjacent parent branch:
+  - E.g. from Nov 1, Previous goes to Oct 31
+  - From Oct 31, Next returns to Nov 1
+- Normal documents still follow file-tree order; desktop and mobile behave the same
+- Mobile navigation is now two clean double-chevron arrows:
+  - Pinned to the left/right screen edges, 50px circles, 30px icons
+  - Transparent with a thin outline, so they do not block content; turn blue when pressed
+  - When there is no previous/next document, the arrow fades; tapping it does nothing
+  - Default distance from the bottom is 80px
+
+**② Quick Note**
+- The plain-text popup now uses a minimal sticky-note style:
+  - Only a drag strip and close button at the top; a larger editor
+  - Shortcut hint and a circular send button at the bottom
+  - Placeholder and typed text now share the same font size, capped at 20px
+- The block-format window now remembers the pin choice: if you unpin it, it stays unpinned next time
+
+**③ Requirements**
+- Minimum SiYuan version remains v3.8.10
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.9.8 — Plugin-built settings dialogs, navigation follows the capsule, TTS fixes
 
 > 💡 Settings on both mobile and desktop now use the plugin's own dialogs and only apply when you click Save; the document navigation now hides together with the bottom capsule; “read only the title” and Edge TTS 403 are fixed too.
@@ -366,11 +398,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 - In bottom-capsule mode the overflow panel now opens upward instead of off-screen
 - `Cannot read properties of undefined (reading 'catch')` when saving the same config twice in a row
 - The import confirmation button showing “Delete” now shows “OK”
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.9.7 — Side capsule, diary scrolling, and Quick Note popup stability updates
 

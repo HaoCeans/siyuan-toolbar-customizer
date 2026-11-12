@@ -2635,5 +2635,9 @@ export function getQuickNoteFloatTitle(isFromButton: boolean): string {
 }
 
 export function getQuickNoteFloatPlaceholder(isFromButton: boolean): string {
-  return '';
+  const { documentId, saveType } = resolveQuickNoteTargetConfig(isFromButton);
+  if (saveType === 'document' && documentId) {
+    return t('quickNote.placeholder.appendDocument', undefined, '请输入要追加到文档的内容...');
+  }
+  return t('quickNote.placeholder.daily', undefined, '请输入您的日记内容...');
 }

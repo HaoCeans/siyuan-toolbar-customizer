@@ -170,6 +170,7 @@ export interface ButtonConfig {
   showName?: boolean;        // 是否在按钮上显示名称（默认false）
   floatOpacity?: number;     // 悬浮弹窗透明度 (0~1)，默认 0.72
   autoHideOnScroll?: boolean; // 悬浮面板：向上滚动隐藏、向下滚动显示（仅 mobile 侧相关功能）
+  docNavDraggable?: boolean; // 桌面前一篇/后一篇导航栏允许鼠标拖拽（默认 true）
   floatPanelPosition?: 'top' | 'center' | 'bottom'; // 悬浮弹窗垂直位置：top=顶部, center=居中(默认), bottom=底部
 	  maxVisibleTabs?: number;   // 手机端标签页：最大可见标签数 (1~10)，超出后可滚动，默认 10
 	  collapseStyle?: 'preview' | 'minimal'; // 折叠面板样式：preview=收起显示预览小图标, minimal=收起仅显示展开手柄

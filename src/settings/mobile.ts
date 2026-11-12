@@ -4881,7 +4881,7 @@ export function createMobileSettingLayout(
         rowTr('⑧', t("settings.mobile.345", undefined, "图片快捷导入"), t("settings.mobile.346", undefined, "一键选择图片导入笔记。若开启思源块编辑模式，可插入记事弹窗编辑器光标处")),
         rowTr('⑨', t("settings.mobile.347", undefined, "手机端悬浮标签页Tab"), t("settings.mobile.348", undefined, "手机端多文档快速切换，苹果风格悬浮Tab栏，自动管理，告别反复返回")),
         rowTr('⑩', t("settings.mobile.349", undefined, "手机端悬浮大纲"), t("settings.mobile.350", undefined, "左侧悬浮大纲面板，标题快速跳转，实时跟踪当前位置，阅读长文必备")),
-        rowTr('⑪', t("settings.mobile.351", undefined, "手机端前一篇/后一篇文档"), t("settings.mobile.352", undefined, "底部悬浮导航栏，按文件树顺序浏览文档，前后翻页，阅读更流畅")),
+        rowTr('⑪', t("settings.mobile.351", undefined, "手机端前一篇/后一篇文档"), t("settings.mobile.352", undefined, "底部悬浮导航栏，普通文档按文件树顺序翻页；日记文档在目录第一条/最后一条时可跨父目录继续翻页，阅读更流畅")),
 		        rowTr('⑫', t("settings.mobile.353", undefined, "滑动快速批注<br><span style=\"color:#10b981;font-size:11px;\">免费</span>"), t("settings.mobile.354", undefined, "完美联动「鲸鱼快速批注」插件（独立插件），请先在电脑端插件市场搜索「鲸鱼快速批注」进行下载，安装后同步到手机端")),
         rowTr('⑬', t("settings.mobile.355", undefined, "文档朗读"), t("settings.mobile.356", undefined, "使用浏览器语音合成朗读当前文档，支持语速调节、段落高亮")),
         rowTr('⑭', t("settings.mobile.357", undefined, "一键清理空块"), t("settings.mobile.358", undefined, "自动扫描并删除文档中空块（无文本段落/标题/列表项），预览确认后批量删除")),

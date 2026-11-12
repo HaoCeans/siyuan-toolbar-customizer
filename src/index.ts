@@ -1130,7 +1130,8 @@ export default class ToolbarCustomizer extends Plugin {
         loadData: (key) => this.loadData(key),
         eventBus: this.eventBus,
         bottomDistance: desktopDocNavBtn?.bottomDistance,
-        autoHideOnScroll: desktopDocNavBtn?.autoHideOnScroll
+        autoHideOnScroll: desktopDocNavBtn?.autoHideOnScroll,
+        draggable: desktopDocNavBtn?.docNavDraggable ?? true
       })
     }
 

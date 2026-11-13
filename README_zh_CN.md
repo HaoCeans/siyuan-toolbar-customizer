@@ -1,84 +1,39 @@
 > **📢 声明：本插件参考叶归的一键记事，深度针对手机端适配；电脑端一键记事，强烈推荐叶归，可快捷键全局调用，纵享丝滑！**
 
-<div style="display: flex; gap: 20px; align-items: center; justify-content: flex-start; margin: 1.5em 0;">
-  <!-- 按钮1：蓝色 -->
+<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:1.2em 0;">
   <a href="https://ld246.com/article/1773594214158"
-      style="display: inline-flex;
-              align-items: center;
-              padding: 10px 20px;
-              background: #2d8cf0;
-              color: white;
-              border-radius: 6px;
-              text-decoration: none;
-              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-              transform: translateY(0);
-              box-shadow: 0 4px 6px rgba(45,140,240,0.1);
-              border: 1px solid rgba(45,140,240,0.2);
-              font-size: 17px;">
-      📖 详细使用教程
+      style="display:inline-flex; align-items:center; padding:6px 12px;
+              background:#2d8cf0; color:#fff; border-radius:999px;
+              text-decoration:none; font-size:13px; line-height:1.5;
+              white-space:nowrap; border:1px solid #2d8cf0;">
+      📖 使用教程
   </a>
-  <!-- 按钮2：绿色 -->
   <a href="https://qm.qq.com/q/Tm94tR1ys8"
-      style="display: inline-flex;
-              align-items: center;
-              padding: 10px 20px;
-              background: #19be6b;
-              color: white;
-              border-radius: 6px;
-              text-decoration: none;
-              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-              transform: translateY(0);
-              box-shadow: 0 4px 6px rgba(25,190,107,0.1);
-              border: 1px solid rgba(25,190,107,0.2);
-              font-size: 17px;">
-      💬 加入用户交流群
+      style="display:inline-flex; align-items:center; padding:6px 12px;
+              background:#19be6b; color:#fff; border-radius:999px;
+              text-decoration:none; font-size:13px; line-height:1.5;
+              white-space:nowrap; border:1px solid #19be6b;">
+      💬 交流群
   </a>
-  <!-- 按钮3：橙色/琥珀色 -->
   <a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/issues"
-      style="display: inline-flex;
-              align-items: center;
-              padding: 10px 20px;
-              background: #ff9900;
-              color: white;
-              border-radius: 6px;
-              text-decoration: none;
-              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-              transform: translateY(0);
-              box-shadow: 0 4px 6px rgba(255,153,0,0.1);
-              border: 1px solid rgba(255,153,0,0.2);
-              font-size: 17px;">
-      💌 插件建议反馈
+      style="display:inline-flex; align-items:center; padding:6px 12px;
+              background:#ff9900; color:#fff; border-radius:999px;
+              text-decoration:none; font-size:13px; line-height:1.5;
+              white-space:nowrap; border:1px solid #ff9900;">
+      💌 建议反馈
   </a>
-  <!-- 按钮4：激活码方案与权益 -->
   <a href="https://ld246.com/article/1773594214158#-%E6%B0%B8%E4%B9%85%E6%BF%80%E6%B4%BB%E7%A0%81-%E9%99%90%E6%97%B6%E4%BC%98%E6%83%A0"
-      style="display: inline-flex;
-              align-items: center;
-              padding: 10px 20px;
-              background: #E11D48;
-              color: white;
-              border-radius: 6px;
-              text-decoration: none;
-              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-              transform: translateY(0);
-              box-shadow: 0 4px 6px rgba(225,29,72,0.1);
-              border: 1px solid rgba(225,29,72,0.2);
-              font-size: 17px;">
-      🐋 激活码方案与权益
+      style="display:inline-flex; align-items:center; padding:6px 12px;
+              background:#E11D48; color:#fff; border-radius:999px;
+              text-decoration:none; font-size:13px; line-height:1.5;
+              white-space:nowrap; border:1px solid #E11D48;">
+      🐋 激活码
   </a>
-  <!-- 按钮5：打赏支持 -->
   <a href="https://ld246.com/article/1773594214158#--%E6%89%93%E8%B5%8F%E6%94%AF%E6%8C%81"
-      style="display: inline-flex;
-              align-items: center;
-              padding: 10px 20px;
-              background: #7C3AED;
-              color: white;
-              border-radius: 6px;
-              text-decoration: none;
-              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-              transform: translateY(0);
-              box-shadow: 0 4px 6px rgba(124,58,237,0.1);
-              border: 1px solid rgba(124,58,237,0.2);
-              font-size: 17px;">
+      style="display:inline-flex; align-items:center; padding:6px 12px;
+              background:#7C3AED; color:#fff; border-radius:999px;
+              text-decoration:none; font-size:13px; line-height:1.5;
+              white-space:nowrap; border:1px solid #7C3AED;">
       ❤️ 打赏支持
   </a>
 </div>
@@ -342,6 +297,32 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 
 # 📌 更新说明
 
+### v3.9.10 — 一键记事更好用了
+
+> 💡 手机端块格式一键记事修了几个烦人的问题：取消会删掉电脑端写的内容、多段内容只显示第一段、列表/任务列表只显示第一项。顺手减少了插件同步写入，README 也不再挤成一团。
+
+**① 一键记事**
+- 电脑端在手机端创建的草稿块里写的内容，手机端取消时不会再被删掉，会先把内容读回弹窗
+- 多段内容、列表、任务列表都能完整读回来，不再只显示第一段/第一项
+- 取消后残留的空块修好了
+- 电脑端改完同步到手机后，内容会自动出现在弹窗里
+- 弹窗是空的、但块里已有内容时，点发送不会把内容覆盖掉
+
+**② 同步更省心**
+- 标签页、悬浮大纲、前后篇导航的显示状态只保存在本机，不会同步到另一台设备互相覆盖
+- 没变化的配置不再反复写入，减少同步冲突
+
+**③ 插件市场**
+- README 顶部按钮改成会自动换行的小胶囊，电脑和手机上都不挤了
+
+**④ 版本要求**
+- 最低思源版本保持 v3.8.10
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ 查看历史版本
+  </summary>
+
 ### v3.9.9 — 文档导航更顺手，一键记事更好用
 
 > 💡 这一版主要改「前一篇/后一篇」和「一键记事」：电脑端文档全屏时导航栏不再消失；日记翻到月份开头/结尾时能继续跨月；手机端导航改成左右两个简洁的箭头；电脑端前后篇可以设置是否允许鼠标拖动；一键记事弹窗的外观和置顶记忆也一起优化了。
@@ -368,11 +349,6 @@ A: 在「4️⃣一键记事弹窗」设置中，重新打开「💡 初次配�
 
 **③ 版本要求**
 - 最低思源版本保持 v3.8.10
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ 查看历史版本
-  </summary>
 
 ### v3.9.8 — 设置弹窗自建、导航跟随胶囊、朗读修复
 

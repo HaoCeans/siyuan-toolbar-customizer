@@ -1,85 +1,40 @@
 > **📢 Notice: This plugin is based on Yegui's one-click note-taking and deeply optimized for mobile; for desktop one-click note-taking, Yegui is strongly recommended, with global hotkey invocation for a smooth experience!**
 
-<div style="display: flex; gap: 20px; align-items: center; justify-content: flex-start; margin: 1.5em 0;">
-  <!-- Button 1: Blue -->
+<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:1.2em 0;">
   <a href="https://ld246.com/article/1773594214158"
-      style="display: inline-flex;
-              align-items: center;
-              padding: 10px 20px;
-              background: #2d8cf0;
-              color: white;
-              border-radius: 6px;
-              text-decoration: none;
-              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-              transform: translateY(0);
-              box-shadow: 0 4px 6px rgba(45,140,240,0.1);
-              border: 1px solid rgba(45,140,240,0.2);
-              font-size: 17px;">
-      📖 Detailed User Guide
+      style="display:inline-flex; align-items:center; padding:6px 12px;
+              background:#2d8cf0; color:#fff; border-radius:999px;
+              text-decoration:none; font-size:13px; line-height:1.5;
+              white-space:nowrap; border:1px solid #2d8cf0;">
+      📖 User Guide
   </a>
-  <!-- Button 2: Green -->
   <a href="https://qm.qq.com/q/Tm94tR1ys8"
-      style="display: inline-flex;
-              align-items: center;
-              padding: 10px 20px;
-              background: #19be6b;
-              color: white;
-              border-radius: 6px;
-              text-decoration: none;
-              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-              transform: translateY(0);
-              box-shadow: 0 4px 6px rgba(25,190,107,0.1);
-              border: 1px solid rgba(25,190,107,0.2);
-              font-size: 17px;">
-      💬 Join the User Community
+      style="display:inline-flex; align-items:center; padding:6px 12px;
+              background:#19be6b; color:#fff; border-radius:999px;
+              text-decoration:none; font-size:13px; line-height:1.5;
+              white-space:nowrap; border:1px solid #19be6b;">
+      💬 Community
   </a>
-  <!-- Button 3: Orange/Amber -->
   <a href="https://github.com/HaoCeans/siyuan-toolbar-customizer/issues"
-      style="display: inline-flex;
-              align-items: center;
-              padding: 10px 20px;
-              background: #ff9900;
-              color: white;
-              border-radius: 6px;
-              text-decoration: none;
-              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-              transform: translateY(0);
-              box-shadow: 0 4px 6px rgba(255,153,0,0.1);
-              border: 1px solid rgba(255,153,0,0.2);
-              font-size: 17px;">
-      💌 Plugin Suggestions & Feedback
+      style="display:inline-flex; align-items:center; padding:6px 12px;
+              background:#ff9900; color:#fff; border-radius:999px;
+              text-decoration:none; font-size:13px; line-height:1.5;
+              white-space:nowrap; border:1px solid #ff9900;">
+      💌 Feedback
   </a>
-  <!-- Button 4: Activation Code Plans & Benefits -->
   <a href="https://ld246.com/article/1773594214158#-%E6%B0%B8%E4%B9%85%E6%BF%80%E6%B4%BB%E7%A0%81-%E9%99%90%E6%97%B6%E4%BC%98%E6%83%A0"
-      style="display: inline-flex;
-              align-items: center;
-              padding: 10px 20px;
-              background: #E11D48;
-              color: white;
-              border-radius: 6px;
-              text-decoration: none;
-              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-              transform: translateY(0);
-              box-shadow: 0 4px 6px rgba(225,29,72,0.1);
-              border: 1px solid rgba(225,29,72,0.2);
-              font-size: 17px;">
-      🐋 Activation Code Plans & Benefits
+      style="display:inline-flex; align-items:center; padding:6px 12px;
+              background:#E11D48; color:#fff; border-radius:999px;
+              text-decoration:none; font-size:13px; line-height:1.5;
+              white-space:nowrap; border:1px solid #E11D48;">
+      🐋 License
   </a>
-  <!-- Button 5: Donation Support -->
   <a href="https://ld246.com/article/1773594214158#--%E6%89%93%E8%B5%8F%E6%94%AF%E6%8C%81"
-      style="display: inline-flex;
-              align-items: center;
-              padding: 10px 20px;
-              background: #7C3AED;
-              color: white;
-              border-radius: 6px;
-              text-decoration: none;
-              transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-              transform: translateY(0);
-              box-shadow: 0 4px 6px rgba(124,58,237,0.1);
-              border: 1px solid rgba(124,58,237,0.2);
-              font-size: 17px;">
-      ❤️ Support via Donation
+      style="display:inline-flex; align-items:center; padding:6px 12px;
+              background:#7C3AED; color:#fff; border-radius:999px;
+              text-decoration:none; font-size:13px; line-height:1.5;
+              white-space:nowrap; border:1px solid #7C3AED;">
+      ❤️ Support
   </a>
 </div>
 
@@ -339,6 +294,32 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v3.9.10 — Quick Note is much more reliable
+
+> 💡 Fixed three annoying mobile block-format Quick Note issues: canceling could delete content typed on desktop, only the first paragraph was shown, and lists/task lists only showed the first item. Also reduced redundant sync writes and tidied the README.
+
+**① Quick Note**
+- Content typed on desktop inside the draft block is no longer deleted when canceling on mobile; it is read back into the popup first
+- Multiple paragraphs, lists and task lists are now read in full instead of only the first paragraph/item
+- Fixed leftover empty blocks after cancel
+- After desktop changes sync to mobile, they appear in the popup automatically
+- If the popup is empty but the block already has content, Send no longer overwrites it
+
+**② Calmer sync**
+- Tab bar, floating outline and document navigation states are now stored only on the local device, so they no longer overwrite each other across devices
+- Unchanged configs are no longer rewritten, reducing sync conflicts
+
+**③ Marketplace**
+- README top buttons now wrap automatically as compact pills, so they no longer look cramped on desktop or mobile
+
+**④ Requirements**
+- Minimum SiYuan version remains v3.8.10
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.9.9 — Smoother document navigation and Quick Note
 
 > 💡 This release focuses on Previous/Next Document and Quick Note: the navigation bar no longer disappears in desktop document fullscreen; daily notes can continue across month folders; the mobile navigation is now two clean arrows at the screen edges; desktop navigation can be locked in place; Quick Note gets a lighter look and remembers its pin state.
@@ -365,11 +346,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 **③ Requirements**
 - Minimum SiYuan version remains v3.8.10
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.9.8 — Plugin-built settings dialogs, navigation follows the capsule, TTS fixes
 

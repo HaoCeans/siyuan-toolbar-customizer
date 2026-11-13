@@ -108,12 +108,12 @@ import { updateIconDisplay as updateIconDisplayUtil } from './data/icons'
 // 导入标签切换器
 import { injectTabSwitcher as injectTabSwitcherUtil, cleanupTabSwitcher } from './ui/tabs'
 // 导入手机端标签页Tab模块
-import { init as initMobileTabs, cleanup as cleanupMobileTabs, reloadState as reloadMobileTabsState, updateMaxVisibleTabs } from './ui/mobileTabs'
+import { init as initMobileTabs, cleanup as cleanupMobileTabs, updateMaxVisibleTabs } from './ui/mobileTabs'
 	import { init as initDesktopTabs, cleanup as cleanupDesktopTabs } from './ui/desktopTabs'
 // 导入手机端悬浮大纲模块
-import { init as initMobileOutline, cleanup as cleanupMobileOutline, reloadState as reloadMobileOutlineState } from './ui/mobileOutline'
+import { init as initMobileOutline, cleanup as cleanupMobileOutline } from './ui/mobileOutline'
 	import { init as initDesktopOutline, cleanup as cleanupDesktopOutline } from './ui/desktopOutline'
-import { init as initMobileDocNav, cleanup as cleanupMobileDocNav, reloadState as reloadMobileDocNavState } from './ui/mobileDocNav'
+import { init as initMobileDocNav, cleanup as cleanupMobileDocNav } from './ui/mobileDocNav'
 	import { init as initDesktopDocNav, cleanup as cleanupDesktopDocNav } from './ui/desktopDocNav'
 import {
   syncMobileTopLineBreakButton,
@@ -162,6 +162,21 @@ try {
 }
 const { version } = PluginInfo
 
+/**
+ * 稳定序列化：递归按 key 排序，避免对象字面量字段顺序不同导致「内容相同却判定为变化」。
+ * 与 JSON.stringify 一样会忽略 undefined 字段、拒绝循环引用。
+ */
+function stableStringify(value: any): string {
+  return JSON.stringify(value, (_key, val) => {
+    if (val && typeof val === 'object' && !Array.isArray(val)) {
+      const sorted: Record<string, any> = {}
+      for (const key of Object.keys(val).sort()) sorted[key] = val[key]
+      return sorted
+    }
+    return val
+  })
+}
+
 
 export default class ToolbarCustomizer extends Plugin {
   // 环境检测属性
@@ -186,15 +201,18 @@ export default class ToolbarCustomizer extends Plugin {
   // 思源 Plugin.saveData 每次调用都经内核在磁盘写一个文件（data/storage/petal/<插件>/<key>）。
   // 用户反馈空闲期 50 秒内出现多次 desktopFeatureConfig / mobileFeatureConfig 写入（另有
   // desktopTabsState、preparedTtsCacheManifest）。这里统一加保护，对所有调用方生效：
-  // 1) 内容与上一次已写入内容相同 → 直接跳过（消除一切重复写）；
+  // 1) 内容与上一次已写入内容相同 → 直接跳过（消除一切重复写）；冷启动时 loadData 会把
+  //    磁盘内容写入缓存，因此「读出来后原样再写」也能跳过，不会无谓地触发同步；
   // 2) 同 key 短时间多次写 → 防抖（600ms）合并为最后一次；写后读（loadData）在待写期间返回
   //    内存最新值，保证「先保存再读」的调用方拿到新值；
   // 3) onunload 置 _unloading 后，后续 saveData 绕过防抖直写（防抖队列也已先冲刷）——
   //    否则 onunload 中后段的写入（如 flushPreparedTtsCache）会因定时器不再触发而丢失；
   // 4) 写失败 reject 传播给所有等待方（保持原生错误语义，调用方的 catch/提示不受影响）；
-  //    同步 onDataChanged 时清「已写入内容」缓存，避免磁盘被同步改写后相同内容的写入被误跳过。
+  //    同步 onDataChanged 后按磁盘内容重建缓存，避免同步后的原样写回再次触发同步。
   private _storageLastJson = new Map<string, string>()
+  private _storageKnownKeys = new Set<string>()
   private _storagePending = new Map<string, { timer: ReturnType<typeof setTimeout>; latestJson: string; resolve: () => void; reject: (e: any) => void; promise: Promise<void> }>()
+  private _uiStateMigration = new Map<string, Promise<any>>()
   private _unloading = false
   // 保存设置时绕过 600ms 防抖：否则每个配置项都要等一个防抖周期，点保存会明显卡一下
   private _storageBypassDebounce = false
@@ -224,11 +242,12 @@ export default class ToolbarCustomizer extends Plugin {
   override saveData(storageName: string, content: any): Promise<void> {
     let latestJson: string
     try {
-      latestJson = JSON.stringify(content)
+      latestJson = stableStringify(content)
     } catch {
       // 不可序列化内容退回原生直写
       return super.saveData(storageName, content)
     }
+    this._storageKnownKeys.add(storageName)
     const pending = this._storagePending.get(storageName)
     if (pending) {
       // 同 key 有待写：合并为最后一次，所有等待方共享同一次落盘
@@ -267,7 +286,18 @@ export default class ToolbarCustomizer extends Plugin {
     // 待写期间读内存最新值：保证 saveData 之后紧跟的 loadData 能读到新内容
     const pending = this._storagePending.get(storageName)
     if (pending) return JSON.parse(pending.latestJson)
-    return super.loadData(storageName)
+    const data = await super.loadData(storageName)
+    // 把刚读到的磁盘内容记为「已写入内容」：调用方原样写回时可直接跳过，
+    // 避免冷启动后把未变化的配置/状态再写一遍，平白触发一次同步。
+    if (data !== undefined && data !== null && data !== '') {
+      try {
+        this._storageKnownKeys.add(storageName)
+        this._storageLastJson.set(storageName, stableStringify(data))
+      } catch {
+        // 不可序列化内容不缓存，后续照常写入
+      }
+    }
+    return data
   }
 
   override async removeData(storageName: string): Promise<any> {
@@ -279,6 +309,74 @@ export default class ToolbarCustomizer extends Plugin {
     }
     this._storageLastJson.delete(storageName)
     return super.removeData(storageName)
+  }
+
+  // ===== 纯 UI 状态（标签页/悬浮大纲/前后篇的显隐、展开、当前位置）=====
+  // 这些状态只对当前设备有意义，放进 data/storage/petal 会随同步仓库一起走：
+  // 两端一启动各自写一次就会互相覆盖，同步时还会被标成冲突文件。
+  // 统一改存本机 localStorage；首次升级时把旧 petal 数据复制过来。
+  // 注意：不删除旧 petal 文件——删除会随同步传播到其它设备，导致尚未升级的设备
+  // 丢失自己的标签页状态。旧文件保留但不再写入，不会再产生同步变更。
+  private _uiStateStorageKey(key: string): string {
+    return `__tc_ui_state__${key}`
+  }
+
+  private async loadLocalUiState(key: string): Promise<any> {
+    const lsKey = this._uiStateStorageKey(key)
+    try {
+      const raw = localStorage.getItem(lsKey)
+      if (raw !== null) return JSON.parse(raw)
+    } catch {
+      // localStorage 不可用时走迁移路径
+    }
+
+    const migrating = this._uiStateMigration.get(key)
+    if (migrating) return migrating
+
+    const task = (async () => {
+      try {
+        const legacy = await super.loadData(key)
+        if (legacy === undefined || legacy === null || legacy === '' || typeof legacy !== 'object') return null
+        try {
+          localStorage.setItem(lsKey, stableStringify(legacy))
+        } catch {
+          // 写不进 localStorage 就只在本次会话使用，下一次再试
+        }
+        return legacy
+      } catch {
+        return null
+      } finally {
+        this._uiStateMigration.delete(key)
+      }
+    })()
+    this._uiStateMigration.set(key, task)
+    return task
+  }
+
+  private saveLocalUiState(key: string, value: any): Promise<void> {
+    try {
+      const json = stableStringify(value)
+      const lsKey = this._uiStateStorageKey(key)
+      if (localStorage.getItem(lsKey) !== json) localStorage.setItem(lsKey, json)
+    } catch (err) {
+      logger.warn(`[存储] 本机 UI 状态写入 ${key} 失败:`, err)
+    }
+    return Promise.resolve()
+  }
+
+  /** 同步改写存储后，以磁盘内容重建「已写入」缓存，避免随后原样写回再次触发同步 */
+  private async _reseedStorageCache(): Promise<void> {
+    this._storageLastJson.clear()
+    for (const key of [...this._storageKnownKeys]) {
+      try {
+        const data = await super.loadData(key)
+        if (data !== undefined && data !== null && data !== '') {
+          this._storageLastJson.set(key, stableStringify(data))
+        }
+      } catch {
+        // 单个 key 读取失败不影响其它 key
+      }
+    }
   }
 
   private _flushStorageKey(storageName: string): Promise<void> {
@@ -1075,8 +1173,8 @@ export default class ToolbarCustomizer extends Plugin {
 
 	      // 初始化手机端标签页Tab模块（await 确保 switch-protyle handler 在 loadState 完成后才注册）
 	      await initMobileTabs({
-	        saveData: (key, value) => this.saveData(key, value),
-	        loadData: (key) => this.loadData(key),
+	        saveData: (key, value) => this.saveLocalUiState(key, value),
+	        loadData: (key) => this.loadLocalUiState(key),
 	        eventBus: this.eventBus,
 	        floatOpacity: tabsOpts.floatOpacity,
 	        autoHideOnScroll: tabsOpts.autoHideOnScroll,
@@ -1087,8 +1185,8 @@ export default class ToolbarCustomizer extends Plugin {
 
 	      // 初始化手机端悬浮大纲模块
 	      await initMobileOutline({
-	        saveData: (key, value) => this.saveData(key, value),
-	        loadData: (key) => this.loadData(key),
+	        saveData: (key, value) => this.saveLocalUiState(key, value),
+	        loadData: (key) => this.loadLocalUiState(key),
 	        eventBus: this.eventBus,
 	        floatOpacity: outlineOpts.floatOpacity,
 	        autoHideOnScroll: outlineOpts.autoHideOnScroll,
@@ -1097,10 +1195,10 @@ export default class ToolbarCustomizer extends Plugin {
 	      })
 
       // 初始化手机端文档导航模块
-      await initMobileDocNav({
-        saveData: (key, value) => this.saveData(key, value),
-        loadData: (key) => this.loadData(key),
-        eventBus: this.eventBus,
+	      await initMobileDocNav({
+	        saveData: (key, value) => this.saveLocalUiState(key, value),
+	        loadData: (key) => this.loadLocalUiState(key),
+	        eventBus: this.eventBus,
         floatOpacity: docNavOpts.floatOpacity,
         autoHideOnScroll: docNavOpts.autoHideOnScroll,
         bottomDistance: docNavOpts.bottomDistance
@@ -1111,23 +1209,23 @@ export default class ToolbarCustomizer extends Plugin {
     if (!this.isMobile) {
       // 初始化桌面端标签页Tab模块
       await initDesktopTabs({
-        saveData: (key, value) => this.saveData(key, value),
-        loadData: (key) => this.loadData(key),
+        saveData: (key, value) => this.saveLocalUiState(key, value),
+        loadData: (key) => this.loadLocalUiState(key),
         eventBus: this.eventBus
       })
 
       // 初始化桌面端悬浮大纲模块
       await initDesktopOutline({
-        saveData: (key, value) => this.saveData(key, value),
-        loadData: (key) => this.loadData(key),
+        saveData: (key, value) => this.saveLocalUiState(key, value),
+        loadData: (key) => this.loadLocalUiState(key),
         eventBus: this.eventBus
       })
 
       // 初始化桌面端文档导航模块
       const desktopDocNavBtn = this.desktopButtonConfigs.find(b => b.type === 'author-tool' && b.authorToolSubtype === 'doc-nav')
       await initDesktopDocNav({
-        saveData: (key, value) => this.saveData(key, value),
-        loadData: (key) => this.loadData(key),
+        saveData: (key, value) => this.saveLocalUiState(key, value),
+        loadData: (key) => this.loadLocalUiState(key),
         eventBus: this.eventBus,
         bottomDistance: desktopDocNavBtn?.bottomDistance,
         autoHideOnScroll: desktopDocNavBtn?.autoHideOnScroll,
@@ -1345,9 +1443,10 @@ export default class ToolbarCustomizer extends Plugin {
 
   /** 思源同步仅变更插件存储数据（dataChangePlugins）时调用，不会触发 onunload/onload */
   async onDataChanged() {
-    // 同步可能改写了磁盘存储：内存里「上次已写入内容」缓存作废，
-    // 否则后续相同内容的 saveData 会被误判为「未变化」而跳过（磁盘上却是同步后的旧值）
-    this._storageLastJson.clear()
+    // 同步可能改写了磁盘存储：以同步后的磁盘内容重建「已写入内容」缓存，
+    // 而不是简单清空——否则同步刚拉下来的配置会在启动流程里被原样写回，
+    // 反过来又把文件标脏，形成「同步 → 写回 → 再同步」的循环。
+    await this._reseedStorageCache()
     try {
       const savedLoggingConfig = await this.loadData('loggingConfig')
       this.loggingEnabled = savedLoggingConfig?.enabled === true
@@ -1364,15 +1463,6 @@ export default class ToolbarCustomizer extends Plugin {
     const savedDesktopButtons = await this.loadData('desktopButtonConfigs')
     if (Array.isArray(savedDesktopButtons)) {
       this.desktopButtonConfigs = savedDesktopButtons.map((btn: any) => ({...btn}))
-    }
-
-    // 重新加载浮窗模块状态（同步可能覆盖了存储数据）
-    if (this.isMobile) {
-      await Promise.all([
-        reloadMobileTabsState(),
-        reloadMobileOutlineState(),
-        reloadMobileDocNavState()
-      ])
     }
   }
 

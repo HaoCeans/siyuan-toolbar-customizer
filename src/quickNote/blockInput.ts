@@ -3,7 +3,7 @@
  * 弹窗打开前在目标文档插入空块；Enter 可产生多个顶层块，保存时逐块 updateBlock 写回。
  */
 
-import { Protyle, getFrontend } from 'siyuan'
+import { Protyle, fetchSyncPost, getFrontend } from 'siyuan'
 import type { App } from 'siyuan'
 import { t } from '../i18n/runtime'
 import type { QuickNoteInputAreaOptions, QuickNoteInputHandle } from './inputArea'
@@ -14,6 +14,7 @@ import {
   loadSingleBlockIntoProtyle,
   patchQuickNoteProtyleResize,
   persistQuickNoteToKernel,
+  type DraftRangeLoadOptions,
 } from './kernelBlockLoader'
 import {
   createQuickNoteRootState,
@@ -193,6 +194,59 @@ function hasWysiwygText(editor: Protyle): boolean {
   return false
 }
 
+/** 草稿可能由多个顶层块组成（Enter 换行），收集当前编辑器 + 状态里的全部块 ID */
+function collectDraftBlockIds(editor: Protyle, state: QuickNoteRootState): string[] {
+  const ids = new Set<string>()
+  for (const el of getLiveWysiwygTopBlocks(editor.protyle.wysiwyg.element)) {
+    const id = el.getAttribute('data-node-id')
+    if (id) ids.add(id)
+  }
+  if (state.rootBlockId) ids.add(state.rootBlockId)
+  return [...ids]
+}
+
+function normalizeDraftText(text: string): string {
+  return (text || '').replace(/\u200b/g, '').replace(/\s+/g, ' ').trim()
+}
+
+function getLocalDraftSnapshot(editor: Protyle): { text: string; images: number } {
+  const el = editor.protyle.wysiwyg.element
+  return {
+    text: normalizeDraftText(el.textContent || ''),
+    images: el.querySelectorAll('img, [data-type="img"]').length,
+  }
+}
+
+/**
+ * 从内核读取草稿块的真实内容。
+ * 弹窗 Protyle 主动切断了 WebSocket（避免整篇文档灌入），所以其他设备同步过来的修改
+ * 不会自动出现在弹窗里；取消前/同步结束后需要直接问内核。
+ */
+async function fetchKernelDraftSnapshot(ids: string[]): Promise<{ text: string; images: number } | null> {
+  let ok = false
+  let text = ''
+  let images = 0
+  for (const id of ids) {
+    try {
+      const res: any = await fetchSyncPost('/api/block/getBlockDOM', { id })
+      if (res?.code !== 0 || typeof res?.data?.dom !== 'string') continue
+      ok = true
+      const holder = document.createElement('div')
+      holder.innerHTML = res.data.dom
+      text += '\n' + (holder.textContent || '')
+      images += holder.querySelectorAll('img, [data-type="img"]').length
+    } catch {
+      // 单个块读取失败不影响其它块
+    }
+  }
+  return ok ? { text: normalizeDraftText(text), images } : null
+}
+
+async function hasKernelDraftContent(editor: Protyle, state: QuickNoteRootState): Promise<boolean> {
+  const snapshot = await fetchKernelDraftSnapshot(collectDraftBlockIds(editor, state))
+  return !!snapshot && (!!snapshot.text || snapshot.images > 0)
+}
+
 /**
  * 模板插入后对齐根块 ID（markdown 快捷语法专用）。
  *
@@ -239,6 +293,7 @@ async function resetDraftBlock(
   }
   state.rootBlockId = newId
   state.docRootId = newId
+  try { localStorage.setItem('__quickNoteDialogDraftBlockId', newId) } catch { /* ignore */ }
   const ok = await loadSingleBlockIntoProtyle(editor, state)
   if (ok) {
     focusBlockEditable(editor.protyle.wysiwyg.element, options.isMobile)
@@ -274,8 +329,14 @@ export async function createBlockInputHandle(
   // 持久化 draftId，用于插件重启时清理残留草稿块
   try { localStorage.setItem('__quickNoteDialogDraftBlockId', draftId) } catch { /* ignore */ }
 
+  // 仅 bottom 插入使用「根块到文末」的整段加载：草稿原本就在文末，电脑端按 Enter
+  // 新增的块都在根块之后；top 插入无法区分草稿和原文档内容，保持只加载根块。
+  const draftRange: DraftRangeLoadOptions | undefined =
+    options.saveTarget?.insertPosition === 'bottom' ? { position: 'bottom' } : undefined
+
   const state = createQuickNoteRootState(draftId)
   let savedToKernel = false
+  let refreshingFromKernel = false
 
   const mountEl = document.createElement('div')
   mountEl.className = 'protyle toolbar-customizer-qnote-protyle'
@@ -317,7 +378,9 @@ export async function createBlockInputHandle(
 
   patchQuickNoteProtyleResize(editor)
 
-  const reloadBlock = () => loadSingleBlockIntoProtyle(editor, state)
+  // 所有 reload（含 Protyle 内部 reload/空内容恢复）都必须带上 draftRange，
+  // 否则首次整段加载后一次内部 reload 就会缩回根块，看起来永远只有第一行。
+  const reloadBlock = () => loadSingleBlockIntoProtyle(editor, state, draftRange)
   let removeGuards = installKernelProtyleGuards(
     editor,
     state,
@@ -339,6 +402,58 @@ export async function createBlockInputHandle(
     return buildFallbackHandle(wrapper, loadingEl)
   }
 
+  // 同步结束后，如果草稿块在内核里的内容与弹窗不一致（典型场景：电脑端编辑了手机端
+  // 创建的草稿块），把内容拉回弹窗。弹窗 Protyle 主动断开了 WebSocket，不会自动收到同步。
+  // 只在「单个顶层块 + 弹窗未聚焦」时刷新：loadSingleBlockIntoProtyle 只保留根块，
+  // 多块草稿（用户按过 Enter）刷新会裁掉其它块。
+  let onSyncEnd: (() => void) | null = null
+  const eventBus = (window as any).__pluginInstance?.eventBus
+  let externalRefreshPending = false
+  const refreshDraftFromKernel = async (force = false) => {
+    if (refreshingFromKernel || state.isDestroying || !state.loadSettled) return
+    const tops = getLiveWysiwygTopBlocks(editor.protyle.wysiwyg.element)
+    if (tops.length > 1) return
+    if (!force && (document.hidden || wrapper.contains(document.activeElement))) {
+      // 用户正在写（或 App 在后台）时不要抢内容，回到前台/失焦后再刷新
+      externalRefreshPending = true
+      return
+    }
+    await waitForProtyleTransactionsIdle(800, 40)
+    if (state.isDestroying) return
+    const kernel = await fetchKernelDraftSnapshot(collectDraftBlockIds(editor, state))
+    if (!kernel) return
+    const local = getLocalDraftSnapshot(editor)
+    if (kernel.text === local.text && kernel.images === local.images) {
+      externalRefreshPending = false
+      return
+    }
+    refreshingFromKernel = true
+    try {
+      await loadSingleBlockIntoProtyle(editor, state, draftRange)
+      externalRefreshPending = false
+    } finally {
+      refreshingFromKernel = false
+    }
+  }
+  const onVisibilityChange = () => {
+    if (!document.hidden && externalRefreshPending) {
+      externalRefreshPending = false
+      void refreshDraftFromKernel()
+    }
+  }
+  const onWrapperFocusOut = () => {
+    if (!externalRefreshPending) return
+    window.setTimeout(() => { void refreshDraftFromKernel() }, 0)
+  }
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  wrapper.addEventListener('focusout', onWrapperFocusOut)
+  onSyncEnd = () => { void refreshDraftFromKernel() }
+  try {
+    eventBus?.on('sync-end', onSyncEnd)
+  } catch {
+    // 旧版本 eventBus 不支持时忽略
+  }
+
   return {
     element: wrapper,
     format: 'block',
@@ -347,7 +462,21 @@ export async function createBlockInputHandle(
       if (!hasWysiwygText(editor)) return null
       return { format: 'block', dom: '' }
     },
+    hasDraftContent: async () => {
+      if (hasWysiwygText(editor)) return true
+      // 刚清空内容时事务可能还在路上，先等落库再问内核，避免误报
+      await waitForProtyleTransactionsIdle(800, 40)
+      return hasKernelDraftContent(editor, state)
+    },
+    reloadDraft: () => refreshDraftFromKernel(true),
     saveToTarget: async () => {
+      // 本地编辑器是空的，但内核草稿块已有内容：多半是其他设备写入的。
+      // 不能把空的本地 DOM 写回去（会覆盖掉那些内容），按「已保存」处理即可。
+      if (!hasWysiwygText(editor) && await hasKernelDraftContent(editor, state)) {
+        savedToKernel = true
+        try { localStorage.removeItem('__quickNoteDialogDraftBlockId') } catch { /* ignore */ }
+        return true
+      }
       // 预检查：长时间挂后台后 draft block 可能已被内核清理
       if (!(await blockExistsInKernel(state.rootBlockId))) {
         const newId = await createQuickNoteDraftBlock(options.saveTarget!)
@@ -362,7 +491,10 @@ export async function createBlockInputHandle(
         }
       }
       const ok = await persistQuickNoteToKernel(editor, state)
-      if (ok) savedToKernel = true
+      if (ok) {
+        savedToKernel = true
+        try { localStorage.removeItem('__quickNoteDialogDraftBlockId') } catch { /* ignore */ }
+      }
       return ok
     },
     cancelDraft: async () => {
@@ -393,6 +525,7 @@ export async function createBlockInputHandle(
       if (!newId) return
       state.rootBlockId = newId
       state.docRootId = newId
+      try { localStorage.setItem('__quickNoteDialogDraftBlockId', newId) } catch { /* ignore */ }
       const ok = await loadSingleBlockIntoProtyle(editor, state)
       if (ok) {
         savedToKernel = false
@@ -419,6 +552,11 @@ export async function createBlockInputHandle(
       focusBlockEditable(editor.protyle.wysiwyg.element, options.isMobile)
     },
     destroy: () => {
+      if (onSyncEnd) {
+        try { eventBus?.off('sync-end', onSyncEnd) } catch { /* ignore */ }
+      }
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      wrapper.removeEventListener('focusout', onWrapperFocusOut)
       removeGuards()
       destroyQuickNoteProtyle(editor)
       wrapper.remove()

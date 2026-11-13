@@ -21,6 +21,10 @@ export interface QuickNoteInputHandle {
   saveToTarget?: () => Promise<boolean>
   /** 块格式：取消时删除未保存的草稿块 */
   cancelDraft?: () => Promise<void>
+  /** 块格式：草稿块是否已有内容（含内核里来自其他设备的修改） */
+  hasDraftContent?: () => Promise<boolean>
+  /** 块格式：从内核重新加载草稿内容（取消时把其他设备的修改显示到弹窗） */
+  reloadDraft?: () => Promise<void>
 }
 
 export interface QuickNoteSaveTarget {

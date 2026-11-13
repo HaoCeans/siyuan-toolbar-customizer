@@ -1,6 +1,6 @@
 import { logger } from '@/utils/logger'
 import { fetchSyncPost } from 'siyuan'
-import { appendBlock, deleteBlock, getChildBlocks, insertBlock, prependBlock, sql } from '../api'
+import { appendBlock, deleteBlock, prependBlock, sql } from '../api'
 
 export interface QuickNoteSaveTarget {
   saveType: 'daily' | 'document'
@@ -51,40 +51,34 @@ function extractBlockIdFromOps(ops: unknown): string | null {
   return extractBlockIdFromTransactions(ops)
 }
 
-async function getOrderedChildBlockIds(parentId: string): Promise<string[]> {
-  try {
-    const children = await getChildBlocks(parentId)
-    if (Array.isArray(children) && children.length > 0) {
-      return children.map(item => item.id).filter(Boolean)
-    }
-  } catch {
-    // fallback to sql
-  }
-
-  try {
-    const rows = await sql(
-      `SELECT id FROM blocks WHERE parent_id = '${parentId}' AND type != 'd' ORDER BY sort ASC`,
-    )
-    return (rows ?? []).map((row: { id: string }) => row.id).filter(Boolean)
-  } catch {
-    return []
-  }
-}
-
 async function resolveDailyNoteDocumentId(notebookId: string): Promise<string | null> {
   if (!notebookId) return null
+  // 先查今天的日记是否已存在。思源 v3.8.10 起，日记路径上若存在同名祖先文档，
+  // createDailyNote 会返回 "ambiguous document ancestor"，即使今天的日记已经建好了。
+  // getDailyNoteInfo 对已存在的日记会直接返回 ID，不会触发这个歧义。
+  try {
+    const info: any = await fetchSyncPost('/api/filetree/getDailyNoteInfo', { notebook: notebookId })
+    if (info?.code === 0 && info?.data?.id) {
+      return info.data.id
+    }
+  } catch {
+    // 旧版本思源没有该接口时继续走 createDailyNote
+  }
   try {
     const response: any = await fetchSyncPost('/api/filetree/createDailyNote', { notebook: notebookId })
     if (response?.code === 0 && response?.data?.id) {
       return response.data.id
     }
-  } catch {
-    // ignore
+    if (response?.code !== 0) {
+      logger.warn('[QuickNote] createDailyNote 失败:', response?.msg)
+    }
+  } catch (err) {
+    logger.warn('[QuickNote] createDailyNote 异常:', err)
   }
   return null
 }
 
-/** 在文档顶层按配置位置插入块（显式 previousID/nextID，避免删光块后 append 落到顶部） */
+/** 在文档顶层按配置位置插入空块，并返回事务操作（可从中取到新块 ID） */
 export async function insertQuickNoteBlockAtPosition(
   parentId: string,
   position: 'top' | 'bottom',
@@ -94,17 +88,12 @@ export async function insertQuickNoteBlockAtPosition(
   const payload = dataType === 'markdown'
     ? (data ? (data.endsWith('\n') ? data : `${data}\n`) : '\n')
     : data
-  const childIds = await getOrderedChildBlockIds(parentId)
-
+  // 思源 v3.8.10：/api/block/insertBlock 的事务响应不会回填新块 ID（operation.ID 为空），
+  // 而 prependBlock / appendBlock 走 doPrependInsert / doAppendInsert，会回填插入块 ID。
+  // 之前用 insertBlock 会拿不到 ID，回退 insertDraftBlockLegacy 又插一次，第一次插入的空块
+  // 就变成了取消后删不掉的孤儿块。这里直接用 prepend/append，既定位在文档首尾，也能拿到 ID。
   if (position === 'top') {
-    if (childIds.length > 0) {
-      return insertBlock(dataType, payload, childIds[0], undefined, parentId)
-    }
     return prependBlock(dataType, payload, parentId)
-  }
-
-  if (childIds.length > 0) {
-    return insertBlock(dataType, payload, undefined, childIds[childIds.length - 1], parentId)
   }
   return appendBlock(dataType, payload, parentId)
 }

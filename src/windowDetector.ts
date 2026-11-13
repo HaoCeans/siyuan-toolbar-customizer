@@ -1033,6 +1033,12 @@ async function showNoteInputDialogMobile(notebookId: string, documentId?: string
     const hasContent = isLifelogMode
       ? !!(getActiveQuickNoteInput()?.element.querySelector('textarea') as HTMLTextAreaElement)?.value.trim()
       : !!(await inputHandle.getContent())
+    // 本地编辑器是空的，但内核里的草稿块已有内容（多半是电脑端编辑了手机端创建的块）：
+    // 直接把内容读回弹窗，不关闭、不删除；之后取消/发送仍走原来的逻辑。
+    if (!hasContent && inputHandle.hasDraftContent && await inputHandle.hasDraftContent()) {
+      await inputHandle.reloadDraft?.()
+      return
+    }
     if (hasContent) {
       const confirmed = await new Promise<boolean>((resolve) => {
         const overlay = document.createElement('div');

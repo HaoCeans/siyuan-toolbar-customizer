@@ -139,6 +139,43 @@ hash 清空 + 僵尸窗口清理是"对抗式"防护。2026-11 修复后已覆�
 **手动兜底**：命令面板触发「清理一键记事弹窗残留」→ `cleanupBlockWindowResidue()`（销毁所有 `__qn_block_window` 标记窗口 + 复位草稿状态）+ `destroyQuickNoteFloatWindow()`。
 彻底方案（未实施）：草稿块从日记迁到独立草稿文档，弹窗 root_id 与任何真实文档解耦——需要把"所见即所得（编辑即日记块）"改为显式发送动作。
 
+### 跨端读取弹窗草稿：整段/列表/任务块加载（v3.9.10）
+
+**问题链**：
+1. 手机端弹窗创建空草稿块后，弹窗 Protyle 主动断开 WebSocket（防止整篇文档灌入），电脑端对同一块的编辑不会自动出现在弹窗。
+2. 点取消只检查本地 DOM，本地为空就直接删草稿块 → 电脑端写的内容被同步删除。
+3. 改成读内核后，只调 `getDoc(mode: 0)`，只拿到根块；列表/任务列表只显示第一项。
+
+**关键结论（本机内核实测）**：
+- `getDoc(id=块ID, mode:0)` = **只返回该节点自己的子树**（`kernel/model/file.go` 的 `loadNodesByMode` case 0），不是整篇文档。
+- `getDoc(id=块ID, mode:2)` = 从 `node.Next` 开始，**不包含根节点**；对列表项这类嵌套节点，顶层没有 next，返回空。
+- `getDoc(id=文档根ID, mode:4)` = 从文末向上加载，能拿到文末的草稿，且避免大文档从开头加载被 `SIZE_GET_MAX`（102400）截断。
+
+**加载方案（bottom 插入）**：
+1. `getDoc(state.docRootId, mode: 4)` 从文末加载整篇文档。
+2. 在 DOM 里找到 `state.rootBlockId`，**向上爬到顶层块**（`findTopLevelForBlock`）。
+   - 列表/任务列表：root 往往指向第一个 `li` 或 `li` 内的段落，必须爬到 `NodeList` 容器。
+3. 按范围裁剪：bottom 保留该顶层块到文末；top 保留根块所在顶层块（或到创建时记录的边界之前）。
+4. 把 `state.rootBlockId` 更新为实际保留的顶层块 ID（列表容器 ID），后续保存/取消都作用于整个列表。
+5. `pruneDraftRange` 返回实际顶层块 ID；找不到时清空编辑器，**绝不能保留整篇文档**，否则取消会删掉整篇文档的顶层块。
+
+**必须带 range 的 reload 路径**（最容易漏）：
+- `installKernelProtyleGuards` 的 `reloadBlock`（被 `editor.reload`、`handleEmptyContent`、空内容恢复调用）
+- `refreshDraftFromKernel`（sync-end / 点取消）
+- 只要有一处调用 `loadSingleBlockIntoProtyle(editor, state)` 不带 `draftRange`，首次整段加载后一次内部 reload 就会缩回根块，表现为"永远只有第一行"。
+
+**取消交互（v3.9.10 最终版）**：
+- 第一次点取消：`hasDraftContent()` 查内核；有内容就 `reloadDraft()` 整段载入弹窗并 return，**不关闭、不删除、不弹选择框**。
+- 载入后再次点取消：走原来的「当前内容尚未保存，确定要取消吗？」确认。
+- 发送：本地为空但内核有内容时按"已保存"处理，不用空 DOM 覆盖其他设备内容。
+
+**其它坑**：
+1. 转成列表后 Protyle 可能重新分配块 ID，`state.rootBlockId` 会过期。弹窗内只有一个顶层块时，reload 前先用当前 DOM 的顶层块 ID 对齐 state。
+2. `getContent()` / `hasDraftContent()` 只看本地 DOM 会在"本地空、内核有内容"时误判；必须查内核。
+3. 只加载单块时不要用 `mode: 2` 去拼兄弟块：列表项没有顶层 next，会丢容器。
+4. top 插入无法区分"草稿新增块"和"原文档内容"，目前仍只加载根块；不要贸然套用 bottom 的整段范围。
+5. `getDoc` 后要手动补 `highlightRender / mathRender / avRender`；`innerHTML` 赋值后 `visibility` 再恢复，避免闪未渲染内容。
+
 ### 手机端弹窗输入：focusBlockEditable + 选区保障（v3.8.1）
 
 **调用链**（点模板按钮 → 插入 + 弹输入法）：

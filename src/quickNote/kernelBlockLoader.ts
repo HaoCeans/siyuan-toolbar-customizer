@@ -8,6 +8,76 @@ const FOREIGN_BLOCK_THRESHOLD = 12
 const QNOTE_WYSIWYG_PADDING = '8px 12px 8px 16px'
 const RESIZE_COMPACT_DELAY = Constants.TIMEOUT_TRANSITION + 120
 
+/** 取消时加载整段草稿：bottom 保留根块到文末；top 保留到原第一个兄弟块之前 */
+export interface DraftRangeLoadOptions {
+  position: 'top' | 'bottom'
+  boundaryId?: string | null
+}
+
+function findTopLevelForBlock(wysiwyg: HTMLElement, blockId: string): HTMLElement | null {
+  const el = wysiwyg.querySelector(`[data-node-id="${blockId}"]`) as HTMLElement | null
+  if (!el) return null
+  let top: HTMLElement = el
+  while (top.parentElement && top.parentElement !== wysiwyg) {
+    top = top.parentElement as HTMLElement
+  }
+  return top
+}
+
+/**
+ * 按草稿范围裁剪整篇文档。
+ * 关键：rootBlockId 可能不是顶层块（例如转成列表后是 li/段落），
+ * 必须先向上找到它所在的顶层块，否则会把整个列表裁掉，只剩第一项。
+ * @returns 实际保留的顶层块 ID（找不到时为 null）
+ */
+function pruneDraftRange(
+  wysiwyg: HTMLElement,
+  rootBlockId: string,
+  range: DraftRangeLoadOptions,
+): string | null {
+  const tops = getLiveWysiwygTopBlocks(wysiwyg)
+  const rootTop = findTopLevelForBlock(wysiwyg, rootBlockId)
+  if (!rootTop) {
+    // 根块 ID 失效（例如被快捷语法转换）：宁可清空，也不要保留整篇文档，
+    // 否则后续取消会把整篇文档的顶层块当草稿删掉。
+    tops.forEach(el => el.remove())
+    return null
+  }
+
+  const rootIndex = tops.indexOf(rootTop)
+  const topId = rootTop.getAttribute('data-node-id') || rootBlockId
+  let start = rootIndex
+  let end = tops.length - 1
+  if (range.position === 'bottom') {
+    // 草稿原本追加在文末，所在顶层块之后新增的块都属于草稿
+    start = rootIndex
+  } else if (range.boundaryId) {
+    // 草稿原本插在最前面，保留到原第一个兄弟块之前
+    const boundaryIndex = tops.findIndex(el => el.getAttribute('data-node-id') === range.boundaryId)
+    start = 0
+    end = boundaryIndex >= 0 ? boundaryIndex - 1 : rootIndex
+  } else {
+    // top 且没有边界：只保留根块所在的顶层块
+    end = rootIndex
+  }
+
+  tops.forEach((el, index) => {
+    if (index < start || index > end) el.remove()
+  })
+
+  const kept = getLiveWysiwygTopBlocks(wysiwyg)
+  kept.forEach((el, index) => {
+    if (index === 0) {
+      el.setAttribute('data-eof', '1')
+    } else if (index === kept.length - 1) {
+      el.setAttribute('data-eof', '2')
+    } else {
+      el.removeAttribute('data-eof')
+    }
+  })
+  return topId
+}
+
 /** 防止 protyle-content 可滚区域超出 wysiwyg 实际内容高度 */
 export function clampQuickNoteContentScroll(editor: Protyle): void {
   const contentEl = editor.protyle.contentElement
@@ -222,37 +292,54 @@ export function installKernelProtyleGuards(
 export async function loadSingleBlockIntoProtyle(
   editor: Protyle,
   state: QuickNoteRootState,
+  range?: DraftRangeLoadOptions,
 ): Promise<boolean> {
-  const blockId = state.rootBlockId
   const wysiwygEl = editor.protyle.wysiwyg.element
+  const wasLoaded = state.loadSettled
   state.loadSettled = false
+  let blockId = state.rootBlockId
+  if (wasLoaded) {
+    // 用户把草稿转成列表/任务列表后，Protyle 会重新分配块 ID，state 里记录的旧 ID
+    // 可能已被删除；弹窗里始终只有草稿，单顶层块时直接以它为准，避免 getDoc 取不到。
+    const liveTops = getLiveWysiwygTopBlocks(wysiwygEl)
+    if (liveTops.length === 1) {
+      const liveId = liveTops[0].getAttribute('data-node-id')
+      if (liveId && liveId !== blockId) {
+        blockId = liveId
+        state.rootBlockId = liveId
+      }
+    }
+  }
+  // top 插入且没拿到边界时无法判断草稿范围，退回只加载根块
+  const useRange = !!range && (range.position === 'bottom' || !!range.boundaryId)
+  // 范围加载必须从整篇文档拿：列表/任务列表/引用的容器（ul/li）在根块之外，
+  // 只按块 ID 取会漏掉兄弟项。bottom 用 mode 4（从文末向上）避免大文档从头加载被 size 截断。
+  const bottomRange = useRange && range!.position === 'bottom'
+  const loadId = useRange ? (state.docRootId || blockId) : blockId
+  const loadMode = bottomRange ? 4 : 0
 
   sealSingleBlockProtyle(editor, blockId, state.docRootId, { pruneSiblings: false })
 
-  let getResponse: { code: number; data?: Record<string, unknown>; msg?: string } | null = null
-  try {
+  const requestDoc = async (id: string, mode: number): Promise<{ code: number; data?: Record<string, unknown>; msg?: string } | null> => {
     for (let attempt = 0; attempt < 4; attempt++) {
-      const response = await fetchSyncPost('/api/filetree/getDoc', {
-        id: blockId,
-        mode: 0,
-        size: Constants.SIZE_GET_MAX,
-      })
-      if (response?.code === 0) {
-        getResponse = response
-        break
-      }
-      const msg = String(response?.msg ?? '')
-      if (!msg.includes('tree not found') || attempt >= 3) {
-        getResponse = response
-        break
+      try {
+        const response = await fetchSyncPost('/api/filetree/getDoc', {
+          id,
+          mode,
+          size: Constants.SIZE_GET_MAX,
+        })
+        if (response?.code === 0) return response
+        const msg = String(response?.msg ?? '')
+        if (!msg.includes('tree not found') || attempt >= 3) return response
+      } catch {
+        if (attempt >= 3) return null
       }
       await new Promise((r) => window.setTimeout(r, 80 * (attempt + 1)))
     }
-  } catch {
-    state.loadSettled = true
-    return false
+    return null
   }
 
+  const getResponse = await requestDoc(loadId, loadMode)
   if (!getResponse || getResponse.code !== 0 || !getResponse.data) {
     state.loadSettled = true
     return false
@@ -271,23 +358,31 @@ export async function loadSingleBlockIntoProtyle(
   }
 
   state.docRootId = data.rootID || state.docRootId
-  state.rootBlockId = blockId
 
   const p = editor.protyle
   p.notebookId = data.box
   p.path = data.path
-  p.block.parentID = data.parentID
-  p.block.parent2ID = data.parent2ID
+  p.block.parentID = useRange ? state.docRootId : data.parentID
+  p.block.parent2ID = useRange ? state.docRootId : data.parent2ID
   p.block.rootID = blockId
   p.block.id = blockId
   p.block.showAll = false
-  p.block.mode = data.mode
+  p.block.mode = useRange ? 0 : data.mode
   p.block.blockCount = data.blockCount
   p.block.scroll = false
-  p.wysiwyg.element.setAttribute('data-doc-type', data.type)
 
   wysiwygEl.style.visibility = 'hidden'
   wysiwygEl.innerHTML = data.content
+  let effectiveRootId = blockId
+  if (useRange) {
+    const prunedRootId = pruneDraftRange(wysiwygEl, blockId, range!)
+    if (prunedRootId) effectiveRootId = prunedRootId
+  }
+  state.rootBlockId = effectiveRootId
+  p.block.rootID = effectiveRootId
+  p.block.id = effectiveRootId
+  const rootTop = findTopLevelForBlock(wysiwygEl, effectiveRootId)
+  wysiwygEl.setAttribute('data-doc-type', rootTop?.getAttribute('data-type') || data.type)
   p.contentElement.classList.remove('fn__none')
   p.preview.element.classList.add('fn__none')
   p.disabled = false
@@ -296,7 +391,7 @@ export async function loadSingleBlockIntoProtyle(
   ProtyleMethod.mathRender(wysiwygEl)
   ProtyleMethod.avRender(wysiwygEl, p)
 
-  sealSingleBlockProtyle(editor, blockId, state.docRootId, { pruneSiblings: false })
+  sealSingleBlockProtyle(editor, effectiveRootId, state.docRootId, { pruneSiblings: false })
   isolateQuickNoteProtyleWs(editor)
 
   compactQuickNoteProtyleLayout(editor)

@@ -715,16 +715,29 @@ function handleSwitchProtyle(): void {
   const domTitle = getProtyleTitle()
 
   if (existing) {
-    if (activeTab) activeTab.isActive = false
-    existing.isActive = true
-    existing.notebookId = notebookId
-    state.activeTabId = existing.id
+    // 只在真实变化时持久化：switch-protyle / loaded-protyle-dynamic 在冷启动和空闲期
+    // 都会触发，旧逻辑无条件 dirty=true 会让每次启动都多写一遍标签状态。
+    if (activeTab && activeTab !== existing && activeTab.isActive) {
+      activeTab.isActive = false
+      dirty = true
+    }
+    if (!existing.isActive) {
+      existing.isActive = true
+      dirty = true
+    }
+    if (notebookId && notebookId !== existing.notebookId) {
+      existing.notebookId = notebookId
+      dirty = true
+    }
+    if (state.activeTabId !== existing.id) {
+      state.activeTabId = existing.id
+      dirty = true
+    }
     if (domTitle && domTitle !== existing.title) {
       existing.title = domTitle
       titleCache[docId] = domTitle
       dirty = true
     }
-    dirty = true // 活动标签变了，需要持久化
   } else {
     addTab(docId, domTitle || t('navigation.common.loading', undefined, '加载中...'), notebookId, 0)
     dirty = true

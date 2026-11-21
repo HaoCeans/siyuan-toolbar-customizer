@@ -178,7 +178,12 @@ export function createAppleSelectEl(opts: AppleSelectOptions = {}): AppleSelectE
     popup.style.left = `${Math.max(8, Math.min(window.innerWidth - width2 - 8, rect.left))}px`
 
     // 点外部关闭（capture 阶段，避免被面板的 stopPropagation 拦截）
+    // openedAt：部分 WebView 在 touchend 打开弹层后还会补一个 click/二次 touchstart，
+    // 事件目标可能不是触发元素，会把刚打开的弹层立刻关掉（表现为“闪一下”）。
+    // 开启后的极短时间内忽略外部事件，只认真实用户操作。
+    const openedAt = Date.now()
     const outside = (ev: Event) => {
+      if (Date.now() - openedAt < 350) return
       const target = ev.target as Node
       if (popup.contains(target) || root.contains(target)) return
       closeAppleSelectPopup()

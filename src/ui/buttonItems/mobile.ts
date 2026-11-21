@@ -620,6 +620,8 @@ export function createMobileButtonItem(
         if (selectElement) {
           selectElement.value = button.type || 'builtin'
         }
+        // 未激活提示（避免静默回弹让用户以为"点了没反应"）
+        showMessage(t('notification.activationRequired', undefined, '🔒 此功能需激活，请在「插件设置 → 激活与权益」中激活'), 2500, 'error')
         // 跳转到激活区域
         setTimeout(() => {
           const activationElement = document.getElementById('whale-toolbox-activation-mobile')
@@ -926,10 +928,12 @@ export function createMobileButtonItem(
       `
 	      subtypeSelect.onchange = () => {
 	        button.authorToolSubtype = subtypeSelect.value as any
-	        // 未激活时仅允许 toggle-lock
+	        // 未激活时仅允许 toggle-lock / slide-comment
 	        if (!context.isAuthorToolActivated() && subtypeSelect.value !== 'toggle-lock' && subtypeSelect.value !== 'slide-comment') {
 	          subtypeSelect.value = 'toggle-lock'
 	          button.authorToolSubtype = 'toggle-lock'
+	          // 未激活提示（避免静默回弹让用户以为"点了没反应"）
+	          showMessage(t('notification.activationRequired', undefined, '🔒 此功能需激活，请在「插件设置 → 激活与权益」中激活'), 2500, 'error')
 	        }
         ;(subtypeSelect as any).refreshForm?.()
       }

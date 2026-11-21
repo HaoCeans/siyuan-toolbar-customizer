@@ -5,6 +5,7 @@ import { t } from '../i18n/runtime'
  */
 
 import { logger } from '@/utils/logger'
+import { nextPluginOverlayZ } from '@/utils/overlayZ'
 export interface ConfirmDialogOptions {
   title?: string
   message: string
@@ -39,7 +40,7 @@ export function showConfirmDialog(options: ConfirmDialogOptions): Promise<boolea
       display: flex;
       align-items: center;
       justify-content: center;
-      z-index: 2000;
+      z-index: ${nextPluginOverlayZ(2000)};
       padding: 20px;
     `
 

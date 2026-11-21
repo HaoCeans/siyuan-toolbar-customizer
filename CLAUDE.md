@@ -1038,3 +1038,50 @@ handleToolbarAutoHideScroll()      ← 滚动事件处理器
 - 判断“设置项是否就绪”要看 `.toolbar-customizer-content`，不能只看 `.config-item` 数量，否则会误判思源设置页
 - 预加载隐藏样式 `#toolbar-customizer-preload-hide` 可能残留多个，清理时用 `querySelectorAll` 全部移除，不要只用 `getElementById` 删一个
 - 修改后至少验证：从集市打开插件设置（思源设置页仍在背后）时四个标签只出现在插件对话框内；点击四个标签只切换插件内容；关闭后重新打开不残留标签或隐藏样式
+
+### 41. 自建浮层禁止写死 z-index：思源 nativeSelect 的 b3-menu 会被压在面板后面（下拉"点了没反应"）
+
+**相关文件**: `src/utils/overlayZ.ts`（`nextPluginOverlayZ(minZ)`）、`src/ui/mobileSettingsDialog.ts`、`src/ui/iconPicker.ts`、`src/ui/dialog.ts`、`src/settings/mobile.ts`
+
+**现象**: 手机端设置面板里，原生 `<select>`（「选择功能」/「功能类型」）点击毫无反应；桌面端 Electron 里用鼠标点同样无反应。console 里只有 pointerdown、没有任何 mousedown/click/touchstart。
+
+**根因链**（两步，缺一不可理解）:
+1. 思源手机端 `mobile/util/nativeSelect.ts` 在 document **capture** 阶段拦截所有原生 `<select>`（匹配 `select.b3-select, select.b3-text-field`）：pointerdown `preventDefault()`，click `preventDefault()+stopImmediatePropagation()` 后弹出**思源自绘的 b3-menu 菜单**（替代 WebView 原生下拉）。pointerdown 被 preventDefault 后浏览器按规范抑制后续 mousedown/click 合成——所以点 select 本来就不会有原生弹层，全靠这个 b3-menu。
+2. b3-menu（共享 `#menu` 元素，思源 popMenu）层号 = `++window.siyuan.zIndex` 递增计数器；插件自建设置面板曾用**固定 `z-index: 1500`**——会话初期计数器远低于 1500，菜单弹在面板**后面**，视觉上"点了没反应"。
+
+**修复**: `src/utils/overlayZ.ts` 的 `nextPluginOverlayZ(minZ)`——`siyuan.zIndex = Math.max(siyuan.zIndex + 1, minZ)` 后返回。所有插件自建浮层统一走它：设置面板（min 1500）、确认框与图标选择器（min 2000）、收款码（min 9999）。"后开者在上"与"盖过固定层"两个目标同时成立，思源随后打开的菜单/消息自然浮在面板上方。
+
+**规则**:
+- **插件自建浮层（overlay/dialog/menu 类）一律用 `nextPluginOverlayZ(minZ)` 取层号，禁止写死 `z-index` 数字**。写死的浮层迟早压住思源后续弹出的菜单/消息（计数器增长不会超过写死值的会话里）
+- `minZ` 保留原固定值的语义（面板 1500 < 选择器/确认框 2000 < 收款码 9999），相对层级不因改造而乱
+- 排查"点击无反应"类问题，先用 `Event.prototype.preventDefault` 包装打印调用栈（本次即由此定位到 `main.js:4077` = nativeSelect.ts），再配合捕获阶段 defaultPrevented 探针确认拦截位置
+- 原生 `<select>` 在思源手机端可以放心使用（思源会接管为自绘菜单），前提是所在浮层走计数器层号
+- 修改后至少验证：手机端设置面板里点开「选择功能」「功能类型」能看到思源自绘菜单并可选择；确认框、图标选择器仍显示在设置面板之上；思源 toast 消息不被面板遮挡
+
+### 42. 手机端 Edge 语音：必须走思源内核 WebSocket 代理（浏览器改不了 User-Agent）
+
+**相关文件**: `src/tts/edgeTtsEngine.ts`（`buildKernelProxyUrl`、`edgeHandshakeHeaders`、`createEdgeWS`）、`src/tts/mobilePanel.ts`（`renderEdgeContent`、`startEdgePlayback`、`installEdgePlaybackCallbacks`）
+
+**背景**: 微软 Edge 语音在握手时校验 `User-Agent` 必须含 `Edg/`，而浏览器禁止脚本设置 UA，所以手机端直接 `new WebSocket(url)` 一定失败，表现为「连接关闭，未收到音频」——这就是之前手机端只有硅基流动/免费两条通路的原因。
+
+**正解**: 走内核的 WebSocket 转发接口（内核 ≥ 3.7.0）：
+
+```
+GET /ws/network/proxy?u=<base64url 目标 ws URL>&h=<base64url headers JSON>&token=<可选>
+```
+
+- `h` 的格式是 `{ "User-Agent": ["..."], "Origin": ["..."], ... }`（value 是**字符串数组**），序列化后 base64url（RawURLEncoding，无 `=` 填充）
+- 内核 Go 层发起握手并代发这些头；桌面端仍用 `NodeWS`（tls 直连），两条通路共用 `edgeHandshakeHeaders()`
+- 音频输出 MP3（`audio-24khz-...`），`<audio>` + Blob 在所有 WebView 可播；WebM/Opus 在 iOS 不可用
+
+**权限与部署前提**（排查时优先检查）:
+- 该接口是 `AuthenticatedAccess | AdminAccess`（`CheckAuth + CheckAdminRole`）：**只读访问的伺服账号会被 403**，必须管理员登录；API Token 可通过 query token 传入
+- `CheckOrigin` 要求 Origin 的 host 与请求 Host 一致：反向代理必须 `proxy_set_header Host $host;` 并透传 `Upgrade/Connection`，否则握手被拒
+- HTTPS 页面必须 `wss`（按 `location.protocol` 自动选择）
+
+**规则**:
+- 手机端/浏览器伺服的 Edge 连接一律走内核代理，不要退回裸 `new WebSocket(edgeUrl)`
+- 新增需要自定义请求头的第三方服务，同样可以复用 `/ws/network/proxy`，不必依赖 Node
+- 切换朗读引擎时要停掉另一条通路（`stopInactiveTTSEngines`），避免两个引擎叠音
+- 失败提示要带排查方向（代理权限 / Host / 网络），不要只抛「连接关闭」
+- 修改后至少验证：手机 App 与手机浏览器伺服都能听到 Edge 音色；只读账号访问时提示权限问题而不是静默失败；断网时提示需要联网

@@ -5,6 +5,7 @@
 
 import { logger } from '@/utils/logger'
 import { t } from '../../i18n/runtime'
+import { showMessage } from 'siyuan'
 import { ButtonConfig, getButtonDisplayName } from '../../toolbarManager'
 import { showClickSequenceSelector } from '../clickSequenceSelector'
 import {
@@ -805,10 +806,12 @@ export function createDesktopButtonItem(
 	    `
 	    subtypeSelect.onchange = () => {
 	      button.authorToolSubtype = subtypeSelect.value as any
-		      // 未激活时仅允许 toggle-lock
+		      // 未激活时仅允许 toggle-lock / slide-comment
 		      if (!context.isAuthorToolActivated() && subtypeSelect.value !== 'toggle-lock' && subtypeSelect.value !== 'slide-comment') {
 		        subtypeSelect.value = 'toggle-lock'
 		        button.authorToolSubtype = 'toggle-lock'
+		        // 未激活提示（避免静默回弹让用户以为"点了没反应"）
+		        showMessage(t('notification.activationRequired', undefined, '🔒 此功能需激活，请在「插件设置 → 激活与权益」中激活'), 2500, 'error')
 		      }
 	      // 刷新表单以显示/隐藏相关配置
 	      if ((subtypeSelect as any).refreshForm) {
@@ -2439,10 +2442,12 @@ export function populateDesktopEditForm(
 	    `
 	    subtypeSelect.onchange = () => {
 	      button.authorToolSubtype = subtypeSelect.value as any
-		      // 未激活时仅允许 toggle-lock
+		      // 未激活时仅允许 toggle-lock / slide-comment
 		      if (!context.isAuthorToolActivated() && subtypeSelect.value !== 'toggle-lock' && subtypeSelect.value !== 'slide-comment') {
 		        subtypeSelect.value = 'toggle-lock'
 		        button.authorToolSubtype = 'toggle-lock'
+		        // 未激活提示（避免静默回弹让用户以为"点了没反应"）
+		        showMessage(t('notification.activationRequired', undefined, '🔒 此功能需激活，请在「插件设置 → 激活与权益」中激活'), 2500, 'error')
 		      }
 	      ;(subtypeSelect as any).refreshForm?.()
     }

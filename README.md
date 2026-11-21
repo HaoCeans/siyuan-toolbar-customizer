@@ -294,6 +294,39 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v4.0.1 — Reading upgrade: Edge voices on mobile, reverse order, per-block repeats
+
+> 💡 Mobile read-aloud gains "Edge Online": no more relying on the flaky free endpoint — Xiaoxiao, Yunxi and other voices are stable and lockable, and it works both in the mobile app and in a mobile browser served by SiYuan. Plus reverse-order reading, repeating each block N times, true smallest-block reading, and automatic position recovery after switching documents.
+
+**① Mobile: new "Edge Online" mode**
+- Microsoft Edge voices relayed through the SiYuan kernel, identical implementation for the mobile app and browser-served mobile
+- 11 Chinese voices (Xiaoxiao / Yunxi / Xiaoyi / Yunjian / Yunyang…), the chosen voice is locked and never silently swapped
+- The default mode is now Edge (users with a SiliconFlow API key keep their setup; any mode you switch to is remembered)
+- Online synthesis needs a network connection; read-only served accounts or reverse proxies that rewrite Host get a clear message instead of failing silently
+
+**② Reading order and repeat count**
+- New "Read backwards" switch: read the whole document from the end, with the progress indicator and previous/next buttons following the direction
+- New "Reads per block" setting (1–5): each block repeats the set number of times and decrements after every pass
+- New counter pill on the playback bar: tap to add 1 (cycles 1→5), highlighted when ≥ 2, and it can temporarily adjust the current block
+- All of the above work across all four engines: browser speech / Edge / SiliconFlow / free endpoint
+
+**③ More accurate reading, sturdier follow-along**
+- Paragraphs are extracted as the smallest text blocks: every list item, nested list, blockquote paragraph, and child of a super block or callout becomes its own segment instead of the whole list being read as one
+- Highlight and auto-scroll recover automatically after switching documents and coming back
+- Previous/next on the playback bar jump back to the document being read and scroll/highlight the current block (blocks outside the loaded window are loaded by index)
+
+**④ Fixes**
+- Mobile settings panel dropdowns ("Select function" / "Function type") no longer ignore taps: plugin overlays now take their z-index from the SiYuan counter, so SiYuan's own menus are no longer hidden behind them
+- Unactivated users now get an explicit "activation required" message instead of a silent revert
+
+**⑤ Requirements**
+- Minimum SiYuan version remains v3.8.10; Edge Online on mobile needs kernel ≥ 3.7.0 (already satisfied)
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v3.9.10 — Quick Note is much more reliable
 
 > 💡 Fixed three annoying mobile block-format Quick Note issues: canceling could delete content typed on desktop, only the first paragraph was shown, and lists/task lists only showed the first item. Also reduced redundant sync writes and tidied the README.
@@ -314,11 +347,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 **④ Requirements**
 - Minimum SiYuan version remains v3.8.10
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.9.9 — Smoother document navigation and Quick Note
 

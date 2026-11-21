@@ -7,6 +7,7 @@ import { getLocale, t } from '../i18n/runtime'
 
 import { aliIconCategories, updateIconDisplay } from '../data/icons'
 import { getLucideIconNames, lucideToSvg } from '../utils/lucideHelper'
+import { nextPluginOverlayZ } from '../utils/overlayZ'
 
 export interface IconPickerOptions {
   title?: string
@@ -86,7 +87,7 @@ export function showIconPicker(options: IconPickerOptions): void {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 2000;
+    z-index: ${nextPluginOverlayZ(2000)};
     padding: 20px;
   `
 

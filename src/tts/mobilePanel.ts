@@ -17,12 +17,14 @@ import { pluginInstance } from '../toolbarManager'
 import {
   getHttpTTSEngine, destroyHttpTTSEngine,
   SF_VOICES, getTTSSettings, saveTTSSettings, getSFAPIConfig, saveSFAPIConfig,
-  ensureHighlightStyle, type TTSController,
+  ensureHighlightStyle, type TTSController, TTS_REPEAT_MAX,
   PREPARED_TTS_SYNTHESIS_SCHEMA_VERSION, PREPARED_TTS_PARAGRAPH_SCHEMA_VERSION,
   PREPARED_TTS_WAV_SCHEMA_VERSION, SF_TTS_MODEL,
 } from './httpTtsEngine'
-import { createIconButton, updateButtonIcon, injectSliderStyles, removeSliderStyles, lucideSvg } from './ttsIconHelper'
+import { createIconButton, updateButtonIcon, injectSliderStyles, removeSliderStyles, lucideSvg, createRepeatButton, syncRepeatButton } from './ttsIconHelper'
 import { createAppleSelectEl, type AppleSelectEl } from './appleSelect'
+import { getEdgeTTSEngine, destroyEdgeTTSEngine, EDGE_TTS_VOICES, isSupportedEdgeVoice } from './edgeTtsEngine'
+import { createRepeatSliderRow, createReadDirectionRow } from './ttsRepeatSetting'
 
 // ═══════════════════════════════════════════════════════════════
 // 手机端 UI
@@ -30,6 +32,7 @@ import { createAppleSelectEl, type AppleSelectEl } from './appleSelect'
 
 let overlay: HTMLElement | null = null
 let bar: HTMLElement | null = null
+let barEngine: TTSController | null = null
 let panelThemeUnsub: (() => void) | null = null
 let barThemeUnsub: (() => void) | null = null
 let docChangeUnsub: (() => void) | null = null
@@ -106,6 +109,7 @@ export async function showTTSOptionsMobile(): Promise<void> {
 export function cleanupMobileTTS(): void {
   removeOverlay(); removeBar()
   destroyHttpTTSEngine()
+  destroyEdgeTTSEngine()
   removeSliderStyles()
 }
 
@@ -147,12 +151,17 @@ function showTTSPanel(total: number): void {
   // ── 模式切换（Apple 分段控件）──
   const savedConfig = getSFAPIConfig()
   const hasApiToken = !!savedConfig.apiKey
-  const lastMode = getTTSSettings().lastMode
-  const defaultMode = lastMode === 'api'
-    ? 'api'
-    : lastMode === 'free'
-      ? 'free'
-      : (hasApiToken ? 'api' : 'free')
+  let lastMode = getTTSSettings().lastMode
+  // 一次性迁移：老版本没有 Edge，lastMode 里的 'free' 只是旧默认值（用户并未主动选过），
+  // 这里统一迁到 edge；填过 API Key 的用户保持 api，之后用户手动切换会正常记住。
+  if (!getTTSSettings().edgeDefaultMigrated) {
+    if (lastMode !== 'api') lastMode = 'edge'
+    saveTTSSettings({ edgeDefaultMigrated: true, lastMode })
+  }
+  // 默认模式：沿用上次；没填过 API Key 且从未选过 → Edge
+  const defaultMode = lastMode === 'api' || lastMode === 'free' || lastMode === 'edge'
+    ? lastMode
+    : (hasApiToken ? 'api' : 'edge')
 
   const modeBar = document.createElement('div')
   modeBar.dataset.ttsModeBar = 'true'
@@ -162,28 +171,26 @@ function showTTSPanel(total: number): void {
     border-radius:10px;padding:2px;gap:0;margin-bottom:16px;
   `
 
-  const modeFree = document.createElement('div')
-  modeFree.textContent = t('tts.mode.freeUnstable', undefined, '免费（不稳定）')
-  modeFree.style.cssText = `
-    flex:1;padding:8px 0;border-radius:8px;text-align:center;
-    font-size:13px;font-weight:500;letter-spacing:-0.01em;
-    cursor:pointer;border:none;background:transparent;
-    color:var(--b3-theme-on-background);
-    transition:all 0.25s cubic-bezier(0.4,0,0.2,1);
-    user-select:none;
-  `
+  const makeModeTab = (label: string): HTMLElement => {
+    const tab = document.createElement('div')
+    tab.textContent = label
+    tab.style.cssText = `
+      flex:1;padding:8px 0;border-radius:8px;text-align:center;
+      font-size:12px;font-weight:500;letter-spacing:-0.01em;
+      cursor:pointer;border:none;background:transparent;
+      color:var(--b3-theme-on-background);
+      transition:all 0.25s cubic-bezier(0.4,0,0.2,1);
+      user-select:none;
+    `
+    return tab
+  }
 
-  const modeApi = document.createElement('div')
-  modeApi.textContent = t('tts.mode.siliconFlow', undefined, '硅基流动')
-  modeApi.style.cssText = `
-    flex:1;padding:8px 0;border-radius:8px;text-align:center;
-    font-size:13px;font-weight:500;letter-spacing:-0.01em;
-    cursor:pointer;border:none;background:transparent;
-    color:var(--b3-theme-on-background);
-    transition:all 0.25s cubic-bezier(0.4,0,0.2,1);
-    user-select:none;
-  `
+  // Edge 放第一：唯一能锁定音色的稳定通路（手机端经内核 WebSocket 代理）
+  const modeEdge = makeModeTab(t('tts.mode.edge', undefined, 'Edge 在线'))
+  const modeFree = makeModeTab(t('tts.mode.freeUnstable', undefined, '免费（不稳定）'))
+  const modeApi = makeModeTab(t('tts.mode.siliconFlow', undefined, '硅基流动'))
 
+  modeBar.appendChild(modeEdge)
   modeBar.appendChild(modeFree)
   modeBar.appendChild(modeApi)
   card.appendChild(modeBar)
@@ -218,33 +225,31 @@ function showTTSPanel(total: number): void {
   autoReadRow.appendChild(autoSel)
   card.appendChild(autoReadRow)
 
+  const modeTabs: Record<string, HTMLElement> = { edge: modeEdge, free: modeFree, api: modeApi }
+
   function activateMode(mode: string) {
     if (modeBar.dataset.locked === 'true') return
+    const current = modeTabs[mode] ? mode : 'free'
     // Apple 分段控件：激活项浮起 + 阴影，非激活项半透明
-    if (mode === 'free') {
-      modeFree.style.background = 'var(--b3-theme-surface)'
-      modeFree.style.opacity = '1'
-      modeFree.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.04)'
-      modeApi.style.background = 'transparent'
-      modeApi.style.opacity = '0.55'
-      modeApi.style.boxShadow = 'none'
-    } else {
-      modeApi.style.background = 'var(--b3-theme-surface)'
-      modeApi.style.opacity = '1'
-      modeApi.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.04)'
-      modeFree.style.background = 'transparent'
-      modeFree.style.opacity = '0.55'
-      modeFree.style.boxShadow = 'none'
+    for (const [key, tab] of Object.entries(modeTabs)) {
+      const active = key === current
+      tab.style.background = active ? 'var(--b3-theme-surface)' : 'transparent'
+      tab.style.opacity = active ? '1' : '0.55'
+      tab.style.boxShadow = active ? '0 1px 3px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.04)' : 'none'
     }
 
+    // 切换即记住，下次打开弹窗停在上次看的模式
+    if (getTTSSettings().lastMode !== current) saveTTSSettings({ lastMode: current })
+
     content.innerHTML = ''
-    if (mode === 'free') renderFreeContent(content, total, autoSel)
+    if (current === 'edge') renderEdgeContent(content, total, autoSel)
+    else if (current === 'free') renderFreeContent(content, total, autoSel)
     else renderApiContent(content, total, autoSel)
   }
 
+  bindTap(modeEdge, () => activateMode('edge'))
   bindTap(modeFree, () => activateMode('free'))
   bindTap(modeApi, () => activateMode('api'))
-  activateMode(defaultMode)
 
   ov.appendChild(card)
   ov.addEventListener('touchend', (e) => {
@@ -255,6 +260,68 @@ function showTTSPanel(total: number): void {
   }, { passive: false })
   document.body.appendChild(ov)
   overlay = ov
+  // 挂载后再渲染默认标签：与其他标签的渲染时机一致，避免子控件在游离 DOM 中初始化
+  activateMode(defaultMode)
+}
+
+/** Edge 在线模式面板（手机端经思源内核 WebSocket 代理连接微软语音服务） */
+function renderEdgeContent(container: HTMLElement, total: number, autoSel?: AppleSelectEl): void {
+  const settings = getTTSSettings()
+
+  const hint = document.createElement('div')
+  hint.style.cssText = 'font-size:11px;opacity:0.5;margin-bottom:14px;letter-spacing:-0.01em;'
+  hint.textContent = t('tts.edgeMobileHint', undefined, '微软 Edge 语音，音色稳定可锁定；在线合成需要联网（经思源内核转发）')
+  container.appendChild(hint)
+
+  // 音色：与「硅基流动」模式相同的下拉弹层（appleSelect）
+  const voiceRow = makeRow(t('tts.voice', undefined, '语音'))
+  const voiceSel = makeSelect(EDGE_TTS_VOICES.map(v => ({ v: v.name, t: v.displayName })))
+  const savedVoice = settings.edgeVoiceName || ''
+  voiceSel.value = isSupportedEdgeVoice(savedVoice) ? savedVoice : EDGE_TTS_VOICES[0].name
+  voiceRow.appendChild(voiceSel)
+  container.appendChild(voiceRow)
+
+  // 每块朗读（在语速上方；松手写盘，播放时生效）
+  container.appendChild(createRepeatSliderRow('mobile').row)
+  container.appendChild(createReadDirectionRow('mobile'))
+
+  // 语速
+  const rateRow = makeRow(t('tts.rate', undefined, '语速'))
+  const rateBox = document.createElement('div')
+  rateBox.style.cssText = 'display:flex;align-items:center;gap:8px'
+  const rateSlider = document.createElement('input')
+  const savedRate = settings.edgeRate ?? 1.0
+  rateSlider.type = 'range'; rateSlider.min = '0.5'; rateSlider.max = '2.0'
+  rateSlider.step = '0.1'; rateSlider.value = String(savedRate); rateSlider.style.cssText = 'flex:1'
+  const rateLabel = document.createElement('span')
+  rateLabel.textContent = parseFloat(rateSlider.value).toFixed(1) + 'x'
+  rateLabel.style.cssText = 'min-width:36px;text-align:right;font-size:13px;font-weight:500;font-variant-numeric:tabular-nums;'
+  rateSlider.oninput = () => { rateLabel.textContent = parseFloat(rateSlider.value).toFixed(1) + 'x' }
+  rateBox.appendChild(rateSlider); rateBox.appendChild(rateLabel)
+  rateRow.appendChild(rateBox)
+  container.appendChild(rateRow)
+
+  // 范围
+  const rangeRow = makeRow(t('tts.range', undefined, '范围'))
+  const rangeSel = makeSelect(buildRangeOptions(total))
+  rangeRow.appendChild(rangeSel)
+  container.appendChild(rangeRow)
+
+  // 按钮
+  const btns = makeBtnRow()
+  bindTap(btns.cancel, () => removeOverlay())
+  bindTap(btns.confirm, () => {
+    autoReadAction = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev'
+    const voice = voiceSel.value || EDGE_TTS_VOICES[0].name
+    const rate = parseFloat(rateSlider.value)
+    saveTTSSettings({ autoReadAction, edgeVoiceName: voice, edgeRate: rate, lastMode: 'edge' })
+
+    let startP = 0, endP: number | undefined
+    parseRange(rangeSel.value, total, (s, e) => { startP = s; endP = e })
+    removeOverlay()
+    startEdgePlayback(voice, rate, startP, endP)
+  })
+  container.appendChild(btns.wrap)
 }
 
 /** 免费模式面板 */
@@ -265,6 +332,10 @@ function renderFreeContent(container: HTMLElement, total: number, autoSel?: Appl
   hint.style.cssText = 'font-size:11px;opacity:0.5;margin-bottom:14px;letter-spacing:-0.01em;'
   hint.textContent = t('tts.baiduFreeMobileHint', undefined, '使用百度翻译接口，免费但可能随时失效。音色需切换到「百度API」模式')
   container.appendChild(hint)
+
+  // 每块朗读（在语速上方；松手写盘，播放时生效）
+  container.appendChild(createRepeatSliderRow('mobile').row)
+  container.appendChild(createReadDirectionRow('mobile'))
 
   // 语速
   const rateRow = makeRow(t('tts.rate', undefined, '语速'))
@@ -299,6 +370,7 @@ function renderFreeContent(container: HTMLElement, total: number, autoSel?: Appl
     let startP = 0, endP: number | undefined
     parseRange(rangeSel.value, total, (s, e) => { startP = s; endP = e })
     removeOverlay()
+    stopInactiveTTSEngines('http')
 
     const engine = getHttpTTSEngine()
     engine.setSpeed(speed)
@@ -387,6 +459,10 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: Apple
   speakerRow.appendChild(speakerSel)
   container.appendChild(speakerRow)
 
+  // 每块朗读（在语速上方；松手写盘，播放时生效）
+  container.appendChild(createRepeatSliderRow('mobile').row)
+  container.appendChild(createReadDirectionRow('mobile'))
+
   // 语速
   const rateRow = makeRow(t('tts.rate', undefined, '语速'))
   const rateBox = document.createElement('div')
@@ -425,6 +501,7 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: Apple
     let startP = 0, endP: number | undefined
     parseRange(rangeSel.value, total, (s, e) => { startP = s; endP = e })
     removeOverlay()
+    stopInactiveTTSEngines('http')
 
     const engine = getHttpTTSEngine()
     engine.setSpeed(speed)
@@ -470,6 +547,54 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: Apple
     return engine as PreparedHttpTTSEngine
   })
   container.appendChild(btns.wrap)
+}
+
+/** 切换朗读引擎时停掉另一条通路，避免两个引擎同时出声 */
+function stopInactiveTTSEngines(keep: 'edge' | 'http'): void {
+  if (keep !== 'edge') getEdgeTTSEngine().stop()
+  if (keep !== 'http') getHttpTTSEngine().stop()
+}
+
+/** 启动 Edge 在线朗读（手机端经内核代理，逻辑与硅基流动一致） */
+function startEdgePlayback(voice: string, rate: number, startP: number, endP: number | undefined): void {
+  stopInactiveTTSEngines('edge')
+  const engine = getEdgeTTSEngine()
+  engine.setVoice(voice)
+  engine.setRate(rate)
+  const continuationGeneration = ++playbackContinuationGeneration
+  void (async () => {
+    await engine.extractParagraphsAsync()
+    if (continuationGeneration !== playbackContinuationGeneration) return
+    installEdgePlaybackCallbacks(engine, continuationGeneration)
+    createBar(engine)
+    engine.speak(startP, endP)
+  })()
+}
+
+/** Edge 引擎的播放条回调（自动继续下一篇、朗读完成提示） */
+function installEdgePlaybackCallbacks(
+  engine: ReturnType<typeof getEdgeTTSEngine>,
+  continuationGeneration = ++playbackContinuationGeneration,
+): void {
+  engine.onStateChange = (st, idx, tot) => updateBar(st, idx, tot)
+  engine.onError = (msg) => { Notify.showErrorCommandCannotExecute(msg); removeBar() }
+  engine.onFinish = async () => {
+    if (autoReadAction === 'stop') {
+      const status = bar?.querySelector('#tm-s') as HTMLElement
+      if (status) status.textContent = t('tts.readingComplete', undefined, '朗读完成')
+      engine.onStateChange = () => {}
+      await engine.speakOnce(t('tts.documentReadingCompleteSpeech', undefined, '本文档已经朗读完成'), () => removeBar())
+      return
+    }
+    const success = await navigateToAdjacentDoc(autoReadAction)
+    if (continuationGeneration !== playbackContinuationGeneration) return
+    if (!success) { removeBar(); showMessage(t('tts.noMoreDocuments', undefined, '已无更多文档'), 2000, 'info'); return }
+    await waitForDocLoaded()
+    if (continuationGeneration !== playbackContinuationGeneration) return
+    await engine.extractParagraphsAsync()
+    if (continuationGeneration !== playbackContinuationGeneration) return
+    engine.speak(0, undefined)
+  }
 }
 
 function installPlaybackCallbacks(engine: HttpTTSEngine, continuationGeneration = ++playbackContinuationGeneration): void {
@@ -698,8 +823,8 @@ function createBar(engine: TTSController): void {
   const b = document.createElement('div')
   b.style.cssText = `
     position:fixed;bottom:80px;left:16px;right:16px;z-index:6;
-    border-radius:9999px;padding:10px 16px;
-    display:flex;align-items:center;gap:4px;
+    border-radius:9999px;padding:10px 14px;
+    display:flex;align-items:center;gap:2px;
     font-size:13px;user-select:none;
     box-shadow:0 8px 32px rgba(0,0,0,0.12),
                0 0 0 0.5px rgba(0,0,0,0.06),
@@ -721,7 +846,24 @@ function createBar(engine: TTSController): void {
   prog.style.cssText = 'opacity:0.45;font-size:12px;white-space:nowrap;margin-left:6px;font-variant-numeric:tabular-nums;'
   b.appendChild(prog)
 
-  b.appendChild(el('span', ''))!.style.flex = '1'
+  // 重复朗读当前块：显示剩余次数（1→2→3 循环，每读完一遍自动减 1）
+  // 左右各一个等宽弹性占位 → 按钮相对「左侧状态文字」与「右侧控制按钮」居中
+  const spacerLeft = el('span', '')
+  spacerLeft.style.flex = '1'
+  b.appendChild(spacerLeft)
+
+  const repeatBtn = createRepeatButton(true)
+  repeatBtn.id = 'tm-rp'
+  bindTap(repeatBtn, () => {
+    const current = barEngine?.repeatRemaining ?? 1
+    barEngine?.setRepeatCount(current >= TTS_REPEAT_MAX ? 1 : current + 1)
+    syncRepeatButton(bar, barEngine)
+  })
+  b.appendChild(repeatBtn)
+
+  const spacerRight = el('span', '')
+  spacerRight.style.flex = '1'
+  b.appendChild(spacerRight)
 
   // 控制按钮（SVG 图标）
   b.appendChild(createIconButton('skip-back', t('tts.previousParagraph', undefined, '上一段'), 18, () => engine.prevParagraph(), { isMobile: true }))
@@ -745,6 +887,8 @@ function createBar(engine: TTSController): void {
 
   document.body.appendChild(b)
   bar = b
+  barEngine = engine
+  syncRepeatButton(bar, barEngine)
 }
 
 function updateBar(st: string, idx: number, tot: number): void {
@@ -759,6 +903,8 @@ function updateBar(st: string, idx: number, tot: number): void {
     const isPlaying = st === 'playing' || st === 'loading'
     updateButtonIcon(pp, isPlaying ? 'pause' : 'play', 18, true)
   }
+  // 重复次数随「读完一遍自动减」实时刷新
+  syncRepeatButton(bar, barEngine)
 }
 
 // ─── UI 工具 ──
@@ -883,4 +1029,5 @@ function removeOverlay(): void {
 function removeBar(): void {
   if (barThemeUnsub) { barThemeUnsub(); barThemeUnsub = null }
   if (bar) { bar.remove(); bar = null }
+  barEngine = null
 }

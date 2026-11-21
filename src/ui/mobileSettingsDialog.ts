@@ -17,6 +17,7 @@
 import { showMessage } from 'siyuan'
 import { t } from '@/i18n/runtime'
 import { logger } from '@/utils/logger'
+import { nextPluginOverlayZ } from '@/utils/overlayZ'
 import { cleanupMobileSettingsNav } from './mobileSettingsNav'
 
 const OVERLAY_ID = 'tc-mobile-settings-overlay'
@@ -297,11 +298,14 @@ export function openSettingsDialog(options: OpenMobileSettingsOptions): void {
   overlay.setAttribute('aria-modal', 'true')
   // 章节导航与手机端布局 CSS 都按该属性识别本插件面板
   overlay.setAttribute('data-plugin-dialog', 'toolbar-customizer')
+  // 层号跟随思源计数器（坑 41）：面板之后打开的思源 b3-menu（原生 select 自绘菜单）
+  // 层号 = ++window.siyuan.zIndex，必须高于面板才可见；OVERLAY_Z_INDEX 仅作保底
+  const overlayZIndex = nextPluginOverlayZ(OVERLAY_Z_INDEX)
   overlay.style.cssText = isDesktopVariant
     ? `
     position: fixed;
     inset: 0;
-    z-index: ${OVERLAY_Z_INDEX};
+    z-index: ${overlayZIndex};
     display: flex;
     align-items: center;
     justify-content: center;
@@ -311,7 +315,7 @@ export function openSettingsDialog(options: OpenMobileSettingsOptions): void {
     : `
     position: fixed;
     inset: 0;
-    z-index: ${OVERLAY_Z_INDEX};
+    z-index: ${overlayZIndex};
     display: flex;
     flex-direction: column;
     background: var(--b3-theme-background);

@@ -13,7 +13,9 @@
  */
 
 import { logger } from '@/utils/logger'
-import { TTSEngine, ParagraphInfo, getCurrentDocId } from './ttsEngine'
+import { TTSEngine, ParagraphInfo, getCurrentDocId, collectLeafParagraphs, resolveParagraphElement } from './ttsEngine'
+import { ensureTtsParagraphVisible } from './ttsParagraphFocus'
+import { clampRepeatCount, getRepeatCountSetting, getReadDirectionSetting } from './httpTtsEngine'
 import { fetchSyncPost } from 'siyuan'
 import { t } from '../i18n/runtime'
 import { EDGE_TTS_SEC_MS_GEC_VERSION, generateSecMsGecV2 } from './edgeTtsDrm'
@@ -216,32 +218,82 @@ function buildEdgeWSUrl(): string {
   return url
 }
 
+// ─── 握手请求头（桌面 Node 传输与手机内核代理共用）──────────
+const EDGE_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0'
+
+function edgeHandshakeHeaders(muid: string): Record<string, string> {
+  return {
+    'Origin': 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
+    'User-Agent': EDGE_USER_AGENT,
+    'Pragma': 'no-cache',
+    'Cache-Control': 'no-cache',
+    'Accept-Encoding': 'gzip, deflate, br, zstd',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Cookie': `muid=${muid};`,
+  }
+}
+
+/** UTF-8 字符串 → base64url（内核代理参数要求 RawURLEncoding 无填充） */
+function base64UrlEncodeText(text: string): string {
+  const bytes = new TextEncoder().encode(text)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+/** 手机端没有 Node crypto：用 WebCrypto 生成 muid */
+function randomHexUpper(bytes: number): string {
+  const arr = new Uint8Array(bytes)
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    crypto.getRandomValues(arr)
+  } else {
+    for (let i = 0; i < bytes; i++) arr[i] = Math.floor(Math.random() * 256)
+  }
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase()
+}
+
+/**
+ * 经思源内核转发 WebSocket（手机端 / 浏览器伺服）。
+ *
+ * 微软 Edge 语音会校验握手请求的 User-Agent 必须含 `Edg/`，而浏览器禁止脚本修改 UA。
+ * 内核提供 GET /ws/network/proxy?u=<base64url>&h=<base64url headers>&token=...
+ * （内核 ≥ 3.7.0），由内核 Go 层完成握手并代发这些头。
+ * 参数格式与 apicontract NetworkWebSocketProxy 一致：h 是 map[string][]string 的 JSON。
+ */
+function buildKernelProxyUrl(targetUrl: string, headers: Record<string, string>): string {
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const params = new URLSearchParams()
+  params.set('u', base64UrlEncodeText(targetUrl))
+  const headerMap: Record<string, string[]> = {}
+  for (const [name, value] of Object.entries(headers)) headerMap[name] = [String(value)]
+  params.set('h', base64UrlEncodeText(JSON.stringify(headerMap)))
+  // 同源请求靠会话 Cookie 鉴权即可；配置了 API Token 时一并带上（内核支持 query token）
+  const token = (window as any).siyuan?.config?.api?.token
+  if (token) params.set('token', String(token))
+  return `${wsProto}//${location.host}/ws/network/proxy?${params.toString()}`
+}
+
+/** 当前连接使用的传输方式（用于错误提示） */
+let lastEdgeTransport: 'node-tls' | 'kernel-proxy' = 'node-tls'
+
 /**
  * 创建 Edge TTS WebSocket 连接
- * 桌面端用 NodeWS（自定义 Origin 头 + Cookie），手机端用标准 WebSocket
+ * - 桌面端：NodeWS（tls 直连，自定义 Origin/UA/Cookie）
+ * - 手机端 / 浏览器伺服：内核 WS 代理（代发同样的请求头）
  */
 function createEdgeWS(): any {
   const url = buildEdgeWSUrl()
-  const transport = isElectron ? 'node-tls' : 'browser-websocket'
+  const muid = isElectron ? nodeCrypto.randomBytes(16).toString('hex').toUpperCase() : randomHexUpper(16)
+  const headers = edgeHandshakeHeaders(muid)
+  lastEdgeTransport = isElectron ? 'node-tls' : 'kernel-proxy'
   edgeLog('environment', {
-    transport,
+    transport: lastEdgeTransport,
     hasSecMsGec: url.includes('Sec-MS-GEC='),
   })
   if (isElectron) {
-    const muid = nodeCrypto.randomBytes(16).toString('hex').toUpperCase()
-    return new NodeWS(url, {
-      headers: {
-        'Origin': 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0',
-        'Pragma': 'no-cache',
-        'Cache-Control': 'no-cache',
-        'Accept-Encoding': 'gzip, deflate, br, zstd',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Cookie': `muid=${muid};`,
-      }
-    })
+    return new NodeWS(url, { headers })
   }
-  const ws = new WebSocket(url)
+  const ws = new WebSocket(buildKernelProxyUrl(url, headers))
   ws.binaryType = 'arraybuffer'
   return ws
 }
@@ -279,14 +331,6 @@ const MAX_CONSECUTIVE_FAILURES = 3
 
 const HIGHLIGHT_CLASS = 'tts-current-paragraph'
 let styleEl: HTMLStyleElement | null = null
-
-// 不朗读的块类型（与 ttsEngine.ts 保持一致）
-const SKIP_DATA_TYPES = new Set([
-  'NodeCodeBlock', 'NodeMathBlock', 'NodeHTMLBlock',
-  'NodeIFrame', 'NodeWidget', 'NodeEmbedBlock',
-  'NodeThematicBreak', 'NodeAudio', 'NodeVideo',
-  'NodeBlockQueryEmbed',
-])
 
 // ─── 工具函数 ──────────────────────────────────────────────
 
@@ -375,6 +419,12 @@ export class EdgeTTSEngine {
   private currentIndex = -1
   private state: EdgeTTSState = 'idle'
   private endParagraphIndex = -1
+  /** 朗读起始边界（倒序时是下限，正序时是起始段） */
+  private startParagraphIndex = 0
+  /** 朗读顺序：forward 从前往后 / backward 从后往前 */
+  private _direction: 'forward' | 'backward' = 'forward'
+  /** 朗读所属文档 id（切文档后用于切回） */
+  private _readingRootId = ''
   private stopped = false
   private voice = 'zh-CN-XiaoxiaoNeural'
   private rate = 1.0
@@ -383,16 +433,45 @@ export class EdgeTTSEngine {
   private activeSockets = new Set<any>()
   private prefetch: { index: number; generation: number; promise: Promise<ArrayBuffer> } | null = null
   private consecutiveFailures = 0
+  // 重复朗读时复用本段已合成的音频，避免每重复一次都重新联网合成
+  private repeatAudio: { index: number; generation: number; data: ArrayBuffer } | null = null
 
   // 音频播放（持久化 <audio> + Blob URL，任何浏览器/WebView 都支持）
   private audioEl: HTMLAudioElement = this.createAudioElement()
   private blobUrl: string | null = null
   private playbackActivated = false
+  // 重复朗读：当前块剩余次数（1 = 不重复，每读完一遍减 1）
+  private _repeatRemaining = 1
+  // 每块朗读次数默认值（来自朗读设置，开始播放时读取）
+  private _defaultRepeat = 1
 
   // 回调
   onStateChange?: (state: EdgeTTSState, index: number, total: number) => void
   onError?: (msg: string) => void
   onFinish?: () => void
+
+  // ─── 重复朗读 ──────────────────────────────────────
+
+  get repeatRemaining(): number { return this._repeatRemaining }
+
+  setRepeatCount(count: number): void {
+    this._repeatRemaining = clampRepeatCount(count)
+    this.notify()
+  }
+
+  /**
+   * 当前块读完一遍后调用：
+   * 剩余次数 > 1 → 减 1 并返回 true（调用方重读本块）；否则重置为 1 并返回 false（调用方进入下一块）。
+   */
+  private consumeRepeatForCurrentBlock(): boolean {
+    if (this._repeatRemaining > 1) {
+      this._repeatRemaining--
+      return true
+    }
+    // 下一块回到「每块朗读次数」默认值
+    this._repeatRemaining = this._defaultRepeat
+    return false
+  }
 
   // ─── 段落提取（复用现有逻辑）─────────────────────────
 
@@ -425,16 +504,8 @@ export class EdgeTTSEngine {
       div.innerHTML = html
       div.querySelectorAll('pre, [data-type="NodeCodeBlock"], [data-type="NodeMathBlock"], [data-type="NodeHTMLBlock"]').forEach(e => e.remove())
 
-      this.paragraphs = []
-      const allBlocks = div.querySelectorAll('[data-node-id]')
-      for (const block of allBlocks) {
-        const el = block as HTMLElement
-        const dataType = el.getAttribute('data-type')
-        if (dataType && SKIP_DATA_TYPES.has(dataType)) continue
-        const text = (el.textContent || '').trim()
-        if (!text) continue
-        this.paragraphs.push({ element: el, text })
-      }
+      // 与 DOM 路径一致：展开容器块，按最小文本块提取
+      this.paragraphs = collectLeafParagraphs(div)
       return this.paragraphs.length
     } catch {
       return 0
@@ -463,11 +534,20 @@ export class EdgeTTSEngine {
     this.stopped = false
     const generation = ++this.operationGeneration
     this.consecutiveFailures = 0
-    this.endParagraphIndex = endParagraph ?? this.paragraphs.length - 1
+    // 每次开始播放都重新读取设置
+    this._defaultRepeat = getRepeatCountSetting()
+    this._repeatRemaining = this._defaultRepeat
+    this._direction = getReadDirectionSetting()
+    this._readingRootId = getCurrentDocId()
+    const last = this.paragraphs.length - 1
+    const start = Math.max(0, Math.min(startParagraph, Math.max(0, last)))
+    this.startParagraphIndex = start
+    this.endParagraphIndex = Math.max(start, Math.min(endParagraph ?? last, last))
     if (this.paragraphs.length === 0) return false
 
     ensureHighlightStyle()
-    this.currentIndex = Math.max(0, Math.min(startParagraph, this.paragraphs.length - 1))
+    // 倒序从范围末尾开始读
+    this.currentIndex = this._direction === 'backward' ? this.endParagraphIndex : start
     this.playCurrentParagraph(generation)
     return true
   }
@@ -483,7 +563,20 @@ export class EdgeTTSEngine {
     if (this.state !== 'paused') return
     this.audioEl.play().catch(() => {})
     this.state = 'playing'
+    // 期间可能切过文档导致高亮元素失效：恢复播放时重新高亮并滚到当前块
+    this.refreshCurrentHighlight()
     this.notify()
+  }
+
+  /** 重新高亮当前块（元素可能因切文档被重建） */
+  private refreshCurrentHighlight(): void {
+    const para = this.paragraphs[this.currentIndex]
+    if (!para) return
+    const el = resolveParagraphElement(para)
+    if (el) {
+      this.clearHighlight()
+      this.applyHighlight(el)
+    }
   }
 
   stop(): void {
@@ -491,8 +584,10 @@ export class EdgeTTSEngine {
     this.operationGeneration++
     this.abortActiveSockets()
     this.prefetch = null
+    this.repeatAudio = null
     this.cleanupAudio()
     this.clearHighlight()
+    this._repeatRemaining = 1
     this.state = 'idle'
     this.currentIndex = -1
     this.notify()
@@ -505,18 +600,33 @@ export class EdgeTTSEngine {
     const generation = this.operationGeneration
     this.abortActiveSockets()
     this.prefetch = null
+    this.repeatAudio = null
+    // 手动跳到别的块：重复次数回到「每块朗读次数」默认值
+    this._repeatRemaining = this._defaultRepeat
     this.cleanupAudio()
     this.clearHighlight()
+    // 切文档 / 编辑器重渲染后旧元素已失效：先确保目标块在当前 DOM 中（必要时切回朗读文档）
+    await ensureTtsParagraphVisible(this.paragraphs[index], this._readingRootId)
+    if (generation !== this.operationGeneration) return
     this.currentIndex = index
     this.playCurrentParagraph(generation)
   }
 
+  /** 步进方向：倒序朗读时「下一段」= 文档中更靠前的块 */
+  private directionStep(): number {
+    return this._direction === 'backward' ? -1 : 1
+  }
+
   async nextParagraph(): Promise<void> {
-    if (this.currentIndex < this.paragraphs.length - 1) await this.jumpToParagraph(this.currentIndex + 1)
+    if (this.currentIndex < 0) return
+    const next = this.currentIndex + this.directionStep()
+    if (next >= 0 && next < this.paragraphs.length) await this.jumpToParagraph(next)
   }
 
   async prevParagraph(): Promise<void> {
-    if (this.currentIndex > 0) await this.jumpToParagraph(this.currentIndex - 1)
+    if (this.currentIndex < 0) return
+    const prev = this.currentIndex - this.directionStep()
+    if (prev >= 0 && prev < this.paragraphs.length) await this.jumpToParagraph(prev)
   }
 
   // ─── 状态查询 ──────────────────────────────────────
@@ -580,16 +690,24 @@ export class EdgeTTSEngine {
 
     // 跳过没有可朗读内容的段落。Edge 对纯标点/符号文本会正常返回 turn.end
     // 但不返回任何音频，若按失败处理会中断整篇朗读。
+    const step = this.directionStep()
     while (
-      this.currentIndex <= this.endParagraphIndex
+      (this._direction === 'backward'
+        ? this.currentIndex >= this.startParagraphIndex
+        : this.currentIndex <= this.endParagraphIndex)
+      && this.currentIndex >= 0
       && this.currentIndex < this.paragraphs.length
       && !hasSpeakableContent(this.paragraphs[this.currentIndex].text)
     ) {
       edgeLog('skip-unspeakable', { paragraphIndex: this.currentIndex })
-      this.currentIndex++
+      this.currentIndex += step
     }
 
-    if (this.currentIndex > this.endParagraphIndex || this.currentIndex >= this.paragraphs.length) {
+    // 正序：越过结束边界即完成；倒序：越过起始边界即完成
+    const outOfRange = this._direction === 'backward'
+      ? this.currentIndex < this.startParagraphIndex || this.currentIndex >= this.paragraphs.length
+      : this.currentIndex > this.endParagraphIndex || this.currentIndex >= this.paragraphs.length
+    if (outOfRange) {
       this.clearHighlight()
       this.state = 'idle'
       this.currentIndex = -1
@@ -601,17 +719,26 @@ export class EdgeTTSEngine {
     const para = this.paragraphs[this.currentIndex]
     const index = this.currentIndex
     this.state = 'loading'
-    this.applyHighlight(para.element)
+    // 切文档后旧元素可能已脱离 DOM：按 node-id 重新解析
+    this.applyHighlight(resolveParagraphElement(para))
     this.notify()
+
+    // 重复朗读：本段已合成过的音频直接复用（playAudioData 只读 ArrayBuffer，不 detach）
+    const repeatReuse = this.repeatAudio && this.repeatAudio.index === index && this.repeatAudio.generation === generation
+      ? this.repeatAudio.data
+      : null
+    this.repeatAudio = null
 
     // 优先使用上一段播放期间预取好的音频，避免在段落之间重新等待一次合成
     const prefetched = this.takePrefetch(index, generation)
-    edgeLog('prefetch', { paragraphIndex: index, reused: prefetched !== null })
-    const audioPromise = prefetched ?? this.synthesize(para.text, generation)
+    edgeLog('prefetch', { paragraphIndex: index, reused: prefetched !== null || repeatReuse !== null })
+    const audioPromise = repeatReuse ? Promise.resolve(repeatReuse) : (prefetched ?? this.synthesize(para.text, generation))
 
+    let playedAudio: ArrayBuffer | null = null
     audioPromise
       .then(audioData => {
         if (this.stopped || generation !== this.operationGeneration) return
+        playedAudio = audioData
         // 在当前段落开始播放前就启动下一段合成，把合成耗时与播放重叠
         this.prefetchNext(index, generation)
         return this.playAudioData(audioData, generation)
@@ -619,7 +746,13 @@ export class EdgeTTSEngine {
       .then(() => {
         if (this.stopped || generation !== this.operationGeneration) return
         this.consecutiveFailures = 0
-        this.currentIndex++
+        // 重复朗读：本块还有剩余次数时停在原地重读，否则进入下一块
+        if (this.consumeRepeatForCurrentBlock()) {
+          if (playedAudio) this.repeatAudio = { index, generation, data: playedAudio }
+          this.playCurrentParagraph(generation)
+          return
+        }
+        this.currentIndex += this.directionStep()
         this.playCurrentParagraph(generation)
       })
       .catch(err => {
@@ -641,7 +774,9 @@ export class EdgeTTSEngine {
           this.stop()
           return
         }
-        this.currentIndex++
+        // 出错跳段时回到默认次数，避免把当前块次数带到下一个块
+        this._repeatRemaining = this._defaultRepeat
+        this.currentIndex += this.directionStep()
         this.playCurrentParagraph(generation)
       })
   }
@@ -656,8 +791,9 @@ export class EdgeTTSEngine {
 
   /** 提前合成下一段，使其在播放当前段时完成，从而消除块与块之间的静音间隔 */
   private prefetchNext(currentIndex: number, generation: number): void {
-    const nextIndex = currentIndex + 1
-    if (nextIndex > this.endParagraphIndex || nextIndex >= this.paragraphs.length) return
+    const nextIndex = currentIndex + this.directionStep()
+    if (nextIndex < this.startParagraphIndex || nextIndex > this.endParagraphIndex ||
+        nextIndex < 0 || nextIndex >= this.paragraphs.length) return
     if (generation !== this.operationGeneration || this.stopped) return
     if (this.prefetch?.index === nextIndex && this.prefetch.generation === generation) return
 
@@ -825,7 +961,10 @@ export class EdgeTTSEngine {
           })
           resolve(concatArrayBuffers(chunks))
         } else {
-          fail('closed', new Error(`连接关闭，未收到音频（语音：${this.voice}）`), true)
+          const hint = lastEdgeTransport === 'kernel-proxy'
+            ? '（手机端经内核代理连接：请确认已用管理员权限访问；反向代理需保留 Host 并透传 WebSocket）'
+            : ''
+          fail('closed', new Error(`连接关闭，未收到音频（语音：${this.voice}）${hint}`), true)
         }
       }
 
@@ -896,7 +1035,8 @@ export class EdgeTTSEngine {
     try { this.audioEl.remove() } catch {}
   }
 
-  private applyHighlight(el: HTMLElement): void {
+  private applyHighlight(el: HTMLElement | null): void {
+    if (!el) return
     this.clearHighlight()
     if (el.isConnected) {
       el.classList.add(HIGHLIGHT_CLASS)
@@ -1200,7 +1340,8 @@ export class GoogleTTSEngine {
     if (this.currentSource) { try { this.currentSource.stop() } catch {}; this.currentSource = null }
   }
 
-  private applyHighlight(el: HTMLElement): void {
+  private applyHighlight(el: HTMLElement | null): void {
+    if (!el) return
     this.clearHighlight()
     if (el.isConnected) { el.classList.add(HIGHLIGHT_CLASS); el.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
   }

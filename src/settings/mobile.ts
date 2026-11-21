@@ -5,6 +5,7 @@
 
 import { t } from '../i18n/runtime'
 import { logger } from '@/utils/logger'
+import { nextPluginOverlayZ } from '../utils/overlayZ'
 import { validateActivationCode } from '../utils/activationCodeValidator'
 import type { LicenseStatus } from '../utils/licenseManager'
 import { TRIAL_CODE, clearTrial } from '../utils/licenseManager'
@@ -210,7 +211,7 @@ function showActivationInfoModal(isActivated: boolean, onStartTrial?: () => void
   // 遮罩
   const overlay = document.createElement('div')
   overlay.style.cssText = `
-    position: fixed; inset: 0; z-index: 2000;
+    position: fixed; inset: 0; z-index: ${nextPluginOverlayZ(2000)};
     background: rgba(0, 0, 0, 0.5);
     display: flex; align-items: center; justify-content: center;
     padding: 16px; box-sizing: border-box;

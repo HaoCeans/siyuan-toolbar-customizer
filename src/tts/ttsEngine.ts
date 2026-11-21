@@ -8,6 +8,8 @@
 
 import { logger } from '@/utils/logger'
 import { t } from '../i18n/runtime'
+import { clampRepeatCount, getRepeatCountSetting, getReadDirectionSetting } from './httpTtsEngine'
+import { ensureTtsParagraphVisible } from './ttsParagraphFocus'
 // ─── 类型 ────────────────────────────────────────────────
 
 export interface TTSOptions {
@@ -22,6 +24,8 @@ export interface TTSOptions {
 export interface ParagraphInfo {
   element: HTMLElement
   text: string
+  /** 块 id（data-node-id）：切换文档 / 编辑器重渲染后靠它找回新元素 */
+  nodeId?: string
 }
 
 type TTSState = 'idle' | 'playing' | 'paused'
@@ -33,6 +37,83 @@ const SKIP_DATA_TYPES = new Set([
   'NodeThematicBreak', 'NodeAudio', 'NodeVideo',
   'NodeBlockQueryEmbed',
 ])
+
+/**
+ * 容器块类型：本身不是「一段文本」，只是包着一批子块。
+ * 列表（NodeList）/列表项（NodeListItem）/引述（NodeBlockquote）/超级块（NodeSuperBlock）/
+ * 高亮块（NodeCallout）都必须向下展开到叶子块，否则整个列表会被当成一段朗读。
+ */
+const CONTAINER_DATA_TYPES = new Set([
+  'NodeDocument', 'NodeList', 'NodeListItem', 'NodeBlockquote', 'NodeSuperBlock', 'NodeCallout',
+])
+
+/**
+ * 按「最小文本块」提取段落：容器块逐层展开，只收集带文本的叶子块。
+ *
+ * 与旧实现（只取 wysiwyg 直接子块）的差别：一个列表过去整块算一段，
+ * 现在列表里的每个列表项段落、嵌套列表项、引述里的每一段都各自成段，
+ * 「每块朗读」与播放条进度都基于这个最小单位。
+ */
+export function collectLeafParagraphs(root: ParentNode): ParagraphInfo[] {
+  const result: ParagraphInfo[] = []
+
+  const visitChildren = (parent: Element): void => {
+    for (const child of Array.from(parent.children)) {
+      if (!(child instanceof HTMLElement)) continue
+      const nodeId = child.getAttribute('data-node-id')
+      const dataType = child.getAttribute('data-type') || ''
+
+      if (!nodeId) {
+        // 非块级包装层（.protyle-attr 等）：继续向下找
+        visitChildren(child)
+        continue
+      }
+      if (SKIP_DATA_TYPES.has(dataType)) continue
+
+      if (CONTAINER_DATA_TYPES.has(dataType)) {
+        const before = result.length
+        visitChildren(child)
+        // 兜底：容器里没有叶子块但自身有文本（未知结构），整体作为一段
+        if (result.length === before) {
+          const text = (child.textContent || '').trim()
+          if (text) result.push({ element: child, text, nodeId: nodeId || undefined })
+        }
+        continue
+      }
+
+      const text = (child.textContent || '').trim()
+      if (text) result.push({ element: child, text, nodeId: nodeId || undefined })
+    }
+  }
+
+  if (root instanceof Element) visitChildren(root)
+  return result
+}
+
+/**
+ * 解析段落在当前 DOM 中的元素。
+ * 切换文档 / 手机端编辑器重渲染后，旧 `element` 引用会脱离文档（isConnected=false），
+ * 此时用 data-node-id 重新查询，并回填到 info.element，后续高亮与滚动就能正常工作。
+ */
+export function resolveParagraphElement(info: ParagraphInfo | null | undefined): HTMLElement | null {
+  if (!info) return null
+  const current = info.element
+  // 优先已连接且可见的元素（多页签时隐藏的旧 DOM 不算可用）
+  if (current?.isConnected && current.getClientRects().length > 0) {
+    if (!info.nodeId) info.nodeId = current.getAttribute('data-node-id') || undefined
+    return current
+  }
+  const nodeId = info.nodeId || current?.getAttribute?.('data-node-id') || ''
+  if (!nodeId) return current?.isConnected ? current : null
+  const found = document.querySelector<HTMLElement>(`[data-node-id="${nodeId}"]`)
+  if (found) {
+    info.element = found
+    info.nodeId = nodeId
+    return found
+  }
+  // 兜底：元素仍连接就用旧的（页签被隐藏但 DOM 还在，高亮至少能保留）
+  return current?.isConnected ? current : null
+}
 
 // ─── 高亮样式 ────────────────────────────────────────────
 const HIGHLIGHT_CLASS = 'tts-current-paragraph'
@@ -75,12 +156,23 @@ export class TTSEngine {
   private state: TTSState = 'idle'
   private options: TTSOptions = { rate: 1.0, pitch: 1.0, volume: 1.0 }
   private endParagraphIndex = -1
+  /** 朗读起始边界（倒序时是下限，正序时是 0） */
+  private startParagraphIndex = 0
+  /** 朗读顺序：forward 从前往后 / backward 从后往前 */
+  private _direction: 'forward' | 'backward' = 'forward'
+  /** 朗读所属文档 id（切文档后用于切回） */
+  private _readingRootId = ''
 
   // ★ 防止 SpeechSynthesisUtterance 被 GC 回收（经典 bug：局部变量 utterance 被回收后朗读立即停止）
   private currentUtterance: SpeechSynthesisUtterance | null = null
 
   // Chrome 保活定时器
   private keepaliveTimer: ReturnType<typeof setInterval> | null = null
+
+  // 重复朗读：当前块剩余次数（1 = 不重复，每次读完一遍减 1）
+  private _repeatRemaining = 1
+  // 每块朗读次数默认值（来自朗读设置，开始播放时读取）
+  private _defaultRepeat = 1
 
   // 外部状态回调
   onStateChange?: (state: TTSState, index: number, total: number) => void
@@ -134,15 +226,8 @@ export class TTSEngine {
       // 注意：必须排除文档标题内的 .protyle-wysiwyg（思源 3.8.10+），否则只会读到标题
       const wysiwyg = findBodyWysiwyg(protyle)
       if (wysiwyg) {
-        const blocks = wysiwyg.querySelectorAll(':scope > [data-node-id]')
-        for (const block of blocks) {
-          const el = block as HTMLElement
-          const dataType = el.getAttribute('data-type')
-          if (dataType && SKIP_DATA_TYPES.has(dataType)) continue
-          const text = (el.textContent || '').trim()
-          if (!text) continue
-          this.paragraphs.push({ element: el, text })
-        }
+        // 按最小文本块提取：列表/引述/超级块逐层展开到叶子块
+        this.paragraphs = collectLeafParagraphs(wysiwyg)
         if (this.paragraphs.length > 0) return this.paragraphs.length
       }
     }
@@ -160,15 +245,8 @@ export class TTSEngine {
           div.innerHTML = resp
           // 移除不需要的块类型
           div.querySelectorAll('pre, [data-type="NodeCodeBlock"], [data-type="NodeMathBlock"], [data-type="NodeHTMLBlock"]').forEach(e => e.remove())
-          const allBlocks = div.querySelectorAll('[data-node-id]')
-          for (const block of allBlocks) {
-            const el = block as HTMLElement
-            const dataType = el.getAttribute('data-type')
-            if (dataType && SKIP_DATA_TYPES.has(dataType)) continue
-            const text = (el.textContent || '').trim()
-            if (!text) continue
-            this.paragraphs.push({ element: el, text })
-          }
+          // 与 DOM 路径一致：展开容器块，按最小文本块提取
+          this.paragraphs = collectLeafParagraphs(div)
         }
       } catch { /* ignore */ }
     }
@@ -200,13 +278,21 @@ export class TTSEngine {
     }
     if (options.voiceName) this.options.voiceName = options.voiceName
 
-    const start = options.startParagraph ?? 0
-    this.endParagraphIndex = options.endParagraph ?? this.paragraphs.length - 1
+    const last = this.paragraphs.length - 1
+    const start = Math.max(0, Math.min(options.startParagraph ?? 0, last))
+    this.endParagraphIndex = Math.max(start, Math.min(options.endParagraph ?? last, last))
+    this.startParagraphIndex = start
+    // 每次开始播放都重新读取设置
+    this._defaultRepeat = getRepeatCountSetting()
+    this._repeatRemaining = this._defaultRepeat
+    this._direction = getReadDirectionSetting()
+    this._readingRootId = getCurrentDocId()
 
     if (this.paragraphs.length === 0) return false
 
     injectHighlightStyle()
-    this.currentIndex = Math.max(0, Math.min(start, this.paragraphs.length - 1))
+    // 倒序从范围的末尾开始读
+    this.currentIndex = this._direction === 'backward' ? this.endParagraphIndex : start
     this.state = 'playing'
     this.startKeepalive()
     this.speakParagraph(this.currentIndex)
@@ -225,7 +311,17 @@ export class TTSEngine {
     if (this.state !== 'paused' || !this.synth) return
     this.synth.resume()
     this.state = 'playing'
+    // 期间可能切过文档导致高亮元素失效：恢复播放时重新高亮并滚到当前块
+    this.refreshCurrentHighlight()
     this.notifyStateChange()
+  }
+
+  /** 重新高亮当前块（元素可能因切文档被重建） */
+  private refreshCurrentHighlight(): void {
+    const para = this.paragraphs[this.currentIndex]
+    if (!para) return
+    const el = resolveParagraphElement(para)
+    if (el) this.applyHighlight(el)
   }
 
   stop(): void {
@@ -235,17 +331,22 @@ export class TTSEngine {
     this.currentUtterance = null  // 清除引用
     this.clearHighlight()
     this.stopKeepalive()
+    this._repeatRemaining = 1
     this.state = 'idle'
     this.currentIndex = -1
     this.notifyStateChange()
   }
 
-  jumpToParagraph(index: number): void {
+  async jumpToParagraph(index: number): Promise<void> {
     if (index < 0 || index >= this.paragraphs.length) return
     if (!this.synth) return
 
+    // 手动跳到别的块：重复次数回到「每块朗读次数」默认值
+    this._repeatRemaining = this._defaultRepeat
     this.synth.cancel()
     this.clearHighlight()
+    // 切文档 / 编辑器重渲染后旧元素已失效：先确保目标块在当前 DOM 中（必要时切回朗读文档）
+    await ensureTtsParagraphVisible(this.paragraphs[index], this._readingRootId)
     this.currentIndex = index
     this.state = 'playing'
     this.startKeepalive()
@@ -253,16 +354,46 @@ export class TTSEngine {
     this.notifyStateChange()
   }
 
+  /** 步进方向：倒序朗读时「下一段」= 文档中更靠前的块 */
+  private directionStep(): number {
+    return this._direction === 'backward' ? -1 : 1
+  }
+
   nextParagraph(): void {
-    if (this.currentIndex < this.paragraphs.length - 1) {
-      this.jumpToParagraph(this.currentIndex + 1)
+    const next = this.currentIndex + this.directionStep()
+    if (this.currentIndex >= 0 && next >= 0 && next < this.paragraphs.length) {
+      void this.jumpToParagraph(next)
     }
   }
 
   prevParagraph(): void {
-    if (this.currentIndex > 0) {
-      this.jumpToParagraph(this.currentIndex - 1)
+    const prev = this.currentIndex - this.directionStep()
+    if (this.currentIndex >= 0 && prev >= 0 && prev < this.paragraphs.length) {
+      void this.jumpToParagraph(prev)
     }
+  }
+
+  // ─── 重复朗读 ─────────────────────────────────────
+
+  get repeatRemaining(): number { return this._repeatRemaining }
+
+  setRepeatCount(count: number): void {
+    this._repeatRemaining = clampRepeatCount(count)
+    this.notifyStateChange()
+  }
+
+  /**
+   * 当前块读完一遍后调用：
+   * 剩余次数 > 1 → 减 1 并返回 true（调用方重读本块）；否则重置为 1 并返回 false（调用方进入下一块）。
+   */
+  private consumeRepeatForCurrentBlock(): boolean {
+    if (this._repeatRemaining > 1) {
+      this._repeatRemaining--
+      return true
+    }
+    // 下一块回到「每块朗读次数」默认值
+    this._repeatRemaining = this._defaultRepeat
+    return false
   }
 
   // ─── 状态查询 ─────────────────────────────────────
@@ -319,7 +450,11 @@ export class TTSEngine {
   // ─── 内部方法 ─────────────────────────────────────
 
   private speakParagraph(index: number): void {
-    if (index > this.endParagraphIndex || index >= this.paragraphs.length) {
+    // 正序：越过结束边界即完成；倒序：越过起始边界即完成
+    const outOfRange = this._direction === 'backward'
+      ? index < this.startParagraphIndex || index >= this.paragraphs.length
+      : index > this.endParagraphIndex || index >= this.paragraphs.length
+    if (outOfRange) {
       this.clearHighlight()
       this.stopKeepalive()
       this.state = 'idle'
@@ -331,7 +466,8 @@ export class TTSEngine {
 
     const para = this.paragraphs[index]
     this.currentIndex = index
-    this.applyHighlight(para.element)
+    // 切文档后旧元素可能已脱离 DOM：按 node-id 重新解析
+    this.applyHighlight(resolveParagraphElement(para))
 
     // ★ 将 utterance 存到实例变量，防止被 GC 回收导致朗读停止
     const utterance = new SpeechSynthesisUtterance(para.text)
@@ -353,7 +489,15 @@ export class TTSEngine {
 
     utterance.onend = () => {
       // ★ 段落间加 100ms 延迟，让 Chrome 引擎重置，防止下一个 speak() 被吞掉
-      setTimeout(() => this.speakParagraph(index + 1), 100)
+      setTimeout(() => {
+        // 重复朗读：本块还有剩余次数时重读本块（状态已非播放说明被 stop/跳段打断，忽略）
+        if (this.state === 'idle') return
+        if (this.consumeRepeatForCurrentBlock()) {
+          this.speakParagraph(index)
+          return
+        }
+        this.speakParagraph(index + this.directionStep())
+      }, 100)
     }
 
     utterance.onerror = (e) => {
@@ -365,7 +509,9 @@ export class TTSEngine {
       // Chrome 15 秒 bug 会触发 'interrupted'，不能静默忽略
       if (this.state !== 'idle') {
         logger.warn('[TTS] utterance error:', e.error, '→ 继续下一段')
-        setTimeout(() => this.speakParagraph(index + 1), 150)
+        // 出错跳段时回到默认次数，避免把当前块的次数带到下一个块
+        this._repeatRemaining = this._defaultRepeat
+        setTimeout(() => this.speakParagraph(index + this.directionStep()), 150)
       }
     }
 
@@ -373,7 +519,8 @@ export class TTSEngine {
     this.notifyStateChange()
   }
 
-  private applyHighlight(el: HTMLElement): void {
+  private applyHighlight(el: HTMLElement | null): void {
+    if (!el) return
     this.clearHighlight()
     el.classList.add(HIGHLIGHT_CLASS)
     el.scrollIntoView({ behavior: 'smooth', block: 'center' })

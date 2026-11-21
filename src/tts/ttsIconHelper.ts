@@ -7,6 +7,8 @@
  * 供 desktopPanel.ts 和 mobilePanel.ts 共用。
  */
 
+import { t } from '../i18n/runtime'
+
 // ─── 内联 SVG 图标路径（Lucide 风格，24x24 viewBox）─────────
 
 const SVG_PATHS: Record<string, string> = {
@@ -18,9 +20,12 @@ const SVG_PATHS: Record<string, string> = {
     '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
   'skip-forward':
     '<polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/>',
+  // lucide RefreshCw 官方路径（顺时针双箭头；旧值实际是 refresh-ccw 的镜像，方向相反）
   'refresh-cw':
-    '<path d="M21 12a9 9 0 0 0-15-6.7L3 8"/><path d="M3 3v5h5"/>'
-    + '<path d="M3 12a9 9 0 0 0 15 6.7l3-2.7"/><path d="M21 21v-5h-5"/>',
+    '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>'
+    + '<path d="M21 3v5h-5"/>'
+    + '<path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>'
+    + '<path d="M8 16H3v5"/>',
   'square':
     '<rect width="18" height="18" x="3" y="3" rx="2"/>',
   'volume-2':
@@ -29,12 +34,12 @@ const SVG_PATHS: Record<string, string> = {
     + '<path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>',
 }
 
-/** 生成内联 SVG HTML 字符串 */
-export function lucideSvg(name: string, size: number, color?: string): string {
+/** 生成内联 SVG HTML 字符串（strokeWidth 默认 2，小尺寸图标可略加粗以提升清晰度） */
+export function lucideSvg(name: string, size: number, color?: string, strokeWidth = 2): string {
   const paths = SVG_PATHS[name]
   if (!paths) return ''
   const c = color || 'currentColor'
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`
 }
 
 // ─── 图标按钮创建 ──────────────────────────────────────
@@ -229,4 +234,62 @@ export function removeSliderStyles(): void {
   const el = document.getElementById('tts-apple-slider-style')
   if (el) el.remove()
   sliderStylesInjected = false
+}
+
+// ─── 重复朗读按钮（手机端/电脑端共用）──
+
+/**
+ * 创建「循环朗读次数」按钮：纯数字胶囊（无图标）。
+ * 次数 = 1 时中性淡胶囊（表示不重复）；次数 > 1 时主题色胶囊高亮。
+ * 外观由 syncRepeatButton 统一维护（含数字与配色）。
+ */
+export function createRepeatButton(isMobile: boolean): HTMLElement {
+  const btn = document.createElement('div')
+  const tip = t('tts.repeatTooltip', undefined, '循环朗读当前块：点一次 +1（1-5），每读完一遍自动减 1')
+  btn.title = tip
+  btn.setAttribute('aria-label', tip)
+  btn.setAttribute('role', 'button')
+  // 尺寸比播放条按钮略小一号，仍保持足够点击面积与可读性
+  const baseHeight = isMobile ? 28 : 30
+  const minWidth = isMobile ? 32 : 36
+  btn.style.cssText = `
+    display:inline-flex;align-items:center;justify-content:center;
+    height:${baseHeight}px;min-width:${minWidth}px;padding:0 ${isMobile ? 10 : 12}px;
+    border-radius:9999px;cursor:pointer;box-sizing:border-box;flex-shrink:0;
+    font-size:${isMobile ? 14 : 15}px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;
+    border:none;background:transparent;color:inherit;
+    transition:background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+  `
+  btn.innerHTML = '<span class="tc-tts-repeat-num" style="line-height:1;">1</span>'
+  // 手机端按下反馈（与 createIconButton 的 isMobile 行为一致）
+  if (isMobile) {
+    btn.addEventListener('touchstart', () => { btn.style.transform = 'scale(0.92)' }, { passive: true })
+    btn.addEventListener('touchend', () => { btn.style.transform = '' }, { passive: true })
+    btn.addEventListener('touchcancel', () => { btn.style.transform = '' })
+  }
+  return btn
+}
+
+/** 把重复次数同步到按钮外观（数字 + 胶囊配色）；container 内查找 id 为 tm-rp / tts-bar-repeat 的按钮 */
+export function syncRepeatButton(
+  container: HTMLElement | null,
+  engine: { repeatRemaining: number } | null,
+): void {
+  if (!container) return
+  const btn = container.querySelector('#tm-rp, #tts-bar-repeat') as HTMLElement | null
+  if (!btn) return
+  const count = engine?.repeatRemaining ?? 1
+  const num = btn.querySelector('.tc-tts-repeat-num')
+  if (num) num.textContent = String(count)
+  if (count > 1) {
+    // 重复开启：主题色胶囊
+    btn.style.opacity = '1'
+    btn.style.color = 'var(--b3-theme-primary)'
+    btn.style.background = 'var(--b3-theme-primary-lightest)'
+  } else {
+    // 默认 1：中性淡胶囊（明暗模式通用的半透明灰）
+    btn.style.opacity = '0.55'
+    btn.style.color = 'inherit'
+    btn.style.background = 'rgba(127, 127, 127, 0.16)'
+  }
 }

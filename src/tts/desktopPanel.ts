@@ -11,11 +11,12 @@ import { getTTSEngine, destroyTTSEngine, TTSOptions } from './ttsEngine'
 import {
   getHttpTTSEngine, destroyHttpTTSEngine, HttpTTSEngine,
   SF_VOICES, getTTSSettings, saveTTSSettings, getSFAPIConfig, saveSFAPIConfig,
-  type TTSController,
+  type TTSController, TTS_REPEAT_MAX,
 } from './httpTtsEngine'
 import { applyFloatPanelBackground, observeSiYuanThemeMode } from '../ui/floatPanelBackground'
-import { createIconButton, updateButtonIcon, injectSliderStyles, removeSliderStyles, lucideSvg } from './ttsIconHelper'
+import { createIconButton, updateButtonIcon, injectSliderStyles, removeSliderStyles, lucideSvg, createRepeatButton, syncRepeatButton } from './ttsIconHelper'
 import { createAppleSelectEl, type AppleSelectEl } from './appleSelect'
+import { createRepeatSliderRow, createReadDirectionRow } from './ttsRepeatSetting'
 import * as Notify from '../notification'
 import { pluginInstance } from '../toolbarManager'
 import { navigateToAdjacentDoc } from '../ui/desktopDocNav'
@@ -25,6 +26,7 @@ import { EDGE_TTS_VOICES, getEdgeTTSEngine, destroyEdgeTTSEngine, isSupportedEdg
 // ─── 状态 ────────────────────────────────────────────────
 let optionsOverlay: HTMLElement | null = null
 let playbackBar: HTMLElement | null = null
+let playbackBarEngine: TTSController | null = null
 let optionsThemeUnsub: (() => void) | null = null
 let barThemeUnsub: (() => void) | null = null
 
@@ -235,6 +237,10 @@ function renderWebSpeechContent(container: HTMLElement, total: number, autoSel?:
   endRow.appendChild(endSelect)
   form.appendChild(endRow)
 
+  // 每块朗读（在语速上方；松手写盘，播放时生效）
+  form.appendChild(createRepeatSliderRow('desktop').row)
+  form.appendChild(createReadDirectionRow('desktop'))
+
   // 语速
   const rateRow = createRow(t('tts.rate', undefined, '语速'))
   const rateValue = document.createElement('span')
@@ -323,6 +329,10 @@ function renderEdgeContent(container: HTMLElement, total: number, autoSel?: Appl
   endRow.appendChild(endSelect)
   form.appendChild(endRow)
 
+  // 每块朗读（在语速上方；松手写盘，播放时生效）
+  form.appendChild(createRepeatSliderRow('desktop').row)
+  form.appendChild(createReadDirectionRow('desktop'))
+
   const rateRow = createRow(t('tts.rate', undefined, '语速'))
   const rateValue = document.createElement('span')
   const savedRate = settings.edgeRate ?? 1.0
@@ -376,6 +386,10 @@ function renderFreeContent(container: HTMLElement, total: number, autoSel?: Appl
 
   const form = document.createElement('div')
   form.style.cssText = 'display:flex;flex-direction:column;gap:14px;'
+
+  // 每块朗读（在语速上方；松手写盘，播放时生效）
+  form.appendChild(createRepeatSliderRow('desktop').row)
+  form.appendChild(createReadDirectionRow('desktop'))
 
   // 语速（百度 0-15）
   const rateRow = createRow(t('tts.rate', undefined, '语速'))
@@ -483,6 +497,10 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: Apple
   speakerSelect.value = settings.speaker
   speakerRow.appendChild(speakerSelect)
   form.appendChild(speakerRow)
+
+  // 每块朗读（在语速上方；松手写盘，播放时生效）
+  form.appendChild(createRepeatSliderRow('desktop').row)
+  form.appendChild(createReadDirectionRow('desktop'))
 
   // 语速（硅基流动 0.5-2.0）
   const rateRow = createRow(t('tts.rate', undefined, '语速'))
@@ -679,9 +697,24 @@ function createPlaybackBar(engine: TTSController): void {
   progressEl.style.cssText = 'opacity: 0.45; font-size: 12px; white-space: nowrap; margin-left: 6px; font-variant-numeric: tabular-nums;'
   bar.appendChild(progressEl)
 
-  const spacer = document.createElement('span')
-  spacer.style.cssText = 'flex: 1;'
-  bar.appendChild(spacer)
+  // 重复朗读当前块：显示剩余次数（1→2→3 循环，每读完一遍自动减 1）
+  // 左右各一个等宽弹性占位 → 按钮相对「左侧状态文字」与「右侧控制按钮」居中
+  const spacerLeft = document.createElement('span')
+  spacerLeft.style.cssText = 'flex: 1;'
+  bar.appendChild(spacerLeft)
+
+  const repeatBtn = createRepeatButton(false)
+  repeatBtn.id = 'tts-bar-repeat'
+  repeatBtn.onclick = () => {
+    const current = playbackBarEngine?.repeatRemaining ?? 1
+    playbackBarEngine?.setRepeatCount(current >= TTS_REPEAT_MAX ? 1 : current + 1)
+    syncRepeatButton(playbackBar, playbackBarEngine)
+  }
+  bar.appendChild(repeatBtn)
+
+  const spacerRight = document.createElement('span')
+  spacerRight.style.cssText = 'flex: 1;'
+  bar.appendChild(spacerRight)
 
   // 控制按钮组（SVG 图标）
   const btnGroup = document.createElement('div')
@@ -712,6 +745,8 @@ function createPlaybackBar(engine: TTSController): void {
 
   document.body.appendChild(bar)
   playbackBar = bar
+  playbackBarEngine = engine
+  syncRepeatButton(playbackBar, playbackBarEngine)
 }
 
 function updatePlaybackBar(state: string, index: number, total: number): void {
@@ -733,6 +768,8 @@ function updatePlaybackBar(state: string, index: number, total: number): void {
     const isPlaying = state === 'playing' || state === 'loading'
     updateButtonIcon(playPauseBtn, isPlaying ? 'pause' : 'play', 18, true)
   }
+  // 重复次数随「读完一遍自动减」实时刷新
+  syncRepeatButton(playbackBar, playbackBarEngine)
 }
 
 // ─── 工具函数 ─────────────────────────────────────────────
@@ -840,4 +877,5 @@ function removeOptionsPanel(): void {
 function removePlaybackBar(): void {
   if (barThemeUnsub) { barThemeUnsub(); barThemeUnsub = null }
   if (playbackBar) { playbackBar.remove(); playbackBar = null }
+  playbackBarEngine = null
 }

@@ -7,7 +7,8 @@
  */
 
 import { logger } from '@/utils/logger'
-import { getTTSEngine, ParagraphInfo, getCurrentDocId } from './ttsEngine'
+import { getTTSEngine, ParagraphInfo, getCurrentDocId, collectLeafParagraphs, resolveParagraphElement } from './ttsEngine'
+import { ensureTtsParagraphVisible } from './ttsParagraphFocus'
 import { forwardProxy, putFile, removeFile } from '../api'
 import { pluginInstance } from '../toolbarManager'
 import { t } from '../i18n/runtime'
@@ -30,13 +31,6 @@ const YOUDAO_TTS = 'https://tts.youdao.com/fanyivoice'
 
 const HIGHLIGHT_CLASS = 'tts-current-paragraph'
 let styleEl: HTMLStyleElement | null = null
-
-// 不朗读的块类型
-const SKIP_DATA_TYPES = new Set([
-  'NodeCodeBlock', 'NodeMathBlock', 'NodeHTMLBlock',
-  'NodeIFrame', 'NodeWidget', 'NodeEmbedBlock',
-  'NodeThematicBreak', 'NodeAudio', 'NodeVideo',
-])
 
 // ═══════════════════════════════════════════════════════════════
 // 类型导出
@@ -62,6 +56,9 @@ export interface TTSSettings {
   lastMode?: string        // 上次使用的模式：'webspeech' | 'edge' | 'free' | 'api'
   autoReadAction?: 'stop' | 'next' | 'prev'  // 朗读完成后动作，默认 'stop'
   webSpeechVoiceName?: string  // 浏览器语音引擎上次选择的语音名
+  repeatCount?: number     // 每块朗读次数（1-5，默认 1）；播放条上的按钮可临时覆盖当前块
+  readDirection?: 'forward' | 'backward'  // 朗读顺序（默认 forward 从前往后）
+  edgeDefaultMigrated?: boolean  // 一次性迁移标记：老版本默认 free → 新版本默认 edge
 }
 
 export interface SFAPIConfig {
@@ -73,6 +70,29 @@ export interface TTSController {
   isPlaying: boolean; isPaused: boolean
   prevParagraph(): void; nextParagraph(): void
   pause(): void; resume(): void; stop(): void
+  /** 当前块剩余重复次数（1 = 不重复；每读完一遍自动减 1） */
+  repeatRemaining: number
+  /** 设置当前块的重复次数（1-3，超出范围自动夹取） */
+  setRepeatCount(count: number): void
+}
+
+/** 重复朗读次数上限（1 = 只读一遍） */
+export const TTS_REPEAT_MAX = 5
+
+/** 把任意输入夹取到合法的重复次数（1-3） */
+export function clampRepeatCount(value: number): number {
+  if (!Number.isFinite(value)) return 1
+  return Math.max(1, Math.min(TTS_REPEAT_MAX, Math.round(value)))
+}
+
+/** 读取「每块朗读次数」设置（1-5，默认 1）。各引擎在开始播放时调用它初始化重复计数。 */
+export function getRepeatCountSetting(): number {
+  return clampRepeatCount(getTTSSettings().repeatCount ?? 1)
+}
+
+/** 读取朗读顺序设置（默认 positive：从前往后） */
+export function getReadDirectionSetting(): 'forward' | 'backward' {
+  return getTTSSettings().readDirection === 'backward' ? 'backward' : 'forward'
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -106,7 +126,7 @@ const SF_API_URL = 'https://api.siliconflow.cn/v1/audio/speech'
 const SF_API_CONFIG_KEY = 'siyuan-tc-sf-api'
 const TTS_SETTINGS_KEY = 'siyuan-tc-tts-settings'
 
-const DEFAULT_TTS_SETTINGS: TTSSettings = { speed: 5, apiSpeed: 1.0, speaker: 'claire' }
+const DEFAULT_TTS_SETTINGS: TTSSettings = { speed: 5, apiSpeed: 1.0, speaker: 'claire', repeatCount: 1, readDirection: 'forward' }
 const DEFAULT_SF_CONFIG: SFAPIConfig = { apiKey: '' }
 
 // 内存缓存
@@ -577,6 +597,12 @@ export class HttpTTSEngine {
   private state: HttpTTSState = 'idle'
   private stopped = false
   private endParagraphIndex = -1
+  /** 朗读起始边界（倒序时是下限，正序时是起始段） */
+  private startParagraphIndex = 0
+  /** 朗读顺序：forward 从前往后 / backward 从后往前 */
+  private _direction: 'forward' | 'backward' = 'forward'
+  /** 朗读所属文档 id（切文档后用于切回） */
+  private _readingRootId = ''
   private speed = 5  // 百度语速 0-15，默认 5
   private mode: 'free' | 'api' = 'free'
   private apiToken = ''
@@ -592,10 +618,37 @@ export class HttpTTSEngine {
   private preparedPlayResolver: ((started: boolean) => void) | null = null
   private operationGeneration = 0
   private mediaDiagnosticsInstalled = false
+  /** 当前块剩余重复次数（1 = 不重复；每次读完一遍减 1，减到 1 后进入下一块） */
+  private _repeatRemaining = 1
+  /** 每块朗读次数默认值（来自朗读设置，开始播放时读取） */
+  private _defaultRepeat = 1
 
   onStateChange?: (state: HttpTTSState, index: number, total: number) => void
   onError?: (msg: string) => void
   onFinish?: (prepared: boolean) => void
+
+  // ─── 重复朗读 ──────────────────────────────────────
+
+  get repeatRemaining(): number { return this._repeatRemaining }
+
+  setRepeatCount(count: number): void {
+    this._repeatRemaining = clampRepeatCount(count)
+    this.notify()
+  }
+
+  /**
+   * 当前块读完一遍后调用：
+   * 剩余次数 > 1 → 减 1 并返回 true（调用方重读本块）；否则重置为 1 并返回 false（调用方进入下一块）。
+   */
+  private consumeRepeatForCurrentBlock(): boolean {
+    if (this._repeatRemaining > 1) {
+      this._repeatRemaining--
+      return true
+    }
+    // 下一块回到「每块朗读次数」默认值
+    this._repeatRemaining = this._defaultRepeat
+    return false
+  }
 
   // ─── 设置 ──────────────────────────────────────────
 
@@ -633,14 +686,8 @@ export class HttpTTSEngine {
       div.innerHTML = data.data.content.replace(/\{:[^}]+\}/g, '')
       div.querySelectorAll('pre,[data-type="NodeCodeBlock"],[data-type="NodeMathBlock"]').forEach(e => e.remove())
 
-      this.paragraphs = []
-      for (const block of div.querySelectorAll('[data-node-id]')) {
-        const el = block as HTMLElement
-        const dt = el.getAttribute('data-type')
-        if (dt && SKIP_DATA_TYPES.has(dt)) continue
-        const text = (el.textContent || '').trim()
-        if (text) this.paragraphs.push({ element: el, text })
-      }
+      // 与 DOM 路径一致：展开容器块，按最小文本块提取
+      this.paragraphs = collectLeafParagraphs(div)
       return this.paragraphs.length
     } catch { return 0 }
   }
@@ -658,11 +705,20 @@ export class HttpTTSEngine {
     this.notify()
     this.stopped = false
     this.successCount = 0
-    this.endParagraphIndex = endParagraph ?? this.paragraphs.length - 1
+    // 每次开始播放都重新读取设置
+    this._defaultRepeat = getRepeatCountSetting()
+    this._repeatRemaining = this._defaultRepeat
+    this._direction = getReadDirectionSetting()
+    this._readingRootId = getCurrentDocId()
+    const last = this.paragraphs.length - 1
+    const start = Math.max(0, Math.min(startParagraph, Math.max(0, last)))
+    this.startParagraphIndex = start
+    this.endParagraphIndex = Math.max(start, Math.min(endParagraph ?? last, last))
     if (this.paragraphs.length === 0) return false
 
     ensureHighlightStyle()
-    this.currentIndex = Math.max(0, Math.min(startParagraph, this.paragraphs.length - 1))
+    // 倒序从范围末尾开始读
+    this.currentIndex = this._direction === 'backward' ? this.endParagraphIndex : start
     this.playCurrentParagraph(generation)
     return true
   }
@@ -867,6 +923,16 @@ export class HttpTTSEngine {
 
   /** 播放 prepared 音频；传入 key 时从持久缓存创建新的运行时 staging 源。 */
   async speakPrepared(cacheKey?: string): Promise<boolean> {
+    // 倒序朗读无法用连续音频（不能反向播放），退回逐段合成播放
+    if (getReadDirectionSetting() === 'backward') {
+      const entry = cacheKey ? await getPreparedTtsCacheEntry(cacheKey, false) : null
+      const start = entry?.startParagraph ?? this.preparedAudio?.startParagraph ?? 0
+      const end = entry?.endParagraph ?? this.preparedAudio?.endParagraph
+      logger.log('[TTS] 倒序朗读：跳过连续音频，改用逐段合成')
+      this.clearPreparedAudioInternal()
+      this.clearHighlight()
+      return this.speak(start, end)
+    }
     const generation = ++this.operationGeneration
     let prepared = this.preparedAudio
     if (cacheKey && prepared?.cacheKey !== cacheKey) {
@@ -927,10 +993,12 @@ export class HttpTTSEngine {
     this.stopped = false
     this.playingPrepared = true
     this.preparedHighlightCleared = false
+    this._defaultRepeat = getRepeatCountSetting()
+    this._repeatRemaining = this._defaultRepeat
     this.endParagraphIndex = prepared.endParagraph
     this.currentIndex = prepared.startParagraph
     ensureHighlightStyle()
-    this.applyHighlight(this.paragraphs[this.currentIndex]?.element)
+    this.applyHighlight(resolveParagraphElement(this.paragraphs[this.currentIndex]))
     this.state = 'loading'
     this.notify()
 
@@ -940,10 +1008,24 @@ export class HttpTTSEngine {
     this.audioEl.ontimeupdate = () => this.updatePreparedPosition(playbackGeneration)
     this.audioEl.onended = () => {
       if (playbackGeneration !== this.operationGeneration || !this.playingPrepared) return
+      // 重复朗读：整段音频播完（通常是最后一块）但仍有剩余次数 → 跳回本块开头继续播，
+      // 不能在这里收尾，否则最后一块的重复永远不会发生（ontimeupdate 可能来不及触发）
+      const lastTiming = this.preparedAudio?.timings.find(item => item.paragraphIndex === this.currentIndex)
+      if (lastTiming && this._repeatRemaining > 1) {
+        this._repeatRemaining--
+        this.preparedHighlightCleared = false
+        try {
+          this.audioEl.currentTime = lastTiming.startTime
+          void this.audioEl.play()
+        } catch { /* ignore */ }
+        this.notify()
+        return
+      }
       this.playingPrepared = false
       this.cleanupAudio()
       this.clearPreparedAudioInternal()
       this.clearHighlight()
+      this._repeatRemaining = this._defaultRepeat
       this.state = 'idle'
       this.currentIndex = -1
       this.notify()
@@ -999,6 +1081,7 @@ export class HttpTTSEngine {
     this.stopPlayback()
     this.clearPreparedAudioInternal()
     this.clearHighlight()
+    this._repeatRemaining = this._defaultRepeat
     this.state = 'idle'
     this.currentIndex = -1
     this.notify()
@@ -1022,7 +1105,20 @@ export class HttpTTSEngine {
     if (this.state !== 'paused') return
     this.audioEl.play().catch(() => {})
     this.state = 'playing'
+    // 期间可能切过文档导致高亮元素失效：恢复播放时重新高亮并滚到当前块
+    this.refreshCurrentHighlight()
     this.notify()
+  }
+
+  /** 重新高亮当前块（元素可能因切文档被重建） */
+  private refreshCurrentHighlight(): void {
+    const para = this.paragraphs[this.currentIndex]
+    if (!para) return
+    const el = resolveParagraphElement(para)
+    if (el) {
+      this.clearHighlight()
+      this.applyHighlight(el)
+    }
   }
 
   stop(): void {
@@ -1031,12 +1127,16 @@ export class HttpTTSEngine {
     this.stopPlayback()
     this.clearPreparedAudioInternal()
     this.clearHighlight()
+    this._repeatRemaining = this._defaultRepeat
     this.state = 'idle'
     this.currentIndex = -1
     this.notify()
   }
 
-  jumpToParagraph(index: number): void {
+  async jumpToParagraph(index: number): Promise<void> {
+    // 手动跳到别的块：重复次数回到「每块朗读次数」默认值
+    this._repeatRemaining = this._defaultRepeat
+    if (index < 0 || index >= this.paragraphs.length) return
     if (this.playingPrepared && this.preparedAudio) {
       const timing = this.preparedAudio.timings.find(item => item.paragraphIndex === index)
       if (!timing) return
@@ -1044,27 +1144,44 @@ export class HttpTTSEngine {
       this.updatePreparedPosition(this.operationGeneration, true)
       return
     }
-    if (index < 0 || index >= this.paragraphs.length) return
     const generation = ++this.operationGeneration
     this.stopped = false
     this.cleanupAudio()
     this.clearHighlight()
+    // 切文档 / 编辑器重渲染后旧元素已失效：先确保目标块在当前 DOM 中（必要时切回朗读文档）
+    await ensureTtsParagraphVisible(this.paragraphs[index], this._readingRootId)
+    if (generation !== this.operationGeneration) return
     this.currentIndex = index
     this.playCurrentParagraph(generation)
+  }
+
+  /** 步进方向：倒序朗读时「下一段」= 文档中更靠前的块 */
+  private directionStep(): number {
+    return this._direction === 'backward' ? -1 : 1
   }
 
   nextParagraph(): void {
     const max = this.playingPrepared && this.preparedAudio
       ? this.preparedAudio.endParagraph
       : this.paragraphs.length - 1
-    if (this.currentIndex < max) this.jumpToParagraph(this.currentIndex + 1)
-  }
-
-  prevParagraph(): void {
     const min = this.playingPrepared && this.preparedAudio
       ? this.preparedAudio.startParagraph
       : 0
-    if (this.currentIndex > min) this.jumpToParagraph(this.currentIndex - 1)
+    if (this.currentIndex < 0) return
+    const next = this.currentIndex + this.directionStep()
+    if (next >= min && next <= max) void this.jumpToParagraph(next)
+  }
+
+  prevParagraph(): void {
+    const max = this.playingPrepared && this.preparedAudio
+      ? this.preparedAudio.endParagraph
+      : this.paragraphs.length - 1
+    const min = this.playingPrepared && this.preparedAudio
+      ? this.preparedAudio.startParagraph
+      : 0
+    if (this.currentIndex < 0) return
+    const prev = this.currentIndex - this.directionStep()
+    if (prev >= min && prev <= max) void this.jumpToParagraph(prev)
   }
 
   // ─── 状态查询 ──────────────────────────────────────
@@ -1090,6 +1207,7 @@ export class HttpTTSEngine {
     this.stopPlayback()
     this.clearPreparedAudioInternal()
     this.clearHighlight()
+    this._repeatRemaining = this._defaultRepeat
     this.state = 'idle'
     this.currentIndex = -1
     this.notify()
@@ -1118,7 +1236,11 @@ export class HttpTTSEngine {
   private playCurrentParagraph(generation = this.operationGeneration): void {
     if (this.stopped || generation !== this.operationGeneration) return
 
-    if (this.currentIndex > this.endParagraphIndex || this.currentIndex >= this.paragraphs.length) {
+    // 正序：越过结束边界即完成；倒序：越过起始边界即完成
+    const outOfRange = this._direction === 'backward'
+      ? this.currentIndex < this.startParagraphIndex || this.currentIndex >= this.paragraphs.length
+      : this.currentIndex > this.endParagraphIndex || this.currentIndex >= this.paragraphs.length
+    if (outOfRange) {
       this.clearHighlight()
       this.state = 'idle'
       this.currentIndex = -1
@@ -1133,7 +1255,8 @@ export class HttpTTSEngine {
 
     const para = this.paragraphs[this.currentIndex]
     this.state = 'loading'
-    this.applyHighlight(para.element)
+    // 切文档后旧元素可能已脱离 DOM：按 node-id 重新解析
+    this.applyHighlight(resolveParagraphElement(para))
     this.notify()
 
     this.fetchTTSAudio(para.text, generation)
@@ -1144,7 +1267,12 @@ export class HttpTTSEngine {
       .then(() => {
         if (this.stopped || generation !== this.operationGeneration) return
         this.successCount++
-        this.currentIndex++
+        // 重复朗读：本块还有剩余次数时停在原地重读，否则进入下一块
+        if (this.consumeRepeatForCurrentBlock()) {
+          this.playCurrentParagraph(generation)
+          return
+        }
+        this.currentIndex += this.directionStep()
         this.playCurrentParagraph(generation)
       })
       .catch(err => {
@@ -1165,8 +1293,9 @@ export class HttpTTSEngine {
           return
         }
         logger.warn('[HttpTTS] 段落朗读失败，跳过:', msg)
-        // 跳过失败段落，继续下一段
-        this.currentIndex++
+        // 跳过失败段落，继续下一段（重复计数回到默认值，避免把当前块的次数带到下一块）
+        this._repeatRemaining = this._defaultRepeat
+        this.currentIndex += this.directionStep()
         this.playCurrentParagraph(generation)
       })
   }
@@ -1396,6 +1525,19 @@ export class HttpTTSEngine {
   private updatePreparedPosition(generation: number, force = false): void {
     if (generation !== this.operationGeneration || !this.playingPrepared || !this.preparedAudio) return
     const currentTime = this.audioEl.currentTime
+
+    // 重复朗读：prepared 是整段连续音频，靠段落时间戳把播放位置拉回本块开头。
+    // 必须用 currentIndex 的时间段判断，不能用「按 currentTime 命中的时间段」——
+    // 越过本块末尾时命中的已经是下一块。
+    const currentTiming = this.preparedAudio.timings.find(item => item.paragraphIndex === this.currentIndex)
+    if (currentTiming && this._repeatRemaining > 1 && currentTime >= currentTiming.endTime - 0.05) {
+      this._repeatRemaining--
+      this.preparedHighlightCleared = false
+      try { this.audioEl.currentTime = currentTiming.startTime } catch { /* ignore */ }
+      this.notify()
+      return
+    }
+
     const timing = this.preparedAudio.timings.find(item => currentTime >= item.startTime && currentTime < item.endTime)
     if (!timing) {
       const lastTiming = this.preparedAudio.timings[this.preparedAudio.timings.length - 1]
@@ -1407,11 +1549,11 @@ export class HttpTTSEngine {
     }
     if (this.preparedHighlightCleared) {
       this.preparedHighlightCleared = false
-      this.applyHighlight(this.paragraphs[timing.paragraphIndex]?.element)
+      this.applyHighlight(resolveParagraphElement(this.paragraphs[timing.paragraphIndex]))
     }
     if (!force && timing.paragraphIndex === this.currentIndex) return
     this.currentIndex = timing.paragraphIndex
-    this.applyHighlight(this.paragraphs[this.currentIndex]?.element)
+    this.applyHighlight(resolveParagraphElement(this.paragraphs[this.currentIndex]))
     this.notify()
   }
 
@@ -1583,7 +1725,8 @@ export class HttpTTSEngine {
     if (this.blobUrl) { try { URL.revokeObjectURL(this.blobUrl) } catch {}; this.blobUrl = null }
   }
 
-  private applyHighlight(el: HTMLElement): void {
+  private applyHighlight(el: HTMLElement | null): void {
+    if (!el) return
     this.clearHighlight()
     if (el.isConnected) {
       el.classList.add(HIGHLIGHT_CLASS)

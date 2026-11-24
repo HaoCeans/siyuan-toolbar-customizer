@@ -557,6 +557,8 @@ export interface MobileFeatureConfig {
   hideHistoryButtons?: boolean
   /** 顶部工具栏云同步位置左侧显示 H，点击硬换行 */
   showMobileLineBreakButton?: boolean
+  /** 思源手机端搜索增强：保留原生搜索，只做外观/可读性增强（默认关） */
+  enableSearchTweak?: boolean
   disableCustomButtons: boolean
   hideStatusBar?: boolean  // 手机端隐藏底部状态条 #status
   keepTopBarVisible?: boolean  // 不隐藏顶栏标题（滚动沉浸时标题栏保持显示，默认关）
@@ -4439,6 +4441,24 @@ export function createMobileSettingLayout(
       toggle.style.cssText = 'transform: scale(1.2);'
       toggle.onchange = async () => {
         context.mobileFeatureConfig.keepTopBarVisible = toggle.checked
+        await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
+        context.applyFeatures()
+      }
+      return toggle
+    }
+  })
+
+  setting.addItem({
+    title: t("settings.mobile.377", undefined, "⑩思源手机端搜索增强"),
+    description: t("settings.mobile.378", undefined, "💡保留思源原生搜索，只做体验增强：底部图标补上文字标签、结果行更大更易读、关键词高亮更明显。默认关闭。"),
+    createActionElement: () => {
+      const toggle = document.createElement('input')
+      toggle.type = 'checkbox'
+      toggle.className = 'b3-switch'
+      toggle.checked = context.mobileFeatureConfig.enableSearchTweak === true
+      toggle.style.cssText = 'transform: scale(1.2);'
+      toggle.onchange = async () => {
+        context.mobileFeatureConfig.enableSearchTweak = toggle.checked
         await context.saveData('mobileFeatureConfig', context.mobileFeatureConfig)
         context.applyFeatures()
       }

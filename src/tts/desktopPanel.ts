@@ -7,7 +7,7 @@
  */
 
 import { t } from '../i18n/runtime'
-import { getTTSEngine, destroyTTSEngine, TTSOptions } from './ttsEngine'
+import { getTTSEngine, destroyTTSEngine, TTSOptions, type ParagraphInfo } from './ttsEngine'
 import {
   getHttpTTSEngine, destroyHttpTTSEngine, HttpTTSEngine,
   SF_VOICES, getTTSSettings, saveTTSSettings, getSFAPIConfig, saveSFAPIConfig,
@@ -16,6 +16,8 @@ import {
 import { applyFloatPanelBackground, observeSiYuanThemeMode } from '../ui/floatPanelBackground'
 import { createIconButton, updateButtonIcon, injectSliderStyles, removeSliderStyles, lucideSvg, createRepeatButton, syncRepeatButton } from './ttsIconHelper'
 import { createAppleSelectEl, type AppleSelectEl } from './appleSelect'
+import { createParagraphPicker, linkParagraphPickers, type ParagraphPicker } from './ttsRangePicker'
+import { setPlaybackRange, resetPlaybackRange, formatRangeProgress } from './ttsPlaybackRange'
 import { createRepeatSliderRow, createReadDirectionRow } from './ttsRepeatSetting'
 import * as Notify from '../notification'
 import { pluginInstance } from '../toolbarManager'
@@ -30,8 +32,8 @@ let playbackBarEngine: TTSController | null = null
 let optionsThemeUnsub: (() => void) | null = null
 let barThemeUnsub: (() => void) | null = null
 
-/** 朗读完成后动作：'stop' | 'next' | 'prev' */
-let autoReadAction: 'stop' | 'next' | 'prev' = 'stop'
+/** 朗读完成后动作：'stop' 停止 / 'next' 下一篇 / 'prev' 上一篇 / 'repeat' 重复当前范围 */
+let autoReadAction: 'stop' | 'next' | 'prev' | 'repeat' = 'stop'
 
 // ─── 导出 ────────────────────────────────────────────────
 
@@ -51,7 +53,7 @@ export function showTTSOptionsDesktop(): void {
   getEdgeTTSEngine().stop()
   removePlaybackBar()
 
-  createOptionsPanel(total)
+  createOptionsPanel()
 }
 
 /** 清理（cleanup / plugin unload 时调用） */
@@ -64,9 +66,111 @@ export function cleanupDesktopTTS(): void {
   removeSliderStyles()
 }
 
+/**
+ * 块菜单入口：从指定段落开始朗读到文档末尾。
+ *
+ * 不弹设置面板，沿用上次使用的引擎与参数（与工具栏按钮打开面板时的默认模式一致）；
+ * 播放条、上一段/下一段、每块重复、暂停/停止仍走原有交互。
+ */
+export interface StartTTSFromBlockOptions {
+  /** 段落下标（由 findParagraphAnchor 按块算出） */
+  startIndex: number
+  /** 结束段落（inclusive），不传表示读到末尾 */
+  endIndex?: number
+  /** 起始块的 id：引擎重新提取段落后用它精确重定位，防止下标错位 */
+  anchorNodeId?: string
+  /** 点击块菜单时所在的编辑器（分屏时避免从另一栏提取段落） */
+  protyleEl?: HTMLElement
+}
+
+export async function startTTSFromParagraph(opts: StartTTSFromBlockOptions): Promise<void> {
+  const { startIndex, endIndex, anchorNodeId, protyleEl } = opts
+  const settings = getTTSSettings()
+  autoReadAction = (settings.autoReadAction || 'stop') as 'stop' | 'next' | 'prev' | 'repeat'
+
+  // 先停掉所有引擎和旧面板/播放条，避免两个引擎同时出声
+  getTTSEngine().stop()
+  getHttpTTSEngine().stop()
+  getEdgeTTSEngine().stop()
+  removeOptionsPanel()
+  removePlaybackBar()
+
+  const fallback = Math.max(0, startIndex)
+  const apiKey = getSFAPIConfig().apiKey
+  const hasToken = !!apiKey
+  // 与 createOptionsPanel 的默认模式保持一致：沿用上次，没填 Key 时回落浏览器语音
+  const mode = settings.lastMode || (hasToken ? 'api' : 'webspeech')
+
+  if (mode === 'edge') {
+    const engine = getEdgeTTSEngine()
+    engine.extractParagraphs(protyleEl)
+    const startP = resolveStartIndex(engine.getParagraphs(), anchorNodeId, fallback)
+    const savedVoice = settings.edgeVoiceName || ''
+    const voice = isSupportedEdgeVoice(savedVoice) ? savedVoice : EDGE_TTS_VOICES[0].name
+    engine.activatePlayback()
+    startEdgePlayback(voice, settings.edgeRate ?? 1.0, startP, endIndex, protyleEl)
+    return
+  }
+
+  if (mode === 'api' && hasToken) {
+    const engine = getHttpTTSEngine()
+    engine.setDirectFetch(true)
+    engine.setSpeed(settings.apiSpeed ?? 1.0)
+    engine.setSpeaker(settings.speaker)
+    engine.setMode('api', apiKey)
+    await engine.extractParagraphsAsync(protyleEl)
+    const startP = resolveStartIndex(engine.getParagraphs(), anchorNodeId, fallback)
+    startHttpPlayback(engine, startP, endIndex)
+    return
+  }
+
+  if (mode === 'free') {
+    const engine = getHttpTTSEngine()
+    engine.setDirectFetch(false)
+    engine.setSpeed(settings.speed)
+    engine.setSpeaker(4)
+    engine.setMode('free')
+    await engine.extractParagraphsAsync(protyleEl)
+    const startP = resolveStartIndex(engine.getParagraphs(), anchorNodeId, fallback)
+    startHttpPlayback(engine, startP, endIndex)
+    return
+  }
+
+  // 浏览器语音（默认；api 模式没配置 Key 时也回退到这里）
+  const engine = getTTSEngine()
+  if (!engine.isAvailable) {
+    Notify.showErrorCommandCannotExecute(t('tts.speechSynthesisUnavailable', undefined, '当前环境不支持 speechSynthesis API'))
+    return
+  }
+  // 面板流程里段落是在 showTTSOptionsDesktop 提前提取的，这里必须自己提
+  engine.extractParagraphs(protyleEl)
+  const startP = resolveStartIndex(engine.getParagraphs(), anchorNodeId, fallback)
+  startWebSpeechPlayback({
+    rate: 1.0,
+    pitch: 1.0,
+    volume: 1.0,
+    voiceName: settings.webSpeechVoiceName,
+    startParagraph: startP,
+    endParagraph: endIndex,
+  })
+}
+
+/** 引擎重新提取段落后，优先按块 id 找起始位置；找不到再退回调用方给的下标 */
+function resolveStartIndex(
+  paragraphs: Array<{ nodeId?: string }>,
+  anchorNodeId: string | undefined,
+  fallback: number,
+): number {
+  if (anchorNodeId) {
+    const index = paragraphs.findIndex(p => p.nodeId === anchorNodeId)
+    if (index >= 0) return index
+  }
+  return Math.max(0, Math.min(fallback, Math.max(0, paragraphs.length - 1)))
+}
+
 // ─── 阶段一：选项面板 ────────────────────────────────────
 
-function createOptionsPanel(total: number): void {
+function createOptionsPanel(): void {
   removeOptionsPanel()
   injectSliderStyles()
 
@@ -92,6 +196,7 @@ function createOptionsPanel(total: number): void {
     width: 100%; max-width: 480px;
     padding: 24px 24px 32px;
     color: var(--b3-theme-on-background);
+    max-height: 86vh; overflow-y: auto; overscroll-behavior: contain;
   `
   applyFloatPanelBackground(card, undefined, 0.85)
   optionsThemeUnsub = observeSiYuanThemeMode(() => applyFloatPanelBackground(card, undefined, 0.85))
@@ -164,6 +269,7 @@ function createOptionsPanel(total: number): void {
     { v: 'stop', t: t('tts.stop', undefined, '停止') },
     { v: 'next', t: t('tts.autoNext', undefined, '自动继续朗读下一篇') },
     { v: 'prev', t: t('tts.autoPrevious', undefined, '自动继续朗读上一篇') },
+    { v: 'repeat', t: t('tts.autoRepeat', undefined, '重复朗读') },
   ]
   for (const o of autoOpts) {
     const opt = document.createElement('option')
@@ -193,10 +299,10 @@ function createOptionsPanel(total: number): void {
       }
     }
     content.innerHTML = ''
-    if (mode === 'webspeech') renderWebSpeechContent(content, total, autoSel)
-    else if (mode === 'edge') renderEdgeContent(content, total, autoSel)
-    else if (mode === 'free') renderFreeContent(content, total, autoSel)
-    else renderApiContent(content, total, autoSel)
+    if (mode === 'webspeech') renderWebSpeechContent(content, autoSel)
+    else if (mode === 'edge') renderEdgeContent(content, autoSel)
+    else if (mode === 'free') renderFreeContent(content, autoSel)
+    else renderApiContent(content, autoSel)
   }
 
   // 卡片内所有点击阻止冒泡
@@ -213,7 +319,34 @@ function createOptionsPanel(total: number): void {
 
 // ─── Web Speech 模式面板（原有功能）─────────────────────────
 
-function renderWebSpeechContent(container: HTMLElement, total: number, autoSel?: AppleSelectEl): void {
+/** 朗读范围：起始块 / 结束块 两个滚动选择器（滚轮或上下滑动切换） */
+function appendRangePickers(
+  container: HTMLElement,
+  paragraphs: ParagraphInfo[],
+): { start: ParagraphPicker; end: ParagraphPicker } {
+  const last = Math.max(0, paragraphs.length - 1)
+  // 与手机端一致：标签在上、选择器占满整行
+  const appendBlock = (labelText: string, picker: ParagraphPicker): void => {
+    const wrap = document.createElement('div')
+    const label = document.createElement('div')
+    label.textContent = labelText
+    label.style.cssText = 'font-size:13px;margin-bottom:6px;opacity:0.6;font-weight:500;letter-spacing:-0.01em;'
+    wrap.appendChild(label)
+    wrap.appendChild(picker.element)
+    container.appendChild(wrap)
+  }
+
+  const start = createParagraphPicker({ paragraphs, initial: 0 })
+  appendBlock(t('tts.startBlock', undefined, '起始块'), start)
+
+  const end = createParagraphPicker({ paragraphs, initial: last })
+  appendBlock(t('tts.endBlock', undefined, '结束块'), end)
+
+  linkParagraphPickers(start, end, paragraphs.length)
+  return { start, end }
+}
+
+function renderWebSpeechContent(container: HTMLElement, autoSel?: AppleSelectEl): void {
   const engine = getTTSEngine()
   if (!engine.isAvailable) {
     const warn = document.createElement('div')
@@ -224,18 +357,6 @@ function renderWebSpeechContent(container: HTMLElement, total: number, autoSel?:
 
   const form = document.createElement('div')
   form.style.cssText = 'display:flex;flex-direction:column;gap:14px;'
-
-  // 起始段落
-  const startRow = createRow(t('tts.startParagraph', undefined, '起始段落'))
-  const startSelect = createParagraphSelect(total, 0)
-  startRow.appendChild(startSelect)
-  form.appendChild(startRow)
-
-  // 结束段落
-  const endRow = createRow(t('tts.endParagraph', undefined, '结束段落'))
-  const endSelect = createParagraphSelect(total, total - 1, true)
-  endRow.appendChild(endSelect)
-  form.appendChild(endRow)
 
   // 每块朗读（在语速上方；松手写盘，播放时生效）
   form.appendChild(createRepeatSliderRow('desktop').row)
@@ -289,6 +410,9 @@ function renderWebSpeechContent(container: HTMLElement, total: number, autoSel?:
   voiceRow.appendChild(voiceSelect)
   form.appendChild(voiceRow)
 
+  // 朗读范围（起始块 → 结束块；与手机端一致放在最后）
+  const range = appendRangePickers(form, getTTSEngine().getParagraphs())
+
   container.appendChild(form)
 
   // ── 按钮
@@ -296,14 +420,14 @@ function renderWebSpeechContent(container: HTMLElement, total: number, autoSel?:
   btns.cancel.onclick = (e) => { e.stopPropagation(); removeOptionsPanel() }
   btns.confirm.onclick = (e) => {
     e.stopPropagation()
-    autoReadAction = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev'
+    autoReadAction = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev' | 'repeat'
     saveTTSSettings({ autoReadAction })
     const opts: TTSOptions = {
       rate: parseFloat(rateSlider.value),
       pitch: parseFloat(pitchSlider.value),
       volume: parseFloat(volumeSlider.value),
-      startParagraph: parseInt(startSelect.value),
-      endParagraph: endSelect.value === 'all' ? undefined : parseInt(endSelect.value),
+      startParagraph: range.start.getValue(),
+      endParagraph: range.end.getValue(),
       voiceName: voiceSelect.value || undefined,
     }
     saveTTSSettings({ lastMode: 'webspeech', webSpeechVoiceName: voiceSelect.value || undefined })
@@ -314,20 +438,10 @@ function renderWebSpeechContent(container: HTMLElement, total: number, autoSel?:
 }
 
 // ─── Edge 在线语音模式 ──────────────────────────────────────
-function renderEdgeContent(container: HTMLElement, total: number, autoSel?: AppleSelectEl): void {
+function renderEdgeContent(container: HTMLElement, autoSel?: AppleSelectEl): void {
   const settings = getTTSSettings()
   const form = document.createElement('div')
   form.style.cssText = 'display:flex;flex-direction:column;gap:14px;'
-
-  const startRow = createRow(t('tts.startParagraph', undefined, '起始段落'))
-  const startSelect = createParagraphSelect(total, 0)
-  startRow.appendChild(startSelect)
-  form.appendChild(startRow)
-
-  const endRow = createRow(t('tts.endParagraph', undefined, '结束段落'))
-  const endSelect = createParagraphSelect(total, total - 1, true)
-  endRow.appendChild(endSelect)
-  form.appendChild(endRow)
 
   // 每块朗读（在语速上方；松手写盘，播放时生效）
   form.appendChild(createRepeatSliderRow('desktop').row)
@@ -358,6 +472,9 @@ function renderEdgeContent(container: HTMLElement, total: number, autoSel?: Appl
   voiceRow.appendChild(voiceSelect)
   form.appendChild(voiceRow)
 
+  // 朗读范围（起始块 → 结束块；与手机端一致放在最后）
+  const range = appendRangePickers(form, getTTSEngine().getParagraphs())
+
   container.appendChild(form)
 
   const btns = createBtnRow()
@@ -366,17 +483,17 @@ function renderEdgeContent(container: HTMLElement, total: number, autoSel?: Appl
     e.stopPropagation()
     const rate = parseFloat(rateSlider.value)
     const voice = voiceSelect.value || EDGE_TTS_VOICES[0].name
-    autoReadAction = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev'
+    autoReadAction = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev' | 'repeat'
     saveTTSSettings({ lastMode: 'edge', edgeRate: rate, edgeVoiceName: voice, autoReadAction })
     getEdgeTTSEngine().activatePlayback()
     removeOptionsPanel()
-    startEdgePlayback(voice, rate, parseInt(startSelect.value), endSelect.value === 'all' ? undefined : parseInt(endSelect.value))
+    startEdgePlayback(voice, rate, range.start.getValue(), range.end.getValue())
   }
   container.appendChild(btns.wrap)
 }
 
 
-function renderFreeContent(container: HTMLElement, total: number, autoSel?: AppleSelectEl): void {
+function renderFreeContent(container: HTMLElement, autoSel?: AppleSelectEl): void {
   const settings = getTTSSettings()
 
   const hint = document.createElement('div')
@@ -401,11 +518,8 @@ function renderFreeContent(container: HTMLElement, total: number, autoSel?: Appl
   rateRow.appendChild(rateSlider); rateRow.appendChild(rateValue)
   form.appendChild(rateRow)
 
-  // 范围
-  const rangeRow = createRow(t('tts.range', undefined, '范围'))
-  const rangeSel = createParagraphSelect(total, 0, true)
-  rangeRow.appendChild(rangeSel)
-  form.appendChild(rangeRow)
+  // 朗读范围（起始块 → 结束块，滚轮/上下滑动选择）
+  const range = appendRangePickers(form, getTTSEngine().getParagraphs())
 
   container.appendChild(form)
 
@@ -414,11 +528,11 @@ function renderFreeContent(container: HTMLElement, total: number, autoSel?: Appl
   btns.cancel.onclick = (e) => { e.stopPropagation(); removeOptionsPanel() }
   btns.confirm.onclick = async (e) => {
     e.stopPropagation()
-    autoReadAction = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev'
+    autoReadAction = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev' | 'repeat'
     saveTTSSettings({ autoReadAction })
     const speed = parseInt(rateSlider.value)
-    const startP = parseInt(rangeSel.value === 'all' ? '0' : rangeSel.value)
-    const endP = rangeSel.value === 'all' ? undefined : parseInt(rangeSel.value)
+    const startP = range.start.getValue()
+    const endP = range.end.getValue()
     saveTTSSettings({ speed, lastMode: 'free' })
 
     removeOptionsPanel()
@@ -437,7 +551,7 @@ function renderFreeContent(container: HTMLElement, total: number, autoSel?: Appl
 
 // ─── 硅基流动 API 模式面板 ──────────────────────────────────
 
-function renderApiContent(container: HTMLElement, total: number, autoSel?: AppleSelectEl): void {
+function renderApiContent(container: HTMLElement, autoSel?: AppleSelectEl): void {
   const cfg = getSFAPIConfig()
   const settings = getTTSSettings()
 
@@ -512,11 +626,8 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: Apple
   rateRow.appendChild(rateSlider); rateRow.appendChild(rateValue)
   form.appendChild(rateRow)
 
-  // 范围
-  const rangeRow = createRow(t('tts.range', undefined, '范围'))
-  const rangeSel = createParagraphSelect(total, 0, true)
-  rangeRow.appendChild(rangeSel)
-  form.appendChild(rangeRow)
+  // 朗读范围（起始块 → 结束块，滚轮/上下滑动选择）
+  const range = appendRangePickers(form, getTTSEngine().getParagraphs())
 
   container.appendChild(form)
 
@@ -525,7 +636,7 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: Apple
   btns.cancel.onclick = (e) => { e.stopPropagation(); removeOptionsPanel() }
   btns.confirm.onclick = async (e) => {
     e.stopPropagation()
-    autoReadAction = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev'
+    autoReadAction = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev' | 'repeat'
     saveTTSSettings({ autoReadAction })
     const apiKey = keyInput.value.trim()
     if (!apiKey) { Notify.showErrorCommandCannotExecute(t('tts.enterApiKey', undefined, '请填写 API Key')); return }
@@ -535,8 +646,8 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: Apple
     saveSFAPIConfig({ apiKey })
     saveTTSSettings({ apiSpeed: speed, speaker, lastMode: 'api' })
 
-    const startP = parseInt(rangeSel.value === 'all' ? '0' : rangeSel.value)
-    const endP = rangeSel.value === 'all' ? undefined : parseInt(rangeSel.value)
+    const startP = range.start.getValue()
+    const endP = range.end.getValue()
     removeOptionsPanel()
 
     const engine = getHttpTTSEngine()
@@ -555,24 +666,26 @@ function renderApiContent(container: HTMLElement, total: number, autoSel?: Apple
 
 /** 等待新文档加载完成（监听 loaded-protyle-dynamic，5s 超时兜底） */
 function waitForDocLoaded(): Promise<void> {
+  // 事件只派发到插件实例自己的 eventBus（思源 App 上没有 eventBus）
+  const eventBus = (pluginInstance as any)?.eventBus ?? (pluginInstance as any)?.app?.eventBus
   return new Promise((resolve) => {
     const handler = () => {
-      pluginInstance?.app?.eventBus?.off('loaded-protyle-dynamic', handler)
+      eventBus?.off?.('loaded-protyle-dynamic', handler)
       resolve()
     }
-    pluginInstance?.app?.eventBus?.on('loaded-protyle-dynamic', handler)
+    eventBus?.on?.('loaded-protyle-dynamic', handler)
     setTimeout(() => {
-      pluginInstance?.app?.eventBus?.off('loaded-protyle-dynamic', handler)
+      eventBus?.off?.('loaded-protyle-dynamic', handler)
       resolve()
     }, 5000)
   })
 }
 
-function startEdgePlayback(voice: string, rate: number, startP: number, endP: number | undefined): void {
+function startEdgePlayback(voice: string, rate: number, startP: number, endP: number | undefined, protyleEl?: HTMLElement): void {
   const engine = getEdgeTTSEngine()
   engine.setVoice(voice)
   engine.setRate(rate)
-  engine.extractParagraphs()
+  engine.extractParagraphs(protyleEl)
   engine.onStateChange = (state, index, total) => updatePlaybackBar(state, index, total)
   engine.onError = (msg) => {
     Notify.showErrorCommandCannotExecute(msg)
@@ -586,6 +699,12 @@ function startEdgePlayback(voice: string, rate: number, startP: number, endP: nu
       await engine.speakOnce(t('tts.documentReadingCompleteSpeech', undefined, '本文档已经朗读完成'), () => removePlaybackBar())
       return
     }
+    if (autoReadAction === 'repeat') {
+      // 重复：重新提取段落，再读同一范围
+      await engine.extractParagraphsAsync(protyleEl)
+      engine.speak(startP, endP)
+      return
+    }
     const success = await navigateToAdjacentDoc(autoReadAction)
     if (!success) {
       removePlaybackBar()
@@ -594,9 +713,11 @@ function startEdgePlayback(voice: string, rate: number, startP: number, endP: nu
     }
     await waitForDocLoaded()
     await engine.extractParagraphsAsync()
+    resetPlaybackRange()
     engine.speak(0, undefined)
   }
   createPlaybackBar(engine)
+  setPlaybackRange(startP, endP)
   engine.speak(startP, endP)
 }
 
@@ -613,6 +734,12 @@ function startWebSpeechPlayback(opts: TTSOptions): void {
       engine.speakOnce(t('tts.documentReadingCompleteSpeech', undefined, '本文档已经朗读完成'), () => removePlaybackBar())
       return
     }
+    if (autoReadAction === 'repeat') {
+      // 重复：重新提取段落，再读同一范围
+      engine.extractParagraphs()
+      engine.speak(opts)
+      return
+    }
     const success = await navigateToAdjacentDoc(autoReadAction)
     if (!success) {
       removePlaybackBar()
@@ -621,9 +748,11 @@ function startWebSpeechPlayback(opts: TTSOptions): void {
     }
     await waitForDocLoaded()
     engine.extractParagraphs()
+    resetPlaybackRange()
     engine.speak({ ...opts, startParagraph: 0, endParagraph: undefined })
   }
   createPlaybackBar(engine)
+  setPlaybackRange(opts.startParagraph ?? 0, opts.endParagraph)
   engine.speak(opts)
 }
 
@@ -643,6 +772,12 @@ function startHttpPlayback(engine: HttpTTSEngine, startP: number, endP: number |
       await engine.speakOnce(t('tts.documentReadingCompleteSpeech', undefined, '本文档已经朗读完成'), () => removePlaybackBar())
       return
     }
+    if (autoReadAction === 'repeat') {
+      // 重复：重新提取段落，再读同一范围
+      await engine.extractParagraphsAsync()
+      engine.speak(startP, endP)
+      return
+    }
     const success = await navigateToAdjacentDoc(autoReadAction)
     if (!success) {
       removePlaybackBar()
@@ -651,9 +786,11 @@ function startHttpPlayback(engine: HttpTTSEngine, startP: number, endP: number |
     }
     await waitForDocLoaded()
     await engine.extractParagraphsAsync()
+    resetPlaybackRange()
     engine.speak(0, undefined)
   }
   createPlaybackBar(engine)
+  setPlaybackRange(startP, endP)
   engine.speak(startP, endP)
 }
 
@@ -763,7 +900,7 @@ function updatePlaybackBar(state: string, index: number, total: number): void {
     idle: t('tts.stopped', undefined, '已停止'),
   }
   if (statusEl) statusEl.textContent = stateMap[state] || t('tts.reading', undefined, '朗读中')
-  if (progressEl && total > 0) progressEl.textContent = `${index + 1} / ${total}`
+  if (progressEl && total > 0) progressEl.textContent = formatRangeProgress(index, total)
   if (playPauseBtn) {
     const isPlaying = state === 'playing' || state === 'loading'
     updateButtonIcon(playPauseBtn, isPlaying ? 'pause' : 'play', 18, true)
@@ -794,25 +931,6 @@ function createSlider(min: string, max: string, step: string, value: string): HT
   slider.min = min; slider.max = max; slider.step = step; slider.value = value
   slider.style.cssText = 'flex: 1; margin: 0 8px;'
   return slider
-}
-
-function createParagraphSelect(total: number, defaultIndex: number, hasAll = false): AppleSelectEl {
-  const sel = createAppleSelect()
-  for (let i = 0; i < total; i++) {
-    const opt = document.createElement('option')
-    opt.value = String(i)
-    opt.textContent = t('tts.paragraph', { index: i + 1 }, `第 ${i + 1} 段`)
-    if (i === defaultIndex && !hasAll) opt.selected = true
-    sel.appendChild(opt)
-  }
-  if (hasAll) {
-    const allOpt = document.createElement('option')
-    allOpt.value = 'all'
-    allOpt.textContent = t('tts.toEnd', undefined, '到最后')
-    allOpt.selected = true
-    sel.appendChild(allOpt)
-  }
-  return sel
 }
 
 /**

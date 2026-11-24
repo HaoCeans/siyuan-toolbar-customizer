@@ -62,6 +62,10 @@ import {
 // TTS 设置持久化初始化
 import { initTTSSettings } from './tts/httpTtsEngine'
 import { flushPreparedTtsCache, initPreparedTtsCache } from './tts/preparedTtsCache'
+// 块菜单「从当前块朗读到末尾」
+import { initTTSBlockMenu, cleanupTTSBlockMenu } from './tts/ttsBlockMenu'
+// 手机端原生搜索增强
+import { syncSearchTweak, cleanupSearchTweak } from './searchTweak'
 
 // 清理残留草稿块
 import { deleteQuickNoteDraftBlock } from './quickNote/kernelBlock'
@@ -479,6 +483,7 @@ export default class ToolbarCustomizer extends Plugin {
     glassEffect: true,  // 毛玻璃背景（半透明+背景模糊，独立于分割线样式，可叠加；默认开）
     disableCustomButtons: false,// 禁用所有自定义按钮
     showMobileLineBreakButton: false, // 顶部工具栏云同步左侧显示 H 换行按钮
+    enableSearchTweak: false, // 思源手机端搜索增强（原生搜索外观增强）
     hideStatusBar: true,         // 手机端隐藏底部状态条 #status
     keepTopBarVisible: false,    // 不隐藏顶栏标题（滚动沉浸时标题栏保持显示，默认关）
     showAllNotifications: true, // 一键开启所有按钮右上角提示
@@ -1282,6 +1287,12 @@ export default class ToolbarCustomizer extends Plugin {
     }
     this.eventBus.on('open-menu-content', this.eventBusContextMenuHandler)
 
+    // ===== 块菜单：从当前块朗读到末尾（click-blockicon 追加菜单项） =====
+    // 块标菜单是桌面端独有；手机端朗读走手机面板，不注册（避免出现桌面样式播放条）
+    if (!this.isMobile) {
+      initTTSBlockMenu()
+    }
+
     // ===== 兼容：第三方“一键记事”弹窗 textarea 的模板右键菜单 =====
     // 第三方插件的弹窗通常使用 textarea，右键不会触发 open-menu-content（该事件仅针对 protyle 编辑器菜单）。
     // 这里用事件委托捕获“看起来像一键记事弹窗”的 textarea 右键，并复用本插件的 showTemplateContextMenu。
@@ -1497,6 +1508,9 @@ export default class ToolbarCustomizer extends Plugin {
     // 清理手机端文档导航资源
     cleanupMobileDocNav()
 
+    // 清理手机端原生搜索增强
+    cleanupSearchTweak()
+
     // 清理桌面端标签页Tab资源
     cleanupDesktopTabs()
 
@@ -1556,6 +1570,9 @@ export default class ToolbarCustomizer extends Plugin {
       this.eventBus.off('open-menu-content', this.eventBusContextMenuHandler)
       this.eventBusContextMenuHandler = null
     }
+
+    // 清理块菜单「从当前块朗读到末尾」监听器
+    cleanupTTSBlockMenu()
 
     // 清理：第三方 quick note textarea 右键菜单兼容
     if (this.quickNoteTextareaContextMenuHandler) {
@@ -2310,6 +2327,17 @@ export default class ToolbarCustomizer extends Plugin {
 
     // 撤销/重做按钮的隐藏开关变化后，自定义按钮的可见性也要立即跟随
     syncHistoryButtonStates()
+
+    // 手机端原生搜索增强：开关变化时注入/移除样式与装饰
+    try {
+      syncSearchTweak(
+        this.isMobile
+        && !disableCustomButtons
+        && (this.mobileFeatureConfig as any).enableSearchTweak === true
+      )
+    } catch (e) {
+      console.warn('[search-tweak] 应用失败:', e)
+    }
   }
 
   /**

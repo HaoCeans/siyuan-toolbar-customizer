@@ -13,7 +13,7 @@
  */
 
 import { logger } from '@/utils/logger'
-import { TTSEngine, ParagraphInfo, getCurrentDocId, collectLeafParagraphs, resolveParagraphElement } from './ttsEngine'
+import { TTSEngine, ParagraphInfo, getCurrentDocId, collectLeafParagraphs, resolveParagraphElement, sanitizeSpeechText } from './ttsEngine'
 import { ensureTtsParagraphVisible } from './ttsParagraphFocus'
 import { clampRepeatCount, getRepeatCountSetting, getReadDirectionSetting } from './httpTtsEngine'
 import { fetchSyncPost } from 'siyuan'
@@ -326,8 +326,14 @@ export function isSupportedEdgeVoice(name: string): boolean {
 const EDGE_TTS_URL = 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1'
 const TRUSTED_TOKEN = '6A5AA1D4EAFF4E9FB37E23D68491D6F4'
 
-// 连续多少段失败后判定为系统性故障并中止，避免整篇被静默跳过
-const MAX_CONSECUTIVE_FAILURES = 3
+// 连续多少段失败后判定为系统性故障并中止，避免整篇被静默跳过。
+// 移动数据/弱网下 WS 连接很脆弱，阈值放宽，让偶发波动有机会恢复。
+const MAX_CONSECUTIVE_FAILURES = 6
+
+// 同一段文本最多合成几次（含首次）。移动数据下首次连接经常失败，多给几次机会。
+const EDGE_MAX_ATTEMPTS = 4
+// 重试间隔（毫秒），按尝试次数递增
+const EDGE_RETRY_DELAYS = [400, 1000, 2200]
 
 const HIGHLIGHT_CLASS = 'tts-current-paragraph'
 let styleEl: HTMLStyleElement | null = null
@@ -475,17 +481,17 @@ export class EdgeTTSEngine {
 
   // ─── 段落提取（复用现有逻辑）─────────────────────────
 
-  extractParagraphs(): number {
+  extractParagraphs(protyleEl?: HTMLElement): number {
     const base = new TTSEngine()
-    base.extractParagraphs()
+    base.extractParagraphs(protyleEl)
     this.paragraphs = base.getParagraphs()
     return this.paragraphs.length
   }
 
-  async extractParagraphsAsync(): Promise<number> {
+  async extractParagraphsAsync(protyleEl?: HTMLElement): Promise<number> {
     // ① 先尝试 DOM 提取（桌面端 / 手机端 protyle 可达时）
     const base = new TTSEngine()
-    let count = base.extractParagraphs()
+    let count = base.extractParagraphs(protyleEl)
     if (count > 0) {
       this.paragraphs = base.getParagraphs()
       return count
@@ -732,7 +738,7 @@ export class EdgeTTSEngine {
     // 优先使用上一段播放期间预取好的音频，避免在段落之间重新等待一次合成
     const prefetched = this.takePrefetch(index, generation)
     edgeLog('prefetch', { paragraphIndex: index, reused: prefetched !== null || repeatReuse !== null })
-    const audioPromise = repeatReuse ? Promise.resolve(repeatReuse) : (prefetched ?? this.synthesize(para.text, generation))
+    const audioPromise = repeatReuse ? Promise.resolve(repeatReuse) : (prefetched ?? this.synthesize(sanitizeSpeechText(para.text), generation))
 
     let playedAudio: ArrayBuffer | null = null
     audioPromise
@@ -797,7 +803,7 @@ export class EdgeTTSEngine {
     if (generation !== this.operationGeneration || this.stopped) return
     if (this.prefetch?.index === nextIndex && this.prefetch.generation === generation) return
 
-    const text = this.paragraphs[nextIndex].text
+    const text = sanitizeSpeechText(this.paragraphs[nextIndex].text)
     if (!hasSpeakableContent(text)) return
 
     const promise = this.synthesize(text, generation)
@@ -816,13 +822,50 @@ export class EdgeTTSEngine {
   // ─── 内部：WebSocket 合成 ──────────────────────────────
 
   private synthesize(text: string, generation: number = this.operationGeneration): Promise<ArrayBuffer> {
-    return this.synthesizeAttempt(text, generation).catch(async (error: unknown) => {
-      const retryable = error instanceof Error && (error as Error & { retryable?: boolean }).retryable === true
-      if (!retryable || generation !== this.operationGeneration || this.stopped) throw error
-      edgeLog('retry', { textLength: text.length, voice: this.voice, rate: this.rate })
-      await new Promise(resolve => setTimeout(resolve, 350))
-      if (generation !== this.operationGeneration || this.stopped) throw new Error('operation cancelled')
-      return this.synthesizeAttempt(text, generation)
+    // 同一段最多尝试 EDGE_MAX_ATTEMPTS 次：移动数据下 WebSocket 首次连接经常失败，
+    // 多给几次机会能显著降低「读着读着提示 Edge 在线朗读失败」的概率。
+    const run = async (): Promise<ArrayBuffer> => {
+      let lastError: unknown
+      for (let attempt = 0; attempt < EDGE_MAX_ATTEMPTS; attempt++) {
+        try {
+          return await this.synthesizeAttempt(text, generation)
+        } catch (error) {
+          lastError = error
+          const retryable = error instanceof Error && (error as Error & { retryable?: boolean }).retryable === true
+          if (!retryable || attempt === EDGE_MAX_ATTEMPTS - 1
+            || generation !== this.operationGeneration || this.stopped) {
+            throw error
+          }
+          edgeLog('retry', {
+            attempt: attempt + 1,
+            maxAttempts: EDGE_MAX_ATTEMPTS,
+            textLength: text.length,
+            voice: this.voice,
+            rate: this.rate,
+          })
+          // 断网时先等网络恢复（最多 4 秒），避免在飞行模式/弱网切换瞬间白白重试
+          await this.waitForOnline(4000)
+          await new Promise(resolve => setTimeout(resolve, EDGE_RETRY_DELAYS[attempt] ?? 2000))
+          if (generation !== this.operationGeneration || this.stopped) throw new Error('operation cancelled')
+        }
+      }
+      throw lastError
+    }
+    return run()
+  }
+
+  /** 浏览器判定离线时，等待 online 事件或超时（最多 maxWaitMs） */
+  private waitForOnline(maxWaitMs: number): Promise<void> {
+    if (typeof navigator === 'undefined' || navigator.onLine !== false) return Promise.resolve()
+    return new Promise<void>(resolve => {
+      let timer: ReturnType<typeof setTimeout> | null = null
+      const done = () => {
+        if (timer) clearTimeout(timer)
+        try { window.removeEventListener('online', done) } catch {}
+        resolve()
+      }
+      timer = setTimeout(done, maxWaitMs)
+      try { window.addEventListener('online', done) } catch { done() }
     })
   }
 

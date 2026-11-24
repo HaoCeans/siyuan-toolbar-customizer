@@ -48,6 +48,25 @@ const CONTAINER_DATA_TYPES = new Set([
 ])
 
 /**
+ * 覆盖拉丁字母（含重音）、希腊、西里尔、假名、CJK、谚文。
+ * 只用于判断「这段文本有没有可朗读内容」，不需要覆盖全部 Unicode。
+ */
+const SPEAKABLE_CHAR = /[0-9A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF\uF900-\uFAFF]/
+
+/** 纯标点/纯符号/纯零宽字符的块没有可朗读内容（Chrome 对这类 utterance 可能永不回调） */
+export function hasSpeakableContent(text: string): boolean {
+  return SPEAKABLE_CHAR.test(text)
+}
+
+/** 去掉零宽与格式控制字符，避免语音引擎把异常字符当成整段无声 */
+export function sanitizeSpeechText(text: string): string {
+  return (text || '')
+    .replace(/[\u200b-\u200f\u202a-\u202e\u2060\ufeff]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
  * 按「最小文本块」提取段落：容器块逐层展开，只收集带文本的叶子块。
  *
  * 与旧实现（只取 wysiwyg 直接子块）的差别：一个列表过去整块算一段，
@@ -113,6 +132,60 @@ export function resolveParagraphElement(info: ParagraphInfo | null | undefined):
   }
   // 兜底：元素仍连接就用旧的（页签被隐藏但 DOM 还在，高亮至少能保留）
   return current?.isConnected ? current : null
+}
+
+export interface ParagraphAnchor {
+  /** 段落在段落列表中的下标；-1 表示找不到可朗读内容 */
+  index: number
+  /** 该段落的块 id：引擎重新提取段落后可用它精确定位，避免下标错位 */
+  nodeId?: string
+}
+
+/**
+ * 找出「从该块开始朗读」的段落锚点（供块菜单使用）。
+ *
+ * 与引擎提取段落用的是同一套 collectLeafParagraphs，因此下标可直接作为
+ * startParagraph 传给各引擎：
+ * - 叶子文本块：返回它在段落列表中的位置
+ * - 容器块（列表 / 引述 / 超级块）：返回其内部第一个叶子文本块的位置
+ * - 被跳过的块（代码块 / 数学块等）：返回文档顺序上它之后第一个可读段落的位置
+ *   （点代码块也不会没反应，直接读后面能读的内容）
+ *
+ * 找不到可朗读内容时返回 -1。
+ */
+export function findParagraphAnchor(
+  protyleEl: HTMLElement | null | undefined,
+  blockEls: HTMLElement[],
+): ParagraphAnchor {
+  if (!blockEls.length) return { index: -1 }
+  const protyle = protyleEl || getActiveProtyleElement()
+  const wysiwyg = protyle ? findBodyWysiwyg(protyle) : null
+  if (!wysiwyg) return { index: -1 }
+  const paragraphs = collectLeafParagraphs(wysiwyg)
+  if (paragraphs.length === 0) return { index: -1 }
+
+  let best = -1
+  for (const blockEl of blockEls) {
+    const index = paragraphIndexForBlock(paragraphs, blockEl)
+    // 多选时取最靠前的块，保证「从选中范围的开头读到末尾」
+    if (index >= 0 && (best < 0 || index < best)) best = index
+  }
+  if (best < 0) return { index: -1 }
+  return { index: best, nodeId: paragraphs[best].nodeId }
+}
+
+function paragraphIndexForBlock(paragraphs: ParagraphInfo[], blockEl: HTMLElement): number {
+  const blockId = blockEl.getAttribute('data-node-id') || ''
+  // ① 命中块自身或它内部的第一个叶子段落（容器块）
+  const inside = paragraphs.findIndex(p =>
+    (blockId && p.nodeId === blockId) || blockEl.contains(p.element)
+  )
+  if (inside >= 0) return inside
+  // ② 不可朗读的块（代码块 / 数学块等被 SKIP_DATA_TYPES 跳过）：
+  //    从文档顺序上它之后的第一个可读段落开始
+  return paragraphs.findIndex(p =>
+    !!(blockEl.compareDocumentPosition(p.element) & Node.DOCUMENT_POSITION_FOLLOWING)
+  )
 }
 
 // ─── 高亮样式 ────────────────────────────────────────────
@@ -217,9 +290,13 @@ export class TTSEngine {
 
   // ─── 段落提取 ──────────────────────────────────────
 
-  extractParagraphs(): number {
+  /**
+   * 提取可朗读段落。
+   * @param protyleEl 指定从哪个编辑器提取（分屏时避免读错栏）；不传则取当前活动编辑器
+   */
+  extractParagraphs(protyleEl?: HTMLElement): number {
     this.paragraphs = []
-    const protyle = this.getProtyleElement()
+    const protyle = protyleEl || this.getProtyleElement()
 
     if (protyle) {
       // ① DOM 提取（桌面端 / 手机端 protyle 可达时）
@@ -266,7 +343,8 @@ export class TTSEngine {
       return false
     }
 
-    // 取消之前的朗读
+    // 取消之前的朗读（先清引用：onerror('canceled') 才能区分「主动取消」和「引擎异常」）
+    this.currentUtterance = null
     this.synth.cancel()
     this.clearHighlight()
     this.stopKeepalive()
@@ -343,6 +421,7 @@ export class TTSEngine {
 
     // 手动跳到别的块：重复次数回到「每块朗读次数」默认值
     this._repeatRemaining = this._defaultRepeat
+    this.currentUtterance = null
     this.synth.cancel()
     this.clearHighlight()
     // 切文档 / 编辑器重渲染后旧元素已失效：先确保目标块在当前 DOM 中（必要时切回朗读文档）
@@ -449,28 +528,45 @@ export class TTSEngine {
 
   // ─── 内部方法 ─────────────────────────────────────
 
+  /** 当前索引是否仍在本次朗读范围内（正序/倒序都用 [start, end] 判定） */
+  private isIndexInRange(index: number): boolean {
+    if (index < 0 || index >= this.paragraphs.length) return false
+    return index >= this.startParagraphIndex && index <= this.endParagraphIndex
+  }
+
+  /** 读完整个范围：清高亮、回到 idle 并触发完成回调 */
+  private finishReading(): void {
+    this.clearHighlight()
+    this.stopKeepalive()
+    this.state = 'idle'
+    this.currentIndex = -1
+    this.notifyStateChange()
+    this.onFinish?.()
+  }
+
   private speakParagraph(index: number): void {
-    // 正序：越过结束边界即完成；倒序：越过起始边界即完成
-    const outOfRange = this._direction === 'backward'
-      ? index < this.startParagraphIndex || index >= this.paragraphs.length
-      : index > this.endParagraphIndex || index >= this.paragraphs.length
-    if (outOfRange) {
-      this.clearHighlight()
-      this.stopKeepalive()
-      this.state = 'idle'
-      this.currentIndex = -1
-      this.notifyStateChange()
-      this.onFinish?.()
+    const step = this.directionStep()
+
+    // 跳过没有实际可读文字的块（纯图片引用/纯符号/零宽字符等）。
+    // Chrome 对这类 utterance 可能既不触发 onend 也不报错，表现为「读到这里就停了」。
+    while (this.isIndexInRange(index) && !hasSpeakableContent(sanitizeSpeechText(this.paragraphs[index].text))) {
+      logger.log('[TTS] 跳过无可读内容的块:', index, this.paragraphs[index].nodeId)
+      index += step
+    }
+
+    if (!this.isIndexInRange(index)) {
+      this.finishReading()
       return
     }
 
     const para = this.paragraphs[index]
+    const speechText = sanitizeSpeechText(para.text)
     this.currentIndex = index
     // 切文档后旧元素可能已脱离 DOM：按 node-id 重新解析
     this.applyHighlight(resolveParagraphElement(para))
 
     // ★ 将 utterance 存到实例变量，防止被 GC 回收导致朗读停止
-    const utterance = new SpeechSynthesisUtterance(para.text)
+    const utterance = new SpeechSynthesisUtterance(speechText)
     this.currentUtterance = utterance
 
     utterance.rate = this.options.rate
@@ -487,32 +583,55 @@ export class TTSEngine {
       if (zhVoice) utterance.voice = zhVoice
     }
 
+    // 语音引擎偶发卡死（长段落、块链接/URL 段落更容易触发）：
+    // 超时后强制跳过当前块，避免整篇朗读停住没有任何反应。
+    let guardTimer: ReturnType<typeof setTimeout> | null = null
+    const clearGuard = () => {
+      if (guardTimer) { clearTimeout(guardTimer); guardTimer = null }
+    }
+    const guardMs = Math.max(10_000, Math.min(120_000, speechText.length * 400))
+    guardTimer = setTimeout(() => {
+      if (this.state === 'idle' || this.currentUtterance !== utterance) return
+      logger.warn('[TTS] 当前块朗读超时，跳过:', index)
+      this.currentUtterance = null
+      try { this.synth?.cancel() } catch {}
+      this.speakParagraph(index + step)
+    }, guardMs)
+
     utterance.onend = () => {
+      clearGuard()
       // ★ 段落间加 100ms 延迟，让 Chrome 引擎重置，防止下一个 speak() 被吞掉
       setTimeout(() => {
-        // 重复朗读：本块还有剩余次数时重读本块（状态已非播放说明被 stop/跳段打断，忽略）
-        if (this.state === 'idle') return
+        // 状态已非播放 / 已被跳段或重读替换：忽略这次回调
+        if (this.state === 'idle' || this.currentUtterance !== utterance) return
+        // 重复朗读：本块还有剩余次数时重读本块
         if (this.consumeRepeatForCurrentBlock()) {
           this.speakParagraph(index)
           return
         }
-        this.speakParagraph(index + this.directionStep())
+        this.speakParagraph(index + step)
       }, 100)
     }
 
     utterance.onerror = (e) => {
+      clearGuard()
       if (e.error === 'canceled') {
-        // 用户主动调了 cancel()（stop / jumpToParagraph），不做任何事
-        return
-      }
-      // interrupted / network / 其他错误：继续下一段
-      // Chrome 15 秒 bug 会触发 'interrupted'，不能静默忽略
-      if (this.state !== 'idle') {
+        // 主动 cancel（stop / 跳段 / 超时兜底）已在调用处清空 currentUtterance；
+        // 若引用仍是它，说明是语音引擎异常取消 —— 继续下一块，别把整篇停死。
+        if (this.state === 'idle' || this.currentUtterance !== utterance) return
+        logger.warn('[TTS] utterance 被意外取消，继续下一段')
+      } else {
+        // interrupted / network / 其他错误：继续下一段
+        // Chrome 15 秒 bug 会触发 'interrupted'，不能静默忽略
         logger.warn('[TTS] utterance error:', e.error, '→ 继续下一段')
-        // 出错跳段时回到默认次数，避免把当前块的次数带到下一个块
-        this._repeatRemaining = this._defaultRepeat
-        setTimeout(() => this.speakParagraph(index + this.directionStep()), 150)
       }
+      if (this.state === 'idle' || this.currentUtterance !== utterance) return
+      // 出错跳段时回到默认次数，避免把当前块的次数带到下一个块
+      this._repeatRemaining = this._defaultRepeat
+      setTimeout(() => {
+        if (this.state === 'idle' || this.currentUtterance !== utterance) return
+        this.speakParagraph(index + step)
+      }, 150)
     }
 
     this.synth!.speak(utterance)
@@ -554,23 +673,36 @@ export class TTSEngine {
   }
 
   private getProtyleElement(): HTMLElement | null {
-    // ① 优先从思源内部对象获取（手机端 window.siyuan.mobile.editor.protyle）
-    const w = window as any
-    const mobileProtyle = w.siyuan?.mobile?.editor?.protyle
-    if (mobileProtyle?.element) return mobileProtyle.element as HTMLElement
-
-    // ② DOM 查询：排除隐藏的 protyle
-    const active = document.querySelector('.protyle:not(.fn__hidden):not(.fn__none)') as HTMLElement
-    if (active) return active
-
-    // ③ 兜底：找可见的 protyle
-    const all = document.querySelectorAll('.protyle')
-    for (const el of all) {
-      const rect = el.getBoundingClientRect()
-      if (rect.width > 0 && rect.height > 0) return el as HTMLElement
-    }
-    return null
+    return getActiveProtyleElement()
   }
+}
+
+/**
+ * 取「正文编辑器」的 .protyle 元素。
+ * 分屏时可能有多个可见编辑器，优先取焦点所在的那个，避免
+ * 从 A 栏块菜单点朗读、实际读的却是 B 栏文档。
+ */
+export function getActiveProtyleElement(): HTMLElement | null {
+  // ① 优先从思源内部对象获取（手机端 window.siyuan.mobile.editor.protyle）
+  const w = window as any
+  const mobileProtyle = w.siyuan?.mobile?.editor?.protyle
+  if (mobileProtyle?.element) return mobileProtyle.element as HTMLElement
+
+  // ② 焦点所在编辑器
+  const focused = (document.activeElement as HTMLElement | null)?.closest?.('.protyle') as HTMLElement | null
+  if (focused && focused.getClientRects().length > 0) return focused
+
+  // ③ DOM 查询：排除隐藏的 protyle
+  const active = document.querySelector('.protyle:not(.fn__hidden):not(.fn__none)') as HTMLElement
+  if (active) return active
+
+  // ④ 兜底：找可见的 protyle
+  const all = document.querySelectorAll('.protyle')
+  for (const el of all) {
+    const rect = el.getBoundingClientRect()
+    if (rect.width > 0 && rect.height > 0) return el as HTMLElement
+  }
+  return null
 }
 
 /**

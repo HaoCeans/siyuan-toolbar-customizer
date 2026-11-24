@@ -1085,3 +1085,24 @@ GET /ws/network/proxy?u=<base64url 目标 ws URL>&h=<base64url headers JSON>&tok
 - 切换朗读引擎时要停掉另一条通路（`stopInactiveTTSEngines`），避免两个引擎叠音
 - 失败提示要带排查方向（代理权限 / Host / 网络），不要只抛「连接关闭」
 - 修改后至少验证：手机 App 与手机浏览器伺服都能听到 Edge 音色；只读账号访问时提示权限问题而不是静默失败；断网时提示需要联网
+
+### 43. 手机端原生搜索增强：只能在原生 DOM 上做样式与装饰，不能改逻辑
+
+**相关文件**: `src/searchTweak/`（`index.ts` 装饰与生命周期、`style.ts` 样式）、`src/settings/mobile.ts`（⑩开关）、`src/index.ts`（applyFeatures / onunload）
+
+**背景**: 手机端搜索是 `#model` 全屏视图（`mobile/menu/search.ts`），配置与渲染都在闭包里，插件拿不到，也**收不到** `input-search` / `before-search-results-render` 事件（仅桌面版发）。因此增强只能做两件事：注入样式、给原生 DOM 补可见的装饰（如文字标签），不改搜索逻辑。
+
+**实现要点**:
+
+1. **打开检测**：`#model.style.transform === 'translateX(0px)'` 且 `#modelMain` 内存在 `#toolbarSearch`；`closeModel()` 会清空 transform，据此移除 `body.tc-native-search`。
+2. **内容每次重建**：`openModel()` 会重设 `#modelMain.innerHTML`，装饰不能只做一次；用 `#modelMain` 中是否存在 `.tc-search-btn` 判断是否需要重新包裹。
+3. **点击委托向上找 `data-type`**：原生在 `searchPanelElement` 上监听 click，并从 `event.target` 逐级向上找 `data-type`。把 svg 包一层容器后，**标签文字区域必须 `pointer-events:none`**，容器自身接收点击并 `svg.dispatchEvent(click)` 转发，否则点标签无反应；点 svg 本体走原生，不要再拦截。
+4. **只用 body class 限定样式**：所有规则挂在 `body.tc-native-search #modelMain ...` 下，关闭开关/关闭面板立即失效。
+5. **关闭时还原 DOM**：`untrapDecorations()` 把 svg 移回原位并删除容器，避免标签残留在还开着的面板里。
+
+**规则**:
+- 不要在原生搜索里注入新功能（筛选/排序/分组）——状态在闭包里，注入的控件无法驱动搜索
+- 不要隐藏原生按钮（用户可能要用），只做「加标签、加留白、调字号」
+- 底部工具栏放不下时用 `overflow-x:auto` 横向滑动，不要缩小点击区域（≥38px）
+- 修改后至少验证：开关开/关、面板反复开关、资源面板与无效引用面板不受影响、点标签文字与点图标行为一致
+

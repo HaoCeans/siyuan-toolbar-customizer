@@ -7,7 +7,7 @@
  */
 
 import { logger } from '@/utils/logger'
-import { getTTSEngine, ParagraphInfo, getCurrentDocId, collectLeafParagraphs, resolveParagraphElement } from './ttsEngine'
+import { getTTSEngine, ParagraphInfo, getCurrentDocId, collectLeafParagraphs, resolveParagraphElement, hasSpeakableContent, sanitizeSpeechText } from './ttsEngine'
 import { ensureTtsParagraphVisible } from './ttsParagraphFocus'
 import { forwardProxy, putFile, removeFile } from '../api'
 import { pluginInstance } from '../toolbarManager'
@@ -54,7 +54,7 @@ export interface TTSSettings {
   edgeVoiceName?: string   // Edge TTS 音色名
   edgeRate?: number        // Edge TTS 语速（0.5-2.0）
   lastMode?: string        // 上次使用的模式：'webspeech' | 'edge' | 'free' | 'api'
-  autoReadAction?: 'stop' | 'next' | 'prev'  // 朗读完成后动作，默认 'stop'
+  autoReadAction?: 'stop' | 'next' | 'prev' | 'repeat'  // 朗读完成后动作，默认 'stop'
   webSpeechVoiceName?: string  // 浏览器语音引擎上次选择的语音名
   repeatCount?: number     // 每块朗读次数（1-5，默认 1）；播放条上的按钮可临时覆盖当前块
   readDirection?: 'forward' | 'backward'  // 朗读顺序（默认 forward 从前往后）
@@ -344,7 +344,8 @@ function concatBuffers(buffers: ArrayBuffer[]): ArrayBuffer {
 // ═══════════════════════════════════════════════════════════════
 
 const SF_REQUEST_TIMEOUT = 30000
-const SF_MAX_ATTEMPTS = 3
+// 弱网下多给一次机会：超时/传输类错误会按退避重试
+const SF_MAX_ATTEMPTS = 4
 // 单段音频的解码上限。移动端 WebView 遇到异常音频时 decodeAudioData 可能既不回成功也不回失败，
 // 而解码是串行排队的，不设上限会让整次准备永久卡住且没有任何报错。
 const PREPARED_DECODE_TIMEOUT = 15000
@@ -663,15 +664,15 @@ export class HttpTTSEngine {
 
   // ─── 段落提取 ──────────────────────────────────────
 
-  extractParagraphs(): number {
+  extractParagraphs(protyleEl?: HTMLElement): number {
     const base = getTTSEngine()
-    base.extractParagraphs()
+    base.extractParagraphs(protyleEl)
     this.paragraphs = base.getParagraphs()
     return this.paragraphs.length
   }
 
-  async extractParagraphsAsync(): Promise<number> {
-    const sync = this.extractParagraphs()
+  async extractParagraphsAsync(protyleEl?: HTMLElement): Promise<number> {
+    const sync = this.extractParagraphs(protyleEl)
     if (sync > 0) return sync
 
     const docId = getCurrentDocId()
@@ -1236,6 +1237,20 @@ export class HttpTTSEngine {
   private playCurrentParagraph(generation = this.operationGeneration): void {
     if (this.stopped || generation !== this.operationGeneration) return
 
+    // 跳过没有实际可读文字的块（纯图片引用/纯符号/零宽字符等），
+    // 避免请求空文本白白失败，也不会把进度卡在不可朗读的块上。
+    const step = this.directionStep()
+    while (
+      this.currentIndex >= this.startParagraphIndex
+      && this.currentIndex <= this.endParagraphIndex
+      && this.currentIndex >= 0
+      && this.currentIndex < this.paragraphs.length
+      && !hasSpeakableContent(sanitizeSpeechText(this.paragraphs[this.currentIndex].text))
+    ) {
+      logger.log('[HttpTTS] 跳过无可读内容的块:', this.currentIndex)
+      this.currentIndex += step
+    }
+
     // 正序：越过结束边界即完成；倒序：越过起始边界即完成
     const outOfRange = this._direction === 'backward'
       ? this.currentIndex < this.startParagraphIndex || this.currentIndex >= this.paragraphs.length
@@ -1278,12 +1293,11 @@ export class HttpTTSEngine {
       .catch(err => {
         if (this.stopped || generation !== this.operationGeneration) return
         const msg = err instanceof Error ? err.message : String(err)
+        // 只有鉴权类错误才终止整篇；其余 4xx（如内容/参数问题）按单段失败跳过，
+        // 避免某个特殊段落（链接、符号等）把整篇朗读打断。
         const permanentApiError = err instanceof SiliconFlowRequestError
           && err.kind === 'http'
-          && err.status !== undefined
-          && err.status >= 400
-          && err.status < 500
-          && err.status !== 429
+          && (err.status === 401 || err.status === 403)
         if (permanentApiError) {
           this.state = 'idle'
           this.clearHighlight()
@@ -1572,6 +1586,9 @@ export class HttpTTSEngine {
   }
 
   private async fetchTTSAudio(text: string, generation = this.operationGeneration): Promise<ArrayBuffer> {
+    // 统一清理零宽/格式控制字符：某些块链接、URL 会带这类字符，部分 TTS 服务会直接拒绝
+    text = sanitizeSpeechText(text)
+    if (!text) throw new Error('段落没有可朗读文字')
     // ★ API 模式：硅基流动 CosyVoice2
     if (this.mode === 'api' && this.apiToken) {
       logger.log(`[HttpTTS] API模式: 硅基流动 CosyVoice2 (directFetch=${this.directFetch})`)
@@ -1600,29 +1617,38 @@ export class HttpTTSEngine {
     return concatBuffers(audioParts)
   }
 
-  /** 逐个尝试 TTS API，返回第一个成功的音频数据 */
+  /** 逐个尝试 TTS API，返回第一个成功的音频数据（弱网下整轮重试一次） */
   private async tryFetchChunk(chunk: string): Promise<ArrayBuffer> {
-    // ① 百度翻译 TTS
-    const safeSpeed = Math.max(1, Math.min(7, this.speed))
-    const baiduFanyiUrl = `https://fanyi.baidu.com/gettts?lan=zh&text=${encodeURIComponent(chunk)}&spd=${safeSpeed}&source=web`
-    const audio0 = await this.tryProxy(baiduFanyiUrl, '百度翻译', {
-      'Referer': 'https://fanyi.baidu.com/',
-    })
-    if (audio0) return audio0
+    const ROUNDS = 2
+    for (let round = 0; round < ROUNDS; round++) {
+      // ① 百度翻译 TTS
+      const safeSpeed = Math.max(1, Math.min(7, this.speed))
+      const baiduFanyiUrl = `https://fanyi.baidu.com/gettts?lan=zh&text=${encodeURIComponent(chunk)}&spd=${safeSpeed}&source=web`
+      const audio0 = await this.tryProxy(baiduFanyiUrl, '百度翻译', {
+        'Referer': 'https://fanyi.baidu.com/',
+      })
+      if (audio0) return audio0
 
-    // ② 百度 TTS
-    const baiduUrl = `${BAIDU_TTS}?lan=zh&ie=UTF-8&spd=${this.speed}&pit=5&vol=5&per=${Number(this.speaker)}&ctp=1&cuid=siyuan_tts&tex=${encodeURIComponent(chunk)}`
-    const audio1 = await this.tryProxy(baiduUrl, '百度TTS', {
-      'Referer': 'https://fanyi.baidu.com/',
-    })
-    if (audio1) return audio1
+      // ② 百度 TTS
+      const baiduUrl = `${BAIDU_TTS}?lan=zh&ie=UTF-8&spd=${this.speed}&pit=5&vol=5&per=${Number(this.speaker)}&ctp=1&cuid=siyuan_tts&tex=${encodeURIComponent(chunk)}`
+      const audio1 = await this.tryProxy(baiduUrl, '百度TTS', {
+        'Referer': 'https://fanyi.baidu.com/',
+      })
+      if (audio1) return audio1
 
-    // ③ 有道 TTS
-    const youdaoUrl = `${YOUDAO_TTS}?word=${encodeURIComponent(chunk)}&le=zh&keyfrom=speaker-target`
-    const audio2 = await this.tryProxy(youdaoUrl, '有道', {
-      'Referer': 'https://fanyi.youdao.com/',
-    })
-    if (audio2) return audio2
+      // ③ 有道 TTS
+      const youdaoUrl = `${YOUDAO_TTS}?word=${encodeURIComponent(chunk)}&le=zh&keyfrom=speaker-target`
+      const audio2 = await this.tryProxy(youdaoUrl, '有道', {
+        'Referer': 'https://fanyi.youdao.com/',
+      })
+      if (audio2) return audio2
+
+      // 三个服务都失败：移动数据波动时等一会儿再整轮重试
+      if (round < ROUNDS - 1) {
+        logger.warn(`[HttpTTS] 本轮 TTS 服务均失败，${800}ms 后重试`)
+        await new Promise(resolve => window.setTimeout(resolve, 800))
+      }
+    }
 
     throw new Error('所有 TTS 服务均不可用')
   }

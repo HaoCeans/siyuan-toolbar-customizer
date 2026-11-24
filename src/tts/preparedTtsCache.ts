@@ -20,7 +20,7 @@ export interface PreparedCacheDescriptor {
   speaker: string | number;
   start: number;
   end: number;
-  autoReadAction: "stop" | "next" | "prev";
+  autoReadAction: "stop" | "next" | "prev" | "repeat";
   trailingText?: string;
 }
 
@@ -152,7 +152,7 @@ function isCacheEntry(value: unknown): value is PreparedTtsCacheEntry {
     && Number.isInteger(descriptor!.end)
     && descriptor!.start! >= 0
     && descriptor!.end! >= descriptor!.start!
-    && (descriptor!.autoReadAction === "stop" || descriptor!.autoReadAction === "next" || descriptor!.autoReadAction === "prev")
+    && (descriptor!.autoReadAction === "stop" || descriptor!.autoReadAction === "next" || descriptor!.autoReadAction === "prev" || descriptor!.autoReadAction === "repeat")
     && (descriptor!.trailingText === undefined || typeof descriptor!.trailingText === "string");
   if (!validDescriptor) return false;
   if (typeof entry.key !== "string" || !/^[a-f0-9]{64}$/.test(entry.key)) return false;

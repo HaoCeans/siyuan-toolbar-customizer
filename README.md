@@ -294,6 +294,43 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v4.0.2 — Pick any reading range, read from the block menu, sturdier on weak networks
+
+> 💡 This release turns Read Aloud into a proper reader: pick any start/end block, start reading from the block menu, see "current block / end block" on the playback bar, and loop when finished. It also fixes reading stopping at block references or links, and makes Edge reading survive mobile-network fluctuations. New "Mobile search enhancement" switch (off by default).
+
+**① Pick any reading range**
+- Start/end block are now wheel pickers with a content preview for every block
+- Up/down buttons on the right jump 20 blocks per click — no more endless scrolling in long documents
+- Mouse wheel, touch swipe, and keyboard (↑/↓, PageUp/PageDown, Home/End) all work
+- Applies to all four engines: browser speech / Edge / Baidu free / SiliconFlow
+
+**② Start from the current block**
+- The block icon menu gains "▶ Read from current block to end": click any block's gutter icon and read to the end of the document
+- Lists, quotes and super blocks start from their first inner paragraph; unreadable blocks (code, math…) start from the next readable one
+- In split view, paragraphs are extracted from the pane you clicked, so the wrong pane is never read
+
+**③ Playback bar and completion action**
+- Progress now shows "current block number / end block number": reading blocks 3–5 shows 3/5, 4/5, 5/5
+- New "Repeat" option under "After reading": loop the current range from the start
+
+**④ Sturdier reading**
+- Fixed reading stopping at block references or links: unreadable blocks are skipped, zero-width characters are stripped, a per-block timeout continues playback, and unexpected engine cancellations no longer halt the document
+- Edge: up to 4 attempts per paragraph (400 ms / 1 s / 2.2 s backoff), waits for the network to come back when offline, and the consecutive-failure threshold is raised from 3 to 6
+- SiliconFlow: attempts raised from 3 to 4; only 401/403 aborts the document, other 4xx responses skip the paragraph
+- Baidu free: the whole service chain is retried once more
+
+**⑤ Mobile native search enhancement (new switch, off by default)**
+- Keeps SiYuan's native search and only improves readability: text labels for the bottom icon buttons, larger result rows, two-line excerpts, stronger hit highlighting
+- The switch lives in mobile settings: "⑩ SiYuan mobile search enhancement"
+
+**⑥ Requirements**
+- Minimum SiYuan version remains v3.8.10
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v4.0.1 — Reading upgrade: Edge voices on mobile, reverse order, per-block repeats
 
 > 💡 Mobile read-aloud gains "Edge Online": no more relying on the flaky free endpoint — Xiaoxiao, Yunxi and other voices are stable and lockable, and it works both in the mobile app and in a mobile browser served by SiYuan. Plus reverse-order reading, repeating each block N times, true smallest-block reading, and automatic position recovery after switching documents.
@@ -321,11 +358,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 **⑤ Requirements**
 - Minimum SiYuan version remains v3.8.10; Edge Online on mobile needs kernel ≥ 3.7.0 (already satisfied)
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v3.9.10 — Quick Note is much more reliable
 

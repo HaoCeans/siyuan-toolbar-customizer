@@ -294,6 +294,37 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v4.0.3 — Quick Note follows the current document, per-document reading ranges, sturdier Edge for long documents
+
+> 💡 This release focuses on Quick Note and Read Aloud: the Quick Note button gains a "follow the current document" switch so you never hand-type a target ID again; Read Aloud remembers the start/end blocks per document; Edge reading now reuses one WebSocket per document so long documents no longer abort mid-way; and fixes the broken document title in SiYuan 3.8.12 mobile top-bar mode.
+
+**① Quick Note: follow the current document**
+- A new "🔗 Follow the current document" switch on the button: clicking targets whatever document you are viewing, no more typing IDs
+- While the popup is open (including minimized), tapping the button again opens the document the popup is bound to — the popup keeps its state and the target never silently changes
+- Only after closing the popup does the next click bind to the then-current document
+- Works across all three popup forms (desktop float window, desktop block-format window, mobile popup); the switch takes priority over a fixed ID when both are set
+
+**② Reading ranges remembered per document**
+- Start/end blocks are remembered by document ID: reopening the Read Aloud settings restores the last chosen range for that document
+- Ranges are stored as block IDs, not indices, so edits that insert or remove blocks still resolve to the original blocks (with a fallback to the saved index if a block was deleted)
+- Works on desktop and mobile across all four engines; the 200 most recent documents are kept
+
+**③ Edge reading: sturdier on long documents**
+- One WebSocket is reused for the whole document instead of a fresh handshake per paragraph (a 250+ paragraph document previously tripped rate limits and aborted)
+- The session is rebuilt automatically when the server closes it or a request times out (30 s), on top of the existing 4-attempt backoff per paragraph
+- Failure logs now include a text preview for faster diagnosis; long documents also read noticeably faster
+
+**④ Fixes and adaptation**
+- Fixed the broken document title in SiYuan 3.8.12 mobile top-bar mode: the new title is an embedded mini-protyle (.protyle-title__rich.protyle), and the top-bar spacing compensation no longer applies to it (bottom / capsule modes were never affected)
+
+**⑤ Requirements**
+- Minimum SiYuan version remains v3.8.10
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v4.0.2 — Pick any reading range, read from the block menu, sturdier on weak networks
 
 > 💡 This release turns Read Aloud into a proper reader: pick any start/end block, start reading from the block menu, see "current block / end block" on the playback bar, and loop when finished. It also fixes reading stopping at block references or links, and makes Edge reading survive mobile-network fluctuations. New "Mobile search enhancement" switch (off by default).
@@ -325,11 +356,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 **⑥ Requirements**
 - Minimum SiYuan version remains v3.8.10
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v4.0.1 — Reading upgrade: Edge voices on mobile, reverse order, per-block repeats
 

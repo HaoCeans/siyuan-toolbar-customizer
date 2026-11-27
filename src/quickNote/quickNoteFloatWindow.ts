@@ -36,8 +36,12 @@ let mainWindowListenerAttached = false
 let mainWindowCloseHandler: (() => void) | null = null
 let themeObserver: MutationObserver | null = null
 let floatSaveIsFromButton = false
-// 保存目标快照：toggle 时（临时配置存活期）解析并冻结，保存回调时经 getQuickNoteFloatSaveTarget 取用
+// 保存目标快照：仅在「创建新窗口」时解析并冻结，保存回调时经 getQuickNoteFloatSaveTarget 取用
 let floatSaveTarget: QuickNoteTargetConfig | null = null
+// 本窗口是否由「跟随当前文档」按钮打开：关闭时销毁窗口，下一次点击才会绑定到当时所在文档
+let floatFollowCurrentDoc = false
+// 用户是否主动关闭过窗口（×/取消/Esc/系统关闭图标），用于判断「关闭后切文档再点」要重建
+let floatClosedByUser = false
 let floatWindowAllowAutoShow = true
 let floatWindowWantsVisible = true
 // 预创建定时器 ID（插件卸载时需清除）
@@ -56,6 +60,11 @@ const QUICKNOTE_FLOAT_WINDOW_MARKER = 'quick-note-float'
 // 修改纯文本弹窗 HTML/CSS 时递增；插件重载后用它识别并销毁旧窗口，避免继续显示旧样式
 const FLOAT_WINDOW_BUILD = '20261112-3'
 
+
+/** 本次打开请求是否来自「跟随当前文档」按钮（executeQuickNote 注入的临时标记） */
+function isFollowCurrentDocRequested(): boolean {
+  return (window as any).__pluginInstance?.mobileFeatureConfig?.__quickNoteFollowCurrentDoc === true
+}
 
 function getFloatUi() {
   return {
@@ -224,6 +233,9 @@ export function destroyQuickNoteFloatWindow(): void {
     preCreateTimer = null
   }
   closeFloatWindow({ force: true })
+  floatSaveTarget = null
+  floatFollowCurrentDoc = false
+  floatClosedByUser = false
   themeObserver?.disconnect()
   themeObserver = null
   removeMainWindowListeners()
@@ -289,12 +301,29 @@ export function toggleQuickNoteFloatWindow(isFromButton = false): void {
   if (now - lastFloatToggleTime < FLOAT_TOGGLE_COOLDOWN_MS) return
   lastFloatToggleTime = now
 
-  floatSaveIsFromButton = isFromButton
-  // 打开瞬间快照保存目标：保存回调发生在 executeQuickNote 的 finally 恢复临时配置之后，
-  // 按钮级覆盖（quickNoteTargetDocId）的文档 ID 不能等到保存时再解析，否则回落全局
-  floatSaveTarget = resolveQuickNoteTargetConfig(isFromButton)
+  // 窗口被用户关掉后，如果这次是「跟随当前文档」且当前文档已经变了：
+  // 先销毁旧窗口，落到下面按当前文档重新创建（否则会一直显示上一篇的目标）。
+  if (floatClosedByUser && isFollowCurrentDocRequested()) {
+    const requestedDocId = (window as any).__pluginInstance?.mobileFeatureConfig?.quickNoteDocumentId || ''
+    const previousDocId = floatSaveTarget?.documentId || ''
+    floatClosedByUser = false
+    if (requestedDocId && requestedDocId !== previousDocId) {
+      floatFollowCurrentDoc = false
+      floatSaveTarget = null
+      closeFloatWindow({ force: true })
+    }
+  }
+
   const win = resolveFloatWindow()
   if (win) {
+    // 预创建（或插件重载后接管）的窗口从未打开过：第一次显示时冻结保存目标。
+    // 已经打开过的窗口保持原有快照 —— 切到别的文档后再点按钮仍是最小化/显示原弹窗。
+    if (!floatSaveTarget) {
+      floatSaveIsFromButton = isFromButton
+      floatSaveTarget = resolveQuickNoteTargetConfig(isFromButton)
+      floatFollowCurrentDoc = isFollowCurrentDocRequested()
+    }
+    // 已存在窗口：只切换显示/隐藏。
     try {
       applyFloatWindowVisibility(win, isQuickNoteWindowHidden(win))
     } catch {
@@ -307,6 +336,11 @@ export function toggleQuickNoteFloatWindow(isFromButton = false): void {
   }
 
   if (floatWindowCreating) {
+    if (!floatSaveTarget) {
+      floatSaveIsFromButton = isFromButton
+      floatSaveTarget = resolveQuickNoteTargetConfig(isFromButton)
+      floatFollowCurrentDoc = isFollowCurrentDocRequested()
+    }
     floatWindowWantsVisible = !floatWindowWantsVisible
     floatWindowAllowAutoShow = floatWindowWantsVisible
     const pending = resolveFloatWindow()
@@ -314,6 +348,11 @@ export function toggleQuickNoteFloatWindow(isFromButton = false): void {
     return
   }
 
+  // 只有真正创建新窗口时才冻结保存目标：保存回调发生在 executeQuickNote 的 finally
+  // 恢复临时配置之后，按钮级覆盖（固定 ID / 当前文档）不能等到保存时再解析，否则回落全局。
+  floatSaveIsFromButton = isFromButton
+  floatSaveTarget = resolveQuickNoteTargetConfig(isFromButton)
+  floatFollowCurrentDoc = isFollowCurrentDocRequested()
   floatWindowWantsVisible = true
   floatWindowAllowAutoShow = true
   createFloatWindow()
@@ -429,7 +468,9 @@ function createFloatWindow(): void {
     // 拦截 close 事件：隐藏而非销毁，保持窗口存活以便瞬间再次唤起
     const closeInterceptor = (e: any) => {
       e.preventDefault()
-      applyFloatWindowVisibility(floatWindow, false)
+      // Alt+F4 / 任务栏关闭等系统关闭也要按「用户关闭」处理，
+      // 否则跟随模式下窗口只是被隐藏，切换文档后会继续显示上一篇
+      closeFloatWindowByUser()
     }
     floatWindow.on('close', closeInterceptor)
     ;(floatWindow as any).__qnCloseInterceptor = closeInterceptor
@@ -559,6 +600,23 @@ function closeFloatWindow(opts?: { force?: boolean }): void {
   }
 }
 
+/** 用户主动关闭弹窗：跟随当前文档时彻底销毁，否则只隐藏（保留草稿） */
+function closeFloatWindowByUser(): void {
+  floatClosedByUser = true
+  if (floatFollowCurrentDoc) {
+    // 跟随当前文档：关闭即彻底结束，下一次点击按当时所在文档重新开窗
+    floatFollowCurrentDoc = false
+    floatSaveTarget = null
+    floatClosedByUser = false
+    floatWindowWantsVisible = false
+    floatWindowAllowAutoShow = false
+    closeFloatWindow({ force: true })
+    return
+  }
+  const win = resolveFloatWindow()
+  if (win) applyFloatWindowVisibility(win, false)
+}
+
 export async function handleQuickNoteFloatCommand(cmd: string, payload?: string): Promise<void> {
   if (!deps) return
 
@@ -568,9 +626,7 @@ export async function handleQuickNoteFloatCommand(cmd: string, payload?: string)
   }
 
   if (cmd === 'cancel') {
-    // 隐藏而非销毁：保持窗口存活，下次唤起时瞬间弹出且保留草稿
-    const win = resolveFloatWindow()
-    if (win) applyFloatWindowVisibility(win, false)
+    closeFloatWindowByUser()
     return
   }
 

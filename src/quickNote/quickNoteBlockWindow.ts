@@ -10,6 +10,8 @@ import { isLoggingEnabled, logger } from '../utils/logger'
 
 const WIN_W = 300, WIN_H = 300, BOUNDS_KEY = '__qn_block_window_bounds'
 const ALWAYS_ON_TOP_KEY = '__qn_block_window_always_on_top'
+// 一次性迁移标记：老版本可能把「未置顶」误写进存储，升级后先重置为默认置顶
+const ALWAYS_ON_TOP_DEFAULT_KEY = '__qn_block_window_top_default_v1'
 function getQuickNoteTitle(): string {
   return t('quickNote.block.windowTitle', undefined, '⚡ 快捷记事')
 }
@@ -51,6 +53,8 @@ const FIND_BODY_WYSIWYG_JS = `
       }`
 let qnWinId: number | null = null
 let _currentDraftBlockId: string | null = null
+// 当前块格式窗口的保存目标快照（创建时冻结）：「再次点击按钮打开目标文档」需要它
+let _currentSaveTarget: QuickNoteTargetConfig | null = null
 function _syncDraftBlockId(): void {
   try { (window as any).__qn_block_id = _currentDraftBlockId } catch {}
 }
@@ -207,6 +211,15 @@ export function cleanupBlockWindowResidue(): void {
   // 提前清空会把非空草稿误判为空并删除。
 }
 function loadBounds(): any { try { const r = localStorage.getItem(BOUNDS_KEY); return r ? JSON.parse(r) : null } catch { return null } }
+/** 一次性把「未置顶」的历史存储重置为默认置顶；之后用户手动取消置顶仍会记住 */
+function ensureDefaultAlwaysOnTop(): void {
+  try {
+    if (localStorage.getItem(ALWAYS_ON_TOP_DEFAULT_KEY) === '1') return
+    localStorage.setItem(ALWAYS_ON_TOP_KEY, '1')
+    localStorage.setItem(ALWAYS_ON_TOP_DEFAULT_KEY, '1')
+  } catch { /* ignore */ }
+}
+
 /** 上次窗口置顶状态；默认 true，保持旧版本的“打开即置顶”行为 */
 function loadWindowAlwaysOnTop(): boolean {
   try {
@@ -341,16 +354,17 @@ function _getInjectionScripts(): { hideJS: string; titleJS: string; closeHookJS:
           }catch(e){}
           var remote=require('@electron/remote');
           var win=remote.getCurrentWindow();
-          // 记录用户最后一次置顶选择：优先用按钮 aria-label（同一次点击里原生 handler 已先更新），
-          // 再回退到窗口真实状态；必须在 destroy 前写入
+          // 记录置顶状态：优先用 BrowserWindow 真实状态（DOM 里的 aria-label 可能过期），
+          // 只有读不到真实状态时才回退到按钮 aria-label；必须在 destroy 前写入
           try{
-            var pinEl=document.getElementById('pinWindow');
-            var pinLabel=window.siyuan&&window.siyuan.languages&&window.siyuan.languages.pinWindow;
-            if(pinEl&&pinLabel){
-              localStorage.setItem('${ALWAYS_ON_TOP_KEY}',pinEl.getAttribute('aria-label')===pinLabel?'0':'1');
-            }else{
-              localStorage.setItem('${ALWAYS_ON_TOP_KEY}',win.isAlwaysOnTop()?'1':'0');
+            var savedTop=null;
+            try{ savedTop=win.isAlwaysOnTop()?'1':'0' }catch(e){}
+            if(savedTop===null){
+              var pinEl=document.getElementById('pinWindow');
+              var pinLabel=window.siyuan&&window.siyuan.languages&&window.siyuan.languages.pinWindow;
+              if(pinEl&&pinLabel)savedTop=pinEl.getAttribute('aria-label')===pinLabel?'0':'1';
             }
+            if(savedTop!==null)localStorage.setItem('${ALWAYS_ON_TOP_KEY}',savedTop);
           }catch(e){}
           // 用 destroy() 而非 close()：同步强制销毁，跳过 SiYuan 的 beforeunload 回调，
           // 不给它通过 history.pushState 设置 location.hash 的机会。
@@ -561,6 +575,7 @@ function createOneWindow(blockId: string): boolean {
   if (!BW) { showMessage(t('quickNote.block.unableCreateWindow', undefined, '无法创建窗口'), 3000, 'error'); return false }
   try {
     const bounds = getBounds()
+    ensureDefaultAlwaysOnTop()
     const alwaysOnTop = loadWindowAlwaysOnTop()
     const win = new BW({
       show: false, x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height,
@@ -606,6 +621,7 @@ function createOneWindow(blockId: string): boolean {
       saveBounds(win)
       const closingBlockId = _currentDraftBlockId
       _currentDraftBlockId = null
+      _currentSaveTarget = null
       _syncDraftBlockId()
       if (qnWinId === win.id) qnWinId = null
       let isEmpty = true
@@ -642,6 +658,46 @@ function createOneWindow(blockId: string): boolean {
   } catch (e) { logger.error('[QN-BlockWindow] 创建窗口失败:', e); showMessage(t('quickNote.block.createWindowFailed', undefined, '创建窗口失败'), 3000, 'error'); return false }
 }
 
+/** 隐藏块格式窗口（最小化，不销毁；非空草稿保留） */
+function hideBlockWindow(existing: any): void {
+  try {
+    existing.hide()
+    // 隐藏前确保 hash 不含文档 ID，避免主进程把主窗口的点击路由到隐藏窗口
+    _clearWindowHash(existing)
+    if (_hideTimer) {
+      clearTimeout(_hideTimer)
+      _hideTimer = null
+    }
+    const seconds = getAutoCleanupSeconds()
+    if (isLoggingEnabled()) {
+      logger.log('[QN-CLEANUP] 隐藏弹窗，自动清理秒数:', seconds)
+    }
+    // 0 表示不自动清理：隐藏窗口保持常驻，恢复显示后继续编辑原草稿
+    if (!(seconds > 0)) return
+    _hideTimer = setTimeout(() => {
+      _hideTimer = null
+      // 定时期间设置可能已改为 0：以触发时的配置为准，避免旧定时器继续清理
+      if (!(getAutoCleanupSeconds() > 0)) return
+      if (isLoggingEnabled()) logger.log('[QN-CLEANUP] 自动清理隐藏弹窗:', existing.id)
+      // 不直接改思源编辑器 DOM：销毁隐藏窗口后，草稿由 closed 处理器按空/非空删除或保留，
+      // 下次打开走正常建草稿 + 建窗口流程
+      try {
+        if (!existing.isDestroyed?.()) existing.destroy?.()
+      } catch {}
+    }, seconds * 1000)
+  } catch { /* ignore */ }
+}
+
+/** 块格式窗口是否打开（含隐藏/最小化） */
+export function isQuickNoteBlockWindowOpen(): boolean {
+  return !!findBlockWindow()
+}
+
+/** 块格式窗口当前的保存目标快照（未知时返回 null） */
+export function getQuickNoteBlockWindowTarget(): QuickNoteTargetConfig | null {
+  return _currentSaveTarget
+}
+
 export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): Promise<boolean> {
   if (!getBW()) return false
   // 建窗口前有异步建草稿块，短时间连按快捷键会并发创建两个窗口（第二个销毁第一个）
@@ -667,34 +723,12 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
         // 否则窗口会一闪而过，看起来像「打开就没了」
         if (Date.now() - _lastOpenAt < 300) return true
         // 弹窗在前台 → 隐藏（不强制聚焦主窗口，避免打断用户在其他软件的操作）
-        existing.hide()
-        // 隐藏前确保 hash 不含文档 ID，避免主进程把主窗口的点击路由到隐藏窗口
-        _clearWindowHash(existing)
-        if (_hideTimer) {
-          clearTimeout(_hideTimer)
-          _hideTimer = null
-        }
-        const seconds = getAutoCleanupSeconds()
-        if (isLoggingEnabled()) {
-          logger.log('[QN-CLEANUP] 隐藏弹窗，自动清理秒数:', seconds)
-        }
-        // 0 表示不自动清理：隐藏窗口保持常驻，恢复显示后继续编辑原草稿
-        if (!(seconds > 0)) return true
-        _hideTimer = setTimeout(() => {
-          _hideTimer = null
-          // 定时期间设置可能已改为 0：以触发时的配置为准，避免旧定时器继续清理
-          if (!(getAutoCleanupSeconds() > 0)) return
-          if (isLoggingEnabled()) logger.log('[QN-CLEANUP] 自动清理隐藏弹窗:', existing.id)
-          // 不直接改思源编辑器 DOM：销毁隐藏窗口后，草稿由 closed 处理器按空/非空删除或保留，
-          // 下次打开走正常建草稿 + 建窗口流程
-          try {
-            if (!existing.isDestroyed?.()) existing.destroy?.()
-          } catch {}
-        }, seconds * 1000)
+        hideBlockWindow(existing)
         return true
       }
       // 还没到清理时间又摁了快捷键：取消清理，恢复编辑
       if (_hideTimer) { clearTimeout(_hideTimer); _hideTimer = null }
+      try { existing.setAlwaysOnTop?.(loadWindowAlwaysOnTop()) } catch { /* ignore */ }
       existing.show(); existing.focus()
       _lastOpenAt = Date.now()
       // show 恢复时第三方「层级导航」插件可能重新渲染面包屑，补一次隐藏（observer 复用，不会重复创建）
@@ -710,6 +744,7 @@ export async function toggleDesktopQuickNoteBlockWindow(isFromButton = false): P
   _creating = true
   try {
     const target = resolveSaveTarget(isFromButton)
+    _currentSaveTarget = target
     if (target.saveType === 'document' && !target.documentId) { showMessage(t('quickNote.configureDocument', undefined, '请先配置文档 ID'), 3000, 'error'); return false }
     if (target.saveType === 'daily' && !target.notebookId) { showMessage(t('quickNote.configureNotebookSpaced', undefined, '请先配置笔记本 ID'), 3000, 'error'); return false }
     const blockId = await createQuickNoteDraftBlock(target)

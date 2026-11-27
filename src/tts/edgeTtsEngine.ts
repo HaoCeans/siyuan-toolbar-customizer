@@ -371,26 +371,38 @@ function edgeTimestamp(date: Date = new Date()): string {
 }
 
 /**
- * 从 Edge TTS 二进制 WebSocket 消息中提取 MP3 音频数据
- * 格式：[2字节 header长度(大端)][文本 header][MP3 音频数据]
+ * Edge TTS 二进制帧：[2字节 header长度(大端)][文本 header][MP3 音频数据]
+ * header 里带 X-RequestId，可据此把音频分发给对应段落（一条连接并发多段时用）。
  */
-function extractAudioFromBinary(data: ArrayBuffer): ArrayBuffer | null {
+function parseEdgeBinaryFrame(data: ArrayBuffer): { reqId: string; audio: ArrayBuffer | null } {
   const bytes = new Uint8Array(data)
-  if (bytes.length < 4) return null
+  if (bytes.length < 4) return { reqId: '', audio: null }
 
   const headerLength = (bytes[0] << 8) | bytes[1]
-  if (headerLength === 0 || bytes.length <= 2 + headerLength) return null
+  if (headerLength === 0 || bytes.length <= 2 + headerLength) return { reqId: '', audio: null }
 
   const header = new TextDecoder().decode(bytes.subarray(2, 2 + headerLength))
-  if (!/(?:^|\r?\n)Path:audio(?:\r?\n|$)/i.test(header)) return null
+  const reqId = /X-RequestId:\s*([^\r\n]+)/i.exec(header)?.[1]?.trim() || ''
+  if (!/(?:^|\r?\n)Path:audio(?:\r?\n|$)/i.test(header)) return { reqId, audio: null }
 
   const audioStart = 2 + headerLength
   const audioData = bytes.subarray(audioStart)
-
   // 太小不可能是有效音频
-  if (audioData.length < 10) return null
+  if (audioData.length < 10) return { reqId, audio: null }
 
-  return audioData.buffer.slice(audioData.byteOffset, audioData.byteOffset + audioData.byteLength)
+  return {
+    reqId,
+    audio: audioData.buffer.slice(audioData.byteOffset, audioData.byteOffset + audioData.byteLength),
+  }
+}
+
+/** Edge TTS 文本帧：header 里带 Path 与 X-RequestId */
+function parseEdgeTextFrame(data: string): { reqId: string; path: string } {
+  const sep = data.indexOf('\r\n\r\n')
+  const header = sep >= 0 ? data.slice(0, sep) : data
+  const reqId = /X-RequestId:\s*([^\r\n]+)/i.exec(header)?.[1]?.trim() || ''
+  const path = /Path:\s*([^\r\n]+)/i.exec(header)?.[1]?.trim() || ''
+  return { reqId, path }
 }
 
 function concatArrayBuffers(buffers: ArrayBuffer[]): ArrayBuffer {
@@ -420,6 +432,26 @@ export type EdgeTTSState = 'idle' | 'loading' | 'playing' | 'paused'
 
 // ─── EdgeTTSEngine ─────────────────────────────────────────
 
+interface EdgePendingRequest {
+  reqId: string
+  chunks: ArrayBuffer[]
+  audioBytes: number
+  textLength: number
+  settled: boolean
+  timer: ReturnType<typeof setTimeout> | null
+  resolve: (audio: ArrayBuffer) => void
+  reject: (error: Error) => void
+}
+
+interface EdgeSessionState {
+  ws: any
+  closed: boolean
+  opened: Promise<void>
+  resolveOpened: () => void
+  rejectOpened: (error: Error) => void
+  openTimer: ReturnType<typeof setTimeout> | null
+}
+
 export class EdgeTTSEngine {
   private paragraphs: ParagraphInfo[] = []
   private currentIndex = -1
@@ -435,7 +467,10 @@ export class EdgeTTSEngine {
   private voice = 'zh-CN-XiaoxiaoNeural'
   private rate = 1.0
   private operationGeneration = 0
-  // 预取会让两个合成连接短暂并存，因此用集合管理，停止时全部关闭
+  // 长文档复用同一条 WebSocket：每段新建连接会被微软限流，表现为读到一半频繁报错
+  private edgeSession: EdgeSessionState | null = null
+  private edgePending = new Map<string, EdgePendingRequest>()
+  // 兼容旧逻辑（停止时清空）
   private activeSockets = new Set<any>()
   private prefetch: { index: number; generation: number; promise: Promise<ArrayBuffer> } | null = null
   private consecutiveFailures = 0
@@ -770,6 +805,8 @@ export class EdgeTTSEngine {
         edgeWarn('paragraph-skipped', {
           paragraphIndex: index,
           textLength: para.text.length,
+          // 记录前 40 个字符，方便定位「总是卡在某种内容」的问题（调试日志开着时才输出）
+          textPreview: sanitizeSpeechText(para.text).slice(0, 40),
           voice: this.voice,
           rate: this.rate,
           skippable,
@@ -813,17 +850,14 @@ export class EdgeTTSEngine {
   }
 
   private abortActiveSockets(): void {
-    for (const socket of this.activeSockets) {
-      try { socket.close() } catch {}
-    }
-    this.activeSockets.clear()
+    this.closeEdgeSession('operation cancelled')
   }
 
   // ─── 内部：WebSocket 合成 ──────────────────────────────
 
   private synthesize(text: string, generation: number = this.operationGeneration): Promise<ArrayBuffer> {
-    // 同一段最多尝试 EDGE_MAX_ATTEMPTS 次：移动数据下 WebSocket 首次连接经常失败，
-    // 多给几次机会能显著降低「读着读着提示 Edge 在线朗读失败」的概率。
+    // 同一段最多尝试 EDGE_MAX_ATTEMPTS 次：弱网下首次连接经常失败，多给几次机会。
+    // 连接本身由 ensureEdgeSession 复用，失败会重建会话，不会每段都重新握手。
     const run = async (): Promise<ArrayBuffer> => {
       let lastError: unknown
       for (let attempt = 0; attempt < EDGE_MAX_ATTEMPTS; attempt++) {
@@ -869,64 +903,59 @@ export class EdgeTTSEngine {
     })
   }
 
-  private synthesizeAttempt(text: string, generation: number): Promise<ArrayBuffer> {
-    return new Promise((resolve, reject) => {
-      const reqId = generateUUID()
-      const startedAt = Date.now()
-
-      let settled = false
-      let binaryFrameCount = 0
-      let audioByteCount = 0
-      let ws: any = null
-      let timer: ReturnType<typeof setTimeout> | null = null
-      const chunks: ArrayBuffer[] = []
-
-      const cleanup = () => {
-        try { ws?.close() } catch {}
-        this.activeSockets.delete(ws)
-      }
-
-      const fail = (stage: string, error: unknown, retryable = false, skippable = false) => {
-        if (settled) return
-        settled = true
-        if (timer) clearTimeout(timer)
-        cleanup()
-        const message = error instanceof Error ? error.message : String(error)
-        const result = error instanceof Error ? error : new Error(message)
-        ;(result as Error & { retryable?: boolean; skippable?: boolean }).retryable = retryable
-        ;(result as Error & { retryable?: boolean; skippable?: boolean }).skippable = skippable
-        edgeWarn(stage, {
-          message,
-          textLength: text.length,
-          voice: this.voice,
-          rate: this.rate,
-          binaryFrameCount,
-          audioByteCount,
-          elapsedMs: Date.now() - startedAt,
-        })
-        reject(result)
-      }
-
-      timer = setTimeout(() => {
-        fail('timeout', new Error('合成超时（30 秒）'), audioByteCount === 0)
-      }, 30000)
-
+  /** 复用同一条 WebSocket：只有连接不存在或已关闭时才重新握手；返回真正可用的 ws */
+  private async ensureEdgeSession(generation: number): Promise<any> {
+    const existing = this.edgeSession
+    if (existing && !existing.closed) {
       try {
-        ws = createEdgeWS()
+        await existing.opened
       } catch (error) {
-        fail('create-websocket', error, true)
-        return
+        throw error
       }
+      return existing.ws
+    }
+    if (generation !== this.operationGeneration || this.stopped) {
+      return Promise.reject(new Error('operation cancelled'))
+    }
 
-      this.activeSockets.add(ws)
+    const ws = createEdgeWS()
+    this.activeSockets.add(ws)
+    let resolveOpened!: () => void
+    let rejectOpened!: (error: Error) => void
+    const opened = new Promise<void>((resolve, reject) => {
+      resolveOpened = resolve
+      rejectOpened = reject
+    })
+    const session: EdgeSessionState = {
+      ws,
+      closed: false,
+      opened,
+      resolveOpened,
+      rejectOpened,
+      openTimer: null,
+    }
+    this.edgeSession = session
 
-      edgeLog('synthesize-start', {
-        textLength: text.length,
-        voice: this.voice,
-        rate: this.rate,
-      })
+    const failSession = (message: string) => {
+      if (session.closed) return
+      session.closed = true
+      if (session.openTimer) { clearTimeout(session.openTimer); session.openTimer = null }
+      try { ws.close?.() } catch {}
+      this.activeSockets.delete(ws)
+      if (this.edgeSession === session) this.edgeSession = null
+      const error = new Error(message)
+      ;(error as Error & { retryable?: boolean }).retryable = true
+      session.rejectOpened(error)
+      this.failAllPending(message)
+    }
 
-      ws.onopen = () => {
+    session.openTimer = setTimeout(() => failSession('WebSocket 连接超时（10 秒）'), 10000)
+
+    ws.onopen = () => {
+      if (session.closed || generation !== this.operationGeneration || this.stopped) return
+      if (session.openTimer) { clearTimeout(session.openTimer); session.openTimer = null }
+      try {
+        // 每条连接只需发送一次 speech.config
         const timestamp = edgeTimestamp()
         const config = JSON.stringify({
           context: {
@@ -939,79 +968,164 @@ export class EdgeTTSEngine {
           },
         })
         ws.send(`X-Timestamp:${timestamp}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n${config}\r\n`)
+      } catch (error) {
+        failSession(error instanceof Error ? error.message : '发送合成配置失败')
+        return
+      }
+      edgeLog('session-open', { transport: lastEdgeTransport })
+      session.resolveOpened()
+    }
 
-        const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>` +
-          `<voice name='${this.voice}'>` +
-          `<prosody pitch='+0Hz' rate='${rateToPercent(this.rate)}' volume='+0%'>` +
-          escapeXml(text) +
-          `</prosody></voice></speak>`
+    ws.onmessage = (event: MessageEvent) => this.handleEdgeMessage(event)
 
-        edgeLog('send', {
-          textLength: text.length,
-          ssmlByteLength: new TextEncoder().encode(ssml).byteLength,
-          voice: this.voice,
-          rate: this.rate,
-        })
+    ws.onerror = (event: Error | Event) => {
+      const message = event instanceof Error
+        ? event.message
+        : 'WebSocket 连接失败（浏览器未提供详细原因）'
+      failSession(message)
+    }
+
+    ws.onclose = () => {
+      if (session.closed) return
+      session.closed = true
+      if (session.openTimer) { clearTimeout(session.openTimer); session.openTimer = null }
+      this.activeSockets.delete(ws)
+      if (this.edgeSession === session) this.edgeSession = null
+      const hint = lastEdgeTransport === 'kernel-proxy'
+        ? '（手机端经内核代理连接：请确认已用管理员权限访问；反向代理需保留 Host 并透传 WebSocket）'
+        : ''
+      const message = `连接关闭，未收到音频（语音：${this.voice}）${hint}`
+      const error = new Error(message)
+      ;(error as Error & { retryable?: boolean }).retryable = true
+      session.rejectOpened(error)
+      this.failAllPending(message)
+    }
+
+    if (ws instanceof NodeWS) ws.connect()
+    await opened
+    return ws
+  }
+
+  /** 关闭会话并把未完成的请求按「有部分音频则用部分音频」处理 */
+  private closeEdgeSession(reason: string): void {
+    const session = this.edgeSession
+    this.edgeSession = null
+    if (session) {
+      session.closed = true
+      if (session.openTimer) { clearTimeout(session.openTimer); session.openTimer = null }
+      try { session.ws?.close?.() } catch {}
+      this.activeSockets.delete(session.ws)
+      const error = new Error(reason)
+      ;(error as Error & { retryable?: boolean }).retryable = true
+      try { session.rejectOpened(error) } catch { /* ignore */ }
+    }
+    this.failAllPending(reason)
+  }
+
+  /** 分发服务器消息：按 X-RequestId 找到对应段落 */
+  private handleEdgeMessage(event: MessageEvent): void {
+    if (typeof event.data === 'string') {
+      const { reqId, path } = parseEdgeTextFrame(event.data)
+      if (path.toLowerCase() !== 'turn.end') return
+      const pending = reqId
+        ? this.edgePending.get(reqId)
+        : (this.edgePending.size === 1 ? Array.from(this.edgePending.values())[0] : undefined)
+      if (!pending) return
+      if (pending.audioBytes === 0) {
+        // 服务端正常结束但没有音频：内容层面的结果，重试后仍为空则跳过该段
+        const error = new Error('合成结束但未收到音频')
+        ;(error as Error & { retryable?: boolean; skippable?: boolean }).retryable = true
+        ;(error as Error & { retryable?: boolean; skippable?: boolean }).skippable = true
+        this.finishPending(pending, undefined, error)
+        edgeWarn('no-audio', { reqId, textLength: pending.textLength })
+      } else {
+        this.finishPending(pending, concatArrayBuffers(pending.chunks))
+      }
+      return
+    }
+
+    const frame = parseEdgeBinaryFrame(event.data)
+    if (!frame.audio) return
+    const pending = frame.reqId
+      ? this.edgePending.get(frame.reqId)
+      : (this.edgePending.size === 1 ? Array.from(this.edgePending.values())[0] : undefined)
+    if (!pending) return
+    pending.chunks.push(frame.audio)
+    pending.audioBytes += frame.audio.byteLength
+  }
+
+  private finishPending(pending: EdgePendingRequest, audio?: ArrayBuffer, error?: Error): void {
+    if (pending.settled) return
+    pending.settled = true
+    if (pending.timer) { clearTimeout(pending.timer); pending.timer = null }
+    this.edgePending.delete(pending.reqId)
+    if (error) pending.reject(error)
+    else pending.resolve(audio ?? new ArrayBuffer(0))
+  }
+
+  /** 会话断开/超时：有部分音频的请求按部分音频返回，其余标记为可重试 */
+  private failAllPending(reason: string): void {
+    for (const pending of Array.from(this.edgePending.values())) {
+      if (pending.settled) continue
+      if (pending.audioBytes > 0) {
+        edgeWarn('closed-before-turn-end', { reqId: pending.reqId, audioByteCount: pending.audioBytes })
+        this.finishPending(pending, concatArrayBuffers(pending.chunks))
+      } else {
+        const error = new Error(reason)
+        ;(error as Error & { retryable?: boolean }).retryable = true
+        this.finishPending(pending, undefined, error)
+      }
+    }
+    this.edgePending.clear()
+  }
+
+  private async synthesizeAttempt(text: string, generation: number): Promise<ArrayBuffer> {
+    if (generation !== this.operationGeneration || this.stopped) throw new Error('operation cancelled')
+    const ws = await this.ensureEdgeSession(generation)
+    if (generation !== this.operationGeneration || this.stopped) throw new Error('operation cancelled')
+
+    const reqId = generateUUID()
+    return new Promise<ArrayBuffer>((resolve, reject) => {
+      const pending: EdgePendingRequest = {
+        reqId,
+        chunks: [],
+        audioBytes: 0,
+        textLength: text.length,
+        settled: false,
+        timer: null,
+        resolve,
+        reject,
+      }
+      pending.timer = setTimeout(() => {
+        if (pending.settled) return
+        edgeWarn('timeout', { reqId, textLength: text.length })
+        // 卡死的请求会污染整条连接：直接重建会话，下一次尝试会重新握手
+        this.closeEdgeSession('合成超时（30 秒）')
+      }, 30000)
+      this.edgePending.set(reqId, pending)
+
+      const timestamp = edgeTimestamp()
+      const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-US'>` +
+        `<voice name='${this.voice}'>` +
+        `<prosody pitch='+0Hz' rate='${rateToPercent(this.rate)}' volume='+0%'>` +
+        escapeXml(text) +
+        `</prosody></voice></speak>`
+
+      edgeLog('send', {
+        reqId,
+        textLength: text.length,
+        ssmlByteLength: new TextEncoder().encode(ssml).byteLength,
+        voice: this.voice,
+        rate: this.rate,
+      })
+      try {
         ws.send(`X-RequestId:${reqId}\r\nX-Timestamp:${timestamp}Z\r\nContent-Type:application/ssml+xml\r\nPath:ssml\r\n\r\n${ssml}`)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '发送合成请求失败'
+        const sendError = new Error(message)
+        ;(sendError as Error & { retryable?: boolean }).retryable = true
+        this.finishPending(pending, undefined, sendError)
       }
-
-      ws.onmessage = (event: MessageEvent) => {
-        if (typeof event.data === 'string') {
-          if (event.data.includes('Path:turn.end')) {
-            if (settled) return
-            if (audioByteCount === 0) {
-              // 服务端正常结束了这一轮但没有音频，属于内容层面的结果而非传输故障，
-              // 重试一次后仍为空则跳过该段，不计入系统性失败判定。
-              fail('no-audio', new Error('合成结束但未收到音频'), true, true)
-              return
-            }
-            settled = true
-            if (timer) clearTimeout(timer)
-            cleanup()
-            edgeLog('synthesize-complete', {
-              binaryFrameCount,
-              audioByteCount,
-              elapsedMs: Date.now() - startedAt,
-            })
-            resolve(concatArrayBuffers(chunks))
-          }
-        } else {
-          binaryFrameCount++
-          const audio = extractAudioFromBinary(event.data)
-          if (audio) {
-            chunks.push(audio)
-            audioByteCount += audio.byteLength
-          }
-        }
-      }
-
-      ws.onerror = (event: Error | Event) => {
-        const message = event instanceof Error
-          ? event.message
-          : 'WebSocket 连接失败（浏览器未提供详细原因）'
-        fail('websocket', new Error(message), audioByteCount === 0)
-      }
-
-      ws.onclose = () => {
-        if (settled) return
-        if (audioByteCount > 0) {
-          settled = true
-          if (timer) clearTimeout(timer)
-          edgeWarn('closed-before-turn-end', {
-            binaryFrameCount,
-            audioByteCount,
-            elapsedMs: Date.now() - startedAt,
-          })
-          resolve(concatArrayBuffers(chunks))
-        } else {
-          const hint = lastEdgeTransport === 'kernel-proxy'
-            ? '（手机端经内核代理连接：请确认已用管理员权限访问；反向代理需保留 Host 并透传 WebSocket）'
-            : ''
-          fail('closed', new Error(`连接关闭，未收到音频（语音：${this.voice}）${hint}`), true)
-        }
-      }
-
-      if (ws instanceof NodeWS) ws.connect()
     })
   }
 

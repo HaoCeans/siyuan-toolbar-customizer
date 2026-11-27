@@ -17,13 +17,16 @@ import {
   shouldUseQuickNoteFloatWindow,
   toggleQuickNoteFloatWindow,
   getQuickNoteFloatSaveTarget,
+  isQuickNoteFloatWindowOpen,
   type QuickNoteFloatSaveResult,
 } from './quickNote/quickNoteFloatWindow';
 import {
   shouldUseDesktopQuickNoteBlockWindow,
   toggleDesktopQuickNoteBlockWindow,
+  getQuickNoteBlockWindowTarget,
+  isQuickNoteBlockWindowOpen,
 } from './quickNote/quickNoteBlockWindow';
-import { resolveQuickNoteTargetConfig } from './quickNote/targetConfig';
+import { resolveQuickNoteTargetConfig, type QuickNoteTargetConfig } from './quickNote/targetConfig';
 import { createQuoteOverlay } from './quickNote/quoteOverlay';
 import { pickAndInsertImages, installImagePasteHandler, preSaveBlockCursor, clearPreSavedBlockCursor } from './quickNote/imageInsert';
 import { fetchSyncPost } from 'siyuan';
@@ -52,6 +55,8 @@ const DIALOG_PROTECTION_MS = 500;
 
 // 记录弹窗当前是否正在显示（防止重复弹出）
 let isNoteDialogShowing = false;
+// 页面内一键记事弹窗（手机 / 旧版桌面）打开时冻结的保存目标，「再次点击按钮 → 打开目标文档」用
+let activeInPageDialogTarget: QuickNoteTargetConfig | null = null;
 let isQuickNoteDialogMinimized = false;
 // 弹窗正在异步创建中（createQuickNoteInputArea 完成前 DOM 尚未挂载）
 let isNoteDialogOpening = false;
@@ -246,6 +251,8 @@ async function showSiyuanEditorDialog(
 
   isNoteDialogOpening = true;
   try {
+    // 记录本次弹窗绑定的目标，供「再次点击按钮 → 打开目标文档」使用
+    activeInPageDialogTarget = { notebookId, documentId: documentId || '', saveType, insertPosition };
     if (isMobileDevice()) {
       const isFromButton = source === 'button';
       await showNoteInputDialogMobile(notebookId, documentId, saveType, insertPosition, isFromButton);
@@ -316,6 +323,22 @@ function getQuickNoteDialogElement(): HTMLElement | null {
     ?? document.getElementById('quick-note-dialog-desktop');
 }
 
+/** 当前已打开（含最小化/隐藏）的一键记事弹窗及其保存目标；没有则返回 null */
+export function getOpenQuickNotePopup(): { target: QuickNoteTargetConfig | null } | null {
+  if (isQuickNoteBlockWindowOpen()) {
+    return { target: getQuickNoteBlockWindowTarget() }
+  }
+  if (isQuickNoteFloatWindowOpen()) {
+    // 预创建但从未打开过的悬浮窗（无目标快照）不算已有弹窗
+    const target = getQuickNoteFloatSaveTarget()
+    if (target) return { target }
+  }
+  if (getQuickNoteDialogElement()) {
+    return { target: activeInPageDialogTarget }
+  }
+  return null
+}
+
 function cleanupQuickNoteDialogStyles(): void {
   const styleIds = ['quick-note-textarea-scrollbar-style', 'quick-note-buttons-scrollbar-style'];
   styleIds.forEach((id) => {
@@ -356,6 +379,7 @@ async function teardownQuickNoteDialog(dialog: HTMLElement, closeMobile: boolean
   clearPreSavedBlockCursor()
   isNoteDialogShowing = false;
   isQuickNoteDialogMinimized = false;
+  activeInPageDialogTarget = null;
   needsInitialFocus = false;
   wasQuickNoteInputFocused = false;
   savedCursorPos = null;

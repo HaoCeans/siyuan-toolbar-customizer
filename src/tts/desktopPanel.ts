@@ -7,7 +7,7 @@
  */
 
 import { t } from '../i18n/runtime'
-import { getTTSEngine, destroyTTSEngine, TTSOptions, type ParagraphInfo } from './ttsEngine'
+import { getTTSEngine, destroyTTSEngine, getCurrentDocId, TTSOptions, type ParagraphInfo } from './ttsEngine'
 import {
   getHttpTTSEngine, destroyHttpTTSEngine, HttpTTSEngine,
   SF_VOICES, getTTSSettings, saveTTSSettings, getSFAPIConfig, saveSFAPIConfig,
@@ -18,6 +18,7 @@ import { createIconButton, updateButtonIcon, injectSliderStyles, removeSliderSty
 import { createAppleSelectEl, type AppleSelectEl } from './appleSelect'
 import { createParagraphPicker, linkParagraphPickers, type ParagraphPicker } from './ttsRangePicker'
 import { setPlaybackRange, resetPlaybackRange, formatRangeProgress } from './ttsPlaybackRange'
+import { rememberTtsRange, restoreTtsRange } from './ttsRangeMemory'
 import { createRepeatSliderRow, createReadDirectionRow } from './ttsRepeatSetting'
 import * as Notify from '../notification'
 import { pluginInstance } from '../toolbarManager'
@@ -325,6 +326,8 @@ function appendRangePickers(
   paragraphs: ParagraphInfo[],
 ): { start: ParagraphPicker; end: ParagraphPicker } {
   const last = Math.max(0, paragraphs.length - 1)
+  // 同一文档恢复上次选择的起始/结束块
+  const saved = restoreTtsRange(getCurrentDocId(), paragraphs)
   // 与手机端一致：标签在上、选择器占满整行
   const appendBlock = (labelText: string, picker: ParagraphPicker): void => {
     const wrap = document.createElement('div')
@@ -336,10 +339,10 @@ function appendRangePickers(
     container.appendChild(wrap)
   }
 
-  const start = createParagraphPicker({ paragraphs, initial: 0 })
+  const start = createParagraphPicker({ paragraphs, initial: saved?.start ?? 0 })
   appendBlock(t('tts.startBlock', undefined, '起始块'), start)
 
-  const end = createParagraphPicker({ paragraphs, initial: last })
+  const end = createParagraphPicker({ paragraphs, initial: saved?.end ?? last })
   appendBlock(t('tts.endBlock', undefined, '结束块'), end)
 
   linkParagraphPickers(start, end, paragraphs.length)
@@ -422,6 +425,7 @@ function renderWebSpeechContent(container: HTMLElement, autoSel?: AppleSelectEl)
     e.stopPropagation()
     autoReadAction = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev' | 'repeat'
     saveTTSSettings({ autoReadAction })
+    rememberTtsRange(getCurrentDocId(), getTTSEngine().getParagraphs(), range.start.getValue(), range.end.getValue())
     const opts: TTSOptions = {
       rate: parseFloat(rateSlider.value),
       pitch: parseFloat(pitchSlider.value),
@@ -485,6 +489,7 @@ function renderEdgeContent(container: HTMLElement, autoSel?: AppleSelectEl): voi
     const voice = voiceSelect.value || EDGE_TTS_VOICES[0].name
     autoReadAction = (autoSel?.value || 'stop') as 'stop' | 'next' | 'prev' | 'repeat'
     saveTTSSettings({ lastMode: 'edge', edgeRate: rate, edgeVoiceName: voice, autoReadAction })
+    rememberTtsRange(getCurrentDocId(), getTTSEngine().getParagraphs(), range.start.getValue(), range.end.getValue())
     getEdgeTTSEngine().activatePlayback()
     removeOptionsPanel()
     startEdgePlayback(voice, rate, range.start.getValue(), range.end.getValue())
@@ -533,6 +538,7 @@ function renderFreeContent(container: HTMLElement, autoSel?: AppleSelectEl): voi
     const speed = parseInt(rateSlider.value)
     const startP = range.start.getValue()
     const endP = range.end.getValue()
+    rememberTtsRange(getCurrentDocId(), getTTSEngine().getParagraphs(), startP, endP)
     saveTTSSettings({ speed, lastMode: 'free' })
 
     removeOptionsPanel()
@@ -648,6 +654,7 @@ function renderApiContent(container: HTMLElement, autoSel?: AppleSelectEl): void
 
     const startP = range.start.getValue()
     const endP = range.end.getValue()
+    rememberTtsRange(getCurrentDocId(), getTTSEngine().getParagraphs(), startP, endP)
     removeOptionsPanel()
 
     const engine = getHttpTTSEngine()

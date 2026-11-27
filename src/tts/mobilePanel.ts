@@ -27,6 +27,7 @@ import { getEdgeTTSEngine, destroyEdgeTTSEngine, EDGE_TTS_VOICES, isSupportedEdg
 import { createRepeatSliderRow, createReadDirectionRow } from './ttsRepeatSetting'
 import { createParagraphPicker, linkParagraphPickers, type ParagraphPicker } from './ttsRangePicker'
 import { setPlaybackRange, resetPlaybackRange, formatRangeProgress } from './ttsPlaybackRange'
+import { rememberTtsRange, restoreTtsRange } from './ttsRangeMemory'
 
 // ═══════════════════════════════════════════════════════════════
 // 手机端 UI
@@ -271,14 +272,16 @@ function showTTSPanel(): void {
 function appendMobileRangePickers(container: HTMLElement): { start: ParagraphPicker; end: ParagraphPicker } {
   const paragraphs = getHttpTTSEngine().getParagraphs()
   const last = Math.max(0, paragraphs.length - 1)
+  // 同一文档恢复上次选择的起始/结束块
+  const saved = restoreTtsRange(getCurrentDocId(), paragraphs)
 
   const startRow = makeRow(t('tts.startBlock', undefined, '起始块'))
-  const start = createParagraphPicker({ paragraphs, initial: 0, rowHeight: 28 })
+  const start = createParagraphPicker({ paragraphs, initial: saved?.start ?? 0, rowHeight: 28 })
   startRow.appendChild(start.element)
   container.appendChild(startRow)
 
   const endRow = makeRow(t('tts.endBlock', undefined, '结束块'))
-  const end = createParagraphPicker({ paragraphs, initial: last, rowHeight: 28 })
+  const end = createParagraphPicker({ paragraphs, initial: saved?.end ?? last, rowHeight: 28 })
   endRow.appendChild(end.element)
   container.appendChild(endRow)
 
@@ -337,6 +340,7 @@ function renderEdgeContent(container: HTMLElement, autoSel?: AppleSelectEl): voi
 
     const startP = range.start.getValue()
     const endP = range.end.getValue()
+    rememberTtsRange(getCurrentDocId(), getHttpTTSEngine().getParagraphs(), startP, endP)
     removeOverlay()
     startEdgePlayback(voice, rate, startP, endP)
   })
@@ -385,6 +389,7 @@ function renderFreeContent(container: HTMLElement, autoSel?: AppleSelectEl): voi
 
     const startP = range.start.getValue()
     const endP = range.end.getValue()
+    rememberTtsRange(getCurrentDocId(), getHttpTTSEngine().getParagraphs(), startP, endP)
     removeOverlay()
     stopInactiveTTSEngines('http')
 
@@ -514,6 +519,7 @@ function renderApiContent(container: HTMLElement, autoSel?: AppleSelectEl): void
 
     const startP = range.start.getValue()
     const endP = range.end.getValue()
+    rememberTtsRange(getCurrentDocId(), getHttpTTSEngine().getParagraphs(), startP, endP)
     removeOverlay()
     stopInactiveTTSEngines('http')
 
@@ -734,6 +740,7 @@ function appendPrepareButton(
     try {
       await engine.extractParagraphsAsync()
       const descriptor = currentDescriptor(engine)
+      rememberTtsRange(getCurrentDocId(), engine.getParagraphs(), descriptor.start, descriptor.end)
       const key = buildPreparedTtsCacheKey(descriptor)
       startP = descriptor.start
       endP = descriptor.end

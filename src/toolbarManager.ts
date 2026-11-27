@@ -32,6 +32,7 @@ import { uploadImageFile, insertProtyleImageAtCaret } from "./quickNote/imageIns
 import { lucideToSvg } from "./utils/lucideHelper";
 import * as licenseManager from "./utils/licenseManager";
 import { insertMultiLineText } from "./utils/protyleEnter";
+import { getActiveDocId } from "./utils/currentDoc";
 import { logger, setLoggingEnabled } from "./utils/logger"
 import { getLocale, t } from "./i18n/runtime";
 // 斜杠菜单工具栏（独立功能）：恢复出厂默认与生命周期拆卸
@@ -117,6 +118,7 @@ export interface ButtonConfig {
   targetDocId?: string;      // 打开指定ID块：目标块ID（桌面端），支持文档ID或块ID
   mobileTargetDocId?: string; // 打开指定ID块：目标块ID（移动端），支持文档ID或块ID
   quickNoteTargetDocId?: string; // 一键记事按钮：填写后固定追加到该文档（覆盖全局保存方式与目标）；留空=跟随全局一键记事设置
+  quickNoteFollowCurrentDoc?: boolean; // 一键记事按钮：开启后每次点击自动使用当前所在文档作为目标（优先于上面的固定 ID）
   // 鲸鱼定制工具箱 - 数据库悬浮弹窗配置
 			  authorToolSubtype?: 'open-doc' | 'database' | 'diary' | 'life-log' | 'popup-select' | 'button-sequence' | 'scroll-doc' | 'image-upload' | 'mobile-tabs' | 'mobile-outline' | 'doc-nav' | 'slide-comment' | 'tts' | 'clear-empty-blocks' | 'toggle-lock' | 'quick-attach'; // 鲸鱼定制工具子类型
 	  unlockIcon?: string;       // 解锁图标（仅 toggle-lock 使用，默认 🔓）
@@ -2048,7 +2050,9 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
     })
 
     // 重置 protyle 的底部内边距
-    const protyles = document.querySelectorAll('.protyle') as NodeListOf<HTMLElement>
+    // 注意：思源 3.8.12 起文档标题是内嵌 mini-protyle（.protyle-title__rich.protyle），
+    // 不能给它设置内边距，否则标题布局错乱
+    const protyles = document.querySelectorAll('.protyle:not(.protyle-title__rich)') as NodeListOf<HTMLElement>
     protyles.forEach(protyle => {
       protyle.style.setProperty('padding-bottom', '0', 'important')
     })
@@ -2119,8 +2123,9 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
             margin-left: 0 !important;
           }
 
-          /* 防止编辑器内容被顶部工具栏遮挡 */
-          body.siyuan-toolbar-top-mode .protyle {
+          /* 防止编辑器内容被顶部工具栏遮挡
+             （排除 3.8.12+ 的标题 mini-protyle：.protyle-title__rich 也带 .protyle 类） */
+          body.siyuan-toolbar-top-mode .protyle:not(.protyle-title__rich) {
             padding-top: ${paddingTopValue}px !important;
           }
 
@@ -2171,8 +2176,8 @@ export function initMobileToolbarAdjuster(config: MobileToolbarConfig, disableCu
             margin-left: 0 !important;
           }
 
-          /* 防止编辑器内容被顶部工具栏遮挡（桌面端） */
-          body.siyuan-toolbar-top-mode .protyle {
+          /* 防止编辑器内容被顶部工具栏遮挡（桌面端；排除标题 mini-protyle） */
+          body.siyuan-toolbar-top-mode .protyle:not(.protyle-title__rich) {
             padding-top: ${paddingTopValue}px !important;
           }
         }
@@ -6097,8 +6102,8 @@ function ensureToolbarAutoHideStyle(): void {
     body.toolbar-autohide-active.siyuan-toolbar-customizer-enabled .protyle {
       padding-bottom: env(safe-area-inset-bottom) !important;
     }
-    /* 工具栏隐藏时，同步收回 protyle 补偿间距（顶部模式） */
-    body.toolbar-autohide-active.siyuan-toolbar-top-mode .protyle {
+    /* 工具栏隐藏时，同步收回 protyle 补偿间距（顶部模式；排除标题 mini-protyle） */
+    body.toolbar-autohide-active.siyuan-toolbar-top-mode .protyle:not(.protyle-title__rich) {
       padding-top: 0 !important;
     }
     /* 工具栏隐藏时，同步隐藏思源底部状态栏 */
@@ -10429,24 +10434,48 @@ import {
   showSmallWindowTip as showSmallWindowTipFromDetector,
   triggerDesktopQuickNoteCapture,
   triggerLifelogQuickNote,
+  getOpenQuickNotePopup,
 } from './windowDetector';
 
 // 一键记事执行函数
 async function executeQuickNote(_config: ButtonConfig) {
+  // 已有弹窗（含最小化）：再次点击按钮 = 打开它绑定的文档（弹窗保持原状态，不收起）。
+  // 切到别的文档后再点，打开的仍是弹窗原来绑定的那篇（关闭弹窗后才会绑定新文档）。
+  const openPopup = getOpenQuickNotePopup()
+  if (openPopup) {
+    const targetDocId = openPopup.target?.documentId || ''
+    if (targetDocId) {
+      await openQuickNoteTargetDocument(targetDocId)
+    } else {
+      showMessage(t('toolbarManager.quickNote.targetDocumentMissing', undefined, '当前一键记事弹窗没有绑定具体文档（日记/笔记本模式），无法打开'), 3000, 'info')
+    }
+    return
+  }
+
   let originalPluginInstance: unknown;
   let tempPlugin: unknown;
   try {
     originalPluginInstance = (window as any).__pluginInstance;
-    // 按钮级覆盖：按钮填了目标文档ID → 强制文档模式写入该文档；留空 → 完全跟随全局一键记事设置。
+    // 按钮级覆盖：开启「跟随当前文档」→ 每次点击都取当前文档作为目标；
+    // 否则按钮填了目标文档ID → 强制文档模式写入该文档；留空 → 完全跟随全局一键记事设置。
     // 覆盖键与全局同名，resolveQuickNoteTargetConfig 在弹窗打开时读取（此处在 finally 恢复之前）
     const btnTargetDocId = _config.quickNoteTargetDocId?.trim();
+    const followCurrentDoc = _config.quickNoteFollowCurrentDoc === true;
+    const currentDocId = followCurrentDoc ? getActiveDocId() : '';
+    // 跟随模式只认当前文档；取不到时**不能**回退到按钮里手填的旧 ID（那正是「切了文档还写到上一篇」的原因），
+    // 交给全局一键记事设置兜底。
+    const effectiveTargetDocId = followCurrentDoc ? currentDocId : btnTargetDocId;
+    if (followCurrentDoc && !currentDocId) {
+      logger.warn('[QuickNote] 跟随当前文档：未获取到当前文档 ID，将使用全局一键记事设置');
+    }
     tempPlugin = {
       mobileFeatureConfig: {
         ...(pluginInstance?.mobileFeatureConfig || {}),
-        ...(btnTargetDocId
-          ? { quickNoteSaveType: 'document' as const, quickNoteDocumentId: btnTargetDocId }
+        ...(effectiveTargetDocId
+          ? { quickNoteSaveType: 'document' as const, quickNoteDocumentId: effectiveTargetDocId }
           : {}),
         __quickNoteButtonTrigger: true,
+        __quickNoteFollowCurrentDoc: followCurrentDoc,
       },
     };
     (window as any).__pluginInstance = tempPlugin;
@@ -10470,6 +10499,22 @@ async function executeQuickNote(_config: ButtonConfig) {
       // 兼容：如果已被其他代码修改，至少清理触发标记
       delete (window as any).__pluginInstance.mobileFeatureConfig.__quickNoteButtonTrigger;
     }
+  }
+}
+
+/** 按文档 ID 打开文档（手机端走 openMobileFileById，电脑端走 openTab） */
+async function openQuickNoteTargetDocument(documentId: string): Promise<void> {
+  const app = pluginInstance?.app
+  if (!app || !documentId) return
+  try {
+    if (isMobileDevice()) {
+      await openMobileFileById(app, documentId)
+    } else {
+      await siyuanOpenTab({ app, doc: { id: documentId } })
+    }
+  } catch (error) {
+    logger.error('[QuickNote] 打开目标文档失败:', error)
+    showMessage(t('toolbarManager.quickNote.openTargetDocumentFailed', undefined, '打开目标文档失败'), 3000, 'error')
   }
 }
 

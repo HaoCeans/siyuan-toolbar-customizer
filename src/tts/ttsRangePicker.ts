@@ -7,7 +7,7 @@
  */
 
 import { t } from '../i18n/runtime'
-import type { ParagraphInfo } from './ttsEngine'
+import { getVisibleParagraphRange, type ParagraphInfo } from './ttsEngine'
 
 export interface ParagraphPicker {
   element: HTMLElement
@@ -296,4 +296,59 @@ export function linkParagraphPickers(start: ParagraphPicker, end: ParagraphPicke
   end.setBounds(start.getValue(), lastIndex)
   start.onChange = (value: number) => end.setBounds(value, lastIndex)
   end.onChange = (value: number) => start.setBounds(0, value)
+}
+
+
+// ─── 定位按钮：把起始/结束块设为当前屏幕可见的块 ──
+
+/** 「定位」小按钮（放在「起始块」标签行右侧；不用 title，避免悬浮提示框） */
+export function createRangeLocateButton(onClick: () => void): HTMLDivElement {
+  const btn = document.createElement('div')
+  btn.textContent = t('tts.locate', undefined, '定位')
+  btn.setAttribute('aria-label', t('tts.locateHint', undefined, '定位到当前屏幕可见的块'))
+  btn.style.cssText = `
+    flex: none; padding: 2px 10px; border-radius: 999px;
+    font-size: 12px; font-weight: 500; cursor: pointer; user-select: none;
+    background: color-mix(in srgb, var(--b3-theme-primary) 12%, transparent);
+    color: var(--b3-theme-primary);
+    transition: background 0.15s ease, opacity 0.15s ease;
+  `
+  btn.addEventListener('pointerdown', (e) => e.stopPropagation())
+  btn.addEventListener('mouseenter', () => {
+    btn.style.background = 'color-mix(in srgb, var(--b3-theme-primary) 22%, transparent)'
+  })
+  btn.addEventListener('mouseleave', () => {
+    btn.style.background = 'color-mix(in srgb, var(--b3-theme-primary) 12%, transparent)'
+  })
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    onClick()
+  })
+  return btn
+}
+
+/**
+ * 「定位」：把起始/结束块设为当前屏幕可见的块范围。
+ * 先放宽两个选择器的边界再赋值，最后重新建立互相约束，避免旧边界把值夹回去。
+ */
+export function locateVisibleRangeInto(
+  paragraphs: ParagraphInfo[],
+  start: ParagraphPicker,
+  end: ParagraphPicker,
+  onFail: () => void,
+): void {
+  const visible = getVisibleParagraphRange(paragraphs)
+  if (!visible) {
+    onFail()
+    return
+  }
+  const last = Math.max(0, paragraphs.length - 1)
+  start.setBounds(0, last)
+  end.setBounds(0, last)
+  start.setValue(visible.start)
+  end.setValue(visible.end)
+  linkParagraphPickers(start, end, paragraphs.length)
+  // 通知依赖范围的 UI（手机端「准备音频」状态等）按新范围刷新
+  start.element.dispatchEvent(new CustomEvent('tts-range-change', { bubbles: true }))
+  end.element.dispatchEvent(new CustomEvent('tts-range-change', { bubbles: true }))
 }

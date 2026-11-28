@@ -153,6 +153,27 @@ export interface ParagraphAnchor {
  *
  * 找不到可朗读内容时返回 -1。
  */
+/**
+ * 计算「当前屏幕上可见」的段落范围（视口与段落矩形相交的第一块 / 最后一块）。
+ * 供朗读设置里的「定位」按钮使用；屏幕上没有可见段落（如编辑器被完全遮挡）时返回 null。
+ */
+export function getVisibleParagraphRange(paragraphs: ParagraphInfo[]): { start: number; end: number } | null {
+  let start = -1
+  let end = -1
+  const viewHeight = window.innerHeight || document.documentElement.clientHeight
+  for (let i = 0; i < paragraphs.length; i++) {
+    const el = resolveParagraphElement(paragraphs[i])
+    if (!el) continue
+    const rect = el.getBoundingClientRect()
+    if (rect.height <= 0) continue
+    // 与视口相交即算可见（部分露出也算）
+    if (rect.bottom <= 0 || rect.top >= viewHeight) continue
+    if (start < 0) start = i
+    end = i
+  }
+  return start < 0 ? null : { start, end }
+}
+
 export function findParagraphAnchor(
   protyleEl: HTMLElement | null | undefined,
   blockEls: HTMLElement[],

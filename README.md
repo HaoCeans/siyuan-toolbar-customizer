@@ -294,6 +294,28 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 # 📌 Changelog
 
+### v4.0.4 — Read from the current block on mobile, one-tap range locating
+
+> 💡 This release brings "read from the current block" to mobile and adds one-tap locating to the Read Aloud settings: the mobile block menu can now read from the current block to the end, and a new "Locate" button sets the reading range to whatever is currently on screen.
+
+**① Mobile: read from the current block to end**
+- Available from both the block icon menu and the long-press action bar (under the "Plugin" button); reading starts at that block and runs to the end of the document
+- No settings panel — it reuses the last-used engine and parameters (Edge / Baidu free / SiliconFlow) and shows the mobile-style playback bar
+- Lists, quotes and super blocks start from their first inner paragraph; unreadable blocks (code, math…) start from the next readable one
+
+**② One-tap range locating**
+- A new "Locate" button on the Start block label row: tapping sets the start/end blocks to the blocks currently visible on screen (first partially-visible block → last partially-visible block)
+- In other words, "read exactly what I'm looking at" — combined with scrolling it makes reading a long document section by section easy
+- Works on desktop and mobile; the mobile "prepare for background reading" cache status refreshes automatically to the new range
+
+**③ Requirements**
+- Minimum SiYuan version remains v3.8.10
+
+<details>
+  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
+    ⬇️ View version history
+  </summary>
+
 ### v4.0.3 — Quick Note follows the current document, per-document reading ranges, sturdier Edge for long documents
 
 > 💡 This release focuses on Quick Note and Read Aloud: the Quick Note button gains a "follow the current document" switch so you never hand-type a target ID again; Read Aloud remembers the start/end blocks per document; Edge reading now reuses one WebSocket per document so long documents no longer abort mid-way; and fixes the broken document title in SiYuan 3.8.12 mobile top-bar mode.
@@ -319,11 +341,6 @@ A: Re-enable the “💡 First-Time Setup Navigation Hint” toggle in the “4�
 
 **⑤ Requirements**
 - Minimum SiYuan version remains v3.8.10
-
-<details>
-  <summary style="font-weight: 600; padding: 6px 0; cursor: pointer;">
-    ⬇️ View version history
-  </summary>
 
 ### v4.0.2 — Pick any reading range, read from the block menu, sturdier on weak networks
 

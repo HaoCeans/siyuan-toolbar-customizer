@@ -16,7 +16,7 @@ import {
 import { applyFloatPanelBackground, observeSiYuanThemeMode } from '../ui/floatPanelBackground'
 import { createIconButton, updateButtonIcon, injectSliderStyles, removeSliderStyles, lucideSvg, createRepeatButton, syncRepeatButton } from './ttsIconHelper'
 import { createAppleSelectEl, type AppleSelectEl } from './appleSelect'
-import { createParagraphPicker, linkParagraphPickers, type ParagraphPicker } from './ttsRangePicker'
+import { createParagraphPicker, createRangeLocateButton, linkParagraphPickers, locateVisibleRangeInto, type ParagraphPicker } from './ttsRangePicker'
 import { setPlaybackRange, resetPlaybackRange, formatRangeProgress } from './ttsPlaybackRange'
 import { rememberTtsRange, restoreTtsRange } from './ttsRangeMemory'
 import { createRepeatSliderRow, createReadDirectionRow } from './ttsRepeatSetting'
@@ -340,7 +340,22 @@ function appendRangePickers(
   }
 
   const start = createParagraphPicker({ paragraphs, initial: saved?.start ?? 0 })
-  appendBlock(t('tts.startBlock', undefined, '起始块'), start)
+  // 起始块标签行：右边放「定位」按钮，点击后起始/结束块 = 当前屏幕可见的块
+  const startWrap = document.createElement('div')
+  const startLabelRow = document.createElement('div')
+  startLabelRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;'
+  const startLabel = document.createElement('div')
+  startLabel.textContent = t('tts.startBlock', undefined, '起始块')
+  startLabel.style.cssText = 'font-size:13px;opacity:0.6;font-weight:500;letter-spacing:-0.01em;'
+  startLabelRow.appendChild(startLabel)
+  startLabelRow.appendChild(createRangeLocateButton(() => {
+    locateVisibleRangeInto(paragraphs, start, end, () => {
+      Notify.showErrorCommandCannotExecute(t('tts.locateFailed', undefined, '未找到屏幕上可见的块'))
+    })
+  }))
+  startWrap.appendChild(startLabelRow)
+  startWrap.appendChild(start.element)
+  container.appendChild(startWrap)
 
   const end = createParagraphPicker({ paragraphs, initial: saved?.end ?? last })
   appendBlock(t('tts.endBlock', undefined, '结束块'), end)

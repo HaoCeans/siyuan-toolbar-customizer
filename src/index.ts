@@ -1287,11 +1287,9 @@ export default class ToolbarCustomizer extends Plugin {
     }
     this.eventBus.on('open-menu-content', this.eventBusContextMenuHandler)
 
-    // ===== 块菜单：从当前块朗读到末尾（click-blockicon 追加菜单项） =====
-    // 块标菜单是桌面端独有；手机端朗读走手机面板，不注册（避免出现桌面样式播放条）
-    if (!this.isMobile) {
-      initTTSBlockMenu()
-    }
+    // ===== 块菜单：从当前块朗读到末尾 =====
+    // 桌面端挂 click-blockicon（块标菜单）；手机端挂 open-menu-content（长按操作条「插件」里）
+    initTTSBlockMenu()
 
     // ===== 兼容：第三方“一键记事”弹窗 textarea 的模板右键菜单 =====
     // 第三方插件的弹窗通常使用 textarea，右键不会触发 open-menu-content（该事件仅针对 protyle 编辑器菜单）。

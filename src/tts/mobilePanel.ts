@@ -25,7 +25,7 @@ import { createIconButton, updateButtonIcon, injectSliderStyles, removeSliderSty
 import { createAppleSelectEl, type AppleSelectEl } from './appleSelect'
 import { getEdgeTTSEngine, destroyEdgeTTSEngine, EDGE_TTS_VOICES, isSupportedEdgeVoice } from './edgeTtsEngine'
 import { createRepeatSliderRow, createReadDirectionRow } from './ttsRepeatSetting'
-import { createParagraphPicker, linkParagraphPickers, type ParagraphPicker } from './ttsRangePicker'
+import { createParagraphPicker, createRangeLocateButton, linkParagraphPickers, locateVisibleRangeInto, type ParagraphPicker } from './ttsRangePicker'
 import { setPlaybackRange, resetPlaybackRange, formatRangeProgress } from './ttsPlaybackRange'
 import { rememberTtsRange, restoreTtsRange } from './ttsRangeMemory'
 
@@ -114,6 +114,79 @@ export function cleanupMobileTTS(): void {
   destroyHttpTTSEngine()
   destroyEdgeTTSEngine()
   removeSliderStyles()
+}
+
+/** 引擎重新提取段落后，优先按块 id 找起始位置；找不到再退回调用方给的下标 */
+function resolveStartIndexMobile(
+  paragraphs: Array<{ nodeId?: string }>,
+  anchorNodeId: string | undefined,
+  fallback: number,
+): number {
+  if (anchorNodeId) {
+    const index = paragraphs.findIndex(p => p.nodeId === anchorNodeId)
+    if (index >= 0) return index
+  }
+  return Math.max(0, Math.min(fallback, Math.max(0, paragraphs.length - 1)))
+}
+
+/**
+ * 块菜单入口：从指定段落开始朗读到末尾（不弹设置面板）。
+ *
+ * 沿用上次使用的引擎与参数（Edge / 免费 / 硅基流动；手机端无浏览器语音），
+ * 播放条、上一段/下一段、每块重复、暂停/停止与面板路径一致。
+ */
+export async function startTTSFromParagraphMobile(
+  startIndex: number,
+  endIndex?: number,
+  anchorNodeId?: string,
+): Promise<void> {
+  const settings = getTTSSettings()
+  autoReadAction = (settings.autoReadAction || 'stop') as 'stop' | 'next' | 'prev' | 'repeat'
+
+  const hasToken = !!getSFAPIConfig().apiKey
+  // 与手机面板的默认模式一致：沿用上次；没填 Key 且从未选过 → Edge
+  const mode = settings.lastMode === 'api' || settings.lastMode === 'free' || settings.lastMode === 'edge'
+    ? settings.lastMode
+    : (hasToken ? 'api' : 'edge')
+
+  if (mode === 'edge') {
+    stopInactiveTTSEngines('edge')
+    const engine = getEdgeTTSEngine()
+    const savedVoice = settings.edgeVoiceName || ''
+    engine.setVoice(isSupportedEdgeVoice(savedVoice) ? savedVoice : EDGE_TTS_VOICES[0].name)
+    engine.setRate(settings.edgeRate ?? 1.0)
+    const continuationGeneration = ++playbackContinuationGeneration
+    void (async () => {
+      await engine.extractParagraphsAsync()
+      if (continuationGeneration !== playbackContinuationGeneration) return
+      const startP = resolveStartIndexMobile(engine.getParagraphs(), anchorNodeId, startIndex)
+      installEdgePlaybackCallbacks(engine, continuationGeneration, () => { engine.speak(startP, endIndex) })
+      createBar(engine)
+      setPlaybackRange(startP, endIndex)
+      engine.speak(startP, endIndex)
+    })()
+    return
+  }
+
+  stopInactiveTTSEngines('http')
+  const engine = getHttpTTSEngine()
+  if (mode === 'api' && hasToken) {
+    engine.setSpeed(settings.apiSpeed ?? 1.0)
+    engine.setSpeaker(settings.speaker)
+    engine.setMode('api', getSFAPIConfig().apiKey)
+    engine.setDirectFetch(false)
+  } else {
+    engine.setSpeed(settings.speed)
+    engine.setSpeaker(4)
+    engine.setMode('free')
+  }
+  await engine.extractParagraphsAsync()
+  const startP = resolveStartIndexMobile(engine.getParagraphs(), anchorNodeId, startIndex)
+  const continuationGeneration = ++playbackContinuationGeneration
+  installPlaybackCallbacks(engine, continuationGeneration, () => { engine.speak(startP, endIndex) })
+  createBar(engine)
+  setPlaybackRange(startP, endIndex)
+  engine.speak(startP, endIndex)
 }
 
 // ─── 面板 ──
@@ -275,8 +348,22 @@ function appendMobileRangePickers(container: HTMLElement): { start: ParagraphPic
   // 同一文档恢复上次选择的起始/结束块
   const saved = restoreTtsRange(getCurrentDocId(), paragraphs)
 
-  const startRow = makeRow(t('tts.startBlock', undefined, '起始块'))
   const start = createParagraphPicker({ paragraphs, initial: saved?.start ?? 0, rowHeight: 28 })
+  // 起始块标签行：右边放「定位」按钮，点击后起始/结束块 = 当前屏幕可见的块
+  const startRow = document.createElement('div')
+  startRow.style.cssText = 'margin-bottom:14px'
+  const startLabelRow = document.createElement('div')
+  startLabelRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;'
+  const startLabel = document.createElement('div')
+  startLabel.textContent = t('tts.startBlock', undefined, '起始块')
+  startLabel.style.cssText = 'font-size:13px;opacity:0.6;font-weight:500;letter-spacing:-0.01em;'
+  startLabelRow.appendChild(startLabel)
+  startLabelRow.appendChild(createRangeLocateButton(() => {
+    locateVisibleRangeInto(paragraphs, start, end, () => {
+      Notify.showErrorCommandCannotExecute(t('tts.locateFailed', undefined, '未找到屏幕上可见的块'))
+    })
+  }))
+  startRow.appendChild(startLabelRow)
   startRow.appendChild(start.element)
   container.appendChild(startRow)
 
